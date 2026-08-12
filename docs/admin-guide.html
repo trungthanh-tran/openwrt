@@ -5,448 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>sbproxy · Hướng dẫn Quản trị</title>
 <style>
-  :root{
-    --bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;
-    --text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;
-    --good:#1a8f4c;--goods:#d8f0e0;--warn:#b5750a;--warns:#f6e9cf;--crit:#cc2f4a;--crits:#f7d9de;
-    --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  }
-  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-    --bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;
-    --text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;
-    --good:#38d178;--goods:#10321f;--warn:#e0a53a;--warns:#33280f;--crit:#f26c81;--crits:#37151c;
-  }}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
-  .doc{max-width:900px;margin:0 auto;padding:0 22px 90px}
-  header.top{padding:34px 0 20px}
-  .kicker{display:flex;align-items:center;gap:11px;margin-bottom:16px}
-  .logo{width:38px;height:38px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#04231f;font-family:var(--mono);font-weight:700;font-size:17px}
-  .badge{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--warn);background:var(--warns);padding:3px 9px;border-radius:20px;font-weight:600}
-  h1{font-size:29px;line-height:1.15;margin:.1em 0 .2em;letter-spacing:-.6px;text-wrap:balance}
-  .lead{font-size:16.5px;color:var(--dim);margin:0}
-  h2{font-size:20px;margin:40px 0 6px;letter-spacing:-.3px;scroll-margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
-  h2 .num{font-family:var(--mono);color:var(--accent2);background:var(--asoft);font-size:12px;padding:3px 9px;border-radius:6px;margin-right:11px;vertical-align:middle;font-weight:700;letter-spacing:.02em}
-  h3{font-size:15.5px;margin:22px 0 4px}
-  p{margin:9px 0}
-  a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
-  ul,ol{margin:9px 0;padding-left:22px}li{margin:4px 0}
-  code{font-family:var(--mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
-  pre{margin:13px 0;background:#11181f;border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
-  pre code{background:none;border:none;padding:0;color:#d6e2ea;font-size:12.6px;line-height:1.65}
-  .call{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;margin:15px 0;background:var(--panel)}
-  .call.warn{border-left-color:var(--warn)}.call.danger{border-left-color:var(--crit)}
-  .call .t{font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;color:var(--accent2)}
-  .call.warn .t{color:var(--warn)}.call.danger .t{color:var(--crit)}
-  table{width:100%;border-collapse:collapse;font-size:13.6px}
-  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top}
-  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
-  .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin:15px 0}
-  .tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
-  td code{white-space:nowrap}
-  .diagram{font-family:var(--mono);font-size:12px;line-height:1.5;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;overflow-x:auto;color:var(--dim);white-space:pre}
-  kbd{font-family:var(--mono);font-size:.82em;background:var(--panel);border:1px solid var(--bstrong);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
-  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);color:var(--faint);font-size:13px}
-  /* best practices */
-  .bp{background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:6px 22px 14px;margin:20px 0}
-  .bp h2{border:none;padding:0;margin:16px 0 4px;font-size:17px;color:var(--accent2)}
-  .bp ul{margin:6px 0}
-  .bp li{margin:6px 0}
-  .bp b{color:var(--text)}
-  /* stepper */
-  .stepper{list-style:none;counter-reset:st;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:14px 0 8px}
-  .stepper li{counter-increment:st;margin:0}
-  .stepper a{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel);color:var(--text);font-size:13.4px}
-  .stepper a::before{content:counter(st);flex:none;width:22px;height:22px;border-radius:6px;background:var(--asoft);color:var(--accent2);font-family:var(--mono);font-weight:700;font-size:12px;display:grid;place-items:center}
-  .stepper a:hover{border-color:var(--accent)}
-  /* step navigation */
-  .stepnav{display:flex;gap:10px;margin:24px 0 4px;padding-top:14px;border-top:1px dashed var(--border);font-size:13.4px;flex-wrap:wrap}
-  .stepnav a{padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
-  .stepnav .next{margin-left:auto;border-color:var(--accent);color:var(--accent2);font-weight:600}
+:root{--bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;--text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;--warn:#b5750a;--warns:#f6e9cf;--mono:ui-monospace,"Cascadia Code",Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;--text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;--warn:#e0a53a;--warns:#33280f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62}
+.doc{max-width:880px;margin:0 auto;padding:30px 22px 90px}
+h1{font-size:28px;letter-spacing:-.5px;margin:.2em 0 .4em;text-wrap:balance}
+h2{font-size:20px;margin:38px 0 6px;padding-top:16px;border-top:1px solid var(--border);scroll-margin-top:16px}
+h3{font-size:15.5px;margin:22px 0 4px}
+p{margin:9px 0}
+a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
+ul,ol{margin:9px 0;padding-left:22px}li{margin:5px 0}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+pre{margin:12px 0;background:#11181f;border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
+pre code{background:none;border:none;padding:0;color:#d6e2ea;font-size:12.6px;line-height:1.6}
+hr{border:none;border-top:1px solid var(--border);margin:26px 0}
+blockquote.call{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:4px 16px;margin:14px 0;background:var(--panel)}
+blockquote.call.warn{border-left-color:var(--warn)}
+blockquote.call p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:13.6px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
+td code{white-space:nowrap}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin:14px 0}
+.tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 8px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px;font-size:13.5px}
+.toc a{color:var(--dim)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--faint);font-size:12.5px}
 </style>
 </head>
 <body>
-
 <div class="doc">
-  <header class="top">
-    <div class="kicker"><div class="logo">sb</div><span class="badge">Hướng dẫn Quản trị · theo bước</span></div>
-    <h1>sbproxy — Triển khai từng bước</h1>
-    <p class="lead">Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent → kiểm tra → vận hành. Mỗi bước có nút chuyển bước ở cuối.</p>
-  </header>
-
-  <!-- BEST PRACTICES -->
-  <section class="bp">
-    <h2>★ Best practices — đọc trước khi bắt đầu</h2>
-    <ul>
-      <li><b>Luôn cắm LAN dây dự phòng</b> khi động vào firmware/mạng — hỏng WiFi vẫn SSH vào cứu được.</li>
-      <li><b>Tải backup RA MÁY TÍNH trước mỗi lần update firmware</b> — backup trên router mất sạch nếu reflash/brick. Xem <a href="#b3">Bước 3</a>.</li>
-      <li><b>Verify sha256</b> mọi image firmware trước khi flash. Giữ sẵn 1 image “biết-chạy-tốt” trên máy.</li>
-      <li><b>Ghi lại phiên bản firmware hiện tại</b> (<code>cat /etc/openwrt_release</code>) trước khi đổi.</li>
-      <li><b>Xem trước bằng <code>DRYRUN=1</code></b> trước khi <code>apply.sh</code>. Test <b>1–2 SSID</b> rồi mới nhân lên 20–30.</li>
-      <li><b>Không expose</b> uhttpd/agent/SSH/LuCI ra WAN. Giữ <b>token</b> agent bí mật. Xem <a href="#b9">Bước 9</a>.</li>
-      <li><b>Chốt số SSID theo <code>iw list</code></b> (giới hạn BSSID), đừng giả định cứng 30. Xem <a href="#b6">Bước 6</a>.</li>
-    </ul>
-  </section>
-
-  <h3>Tổng quan kiến trúc</h3>
-  <div class="diagram">WiFi Alpha ─(br-w1, 192.168.11.0/24)─┐
+<nav class="toc"><a href="#sec-1">★ Best practices — đọc trước khi bắt đầu</a><a href="#sec-2">Kiến trúc tổng thể</a><a href="#sec-3">Bước 1 — Chuẩn bị</a><a href="#sec-4">Bước 2 — Tải firmware &amp; verify</a><a href="#sec-5">Bước 3 — Backup RA MÁY TÍNH (trước khi update)</a><a href="#sec-6">Bước 4 — Update / flash firmware</a><a href="#sec-7">Bước 5 — Truy cập router sau update</a><a href="#sec-8">Bước 6 — Đưa project lên router &amp; cài gói</a><a href="#sec-9">Bước 7 — Cấu hình WiFi / SOCKS</a><a href="#sec-10">Bước 8 — Áp dụng</a><a href="#sec-11">Bước 9 — Cài agent điều khiển (kiến trúc B)</a><a href="#sec-12">Bước 10 — Kiểm tra / nghiệm thu</a><a href="#sec-13">Bước 11 — Vận hành hằng ngày</a><a href="#sec-14">Bước 12 — Rollback &amp; cứu router treo/brick</a><a href="#sec-15">Bước 13 — Xử lý lỗi (theo triệu chứng)</a><a href="#sec-16">Bước 14 — Tham chiếu API (agent LAN)</a><a href="#sec-17">Bước 15 — Điều khiển từ xa qua Cloud (tùy chọn)</a><a href="#sec-18">Bước 16 — Bảo mật &amp; chống lộ (checklist)</a></nav><h1>sbproxy — Hướng dẫn Quản trị (theo bước)</h1>
+<p>Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent → kiểm tra → vận hành → điều khiển từ xa → bảo mật.</p>
+<blockquote class="call"><p>Bản HTML đọc offline: <a href="admin-guide.html">admin-guide.html</a>. Bổ trợ: <a href="GUIDE.md">GUIDE.md</a>, <a href="INSTALL.md">INSTALL.md</a>, <a href="TESTING.md">TESTING.md</a>, <a href="ROLLBACK.md">ROLLBACK.md</a>, <a href="../cloud-server/README.md">../cloud-server/README.md</a>.</p></blockquote>
+<h2 id="sec-1">★ Best practices — đọc trước khi bắt đầu</h2>
+<ul><li><strong>Luôn cắm LAN dây dự phòng</strong> khi động vào firmware/mạng — hỏng WiFi vẫn SSH vào cứu được.</li><li><strong>Tải backup RA MÁY TÍNH trước mỗi lần update firmware</strong> — backup trên router mất sạch nếu reflash/brick (Bước 3).</li><li><strong>Verify sha256</strong> mọi image firmware. Giữ sẵn 1 image "biết-chạy-tốt" trên máy.</li><li><strong>Ghi lại phiên bản firmware hiện tại</strong> (<code>cat /etc/openwrt_release</code>) trước khi đổi.</li><li><strong>Xem trước bằng <code>DRYRUN=1</code></strong> trước khi <code>apply.sh</code>. Test <strong>1–2 SSID</strong> rồi mới nhân lên 20–30.</li><li><strong>Không expose</strong> uhttpd/agent/SSH/LuCI ra WAN. Giữ <strong>token</strong> agent bí mật (Bước 9).</li><li><strong>Chốt số SSID theo <code>iw list</code></strong> (giới hạn BSSID), đừng giả định cứng 30 (Bước 6).</li></ul>
+<h2 id="sec-2">Kiến trúc tổng thể</h2>
+<pre><code>WiFi Alpha ─(br-w1, 192.168.11.0/24)─┐
 WiFi Bravo ─(br-w2, 192.168.12.0/24)─┤  nftables TPROXY theo iifname
 WiFi ...   ─(br-wN, ...)─────────────┘        │  (mỗi WiFi → cổng 12000+idx)
                                               ▼
                                       sing-box (tproxy in → socks out) ──▶ WAN
 UI http://router/sbproxy/ ─▶ CGI /cgi-bin/sbproxy ─▶ apply/set-sock/rollback
-sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latency realtime)</div>
-
-  <!-- LỘ TRÌNH -->
-  <h3>Lộ trình</h3>
-  <ol class="stepper">
-    <li><a href="#b1">Chuẩn bị</a></li>
-    <li><a href="#b2">Tải firmware</a></li>
-    <li><a href="#b3">Backup (ra máy)</a></li>
-    <li><a href="#b4">Update firmware</a></li>
-    <li><a href="#b5">Truy cập router</a></li>
-    <li><a href="#b6">Cài project &amp; gói</a></li>
-    <li><a href="#b7">Cấu hình</a></li>
-    <li><a href="#b8">Áp dụng</a></li>
-    <li><a href="#b9">Cài agent</a></li>
-    <li><a href="#b10">Kiểm tra</a></li>
-    <li><a href="#b11">Vận hành</a></li>
-    <li><a href="#b12">Rollback &amp; cứu brick</a></li>
-    <li><a href="#b13">Xử lý lỗi</a></li>
-    <li><a href="#b14">API</a></li>
-    <li><a href="#b15">Điều khiển từ xa (Cloud)</a></li>
-    <li><a href="#b16">Bảo mật &amp; chống lộ</a></li>
-  </ol>
-
-  <!-- ========================= BƯỚC 1 ========================= -->
-  <h2 id="b1"><span class="num">BƯỚC 1</span>Chuẩn bị</h2>
-  <ul>
-    <li>Router <b>GL-MT6000 (Flint 2)</b>. Xác định IP quản trị hiện tại (GL stock: <code>192.168.8.1</code>).</li>
-    <li>Cáp <b>LAN</b> nối máy tính ↔ router (đường cứu hộ). SSH client + trình duyệt.</li>
-    <li>Không thử nghiệm lần đầu trên router đang phục vụ việc quan trọng.</li>
-  </ul>
-  <div class="call"><div class="t">Firmware nên dùng</div><b>OpenWrt vanilla</b> bản release mới nhất (hoặc ImmortalWrt nếu cần GUI proxy). Tránh firmware lạ chưa xác thực nguồn.</div>
-  <div class="stepnav"><a class="next" href="#b2">Bước 2 · Tải firmware →</a></div>
-
-  <!-- ========================= BƯỚC 2 ========================= -->
-  <h2 id="b2"><span class="num">BƯỚC 2</span>Tải firmware &amp; verify</h2>
-  <ol>
-    <li>Vào <b>firmware-selector.openwrt.org</b> → tìm <code>GL.iNet GL-MT6000</code> (target <code>mediatek/filogic</code>, profile <code>glinet,gl-mt6000</code>).</li>
-    <li>Tải bản <b>sysupgrade</b> mới nhất + ghi lại <b>sha256</b> trên trang.</li>
-    <li>Verify (không khớp → KHÔNG flash):
-      <pre><code>Get-FileHash .\openwrt-*-glinet_gl-mt6000-*-sysupgrade.bin -Algorithm SHA256</code></pre>
-    </li>
-    <li>Ghi lại phiên bản + ngày tải để về sau biết đang chạy gì.</li>
-  </ol>
-  <div class="stepnav"><a href="#b1">← Bước 1</a><a class="next" href="#b3">Bước 3 · Backup →</a></div>
-
-  <!-- ========================= BƯỚC 3 ========================= -->
-  <h2 id="b3"><span class="num">BƯỚC 3</span>Backup — RA MÁY TÍNH (trước khi update)</h2>
-  <div class="call danger"><div class="t">Vì sao bắt buộc</div>Backup mặc định nằm ở <code>/root/sbproxy-backups/</code> trên router — nếu update lỗi phải reflash/brick, backup đó <b>mất theo</b>. Phải có một bản trên máy tính.</div>
-  <pre><code># Cách 1 — UI: 🗂 Backup / Rollback → ⭳ Về máy
+sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latency realtime)</code></pre>
+<hr>
+<h2 id="sec-3">Bước 1 — Chuẩn bị</h2>
+<ul><li>Router <strong>GL-MT6000 (Flint 2)</strong>. Xác định IP quản trị (GL stock: <code>192.168.8.1</code>).</li><li>Cáp <strong>LAN</strong> nối máy tính ↔ router (đường cứu hộ). SSH client + trình duyệt.</li><li>Không thử nghiệm lần đầu trên router đang phục vụ việc quan trọng.</li><li><strong>Firmware nên dùng:</strong> OpenWrt vanilla mới nhất (hoặc ImmortalWrt nếu cần GUI proxy). Tránh firmware lạ chưa xác thực nguồn.</li></ul>
+<h2 id="sec-4">Bước 2 — Tải firmware &amp; verify</h2>
+<ol><li>Vào <strong>firmware-selector.openwrt.org</strong> → <code>GL.iNet GL-MT6000</code> (target <code>mediatek/filogic</code>, profile <code>glinet,gl-mt6000</code>).</li><li>Tải bản <strong>sysupgrade</strong> mới nhất + ghi lại <strong>sha256</strong>.</li><li>Verify (không khớp → KHÔNG flash):<pre><code>Get-FileHash .\openwrt-*-glinet_gl-mt6000-*-sysupgrade.bin -Algorithm SHA256</code></pre></li><li>Ghi lại phiên bản + ngày tải.</li></ol>
+<h2 id="sec-5">Bước 3 — Backup RA MÁY TÍNH (trước khi update)</h2>
+<blockquote class="call warn"><p><strong>Vì sao bắt buộc:</strong> backup mặc định ở <code>/root/sbproxy-backups/</code> trên router — reflash/brick là mất theo.</p></blockquote>
+<pre><code># Cách 1 — UI: 🗂 Backup / Rollback → ⭳ Về máy
 # Cách 2 — LuCI: System → Backup/Flash Firmware → Generate archive
 # Cách 3 — từ máy tính (PowerShell):
 scp -r root@192.168.1.1:/root/sbproxy-backups .\sbproxy-backups
 sh scripts/backup.sh before-fw-upgrade    # (nếu đã cài project) tạo mốc</code></pre>
-  <p>Đảm bảo backup chuẩn OpenWrt giữ được config sbproxy (đã tự đăng ký bởi <a href="#b6">install-deps</a>/<a href="#b9">install-agent</a>):</p>
-  <pre><code>cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/sbproxy/, config/</code></pre>
-  <div class="stepnav"><a href="#b2">← Bước 2</a><a class="next" href="#b4">Bước 4 · Update firmware →</a></div>
-
-  <!-- ========================= BƯỚC 4 ========================= -->
-  <h2 id="b4"><span class="num">BƯỚC 4</span>Update / flash firmware</h2>
-  <h3>Cách A — U-Boot recovery (an toàn nhất, khuyên dùng khi đổi họ firmware)</h3>
-  <ol>
-    <li>Tắt nguồn. Máy tính đặt IP tĩnh <code>192.168.1.2 / 255.255.255.0</code>.</li>
-    <li>Giữ <kbd>Reset</kbd>, cấp nguồn, giữ tới khi đèn nháy nhanh rồi thả.</li>
-    <li>Mở <code>http://192.168.1.1</code> → U-Boot → upload image → flash → chờ reboot.</li>
-  </ol>
-  <h3>Cách B — Local Upgrade từ GL GUI</h3>
-  <p><code>http://192.168.8.1</code> → System → Upgrade → Local Upgrade → chọn image → <b>BỎ TICK “Keep settings”</b> khi đổi họ firmware → Upgrade.</p>
-  <div class="call warn"><div class="t">Giữ settings?</div>Nâng cấp <b>cùng họ</b> firmware có thể “keep settings”. <b>Đổi họ</b> (GL→OpenWrt) thì không giữ được → sẽ khôi phục bằng backup ở <a href="#b12">Bước 12</a> hoặc cấu hình lại từ <a href="#b7">Bước 7</a>.</div>
-  <div class="call danger"><div class="t">Nếu router treo/không lên sau flash</div>Xem <a href="#b12">Bước 12 · Rollback &amp; cứu brick</a> (Failsafe / U-Boot).</div>
-  <div class="stepnav"><a href="#b3">← Bước 3</a><a class="next" href="#b5">Bước 5 · Truy cập router →</a></div>
-
-  <!-- ========================= BƯỚC 5 ========================= -->
-  <h2 id="b5"><span class="num">BƯỚC 5</span>Truy cập router sau update</h2>
-  <ul>
-    <li>IP đổi về mặc định OpenWrt <code>192.168.1.1</code> (khác GL stock). Đưa máy tính về DHCP / cùng dải.</li>
-    <li>Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi <code>passwd</code>.</li>
-    <li>SSH: <code>ssh root@192.168.1.1</code>. Nếu báo host key đổi → xoá dòng cũ trong <code>~/.ssh/known_hosts</code>.</li>
-  </ul>
-  <div class="stepnav"><a href="#b4">← Bước 4</a><a class="next" href="#b6">Bước 6 · Cài project &amp; gói →</a></div>
-
-  <!-- ========================= BƯỚC 6 ========================= -->
-  <h2 id="b6"><span class="num">BƯỚC 6</span>Đưa project lên router &amp; cài gói</h2>
-  <pre><code># từ máy tính
+<p>Đảm bảo backup chuẩn OpenWrt giữ được config sbproxy (đã tự đăng ký bởi install-deps/install-agent):</p>
+<pre><code>cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/sbproxy/, config/</code></pre>
+<h2 id="sec-6">Bước 4 — Update / flash firmware</h2>
+<p><strong>Cách A — U-Boot recovery (an toàn nhất, khi đổi họ firmware):</strong></p>
+<ol><li>Tắt nguồn. Máy tính đặt IP tĩnh <code>192.168.1.2 / 255.255.255.0</code>.</li><li>Giữ <strong>Reset</strong>, cấp nguồn, giữ tới khi đèn nháy nhanh rồi thả.</li><li>Mở <code>http://192.168.1.1</code> → U-Boot → upload image → flash → chờ reboot.</li></ol>
+<p><strong>Cách B — Local Upgrade từ GL GUI:</strong> <code>http://192.168.8.1</code> → System → Upgrade → Local Upgrade → chọn image → <strong>BỎ TICK "Keep settings"</strong> khi đổi họ → Upgrade.</p>
+<blockquote class="call warn"><p><strong>Giữ settings?</strong> Cùng họ firmware có thể "keep settings". Đổi họ (GL→OpenWrt) thì không → khôi phục bằng backup (Bước 12) hoặc cấu hình lại (Bước 7). <strong>Router treo/không lên sau flash?</strong> Xem Bước 12 (Failsafe / U-Boot).</p></blockquote>
+<h2 id="sec-7">Bước 5 — Truy cập router sau update</h2>
+<ul><li>IP đổi về mặc định OpenWrt <code>192.168.1.1</code>. Đưa máy tính về DHCP / cùng dải.</li><li>Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi <code>passwd</code>.</li><li>SSH: <code>ssh root@192.168.1.1</code>. Host key đổi → xoá dòng cũ trong <code>~/.ssh/known_hosts</code>.</li></ul>
+<h2 id="sec-8">Bước 6 — Đưa project lên router &amp; cài gói</h2>
+<pre><code># từ máy tính
 scp -r .\openwrt-multiwifi-socks5 root@192.168.1.1:/root/sbproxy
-
 # trên router
 cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
 sh scripts/preflight.sh        # kiểm tra phần cứng (chỉ đọc)
-sh scripts/install-deps.sh     # cài nftables/kmod-nft-tproxy/ip-full/iw-full/sing-box + đăng ký sysupgrade.conf</code></pre>
-  <div class="call"><div class="t">Preflight — 3 điều phải xác nhận</div>
-    <b>(1)</b> mapping <code>radio0/1</code> ↔ băng tần → sửa <code>RADIO_2G/5G</code> trong <code>settings.sh</code>.
-    <b>(2)</b> <code>iw list</code> “valid interface combinations” = số AP tối đa/radio → chốt số SSID ≤ số này.
-    <b>(3)</b> các gói <code>[THIẾU]</code>.</div>
-  <div class="stepnav"><a href="#b5">← Bước 5</a><a class="next" href="#b7">Bước 7 · Cấu hình →</a></div>
-
-  <!-- ========================= BƯỚC 7 ========================= -->
-  <h2 id="b7"><span class="num">BƯỚC 7</span>Cấu hình WiFi / SOCKS</h2>
-  <h3>File nguồn: <code>config/wifi-socks.conf</code></h3>
-  <p>Mỗi dòng: <code>name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc</code>. <code>idx</code> duy nhất &amp; ổn định (quyết định subnet <code>192.168.(10+idx).0/24</code>, cổng tproxy <code>12000+idx</code>). Có thể soạn bằng UI Console rồi copy/tải.</p>
-  <h3>Tunables: <code>config/settings.sh</code></h3>
-  <div class="tablewrap"><table>
-    <tr><th>Biến</th><th>Ý nghĩa</th></tr>
-    <tr><td><code>RADIO_2G / RADIO_5G</code></td><td>Ánh xạ radio ↔ băng tần (phải khớp phần cứng).</td></tr>
-    <tr><td><code>BSSID_LIMIT</code></td><td>Số SSID tối đa mỗi băng (theo <code>iw list</code>).</td></tr>
-    <tr><td><code>ZONE_INPUT</code></td><td><code>ACCEPT</code> mặc định (chạy chắc; đã chặn cổng admin từ zone khách).</td></tr>
-    <tr><td><code>WIFI_ENCRYPTION</code></td><td><code>psk2</code> (WPA2) · <code>sae</code>/<code>sae-mixed</code> (WPA3).</td></tr>
-    <tr><td><code>STUN_*_PORTS</code></td><td>Cổng STUN/TURN bị chặn khi WebRTC bật.</td></tr>
-  </table></div>
-  <div class="stepnav"><a href="#b6">← Bước 6</a><a class="next" href="#b8">Bước 8 · Áp dụng →</a></div>
-
-  <!-- ========================= BƯỚC 8 ========================= -->
-  <h2 id="b8"><span class="num">BƯỚC 8</span>Áp dụng</h2>
-  <pre><code>DRYRUN=1 sh scripts/apply.sh | less   # xem trước UCI + sing-box + nft (không đổi gì)
+sh scripts/install-deps.sh     # cài gói + đăng ký sysupgrade.conf</code></pre>
+<p><strong>Preflight — 3 điều phải xác nhận:</strong> (1) mapping <code>radio0/1</code> ↔ băng tần → sửa <code>RADIO_2G/5G</code> trong <code>settings.sh</code>; (2) <code>iw list</code> "valid interface combinations" = số AP tối đa/radio → chốt số SSID ≤ số này; (3) các gói <code>[THIẾU]</code>.</p>
+<h2 id="sec-9">Bước 7 — Cấu hình WiFi / SOCKS</h2>
+<p><strong>File nguồn <code>config/wifi-socks.conf</code></strong> — mỗi dòng:</p>
+<pre><code>name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc</code></pre>
+<p><code>idx</code> duy nhất &amp; ổn định (quyết định subnet <code>192.168.(10+idx).0/24</code>, cổng tproxy <code>12000+idx</code>). Có thể soạn bằng UI rồi copy/tải.</p>
+<p><strong>Tunables <code>config/settings.sh</code>:</strong></p>
+<div class="tablewrap"><table><thead><tr><th>Biến</th><th>Ý nghĩa</th></tr></thead><tbody><tr><td><code>RADIO_2G / RADIO_5G</code></td><td>Ánh xạ radio ↔ băng tần (phải khớp phần cứng).</td></tr><tr><td><code>BSSID_LIMIT</code></td><td>Số SSID tối đa mỗi băng (theo <code>iw list</code>).</td></tr><tr><td><code>ZONE_INPUT</code></td><td><code>ACCEPT</code> mặc định (đã chặn cổng admin từ zone khách).</td></tr><tr><td><code>WIFI_ENCRYPTION</code></td><td><code>psk2</code> (WPA2) · <code>sae</code>/<code>sae-mixed</code> (WPA3).</td></tr><tr><td><code>STUN_*_PORTS</code></td><td>Cổng STUN/TURN bị chặn khi WebRTC bật.</td></tr></tbody></table></div>
+<h2 id="sec-10">Bước 8 — Áp dụng</h2>
+<pre><code>DRYRUN=1 sh scripts/apply.sh | less   # xem trước (không đổi gì)
 sh scripts/apply.sh                    # áp thật (tự backup trước)
 sh scripts/uninstall.sh                # gỡ sạch phần project tạo</code></pre>
-  <div class="call warn"><div class="t">Xoá 1 WiFi</div><code>apply.sh</code> không tự dọn section cũ. Khi bỏ dòng khỏi conf: chạy <code>uninstall.sh</code> rồi <code>apply.sh</code> lại, hoặc xoá tay <code>wireless.wIDX</code>, <code>network.wIDX/brwIDX</code>, <code>dhcp.wIDX</code>, <code>firewall.zIDX</code>.</div>
-  <div class="stepnav"><a href="#b7">← Bước 7</a><a class="next" href="#b9">Bước 9 · Cài agent →</a></div>
-
-  <!-- ========================= BƯỚC 9 ========================= -->
-  <h2 id="b9"><span class="num">BƯỚC 9</span>Cài agent điều khiển (kiến trúc B)</h2>
-  <p>Cho UI áp config trực tiếp + health-check latency realtime.</p>
-  <pre><code>cd /root/sbproxy
+<blockquote class="call warn"><p><strong>Xoá 1 WiFi:</strong> <code>apply.sh</code> không tự dọn section cũ. Khi bỏ dòng khỏi conf: chạy <code>uninstall.sh</code> rồi <code>apply.sh</code> lại, hoặc xoá tay <code>wireless.wIDX</code>, <code>network.wIDX/brwIDX</code>, <code>dhcp.wIDX</code>, <code>firewall.zIDX</code>.</p></blockquote>
+<h2 id="sec-11">Bước 9 — Cài agent điều khiển (kiến trúc B)</h2>
+<p>Cho UI áp config trực tiếp + health-check latency realtime.</p>
+<pre><code>cd /root/sbproxy
 sh agent/install-agent.sh
 # → cài curl/jq, tạo /etc/sbproxy/token, đặt CGI /www/cgi-bin/sbproxy,
 #   self-host UI /www/sbproxy/, chạy daemon sbproxy-healthd. In ra URL + TOKEN.</code></pre>
-  <p>Mở <code>http://&lt;router&gt;/sbproxy/</code> → <b>🔌 Kết nối router</b> → dán token. Cấu hình daemon ở <code>/etc/sbproxy/env</code>:</p>
-  <div class="tablewrap"><table>
-    <tr><th>Biến</th><th>Mặc định</th><th>Ý nghĩa</th></tr>
-    <tr><td><code>INTERVAL</code></td><td>15</td><td>Giây giữa các lần probe.</td></tr>
-    <tr><td><code>SLOW_MS</code></td><td>800</td><td>Ngưỡng coi là “chậm”.</td></tr>
-    <tr><td><code>PROBE_URL</code></td><td>gstatic /generate_204</td><td>URL đo latency.</td></tr>
-    <tr><td><code>PROBE_TIMEOUT</code></td><td>8</td><td>Timeout mỗi probe (giây).</td></tr>
-  </table></div>
-  <h3>9.1 Token điều khiển là gì?</h3>
-  <p>Là một <b>chuỗi bí mật ngẫu nhiên</b> (bearer token — kiểu "mật khẩu máy-với-máy"), do <code>install-agent.sh</code> sinh ra và lưu tại <code>/etc/sbproxy/token</code> trên router (<code>chmod 600</code>). UI trong trình duyệt gắn token vào header <code>X-SB-Token</code> mỗi request; agent so khớp mới cho thực thi.</p>
-  <div class="call warn"><div class="t">Bản chất</div>Đây là <b>bí mật dùng chung</b>, KHÔNG phải hệ đăng nhập. Ai cầm token là có <b>toàn quyền</b> router (apply/rollback/đổi sock…), không phân biệt người, không hết hạn, không ghi "ai làm gì". Cần phân quyền theo người → dùng <a href="#b15">Cloud (Bước 15)</a>.</div>
-
-  <h3>9.2 Bảo mật token</h3>
-  <ul>
-    <li><b>Không expose agent/uhttpd ra WAN</b> — chỉ LAN/VLAN quản trị (biện pháp quan trọng nhất).</li>
-    <li>Chặn SSID khách chạm tới UI/agent (firewall input zone khách = reject cổng admin).</li>
-    <li>Ưu tiên <b>HTTPS nội bộ</b> cho uhttpd nếu LAN nhiều người (HTTP để token đi dạng rõ trong mạng).</li>
-    <li>Giữ quyền file <code>/etc/sbproxy/token</code> = <code>600</code> (chỉ root). Trình duyệt lưu token trong <code>localStorage</code> → khoá máy, đừng paste trên máy chung/lạ.</li>
-    <li>Chỉ paste vào UI của chính router (<code>http://&lt;router&gt;/sbproxy/</code>), không dán vào web lạ.</li>
-  </ul>
-
-  <h3>9.3 Quên / lấy lại / xoay token</h3>
-  <p><b>Còn SSH vào router → chỉ cần đọc lại file, token không bị mất:</b></p>
-  <pre><code>cat /etc/sbproxy/token          # in ra token hiện tại → copy, paste lại vào UI
-
-# kiểm tra token có hoạt động:
+<p>Mở <code>http://&lt;router&gt;/sbproxy/</code> → <strong>🔌 Kết nối router</strong> → dán token. Cấu hình daemon ở <code>/etc/sbproxy/env</code>:</p>
+<div class="tablewrap"><table><thead><tr><th>Biến</th><th>Mặc định</th><th>Ý nghĩa</th></tr></thead><tbody><tr><td><code>INTERVAL</code></td><td>15</td><td>Giây giữa các lần probe.</td></tr><tr><td><code>SLOW_MS</code></td><td>800</td><td>Ngưỡng coi là "chậm".</td></tr><tr><td><code>PROBE_URL</code></td><td>gstatic /generate_204</td><td>URL đo latency.</td></tr><tr><td><code>PROBE_TIMEOUT</code></td><td>8</td><td>Timeout mỗi probe (giây).</td></tr></tbody></table></div>
+<h3>9.1 Token điều khiển là gì?</h3>
+<p>Là một <strong>chuỗi bí mật ngẫu nhiên</strong> (bearer token — "mật khẩu máy-với-máy"), do <code>install-agent.sh</code> sinh và lưu tại <code>/etc/sbproxy/token</code> (<code>chmod 600</code>). UI gắn token vào header <code>X-SB-Token</code> mỗi request; agent so khớp mới cho thực thi.</p>
+<blockquote class="call warn"><p><strong>Bản chất:</strong> bí mật <strong>dùng chung</strong>, KHÔNG phải hệ đăng nhập. Ai cầm token là có <strong>toàn quyền</strong> router, không phân biệt người, không hết hạn, không ghi "ai làm gì". Cần phân quyền theo người → dùng Cloud (Bước 15).</p></blockquote>
+<h3>9.2 Bảo mật token</h3>
+<ul><li><strong>Không expose agent/uhttpd ra WAN</strong> — chỉ LAN/VLAN quản trị (quan trọng nhất).</li><li>Chặn SSID khách chạm tới UI/agent (firewall input zone khách = reject cổng admin).</li><li>Ưu tiên <strong>HTTPS nội bộ</strong> cho uhttpd nếu LAN nhiều người.</li><li>Giữ quyền file <code>/etc/sbproxy/token</code> = <code>600</code>. Trình duyệt lưu token trong <code>localStorage</code> → khoá máy, đừng paste trên máy chung/lạ.</li><li>Chỉ paste vào UI của chính router (<code>http://&lt;router&gt;/sbproxy/</code>), không dán web lạ.</li></ul>
+<h3>9.3 Quên / lấy lại / xoay token</h3>
+<p><strong>Còn SSH → chỉ cần đọc lại file, token không mất:</strong></p>
+<pre><code>cat /etc/sbproxy/token          # in ra token hiện tại → copy, paste lại vào UI
 TOKEN=$(cat /etc/sbproxy/token)
 curl -H "X-SB-Token: $TOKEN" http://192.168.1.1/cgi-bin/sbproxy?action=status</code></pre>
-  <p><b>Nghi lộ / muốn đổi token mới (xoay):</b></p>
-  <pre><code>head -c 18 /dev/urandom | hexdump -v -e '/1 "%02x"' > /etc/sbproxy/token
-echo >> /etc/sbproxy/token
+<p><strong>Nghi lộ / đổi token mới (xoay):</strong></p>
+<pre><code>head -c 18 /dev/urandom | hexdump -v -e '/1 "%02x"' &gt; /etc/sbproxy/token
+echo &gt;&gt; /etc/sbproxy/token
 chmod 600 /etc/sbproxy/token
-cat /etc/sbproxy/token          # token MỚI → paste lại vào UI (token cũ lập tức vô hiệu)
-# hoặc: rm /etc/sbproxy/token && sh agent/install-agent.sh   (chạy lại sẽ sinh token mới)</code></pre>
-  <div class="call"><div class="t">Không còn SSH và cũng quên token?</div>Vào lại router bằng <b>LAN dây</b> (SSH), hoặc <a href="#b12">Failsafe</a> để mount rootfs rồi <code>cat /etc/sbproxy/token</code>. Token luôn nằm trong file trên router — không mất trừ khi wipe cấu hình.</div>
-
-  <div class="call danger"><div class="t">Mixed-content</div>
-    Chế độ Live chỉ chạy khi mở UI qua <b>http</b> từ chính router (trình duyệt chặn https→http). Với điều khiển từ xa an toàn hơn, dùng <a href="#b15">Cloud (Bước 15)</a> — có tài khoản riêng + RBAC + <b>device key</b> (đổi bằng nút Rekey nếu lộ).</div>
-  <div class="call"><div class="t">Muốn điều khiển từ xa / nhiều router / login riêng?</div>Agent LAN này chỉ dùng trong mạng router (hoặc qua VPN). Để quản từ xa qua web có tài khoản &amp; phân quyền, xem <a href="#b15">Bước 15 · Điều khiển từ xa (Cloud)</a>.</div>
-  <div class="stepnav"><a href="#b8">← Bước 8</a><a class="next" href="#b10">Bước 10 · Kiểm tra →</a></div>
-
-  <!-- ========================= BƯỚC 10 ========================= -->
-  <h2 id="b10"><span class="num">BƯỚC 10</span>Kiểm tra / nghiệm thu</h2>
-  <pre><code># trên router
+cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập tức vô hiệu)
+# hoặc: rm /etc/sbproxy/token &amp;&amp; sh agent/install-agent.sh</code></pre>
+<blockquote class="call warn"><p><strong>Không còn SSH và quên token?</strong> Vào lại bằng LAN dây (SSH), hoặc Failsafe (Bước 12) để mount rootfs rồi <code>cat /etc/sbproxy/token</code>. Token luôn nằm trong file trên router — không mất trừ khi wipe cấu hình.</p></blockquote>
+<blockquote class="call"><p><strong>Mixed-content:</strong> chế độ Live chỉ chạy khi mở UI qua <strong>http</strong> từ chính router. Điều khiển từ xa an toàn hơn → Cloud (Bước 15). <strong>Muốn điều khiển từ xa / nhiều router / login riêng?</strong> Agent LAN chỉ dùng trong mạng router (hoặc VPN). Xem Bước 15.</p></blockquote>
+<h2 id="sec-12">Bước 10 — Kiểm tra / nghiệm thu</h2>
+<pre><code># trên router
 wifi status ; iw dev | grep -E 'Interface|ssid|addr'   # SSID + MAC random
 sing-box check -c /etc/sing-box/config.json            # config hợp lệ
 nft list table inet sbproxy ; ip rule | grep 0x1       # tproxy + policy routing
 logread -e sing-box | tail -20</code></pre>
-  <div class="tablewrap"><table>
-    <tr><th>Trên client (từng WiFi)</th><th>Đạt khi</th></tr>
-    <tr><td><code>https://ipinfo.io/ip</code></td><td>IP = SOCKS gán cho WiFi đó; 2 WiFi khác sock → 2 IP khác</td></tr>
-    <tr><td><code>dnsleaktest.com</code></td><td>DNS không phải ISP thật (xem hạn chế v0.1 ở <a href="#b13">Bước 13</a>)</td></tr>
-    <tr><td><code>browserleaks.com/webrtc</code></td><td>Không lộ IP thật</td></tr>
-    <tr><td>2 máy cùng WiFi ping nhau</td><td>Không ping được (isolate)</td></tr>
-  </table></div>
-  <div class="stepnav"><a href="#b9">← Bước 9</a><a class="next" href="#b11">Bước 11 · Vận hành →</a></div>
-
-  <!-- ========================= BƯỚC 11 ========================= -->
-  <h2 id="b11"><span class="num">BƯỚC 11</span>Vận hành hằng ngày</h2>
-  <pre><code>sh scripts/set-sock.sh &lt;idx&gt; &lt;host&gt; &lt;port&gt; [user] [pass]   # đổi sock 1 WiFi, KHÔNG rớt WiFi
+<div class="tablewrap"><table><thead><tr><th>Trên client (từng WiFi)</th><th>Đạt khi</th></tr></thead><tbody><tr><td><code>https://ipinfo.io/ip</code></td><td>IP = SOCKS gán cho WiFi đó; 2 WiFi khác sock → 2 IP khác</td></tr><tr><td><code>dnsleaktest.com</code></td><td>DNS không phải ISP thật (xem hạn chế v0.1, Bước 16)</td></tr><tr><td><code>browserleaks.com/webrtc</code></td><td>Không lộ IP thật</td></tr><tr><td>2 máy cùng WiFi ping nhau</td><td>Không ping được (isolate)</td></tr></tbody></table></div>
+<h2 id="sec-13">Bước 11 — Vận hành hằng ngày</h2>
+<pre><code>sh scripts/set-sock.sh &lt;idx&gt; &lt;host&gt; &lt;port&gt; [user] [pass]   # đổi sock 1 WiFi, KHÔNG rớt WiFi
 sh scripts/backup.sh &lt;nhãn&gt;                                # backup thủ công
 sh scripts/rollback.sh --list                               # xem danh sách backup</code></pre>
-  <ul>
-    <li><b>Thêm/sửa WiFi:</b> sửa <code>wifi-socks.conf</code> (hoặc UI) → <code>apply.sh</code>.</li>
-    <li><b>Định kỳ tải backup ra máy</b> (nhất là trước update firmware — <a href="#b3">Bước 3</a>).</li>
-    <li>Trên UI: cột <b>Sức khỏe</b> latency realtime + <b>🗂 Backup / Rollback</b> + nút <b>⚡</b> đổi sock nhanh.</li>
-  </ul>
-  <div class="stepnav"><a href="#b10">← Bước 10</a><a class="next" href="#b12">Bước 12 · Rollback &amp; cứu brick →</a></div>
-
-  <!-- ========================= BƯỚC 12 ========================= -->
-  <h2 id="b12"><span class="num">BƯỚC 12</span>Rollback &amp; cứu router treo/brick</h2>
-  <div class="tablewrap"><table>
-    <tr><th>Mức</th><th>Lệnh / thao tác</th><th>Khi nào</th></tr>
-    <tr><td>1</td><td><code>sh scripts/rollback.sh --list</code> · <code>rollback.sh [tên]</code></td><td>Quay lui cấu hình.</td></tr>
-    <tr><td>2</td><td><code>sh scripts/uninstall.sh</code></td><td>Gỡ sạch phần project.</td></tr>
-    <tr><td>3</td><td><code>sysupgrade -r &lt;backup&gt;.tar.gz &amp;&amp; reboot</code></td><td>UCI hỏng nặng.</td></tr>
-    <tr><td>4</td><td>LAN dây → Failsafe → U-Boot</td><td>Mất kết nối / brick.</td></tr>
-    <tr><td>5</td><td>Debug sing-box/tproxy (<a href="#b13">Bước 13·D</a>)</td><td>Chỉ proxy lỗi.</td></tr>
-  </table></div>
-  <h3>Router treo / brick sau update — cứu bằng U-Boot (GL-MT6000)</h3>
-  <ol>
-    <li><b>Mềm:</b> LAN dây → SSH → <code>sh scripts/rollback.sh</code>.</li>
-    <li><b>Failsafe (OpenWrt):</b> reboot, bấm <kbd>Reset</kbd> khi đèn nháy → máy IP <code>192.168.1.2</code> → SSH <code>root@192.168.1.1</code> (không mật khẩu) → <code>mount_root</code> rồi rollback, hoặc <code>firstboot &amp;&amp; reboot</code> (reset về mặc định).</li>
-    <li><b>U-Boot web (cứu brick):</b> tắt nguồn → máy IP <code>192.168.1.2</code> → giữ <kbd>Reset</kbd> khi cấp nguồn tới khi đèn nháy nhanh → <code>http://192.168.1.1</code> → upload image sạch → flash.</li>
-  </ol>
-  <div class="call"><div class="t">Khôi phục backup đã tải về máy</div>
-    <pre style="margin:.5em 0 0"><code>scp .\sbproxy-&lt;tên&gt;.tar.gz root@192.168.1.1:/tmp/
+<ul><li><strong>Thêm/sửa WiFi:</strong> sửa <code>wifi-socks.conf</code> (hoặc UI) → <code>apply.sh</code>.</li><li><strong>Định kỳ tải backup ra máy</strong> (nhất là trước update firmware — Bước 3).</li><li>Trên UI: cột <strong>Sức khỏe</strong> latency realtime + <strong>🗂 Backup / Rollback</strong> + nút <strong>⚡</strong> đổi sock nhanh.</li></ul>
+<h2 id="sec-14">Bước 12 — Rollback &amp; cứu router treo/brick</h2>
+<div class="tablewrap"><table><thead><tr><th>Mức</th><th>Lệnh / thao tác</th><th>Khi nào</th></tr></thead><tbody><tr><td>1</td><td><code>sh scripts/rollback.sh --list</code> · <code>rollback.sh [tên]</code></td><td>Quay lui cấu hình.</td></tr><tr><td>2</td><td><code>sh scripts/uninstall.sh</code></td><td>Gỡ sạch phần project.</td></tr><tr><td>3</td><td><code>sysupgrade -r &lt;backup&gt;.tar.gz &amp;&amp; reboot</code></td><td>UCI hỏng nặng.</td></tr><tr><td>4</td><td>LAN dây → Failsafe → U-Boot</td><td>Mất kết nối / brick.</td></tr><tr><td>5</td><td>Debug sing-box/tproxy (Bước 13·D)</td><td>Chỉ proxy lỗi.</td></tr></tbody></table></div>
+<p><strong>Router treo / brick sau update — cứu bằng U-Boot (GL-MT6000):</strong></p>
+<ol><li><strong>Mềm:</strong> LAN dây → SSH → <code>sh scripts/rollback.sh</code>.</li><li><strong>Failsafe (OpenWrt):</strong> reboot, bấm Reset khi đèn nháy → máy IP <code>192.168.1.2</code> → SSH <code>root@192.168.1.1</code> (không mật khẩu) → <code>mount_root</code> rồi rollback, hoặc <code>firstboot &amp;&amp; reboot</code>.</li><li><strong>U-Boot web (cứu brick):</strong> tắt nguồn → máy IP <code>192.168.1.2</code> → giữ Reset khi cấp nguồn tới khi đèn nháy nhanh → <code>http://192.168.1.1</code> → upload image sạch → flash.</li></ol>
+<p><strong>Khôi phục backup đã tải về máy:</strong></p>
+<pre><code>scp .\sbproxy-&lt;tên&gt;.tar.gz root@192.168.1.1:/tmp/
 ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-&lt;tên&gt;.tar.gz &amp;&amp; reboot"
-# hoặc LuCI: System → Backup/Flash → Restore → upload .tar.gz</code></pre></div>
-  <div class="stepnav"><a href="#b11">← Bước 11</a><a class="next" href="#b13">Bước 13 · Xử lý lỗi →</a></div>
-
-  <!-- ========================= BƯỚC 13 ========================= -->
-  <h2 id="b13"><span class="num">BƯỚC 13</span>Xử lý lỗi (theo triệu chứng)</h2>
-  <h3>D · Có WiFi + IP nhưng không ra internet (hay gặp nhất)</h3>
-  <pre><code>pgrep -f sing-box || /etc/init.d/sing-box restart
+# hoặc LuCI: System → Backup/Flash → Restore → upload .tar.gz</code></pre>
+<h2 id="sec-15">Bước 13 — Xử lý lỗi (theo triệu chứng)</h2>
+<p><strong>D · Có WiFi + IP nhưng không ra internet (hay gặp nhất):</strong></p>
+<pre><code>pgrep -f sing-box || /etc/init.d/sing-box restart
 sing-box check -c /etc/sing-box/config.json
 curl -x socks5h://user:pass@HOST:PORT https://ipinfo.io/ip   # SOCKS sống?
 nft list table inet sbproxy ; ip rule | grep 0x1 ; ip route show table 100
 /etc/init.d/sbproxy restart</code></pre>
-  <div class="tablewrap"><table>
-    <tr><th>Nhóm</th><th>Nguyên nhân → xử lý</th></tr>
-    <tr><td>Firmware/flash</td><td>Brick → U-Boot (<a href="#b12">Bước 12</a>). sha256 lệch → tải lại. Mất SSID sau nâng cấp → <code>apply.sh</code>.</td></tr>
-    <tr><td>WiFi thiếu SSID</td><td>Vượt BSSID → giảm/chia băng. Không SSID nào lên → sai <code>RADIO_*</code> hoặc radio <code>disabled</code>.</td></tr>
-    <tr><td>Client không có IP</td><td><code>/etc/init.d/dnsmasq restart</code>; đảm bảo <code>ZONE_INPUT=ACCEPT</code>.</td></tr>
-    <tr><td>Ra net nhưng sai IP</td><td><code>iifname</code> không khớp <code>br-w&lt;idx&gt;</code>; kiểm tra route sing-box <code>in-w→out-w</code>.</td></tr>
-    <tr><td>DNS leak</td><td>v0.1 DNS qua dnsmasq → trỏ upstream sang DoH/ẩn danh, hoặc bật khối <code>dns</code> trong sing-box.</td></tr>
-    <tr><td>WebRTC lộ</td><td>Bật <code>webrtc=1</code> → <code>apply</code>; kiểm tra <code>nft list chain inet sbproxy webrtc</code>.</td></tr>
-    <tr><td>Client thấy nhau</td><td><code>isolate=1</code>; zone <code>forward=REJECT</code>; mỗi SSID một <code>br-w&lt;idx&gt;</code>.</td></tr>
-    <tr><td>Agent không kết nối</td><td><code>curl -H "X-SB-Token: $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status</code>; kiểm tra <code>+x</code> của CGI; mixed-content.</td></tr>
-  </table></div>
-  <div class="stepnav"><a href="#b12">← Bước 12</a><a class="next" href="#b14">Bước 14 · API →</a></div>
-
-  <!-- ========================= BƯỚC 14 ========================= -->
-  <h2 id="b14"><span class="num">BƯỚC 14</span>Tham chiếu API</h2>
-  <p>Endpoint <code>/cgi-bin/sbproxy?action=…</code>, header <code>X-SB-Token</code>.</p>
-  <div class="tablewrap"><table>
-    <tr><th>Method</th><th>action</th><th>Body</th><th>Trả về</th></tr>
-    <tr><td>GET</td><td><code>status</code></td><td>—</td><td>ssids[], health{probes{idx:{state,latency_ms,code}}}, meta</td></tr>
-    <tr><td>GET</td><td><code>get_conf</code></td><td>—</td><td>text conf</td></tr>
-    <tr><td>POST</td><td><code>save_conf</code></td><td>text</td><td>{ok,saved}</td></tr>
-    <tr><td>POST</td><td><code>apply</code></td><td>—</td><td>{ok,rc,log}</td></tr>
-    <tr><td>POST</td><td><code>set_sock</code></td><td>{idx,host,port,user,pass}</td><td>{ok,rc,log}</td></tr>
-    <tr><td>POST</td><td><code>backup</code></td><td>{label?}</td><td>{ok,rc,log}</td></tr>
-    <tr><td>GET</td><td><code>backups</code></td><td>—</td><td>{ok,backups[]}</td></tr>
-    <tr><td>GET</td><td><code>download_backup</code></td><td>?name=</td><td>file .tar.gz (tải về máy)</td></tr>
-    <tr><td>POST</td><td><code>rollback</code></td><td>{name?}</td><td>{ok,rc,log}</td></tr>
-    <tr><td>POST</td><td><code>uninstall</code></td><td>—</td><td>{ok,rc,log}</td></tr>
-    <tr><td>GET</td><td><code>health_now</code></td><td>—</td><td>probe ngay 1 lần</td></tr>
-  </table></div>
-  <div class="stepnav"><a href="#b13">← Bước 13</a><a class="next" href="#b15">Bước 15 · Điều khiển từ xa →</a></div>
-
-  <!-- ========================= BƯỚC 15 ========================= -->
-  <h2 id="b15"><span class="num">BƯỚC 15</span>Điều khiển từ xa qua Cloud (tùy chọn)</h2>
-  <p>Hai lớp điều khiển — chọn theo nhu cầu:</p>
-  <div class="tablewrap"><table>
-    <tr><th>Lớp</th><th>Truy cập</th><th>Đăng nhập</th><th>Hợp khi</th></tr>
-    <tr><td><b>Agent LAN</b> (<a href="#b9">Bước 9</a>)</td><td>Cùng mạng router (hoặc qua VPN)</td><td>Token router</td><td>1 router, quản tại chỗ</td></tr>
-    <tr><td><b>Cloud server</b> (bước này)</td><td><b>Từ xa</b>, router poll RA (không mở WAN)</td><td><b>Tài khoản riêng + RBAC</b></td><td>Từ xa, nhiều router (fleet)</td></tr>
-  </table></div>
-  <div class="diagram">Bạn ─(đăng nhập)─▶ Web UI + API (VPS, có DB) ◀─ router poll RA (~10s)
+<div class="tablewrap"><table><thead><tr><th>Nhóm</th><th>Nguyên nhân → xử lý</th></tr></thead><tbody><tr><td>Firmware/flash</td><td>Brick → U-Boot (Bước 12). sha256 lệch → tải lại. Mất SSID sau nâng cấp → <code>apply.sh</code>.</td></tr><tr><td>WiFi thiếu SSID</td><td>Vượt BSSID → giảm/chia băng. Không SSID nào lên → sai <code>RADIO_*</code> hoặc radio <code>disabled</code>.</td></tr><tr><td>Client không có IP</td><td><code>/etc/init.d/dnsmasq restart</code>; đảm bảo <code>ZONE_INPUT=ACCEPT</code>.</td></tr><tr><td>Ra net nhưng sai IP</td><td><code>iifname</code> không khớp <code>br-w&lt;idx&gt;</code>; kiểm tra route sing-box <code>in-w→out-w</code>.</td></tr><tr><td>DNS leak</td><td>v0.1 DNS qua dnsmasq → trỏ upstream DoH/ẩn danh, hoặc bật khối <code>dns</code> trong sing-box.</td></tr><tr><td>WebRTC lộ</td><td>Bật <code>webrtc=1</code> → <code>apply</code>; kiểm tra <code>nft list chain inet sbproxy webrtc</code>.</td></tr><tr><td>Client thấy nhau</td><td><code>isolate=1</code>; zone <code>forward=REJECT</code>; mỗi SSID một <code>br-w&lt;idx&gt;</code>.</td></tr><tr><td>Agent không kết nối</td><td><code>curl -H "X-SB-Token: $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status</code>; kiểm tra <code>+x</code> của CGI; mixed-content.</td></tr></tbody></table></div>
+<h2 id="sec-16">Bước 14 — Tham chiếu API (agent LAN)</h2>
+<p>Endpoint <code>/cgi-bin/sbproxy?action=…</code>, header <code>X-SB-Token</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>Method</th><th>action</th><th>Body</th><th>Trả về</th></tr></thead><tbody><tr><td>GET</td><td><code>status</code></td><td>—</td><td>ssids[], health{probes{idx:{state,latency_ms,code}}}, meta</td></tr><tr><td>GET</td><td><code>get_conf</code></td><td>—</td><td>text conf</td></tr><tr><td>POST</td><td><code>save_conf</code></td><td>text</td><td>{ok,saved}</td></tr><tr><td>POST</td><td><code>apply</code></td><td>—</td><td>{ok,rc,log}</td></tr><tr><td>POST</td><td><code>set_sock</code></td><td>{idx,host,port,user,pass}</td><td>{ok,rc,log}</td></tr><tr><td>POST</td><td><code>backup</code></td><td>{label?}</td><td>{ok,rc,log}</td></tr><tr><td>GET</td><td><code>backups</code></td><td>—</td><td>{ok,backups[]}</td></tr><tr><td>GET</td><td><code>download_backup</code></td><td>?name=</td><td>file .tar.gz</td></tr><tr><td>POST</td><td><code>rollback</code></td><td>{name?}</td><td>{ok,rc,log}</td></tr><tr><td>POST</td><td><code>uninstall</code></td><td>—</td><td>{ok,rc,log}</td></tr><tr><td>GET</td><td><code>health_now</code></td><td>—</td><td>probe ngay 1 lần</td></tr></tbody></table></div>
+<h2 id="sec-17">Bước 15 — Điều khiển từ xa qua Cloud (tùy chọn)</h2>
+<div class="tablewrap"><table><thead><tr><th>Lớp</th><th>Truy cập</th><th>Đăng nhập</th><th>Hợp khi</th></tr></thead><tbody><tr><td><strong>Agent LAN</strong> (Bước 9)</td><td>Cùng mạng router (hoặc VPN)</td><td>Token router</td><td>1 router, quản tại chỗ</td></tr><tr><td><strong>Cloud server</strong></td><td><strong>Từ xa</strong>, router poll RA (không mở WAN)</td><td><strong>Tài khoản riêng + RBAC</strong></td><td>Từ xa, nhiều router (fleet)</td></tr></tbody></table></div>
+<pre><code>Bạn ─(đăng nhập)─▶ Web UI + API (VPS, có DB) ◀─ router poll RA (~10s)
                          │  lưu lịch sử latency + config mong muốn      │ push health
-                         └──────────────────────────────────────────────┘ pull config/commands</div>
-
-  <h3>15.1 Deploy server (VPS)</h3>
-  <pre><code>cd cloud-server
-npm install                            # Node >= 18 (better-sqlite3 sẽ build)
+                         └──────────────────────────────────────────────┘ pull config/commands</code></pre>
+<p><strong>15.1 Deploy server (VPS):</strong></p>
+<pre><code>cd cloud-server
+npm install                            # Node &gt;= 18 (better-sqlite3 sẽ build)
 node seed.js admin 'MatKhauManh123'    # tạo SUPERUSER (chỉ tạo super qua CLI)
 PORT=8088 HTTPS=1 npm start            # mở http://&lt;VPS&gt;:8088</code></pre>
-  <div class="call danger"><div class="t">Bảo mật bắt buộc</div>Đặt sau <b>reverse proxy HTTPS</b> (Caddy/Nginx) + biến <code>HTTPS=1</code>. Không chạy HTTP trần ra internet. Sao lưu thư mục <code>cloud-server/data/</code> (DB + jwt.secret).</div>
-
-  <h3>15.2 Phân quyền (RBAC)</h3>
-  <p><b>superuser</b> (tạo qua <code>seed.js</code>): toàn quyền + quản user/router. <b>user thường</b>: gán tập quyền theo tính năng + giới hạn router được thấy/điều khiển. UI tự ẩn/khoá nút; server luôn kiểm tra lại ở API.</p>
-  <div class="tablewrap"><table>
-    <tr><th>Quyền</th><th>Cho phép</th></tr>
-    <tr><td><code>health.view</code></td><td>Xem trạng thái &amp; latency</td></tr>
-    <tr><td><code>wifi.view</code> / <code>wifi.manage</code></td><td>Xem / sửa danh sách WiFi</td></tr>
-    <tr><td><code>sock.change</code></td><td>Đổi SOCKS (không rớt WiFi)</td></tr>
-    <tr><td><code>config.apply</code></td><td>Đẩy &amp; áp cấu hình</td></tr>
-    <tr><td><code>backup.create</code> / <code>backup.rollback</code></td><td>Tạo backup / khôi phục</td></tr>
-    <tr><td><code>device.manage</code> / <code>user.manage</code></td><td><i>(super)</i> Quản router / người dùng</td></tr>
-    <tr><td><code>audit.view</code></td><td>Xem nhật ký</td></tr>
-  </table></div>
-
-  <h3>15.3 Thêm router &amp; cài cloud-agent</h3>
-  <ol>
-    <li>Web → tab <b>Router</b> → <b>＋ Thêm router</b> → nhận <b>device key (hiện 1 lần)</b>.</li>
-    <li>Trên router (đã xong <a href="#b8">Bước 8</a> + <a href="#b9">agent health</a>):
-      <pre><code>cat > /etc/sbproxy/cloud.env &lt;&lt;'EOF'
+<blockquote class="call warn"><p><strong>Bảo mật bắt buộc:</strong> đặt sau <strong>reverse proxy HTTPS</strong> (Caddy/Nginx) + <code>HTTPS=1</code>. Không chạy HTTP trần ra internet. Sao lưu <code>cloud-server/data/</code> (DB + jwt.secret).</p></blockquote>
+<p><strong>15.2 Phân quyền (RBAC):</strong> <strong>superuser</strong> (tạo qua <code>seed.js</code>): toàn quyền + quản user/router. <strong>user thường</strong>: gán tập quyền theo tính năng + giới hạn router. UI tự ẩn/khoá nút; server luôn kiểm tra lại ở API.</p>
+<div class="tablewrap"><table><thead><tr><th>Quyền</th><th>Cho phép</th></tr></thead><tbody><tr><td><code>health.view</code></td><td>Xem trạng thái &amp; latency</td></tr><tr><td><code>wifi.view</code> / <code>wifi.manage</code></td><td>Xem / sửa danh sách WiFi</td></tr><tr><td><code>sock.change</code></td><td>Đổi SOCKS (không rớt WiFi)</td></tr><tr><td><code>config.apply</code></td><td>Đẩy &amp; áp cấu hình</td></tr><tr><td><code>backup.create</code> / <code>backup.rollback</code></td><td>Tạo backup / khôi phục</td></tr><tr><td><code>device.manage</code> / <code>user.manage</code></td><td><em>(super)</em> Quản router / người dùng</td></tr><tr><td><code>audit.view</code></td><td>Xem nhật ký</td></tr></tbody></table></div>
+<p><strong>15.3 Thêm router &amp; cài cloud-agent:</strong></p>
+<ol><li>Web → tab <strong>Router</strong> → <strong>＋ Thêm router</strong> → nhận <strong>device key (hiện 1 lần)</strong>.</li><li>Trên router (đã xong Bước 8 + agent health):<pre><code>cat &gt; /etc/sbproxy/cloud.env &lt;&lt;'EOF'
 CLOUD_URL=https://cloud.example.com
 DEVICE_KEY=&lt;key vừa cấp&gt;
 CLOUD_INTERVAL=10
 EOF
 chmod 600 /etc/sbproxy/cloud.env
-sh cloud-server/agent/install-cloud-agent.sh</code></pre></li>
-    <li>Sau ~10s router chuyển <b>online</b> trên web.</li>
-  </ol>
-  <div class="call"><div class="t">Cách hoạt động (pull)</div>Config mong muốn lưu ở server; router poll → nếu version mới thì ghi conf + <code>apply.sh</code>; nhận command (backup/rollback/set_sock) và <code>report</code> health. Chi tiết: <code>cloud-server/README.md</code>.</div>
-
-  <div class="stepnav"><a href="#b14">← Bước 14</a><a class="next" href="#b16">Bước 16 · Bảo mật &amp; chống lộ →</a></div>
-
-  <!-- ========================= BƯỚC 16 ========================= -->
-  <h2 id="b16"><span class="num">BƯỚC 16</span>Bảo mật &amp; chống lộ (checklist)</h2>
-  <p>Ba nhóm "lộ" cần chặn: <b>(A) lộ danh tính/IP thật</b> của người dùng qua proxy, <b>(B) lộ quyền điều khiển</b> router/hệ thống, <b>(C) lộ dữ liệu nhạy cảm</b> (mật khẩu sock/wifi, DB).</p>
-
-  <h3>A · Chống lộ danh tính / IP thật</h3>
-  <div class="tablewrap"><table>
-    <tr><th>Kênh lộ</th><th>Trạng thái</th><th>Cách bịt</th></tr>
-    <tr><td><b>IPv6 bypass</b> (nguy hiểm, dễ quên)</td><td>⚠️ Chưa xử lý ở v0.1</td><td>nftables tproxy chỉ bắt IPv4 → client có IPv6 sẽ ra thẳng, lộ IP thật. <b>Tắt IPv6 trên SSID khách</b>: <code>uci set dhcp.wIDX.dhcpv6='disabled'; uci set dhcp.wIDX.ra='disabled'</code> (mỗi idx) rồi <code>uci commit dhcp; /etc/init.d/odhcpd restart</code>. Hoặc tắt IPv6 WAN.</td></tr>
-    <tr><td><b>DNS leak</b></td><td>⚠️ v0.1 DNS qua dnsmasq → có thể lộ</td><td>Ép DNS ẩn danh: <code>uci add_list dhcp.@dnsmasq[0].server='1.1.1.1'; uci set dhcp.@dnsmasq[0].noresolv='1'</code> (tốt hơn: DoH qua <code>https-dns-proxy</code>, hoặc bật khối <code>dns</code> trong sing-box đi qua proxy).</td></tr>
-    <tr><td><b>WebRTC leak</b></td><td>✅ Có (nếu bật)</td><td>Đặt <code>webrtc=1</code> cho SSID cần ẩn danh (<a href="#b7">Bước 7</a>).</td></tr>
-    <tr><td><b>Rò khi proxy chết</b></td><td>✅ Fail-closed</td><td>Zone khách <code>forward=REJECT</code> → sing-box/tproxy chết thì client <b>mất mạng</b> chứ không ra thẳng lộ IP. Đừng thêm rule forward guest→wan.</td></tr>
-    <tr><td><b>MAC thật</b></td><td>✅ Random</td><td>MAC <code>02:xx</code> tự sinh mỗi SSID.</td></tr>
-  </table></div>
-  <div class="call"><div class="t">Kiểm tra lại sau khi cấu hình</div>Trên client mỗi SSID: <code>ipinfo.io/ip</code> (đúng sock), <code>dnsleaktest.com</code>, <code>browserleaks.com/webrtc</code>, và <b><code>test-ipv6.com</code></b> (không lộ IPv6 thật).</div>
-
-  <h3>B · Chống lộ quyền điều khiển</h3>
-  <ul>
-    <li><b>Không đưa quản trị ra WAN:</b> uhttpd/agent/LuCI/SSH chỉ nghe LAN/VLAN quản trị. Đây là biện pháp quan trọng nhất.</li>
-    <li><b>Router:</b> mật khẩu root mạnh; ưu tiên SSH key + tắt đăng nhập mật khẩu (<code>uci set dropbear.@dropbear[0].PasswordAuth='off'</code>); đổi mật khẩu mặc định.</li>
-    <li><b>Token agent</b> (<a href="#b9">9.1–9.3</a>): bí mật dùng chung = toàn quyền → LAN only, file <code>600</code>, xoay khi nghi lộ.</li>
-    <li><b>Cloud:</b> chạy sau <b>HTTPS reverse proxy</b> (<code>HTTPS=1</code>); superuser chỉ tạo qua <code>seed.js</code>; cấp <b>quyền tối thiểu</b> + giới hạn router cho từng user; <b>device key</b> lộ → Rekey; cân nhắc <b>khoá đăng nhập sai nhiều lần + 2FA</b> cho production.</li>
-    <li><b>Cách ly zone:</b> SSID khách <code>input=REJECT</code>/không forward chéo → không chạm được LuCI/SSH/agent và không thấy nhau.</li>
-  </ul>
-
-  <h3>C · Chống lộ dữ liệu nhạy cảm</h3>
-  <div class="tablewrap"><table>
-    <tr><th>Dữ liệu</th><th>Ở đâu</th><th>Bảo vệ</th></tr>
-    <tr><td>User/pass SOCKS, mật khẩu WiFi</td><td><code>wifi-socks.conf</code>, <code>/etc/sing-box/config.json</code>, backups</td><td>Chỉ root đọc; <b>KHÔNG commit lên git/nơi công khai</b>; backup tải về máy để nơi an toàn (mã hoá ổ đĩa).</td></tr>
-    <tr><td>Token agent</td><td><code>/etc/sbproxy/token</code></td><td><code>chmod 600</code>; không log; không dán web lạ.</td></tr>
-    <tr><td>DB Cloud + jwt.secret + device keys(hash)</td><td><code>cloud-server/data/</code></td><td>Quyền hạn chế; backup an toàn; mất <code>data/</code> = mất tài khoản/khoá.</td></tr>
-    <tr><td>Nhật ký</td><td><code>logread</code>, audit</td><td>Không in token/mật khẩu ra log; giới hạn ai xem (quyền <code>audit.view</code>).</td></tr>
-  </table></div>
-
-  <h3>D · Kênh truyền &amp; vận hành</h3>
-  <ul>
-    <li>SOCKS5 dùng <code>socks5h</code> (DNS resolve phía proxy) — đã dùng trong health-check &amp; sing-box.</li>
-    <li>Nếu SOCKS không mã hoá đường tới nó, cân nhắc bọc thêm (chain qua TLS/WireGuard tới nhà cung cấp) để ISP không thấy đích.</li>
-    <li><b>Cập nhật</b> firmware + <code>sing-box</code> để vá lỗi bảo mật (theo <a href="#b3">Bước 3</a> an toàn: backup ra máy trước).</li>
-    <li><b>Xoay</b> token/device key/mật khẩu định kỳ; rà <b>audit log</b> (Cloud) xem có thao tác lạ.</li>
-  </ul>
-  <div class="call danger"><div class="t">Ưu tiên nếu chỉ làm được vài việc</div>1) IPv6 tắt trên SSID khách · 2) DNS ép ẩn danh · 3) Quản trị/agent/Cloud không ra WAN · 4) HTTPS cho Cloud · 5) Không commit file chứa mật khẩu.</div>
-
-  <div class="stepnav"><a href="#b15">← Bước 15</a><a href="#b1">↑ Về đầu (Bước 1)</a></div>
-
-  <footer>sbproxy · Hướng dẫn Quản trị theo bước · GL-MT6000 / OpenWrt · Chi tiết bổ trợ: README, GUIDE.md, agent/README.md, ROLLBACK.md trong repo.</footer>
+sh cloud-server/agent/install-cloud-agent.sh</code></pre></li><li>Sau ~10s router chuyển <strong>online</strong> trên web.</li></ol>
+<blockquote class="call"><p><strong>Cách hoạt động (pull):</strong> config mong muốn lưu ở server; router poll → nếu version mới thì ghi conf + <code>apply.sh</code>; nhận command (backup/rollback/set_sock) và <code>report</code> health. Chi tiết: <a href="../cloud-server/README.md">../cloud-server/README.md</a>.</p></blockquote>
+<h2 id="sec-18">Bước 16 — Bảo mật &amp; chống lộ (checklist)</h2>
+<p>Ba nhóm "lộ" cần chặn: <strong>(A) lộ danh tính/IP thật</strong>, <strong>(B) lộ quyền điều khiển</strong>, <strong>(C) lộ dữ liệu nhạy cảm</strong>.</p>
+<h3>A · Chống lộ danh tính / IP thật</h3>
+<div class="tablewrap"><table><thead><tr><th>Kênh lộ</th><th>Trạng thái</th><th>Cách bịt</th></tr></thead><tbody><tr><td><strong>IPv6 bypass</strong> (dễ quên)</td><td>⚠️ Chưa xử lý ở v0.1</td><td>tproxy chỉ bắt IPv4 → client có IPv6 ra thẳng, lộ IP thật. <strong>Tắt IPv6 trên SSID khách:</strong> <code>uci set dhcp.wIDX.dhcpv6='disabled'; uci set dhcp.wIDX.ra='disabled'</code> rồi <code>uci commit dhcp; /etc/init.d/odhcpd restart</code>. Hoặc tắt IPv6 WAN.</td></tr><tr><td><strong>DNS leak</strong></td><td>⚠️ v0.1 có thể lộ</td><td><code>uci add_list dhcp.@dnsmasq[0].server='1.1.1.1'; uci set dhcp.@dnsmasq[0].noresolv='1'</code> (tốt hơn: DoH qua <code>https-dns-proxy</code>, hoặc DNS trong sing-box đi qua proxy).</td></tr><tr><td><strong>WebRTC leak</strong></td><td>✅ Có (nếu bật)</td><td>Đặt <code>webrtc=1</code> cho SSID cần ẩn danh (Bước 7).</td></tr><tr><td><strong>Rò khi proxy chết</strong></td><td>✅ Fail-closed</td><td>Zone khách <code>forward=REJECT</code> → sing-box/tproxy chết thì client <strong>mất mạng</strong> chứ không ra thẳng. Đừng thêm rule forward guest→wan.</td></tr><tr><td><strong>MAC thật</strong></td><td>✅ Random</td><td>MAC <code>02:xx</code> tự sinh mỗi SSID.</td></tr></tbody></table></div>
+<p>Kiểm tra lại: <code>ipinfo.io/ip</code>, <code>dnsleaktest.com</code>, <code>browserleaks.com/webrtc</code>, <strong><code>test-ipv6.com</code></strong> (không lộ IPv6 thật).</p>
+<h3>B · Chống lộ quyền điều khiển</h3>
+<ul><li><strong>Không đưa quản trị ra WAN:</strong> uhttpd/agent/LuCI/SSH chỉ nghe LAN/VLAN quản trị (quan trọng nhất).</li><li><strong>Router:</strong> mật khẩu root mạnh; ưu tiên SSH key + tắt password auth (<code>uci set dropbear.@dropbear[0].PasswordAuth='off'</code>).</li><li><strong>Token agent</strong> (9.1–9.3): bí mật dùng chung = toàn quyền → LAN only, file <code>600</code>, xoay khi nghi lộ.</li><li><strong>Cloud:</strong> HTTPS reverse proxy (<code>HTTPS=1</code>); superuser chỉ qua <code>seed.js</code>; <strong>quyền tối thiểu</strong> + giới hạn router; device key lộ → Rekey; cân nhắc <strong>khoá đăng nhập sai nhiều lần + 2FA</strong>.</li><li><strong>Cách ly zone:</strong> SSID khách <code>input=REJECT</code>/không forward chéo → không chạm LuCI/SSH/agent, không thấy nhau.</li></ul>
+<h3>C · Chống lộ dữ liệu nhạy cảm</h3>
+<div class="tablewrap"><table><thead><tr><th>Dữ liệu</th><th>Ở đâu</th><th>Bảo vệ</th></tr></thead><tbody><tr><td>User/pass SOCKS, mật khẩu WiFi</td><td><code>wifi-socks.conf</code>, <code>config.json</code>, backups</td><td>Chỉ root đọc; <strong>KHÔNG commit lên git/nơi công khai</strong>; backup để nơi an toàn (mã hoá ổ đĩa).</td></tr><tr><td>Token agent</td><td><code>/etc/sbproxy/token</code></td><td><code>chmod 600</code>; không log; không dán web lạ.</td></tr><tr><td>DB Cloud + jwt.secret + device keys</td><td><code>cloud-server/data/</code></td><td>Quyền hạn chế; backup an toàn; mất <code>data/</code> = mất tài khoản/khoá.</td></tr><tr><td>Nhật ký</td><td><code>logread</code>, audit</td><td>Không in token/mật khẩu ra log; giới hạn ai xem (<code>audit.view</code>).</td></tr></tbody></table></div>
+<h3>D · Kênh truyền &amp; vận hành</h3>
+<ul><li>SOCKS5 dùng <code>socks5h</code> (DNS resolve phía proxy) — đã dùng trong health-check &amp; sing-box.</li><li>Nếu SOCKS không mã hoá đường tới nó, cân nhắc bọc thêm (chain qua TLS/WireGuard).</li><li><strong>Cập nhật</strong> firmware + <code>sing-box</code> để vá lỗi (Bước 3 an toàn: backup ra máy trước).</li><li><strong>Xoay</strong> token/device key/mật khẩu định kỳ; rà <strong>audit log</strong> (Cloud).</li></ul>
+<blockquote class="call warn"><p><strong>Ưu tiên nếu chỉ làm được vài việc:</strong> 1) IPv6 tắt trên SSID khách · 2) DNS ép ẩn danh · 3) Quản trị/agent/Cloud không ra WAN · 4) HTTPS cho Cloud · 5) Không commit file chứa mật khẩu.</p></blockquote>
+<footer>Sinh tự động từ Markdown bằng tools/build-docs.js — sửa bản .md rồi chạy lại. Không sửa tay file .html này.</footer>
 </div>
 </body>
 </html>

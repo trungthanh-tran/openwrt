@@ -86,6 +86,8 @@ sh scripts/rollback.sh
 - **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ theo bước: firmware → cấu hình → agent → cloud → bảo mật. Bắt đầu ở đây.**
 - **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: vận hành console hằng ngày, không cần dòng lệnh.**
 - Bản HTML đọc offline: [docs/admin-guide.html](docs/admin-guide.html) · [docs/user-guide.html](docs/user-guide.html)
+
+> **Sửa tài liệu:** chỉ sửa file **`.md`** (nguồn duy nhất), rồi chạy `node tools/build-docs.js` để sinh lại `.html`. Đừng sửa tay file `.html` (sẽ bị ghi đè).
 - [docs/GUIDE.md](docs/GUIDE.md) — Hướng dẫn toàn tập (một mạch): từ flash firmware → cấu hình → test → xử lý lỗi.
 - [docs/INSTALL.md](docs/INSTALL.md) — cài chi tiết + giải thích từng bước
 - [docs/TESTING.md](docs/TESTING.md) — cách test từng yêu cầu (IP đúng sock, DNS leak, WebRTC, isolation)
