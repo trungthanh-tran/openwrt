@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy · Hướng dẫn Người dùng</title>
+<style>
+  :root{
+    --bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;
+    --text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;
+    --good:#1a8f4c;--goods:#d8f0e0;--warn:#b5750a;--warns:#f6e9cf;--crit:#cc2f4a;--crits:#f7d9de;
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;
+    --text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;
+    --good:#38d178;--goods:#10321f;--warn:#e0a53a;--warns:#33280f;--crit:#f26c81;--crits:#37151c;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .doc{max-width:820px;margin:0 auto;padding:0 22px 90px}
+  header.top{padding:34px 0 22px;border-bottom:1px solid var(--border);margin-bottom:34px}
+  .kicker{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+  .logo{width:38px;height:38px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#04231f;font-family:var(--mono);font-weight:700;font-size:17px}
+  .badge{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);background:var(--asoft);padding:3px 9px;border-radius:20px;font-weight:600}
+  h1{font-size:30px;line-height:1.15;margin:.1em 0 .2em;letter-spacing:-.6px;text-wrap:balance}
+  .lead{font-size:17px;color:var(--dim);margin:0}
+  h2{font-size:21px;margin:44px 0 4px;letter-spacing:-.3px;scroll-margin-top:20px}
+  h2 .num{font-family:var(--mono);color:var(--accent);font-size:15px;margin-right:10px}
+  h3{font-size:16px;margin:26px 0 4px}
+  p{margin:10px 0}
+  a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
+  ul,ol{margin:10px 0;padding-left:22px}li{margin:5px 0}
+  code{font-family:var(--mono);font-size:.86em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  pre{margin:14px 0;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
+  pre code{background:none;border:none;padding:0;font-size:12.8px;line-height:1.6}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:16px 0;box-shadow:0 1px 2px rgba(16,32,43,.05)}
+  .call{border-left:3px solid var(--accent);background:var(--panel);border:1px solid var(--border);border-left-width:3px;border-radius:10px;padding:12px 16px;margin:16px 0}
+  .call.warn{border-left-color:var(--warn)}.call.danger{border-left-color:var(--crit)}
+  .call .t{font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+  .call.warn .t{color:var(--warn)}.call.danger .t{color:var(--crit)}.call .t{color:var(--accent2)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
+  .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+  .tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:20px}
+  .pill.ok{color:var(--good);background:var(--goods)}.pill.warn{color:var(--warn);background:var(--warns)}.pill.bad{color:var(--crit);background:var(--crits)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+  .steps{counter-reset:s;list-style:none;padding:0}
+  .steps>li{counter-increment:s;position:relative;padding:2px 0 2px 42px;margin:14px 0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:8px;background:var(--asoft);color:var(--accent2);font-family:var(--mono);font-weight:700;font-size:13px;display:grid;place-items:center}
+  .toc{font-size:14px;color:var(--dim)}.toc a{display:inline-block;margin-right:14px}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);color:var(--faint);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="doc">
+  <header class="top">
+    <div class="kicker"><div class="logo">sb</div><span class="badge">Hướng dẫn Người dùng</span></div>
+    <h1>sbproxy Console — Vận hành hằng ngày</h1>
+    <p class="lead">Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo dõi sức khỏe proxy, và sao lưu/khôi phục — tất cả bằng giao diện. Không cần dòng lệnh.</p>
+    <p class="toc">Mục: <a href="#gioithieu">Giới thiệu</a><a href="#moconsole">Mở &amp; kết nối</a><a href="#doc-bang">Đọc bảng</a><a href="#suckhoe">Sức khỏe proxy</a><a href="#thaotac">Thao tác WiFi</a><a href="#backup">Backup/Rollback</a><a href="#suco">Khi gặp sự cố</a></p>
+  </header>
+
+  <h2 id="gioithieu"><span class="num">01</span>Console này làm gì?</h2>
+  <p>Mỗi mạng WiFi bạn tạo sẽ được gắn với một <b>SOCKS5</b> riêng — nghĩa là các thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:</p>
+  <ul>
+    <li>Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.</li>
+    <li>Đổi SOCKS của một WiFi <b>không làm rớt kết nối</b>.</li>
+    <li>Xem <b>độ trễ (latency) proxy theo thời gian thực</b> cho từng WiFi.</li>
+    <li>Sao lưu &amp; khôi phục cấu hình chỉ bằng một nút.</li>
+  </ul>
+  <div class="call"><div class="t">Ba cách dùng</div>
+    <b>Offline</b> — soạn cấu hình rồi tải file về (không đụng router). <b>Live LAN</b> — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp). <b>Cloud (từ xa)</b> — nếu quản trị viên đã dựng server, bạn <b>đăng nhập bằng tài khoản riêng</b> trên web để điều khiển router từ bất cứ đâu; thao tác hằng ngày giống hệt mô tả dưới đây, chỉ khác là mỗi hành động có thể bị giới hạn theo <b>quyền</b> tài khoản của bạn.</div>
+  <div class="call warn"><div class="t">Dùng web Cloud (đăng nhập từ xa)</div>
+    Mở địa chỉ web quản trị viên cấp → đăng nhập tài khoản/mật khẩu của bạn. Chọn router muốn quản ở ô trên cùng. Nút nào bị mờ/ẩn nghĩa là tài khoản của bạn <b>chưa được cấp quyền</b> cho tính năng đó — liên hệ quản trị viên. Đổi mật khẩu ở nút <b>Đổi MK</b> góc trên phải.</div>
+
+  <h2 id="moconsole"><span class="num">02</span>Mở &amp; kết nối router</h2>
+  <ol class="steps">
+    <li>Mở console: nếu quản trị viên đã cài trên router, vào <code>http://&lt;địa-chỉ-router&gt;/sbproxy/</code> (ví dụ <code>http://192.168.1.1/sbproxy/</code>).</li>
+    <li>Bấm <b>🔌 Kết nối router</b> (góc trên phải).</li>
+    <li>Để trống ô <i>Base URL</i>, dán <b>token</b> quản trị viên cấp, bấm <b>Kết nối</b>.</li>
+    <li>Kết nối thành công: hiện huy hiệu <span class="pill ok"><span class="dot"></span>Live</span> và cột <b>Sức khỏe</b> bắt đầu chạy.</li>
+  </ol>
+  <div class="call warn"><div class="t">Nếu không kết nối được</div>
+    Thường do mở console qua địa chỉ <code>https</code> (bản web) nên trình duyệt chặn gọi router. Hãy mở đúng <code>http://&lt;router&gt;/sbproxy/</code>. Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.</div>
+
+  <h2 id="doc-bang"><span class="num">03</span>Đọc bảng WiFi</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Cột</th><th>Ý nghĩa</th></tr>
+    <tr><td><b>#</b></td><td>Số thứ tự (idx) — cố định cho mỗi WiFi, quyết định dải mạng riêng.</td></tr>
+    <tr><td><b>WiFi (SSID)</b></td><td>Tên WiFi + dải mạng &amp; cổng nội bộ (thông tin kỹ thuật, chỉ để tham khảo).</td></tr>
+    <tr><td><b>Băng</b></td><td><span class="pill warn">2.4G</span> xa hơn/chậm hơn · <span class="pill ok">5G</span> nhanh hơn/gần hơn.</td></tr>
+    <tr><td><b>SOCKS5</b></td><td>Proxy đang gán: <code>host:cổng</code>.</td></tr>
+    <tr><td><b>Isolate</b></td><td><span class="pill ok"><span class="dot"></span>on</span> = các thiết bị trong WiFi này không thấy nhau (an toàn hơn).</td></tr>
+    <tr><td><b>WebRTC</b></td><td><span class="pill warn"><span class="dot"></span>on</span> = chặn rò rỉ IP qua WebRTC (đánh đổi: hỏng gọi video P2P).</td></tr>
+    <tr><td><b>Sức khỏe</b></td><td>Độ trễ proxy realtime + biểu đồ xu hướng — xem mục kế.</td></tr>
+  </table></div>
+
+  <h2 id="suckhoe"><span class="num">04</span>Sức khỏe proxy (realtime)</h2>
+  <p>Ở chế độ Live, router đo độ trễ mỗi proxy khoảng mỗi 15 giây; console cập nhật ~8 giây/lần và vẽ <b>biểu đồ đường (sparkline)</b> theo thời gian bên cạnh con số.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Hiển thị</th><th>Nghĩa</th><th>Nên làm</th></tr>
+    <tr><td><span class="pill ok"><span class="dot"></span>123ms</span></td><td>Proxy tốt, phản hồi nhanh.</td><td>Không cần làm gì.</td></tr>
+    <tr><td><span class="pill warn"><span class="dot"></span>950ms</span></td><td>Proxy chậm (trên ngưỡng).</td><td>Theo dõi; cân nhắc đổi sang SOCKS khác.</td></tr>
+    <tr><td><span class="pill bad"><span class="dot"></span>fail</span></td><td>Proxy chết/không phản hồi (kèm mã lỗi).</td><td>Đổi SOCKS cho WiFi đó (nút ⚡).</td></tr>
+  </table></div>
+  <p>Đường biểu đồ đi lên = độ trễ tăng dần (proxy đang xấu đi); đường thấp và phẳng = ổn định.</p>
+
+  <h2 id="thaotac"><span class="num">05</span>Thao tác WiFi</h2>
+  <h3>Thêm WiFi</h3>
+  <p>Bấm <b>＋ Thêm WiFi</b>, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, và user/pass nếu có), bật/tắt <i>Cách ly</i> &amp; <i>Chặn WebRTC</i>. Theo dõi đồng hồ <b>BSSID</b> ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).</p>
+  <h3>Đổi SOCKS nhanh (không rớt WiFi)</h3>
+  <p>Sửa host/cổng của WiFi (nút <b>Sửa</b>), rồi bấm nút <b>⚡</b> ở hàng đó để đẩy riêng thay đổi SOCKS lên router. Người đang dùng WiFi <b>không bị ngắt</b>, chỉ đường ra internet đổi proxy.</p>
+  <h3>Áp toàn bộ thay đổi</h3>
+  <p>Sau khi thêm/sửa/xoá nhiều WiFi, bấm <b>⇪ Đẩy &amp; Áp lên router</b> để ghi và áp dụng tất cả (bước này sẽ reload WiFi trong giây lát).</p>
+  <div class="call"><div class="t">Mẹo</div><b>⭳ Tải từ router</b> để nạp cấu hình đang chạy trên router về console (khi bạn mở console trên máy khác).</div>
+
+  <h2 id="backup"><span class="num">06</span>Backup &amp; Rollback</h2>
+  <p>Router <b>tự sao lưu</b> trước mỗi lần “Áp” hay “đổi sock”. Ngoài ra bạn có thể chủ động:</p>
+  <ol class="steps">
+    <li>Bấm <b>🗂 Backup / Rollback</b>.</li>
+    <li><b>💾 Tạo backup ngay</b> để lưu một mốc thủ công (nên làm trước khi thay đổi lớn).</li>
+    <li><b>⭳ Về máy</b> ở mỗi bản — tải file backup xuống <b>máy tính của bạn</b> để giữ an toàn.</li>
+    <li>Để quay lui: chọn một bản (mới nhất ở trên) → <b>↩ Khôi phục</b> → xác nhận. Router phục hồi cấu hình và reload.</li>
+  </ol>
+  <div class="call danger"><div class="t">Rất quan trọng — tải backup về máy</div>
+    Backup lưu <b>trên router</b>. Nếu router phải cài lại firmware hoặc bị hỏng, các backup đó <b>mất theo</b>. Vì vậy: định kỳ, và <b>bắt buộc trước khi cập nhật firmware</b>, hãy bấm <b>⭳ Về máy</b> để lưu một bản xuống máy tính. Có file này thì luôn khôi phục lại được.</div>
+  <div class="call warn"><div class="t">Lưu ý</div>Khôi phục sẽ <b>ghi đè</b> cấu hình hiện tại. Nếu chưa chắc, tạo một backup mới trước khi khôi phục để không mất trạng thái hiện tại.</div>
+
+  <h2 id="suco"><span class="num">07</span>Khi gặp sự cố</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Hiện tượng</th><th>Bạn có thể tự làm</th></tr>
+    <tr><td>Một WiFi báo <span class="pill bad"><span class="dot"></span>fail</span></td><td>Đổi SOCKS cho WiFi đó (đổi host/cổng → nút ⚡). Nếu nhiều sock cùng fail, báo quản trị viên.</td></tr>
+    <tr><td>Sau khi “Áp” bị lỗi/mất mạng</td><td>Vào <b>🗂 Backup / Rollback</b> → khôi phục bản “mới nhất” (thường có nhãn <code>pre-apply</code>).</td></tr>
+    <tr><td><b>Router treo / không vào được sau khi update firmware</b></td><td>Đây là việc của quản trị viên (cứu bằng chế độ recovery của router). Bạn hãy cung cấp <b>file backup đã tải về máy</b> để họ khôi phục nhanh — xem hộp “tải backup về máy” ở trên.</td></tr>
+    <tr><td>Console báo “Mất kết nối”</td><td>Mở lại đúng <code>http://&lt;router&gt;/sbproxy/</code>; kiểm tra token; hỏi quản trị viên xem router còn chạy không.</td></tr>
+    <tr><td>Latency toàn bộ tăng cao</td><td>Có thể do đường mạng/nhà cung cấp SOCKS. Theo dõi biểu đồ; báo quản trị viên nếu kéo dài.</td></tr>
+    <tr><td>Client vẫn thấy nhau / gọi video hỏng</td><td>Kiểm tra cột <i>Isolate</i>/<i>WebRTC</i> của WiFi đó và chỉnh cho đúng nhu cầu.</td></tr>
+  </table></div>
+  <div class="call danger"><div class="t">Việc của quản trị viên</div>Flash/cập nhật firmware, cài đặt hệ thống, đổi giới hạn phần cứng, xử lý mất kết nối hoàn toàn (không vào được router) — xem <b>Hướng dẫn Quản trị viên</b>.</div>
+
+  <h2 id="antoan"><span class="num">08</span>An toàn tài khoản (chống lộ)</h2>
+  <ul>
+    <li><b>Không chia sẻ</b> mật khẩu / token của bạn cho ai. Mỗi người một tài khoản riêng.</li>
+    <li><b>Đăng xuất</b> khi dùng máy chung; khoá máy khi rời đi (token/đăng nhập được lưu trong trình duyệt).</li>
+    <li>Chỉ mở console/web ở <b>đúng địa chỉ</b> quản trị viên cấp — cảnh giác trang giả xin token/mật khẩu.</li>
+    <li>Nghi lộ mật khẩu → đổi ngay ở nút <b>Đổi MK</b> và báo quản trị viên.</li>
+    <li><b>Không gửi ảnh chụp màn hình</b> chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.</li>
+  </ul>
+  <div class="call warn"><div class="t">Nút bị mờ/ẩn?</div>Nghĩa là tài khoản của bạn chưa được cấp quyền cho tính năng đó — điều này là <b>chủ ý để an toàn</b>, hãy liên hệ quản trị viên nếu cần.</div>
+
+  <footer>sbproxy Console · Hướng dẫn Người dùng · Dành cho vận hành hằng ngày, không cần dòng lệnh.</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy Console</title>
+<style>
+  :root {
+    --bg: #eef1f4;
+    --panel: #ffffff;
+    --panel-2: #f5f7f9;
+    --border: #d5dce3;
+    --border-strong: #c0cad3;
+    --text: #16202b;
+    --text-dim: #5c6b78;
+    --text-faint: #8593a0;
+    --accent: #0d8f80;
+    --accent-soft: #d3efe9;
+    --accent-ink: #0a6a5f;
+    --good: #1a8f4c;
+    --good-soft: #d8f0e0;
+    --warn: #b5750a;
+    --warn-soft: #f6e9cf;
+    --crit: #cc2f4a;
+    --crit-soft: #f7d9de;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(16,32,43,.06), 0 4px 16px rgba(16,32,43,.05);
+  }
+  :root:not([data-theme="light"]) {}
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1015;
+      --panel: #141c24;
+      --panel-2: #1a232d;
+      --border: #26323f;
+      --border-strong: #35434f;
+      --text: #e6edf3;
+      --text-dim: #94a3b0;
+      --text-faint: #6b7a88;
+      --accent: #2dd4bf;
+      --accent-soft: #113631;
+      --accent-ink: #7ff0e2;
+      --good: #38d178;
+      --good-soft: #10321f;
+      --warn: #e0a53a;
+      --warn-soft: #33280f;
+      --crit: #f26c81;
+      --crit-soft: #37151c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1015; --panel: #141c24; --panel-2: #1a232d; --border: #26323f;
+    --border-strong: #35434f; --text: #e6edf3; --text-dim: #94a3b0; --text-faint: #6b7a88;
+    --accent: #2dd4bf; --accent-soft: #113631; --accent-ink: #7ff0e2;
+    --good: #38d178; --good-soft: #10321f; --warn: #e0a53a; --warn-soft: #33280f;
+    --crit: #f26c81; --crit-soft: #37151c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 20px 80px; }
+
+  /* Header */
+  header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 9px; flex: none;
+    background: linear-gradient(150deg, var(--accent), var(--accent-ink));
+    display: grid; place-items: center; color: #fff; font-family: var(--mono); font-weight: 700; font-size: 18px;
+    box-shadow: var(--shadow);
+  }
+  .brand h1 { margin: 0; font-size: 18px; letter-spacing: -.2px; }
+  .brand p { margin: 1px 0 0; font-size: 12.5px; color: var(--text-dim); }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
+    border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 13px; font-family: var(--sans);
+  }
+  .theme-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+  /* Stat bar */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px; box-shadow: var(--shadow); }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); margin-bottom: 6px; }
+  .stat .val { font-family: var(--mono); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .stat .val small { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+  .meter { height: 5px; border-radius: 3px; background: var(--panel-2); margin-top: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .meter > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+  .meter.over > i { background: var(--crit); }
+  .stat.warnstate { border-color: var(--crit); }
+
+  /* Toolbar */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
+  .btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 8px 13px; cursor: pointer; font-size: 13px; font-family: var(--sans);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .btn:hover { border-color: var(--border-strong); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #04231f; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn.ghost { background: transparent; }
+  .btn.danger:hover { border-color: var(--crit); color: var(--crit); }
+  .spacer { flex: 1; }
+
+  /* Table */
+  .tablecard { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .tablescroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-faint); font-weight: 600; padding: 11px 12px; border-bottom: 1px solid var(--border);
+    background: var(--panel-2); white-space: nowrap;
+  }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--panel-2); }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .ssid-name { font-weight: 600; }
+  .sub { color: var(--text-dim); font-size: 12px; }
+  .idxpill { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; }
+  .band { font-family: var(--mono); font-size: 12px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border); }
+  .band.b2 { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+  .band.b5 { color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
+  .chip.on { color: var(--good); background: var(--good-soft); border-color: transparent; }
+  .chip.on.warnhue { color: var(--warn); background: var(--warn-soft); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .rowbtns { display: flex; gap: 5px; justify-content: flex-end; }
+  .iconbtn { border: 1px solid var(--border); background: var(--panel); color: var(--text-dim); border-radius: 7px; padding: 5px 8px; cursor: pointer; font-size: 12px; }
+  .iconbtn:hover { border-color: var(--border-strong); color: var(--text); }
+  .iconbtn.del:hover { border-color: var(--crit); color: var(--crit); }
+  .empty { padding: 44px 20px; text-align: center; color: var(--text-dim); }
+  .empty b { color: var(--text); display: block; margin-bottom: 4px; }
+
+  /* Config output */
+  .out { margin-top: 22px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .out .tabs { display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--border); background: var(--panel-2); flex-wrap: wrap; }
+  .tab { border: 1px solid transparent; border-bottom: none; background: transparent; color: var(--text-dim); padding: 8px 13px; cursor: pointer; font-size: 13px; border-radius: 8px 8px 0 0; font-family: var(--sans); }
+  .tab.active { background: var(--panel); color: var(--text); border-color: var(--border); font-weight: 600; }
+  .out .head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
+  .out .head .fname { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
+  pre.code { margin: 0; padding: 0 16px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--text); white-space: pre; }
+  .hint { padding: 12px 16px; background: var(--panel-2); border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-dim); }
+  .hint code { font-family: var(--mono); background: var(--panel); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); color: var(--text); }
+
+  /* Modal */
+  .backdrop { position: fixed; inset: 0; background: rgba(8,14,20,.55); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .backdrop.show { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 12px; width: 100%; max-width: 520px; box-shadow: 0 20px 60px rgba(0,0,0,.4); max-height: 90vh; overflow-y: auto; }
+  .modal h2 { margin: 0; padding: 16px 20px; font-size: 16px; border-bottom: 1px solid var(--border); }
+  .form { padding: 18px 20px; display: grid; gap: 14px; }
+  .field { display: grid; gap: 5px; }
+  .field.two { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field.two > div { display: grid; gap: 5px; }
+  label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+  label .req { color: var(--crit); }
+  input[type=text], input[type=number], select {
+    font-family: var(--sans); font-size: 13.5px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel-2); color: var(--text); width: 100%;
+  }
+  input.mono { font-family: var(--mono); }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+  .toggles { display: flex; gap: 18px; }
+  .tg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .tg input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--panel); }
+  .err { color: var(--crit); font-size: 12px; min-height: 0; }
+  .derived { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all .2s; pointer-events: none; z-index: 60; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 560px) { .toggles { flex-direction: column; gap: 10px; } .field.two { grid-template-columns: 1fr; } }
+
+  /* Live mode */
+  .hdr-actions { display: flex; gap: 8px; align-items: center; }
+  .live-badge { display: none; align-items: center; gap: 6px; font-size: 12px; font-family: var(--mono); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
+  .live-badge.on { display: inline-flex; color: var(--good); background: var(--good-soft); border-color: transparent; }
+  .live-badge.on .dot { animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  #liveTools { display: none; gap: 8px; }
+  #liveTools.on { display: flex; }
+  /* health pill */
+  .hp { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
+  .hp.okp { color: var(--good); background: var(--good-soft); border-color: transparent; }
+  .hp.warnp { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+  .hp.bad { color: var(--crit); background: var(--crit-soft); border-color: transparent; }
+  .hp.wait { color: var(--text-faint); }
+  .iconbtn.zap { color: var(--accent-ink); }
+  .iconbtn.zap:hover { border-color: var(--accent); }
+  .conn-status { font-size: 12.5px; padding: 8px 11px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); }
+  .conn-status.ok { color: var(--good); }
+  .conn-status.bad { color: var(--crit); }
+  .logbox { font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; max-height: 220px; overflow: auto; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text-dim); }
+  .healthwrap { display: inline-flex; align-items: center; gap: 8px; }
+  svg.spark { display: block; overflow: visible; }
+  .rblist { display: grid; gap: 8px; max-height: 300px; overflow: auto; }
+  .rbitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
+  .rbitem .nm { font-family: var(--mono); font-size: 12.5px; }
+  .rbitem .nm small { color: var(--text-faint); display: block; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">sb</div>
+      <div>
+        <h1>sbproxy Console</h1>
+        <p>Multi-WiFi → SOCKS5 · GL-MT6000 / OpenWrt</p>
+      </div>
+    </div>
+    <div class="hdr-actions">
+      <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
+      <button class="theme-btn" id="connBtn" title="Kết nối agent trên router">🔌 Kết nối router</button>
+      <button class="theme-btn" id="themeBtn" title="Đổi giao diện sáng/tối">◐ Theme</button>
+    </div>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <div class="toolbar">
+    <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
+    <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
+    <div class="spacer"></div>
+    <span id="liveTools">
+      <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
+      <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
+      <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
+    </span>
+    <button class="btn ghost" id="exportConf">Tải wifi-socks.conf</button>
+    <button class="btn ghost" id="exportJson">Tải JSON</button>
+    <button class="btn ghost danger" id="clearBtn">Xoá hết</button>
+  </div>
+
+  <div class="tablecard">
+    <div class="tablescroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>WiFi (SSID)</th><th>Băng</th><th>Subnet</th>
+            <th>SOCKS5</th><th>Auth</th><th>Isolate</th><th>WebRTC</th><th>Sức khỏe</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" style="display:none">
+      <b>Chưa có WiFi nào</b>
+      Bấm “＋ Thêm WiFi” để tạo, hoặc “⤓ Nhập .conf” để dán file có sẵn.
+    </div>
+  </div>
+
+  <div class="out">
+    <div class="tabs" id="outTabs">
+      <button class="tab active" data-t="conf">wifi-socks.conf</button>
+      <button class="tab" data-t="singbox">sing-box config.json</button>
+      <button class="tab" data-t="nft">sbproxy.nft</button>
+    </div>
+    <div class="head">
+      <span class="fname" id="outName">config/wifi-socks.conf</span>
+      <button class="btn ghost" id="copyBtn">⧉ Copy</button>
+    </div>
+    <pre class="code" id="outCode"></pre>
+    <div class="hint" id="applyHint"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="backdrop" id="backdrop">
+  <div class="modal">
+    <h2 id="modalTitle">Thêm WiFi</h2>
+    <div class="form">
+      <div class="field">
+        <label>Tên WiFi (SSID) <span class="req">*</span></label>
+        <input type="text" id="f_name" placeholder="Alpha" maxlength="32">
+      </div>
+      <div class="field two">
+        <div>
+          <label>Băng tần</label>
+          <select id="f_band"><option value="2g">2.4 GHz</option><option value="5g">5 GHz</option></select>
+        </div>
+        <div>
+          <label>idx (số duy nhất) <span class="req">*</span></label>
+          <input type="number" id="f_idx" class="mono" min="1" max="240">
+        </div>
+      </div>
+      <div class="field">
+        <label>Mật khẩu WiFi <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
+        <input type="text" id="f_key" class="mono" placeholder="Alpha_pass_123">
+      </div>
+      <div class="field two">
+        <div>
+          <label>SOCKS5 host <span class="req">*</span></label>
+          <input type="text" id="f_host" class="mono" placeholder="1.2.3.4">
+        </div>
+        <div>
+          <label>Cổng <span class="req">*</span></label>
+          <input type="number" id="f_port" class="mono" placeholder="1080" value="1080">
+        </div>
+      </div>
+      <div class="field two">
+        <div>
+          <label>SOCKS user <span class="derived">(trống nếu không auth)</span></label>
+          <input type="text" id="f_user" class="mono">
+        </div>
+        <div>
+          <label>SOCKS pass</label>
+          <input type="text" id="f_pass" class="mono">
+        </div>
+      </div>
+      <div class="toggles">
+        <label class="tg"><input type="checkbox" id="f_isolate" checked> Cách ly client</label>
+        <label class="tg"><input type="checkbox" id="f_webrtc" checked> Chặn WebRTC</label>
+      </div>
+      <div class="derived" id="f_derived"></div>
+      <div class="err" id="f_err"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="cancelBtn">Huỷ</button>
+      <button class="btn primary" id="saveBtn">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Connect modal -->
+<div class="backdrop" id="connBackdrop">
+  <div class="modal">
+    <h2>Kết nối agent trên router</h2>
+    <div class="form">
+      <div class="conn-status" id="connStatus">Chưa kết nối. Nhập token rồi bấm “Kết nối”.</div>
+      <div class="field">
+        <label>Agent base URL <span class="derived">(để trống nếu mở UI ngay từ router)</span></label>
+        <input type="text" id="c_base" class="mono" placeholder="(same-origin)  hoặc  http://192.168.1.1">
+      </div>
+      <div class="field">
+        <label>Token <span class="req">*</span> <span class="derived">(in ra bởi install-agent.sh)</span></label>
+        <input type="text" id="c_token" class="mono" placeholder="vd 3f9a1c...">
+      </div>
+      <div class="derived">Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b>.</div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="disconnectBtn">Ngắt</button>
+      <button class="btn ghost" id="connCancel">Đóng</button>
+      <button class="btn primary" id="connectBtn">Kết nối</button>
+    </div>
+  </div>
+</div>
+
+<!-- Backup / Rollback modal -->
+<div class="backdrop" id="rbBackdrop">
+  <div class="modal">
+    <h2>Backup &amp; Rollback</h2>
+    <div class="form">
+      <div class="conn-status" id="rbHint">Mỗi lần “Áp”/“đổi sock” router đã tự backup. ⚠️ Trước khi <b>cập nhật firmware</b>, hãy bấm <b>⭳ Về máy</b> để lưu backup ra máy tính — backup nằm trên router sẽ mất nếu reflash/brick.</div>
+      <div class="rblist" id="rbList"><div class="sub">Đang tải danh sách…</div></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="rbClose">Đóng</button>
+      <button class="btn primary" id="rbBackupNow">💾 Tạo backup ngay</button>
+    </div>
+  </div>
+</div>
+
+<!-- Log modal -->
+<div class="backdrop" id="logBackdrop">
+  <div class="modal">
+    <h2 id="logTitle">Kết quả</h2>
+    <div class="form"><div class="logbox" id="logBox"></div></div>
+    <div class="foot"><button class="btn primary" id="logClose">Đóng</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  const LS_KEY = "sbproxy.ssids.v1";
+  const NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, MARK = 1;
+  const STUN_TCP = "3478, 3479, 5349, 5350";
+  const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
+
+  /** @type {Array} */
+  let ssids = load();
+  let editId = null;
+  let curTab = "conf";
+
+  // ---- persistence ----
+  function load() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch (e) { return []; }
+  }
+  function save() { localStorage.setItem(LS_KEY, JSON.stringify(ssids)); }
+
+  // ---- derived ----
+  const octet = i => NET_BASE + i;
+  const subnet = i => `192.168.${octet(i)}.0/24`;
+  const gw = i => `192.168.${octet(i)}.1`;
+  const tport = i => TPROXY_BASE + i;
+  const isIP = h => /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(h);
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  function nextIdx() {
+    const used = new Set(ssids.map(s => s.idx));
+    let i = 1; while (used.has(i)) i++; return i;
+  }
+
+  // ---- agent (kiến trúc B: CGI trên router) ----
+  const agent = {
+    base: localStorage.getItem("sbproxy.agent.base") || "",
+    token: localStorage.getItem("sbproxy.agent.token") || "",
+    connected: false, health: {}, timer: null
+  };
+  const apiUrl = a => (agent.base || "") + "/cgi-bin/sbproxy?action=" + a;
+  function api(action, method, body, isText) {
+    const headers = { "X-SB-Token": agent.token };
+    if (body != null) headers["Content-Type"] = isText ? "text/plain" : "application/json";
+    return fetch(apiUrl(action), {
+      method: method || "GET", headers,
+      body: body == null ? undefined : (isText ? body : JSON.stringify(body))
+    }).then(r => isText === "resp" ? r.text() : r.json());
+  }
+
+  const healthHistory = {};   // idx -> [{ms,state}], tích luỹ theo mỗi lần poll
+  const HIST_MAX = 60;
+
+  function sparkline(idx) {
+    const h = healthHistory[idx];
+    if (!h || h.length < 2) return "";
+    const w = 72, ht = 18, n = h.length;
+    const max = Math.max(300, ...h.map(p => p.ms));
+    const pts = h.map((p, i) => `${((i / (n - 1)) * w).toFixed(1)},${(ht - (p.ms / max) * ht).toFixed(1)}`).join(" ");
+    const last = h[h.length - 1];
+    const col = last.state === "fail" ? "var(--crit)" : last.state === "slow" ? "var(--warn)" : "var(--good)";
+    const lx = w, ly = (ht - (last.ms / max) * ht).toFixed(1);
+    return `<svg class="spark" width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}" aria-hidden="true">
+      <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="${lx}" cy="${ly}" r="1.8" fill="${col}"/></svg>`;
+  }
+
+  function healthCell(idx) {
+    if (!agent.connected) return '<span class="sub">—</span>';
+    const h = agent.health[idx];
+    if (!h) return '<span class="hp wait">…</span>';
+    const pill = h.state === "fail"
+      ? `<span class="hp bad"><span class="dot"></span>fail${h.code ? " " + h.code : ""}</span>`
+      : `<span class="hp ${h.state === "slow" ? "warnp" : "okp"}"><span class="dot"></span>${h.latency_ms}ms</span>`;
+    return `<span class="healthwrap">${pill}${sparkline(idx)}</span>`;
+  }
+
+  function setConnStatus(msg, cls) {
+    const el = document.getElementById("connStatus");
+    el.textContent = msg; el.className = "conn-status" + (cls ? " " + cls : "");
+  }
+  function updateLiveUI() {
+    document.getElementById("liveBadge").classList.toggle("on", agent.connected);
+    document.getElementById("liveTools").classList.toggle("on", agent.connected);
+  }
+
+  function startPoll() { stopPoll(); poll(); agent.timer = setInterval(poll, 8000); }
+  function stopPoll() { if (agent.timer) clearInterval(agent.timer); agent.timer = null; }
+  function poll() {
+    api("status").then(d => {
+      if (!d || !d.ok) throw new Error((d && d.error) || "phản hồi lỗi");
+      agent.connected = true;
+      agent.health = (d.health && d.health.probes) || {};
+      recordHistory();
+      updateLiveUI(); renderRows();
+      const run = d.meta && d.meta.singbox_running;
+      setConnStatus("Đã kết nối · sing-box " + (run ? "đang chạy" : "KHÔNG chạy"), run ? "ok" : "bad");
+    }).catch(err => {
+      if (agent.connected) { agent.connected = false; updateLiveUI(); renderRows(); }
+      stopPoll();
+      setConnStatus("Mất kết nối: " + err.message + " (mixed-content? token sai? agent chưa cài?)", "bad");
+    });
+  }
+
+  function connect() {
+    agent.base = document.getElementById("c_base").value.trim().replace(/\/$/, "");
+    agent.token = document.getElementById("c_token").value.trim();
+    if (!agent.token) return setConnStatus("Thiếu token.", "bad");
+    localStorage.setItem("sbproxy.agent.base", agent.base);
+    localStorage.setItem("sbproxy.agent.token", agent.token);
+    setConnStatus("Đang kết nối…");
+    api("status").then(d => {
+      if (!d || !d.ok) throw new Error((d && d.error) || "phản hồi lỗi");
+      agent.connected = true; agent.health = (d.health && d.health.probes) || {};
+      updateLiveUI(); renderRows(); startPoll();
+      setConnStatus("Đã kết nối ✓", "ok");
+      toast("Đã kết nối router");
+      setTimeout(() => document.getElementById("connBackdrop").classList.remove("show"), 700);
+    }).catch(err => setConnStatus("Không kết nối được: " + err.message, "bad"));
+  }
+  function disconnect() {
+    agent.connected = false; stopPoll(); updateLiveUI(); renderRows();
+    setConnStatus("Đã ngắt kết nối.");
+  }
+
+  function showLog(title, d) {
+    document.getElementById("logTitle").textContent = title + (d && d.ok ? " ✓" : " ✗");
+    document.getElementById("logBox").textContent = (d && (d.log || d.error)) || JSON.stringify(d, null, 2);
+    document.getElementById("logBackdrop").classList.add("show");
+  }
+
+  function pushApply() {
+    if (!agent.connected) return;
+    if (!confirm("Ghi wifi-socks.conf hiện tại lên router rồi chạy apply.sh (reload WiFi)?")) return;
+    toast("Đang đẩy & áp…");
+    api("save_conf", "POST", genConf(), true).then(sv => {
+      if (!sv || !sv.ok) throw new Error((sv && sv.error) || "ghi conf lỗi");
+      return api("apply", "POST", {});
+    }).then(d => { showLog("apply.sh", d); poll(); })
+      .catch(err => toast("Lỗi: " + err.message));
+  }
+  function pullFromRouter() {
+    api("get_conf", "GET", null, "resp").then(txt => {
+      if (!txt) return toast("Router chưa có conf.");
+      parseConfInto(txt); render(); toast("Đã tải config từ router");
+    }).catch(err => toast("Lỗi: " + err.message));
+  }
+  function zapSock(s) {
+    if (!agent.connected) return;
+    if (!confirm(`Đổi SOCKS của "${s.name}" lên router ngay (không rớt WiFi)?\n→ ${s.host}:${s.port}`)) return;
+    toast("Đang đổi sock…");
+    api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "" })
+      .then(d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); })
+      .catch(err => toast("Lỗi: " + err.message));
+  }
+
+  function recordHistory() {
+    Object.keys(agent.health).forEach(idx => {
+      const p = agent.health[idx];
+      const arr = healthHistory[idx] || (healthHistory[idx] = []);
+      arr.push({ ms: p.latency_ms || 0, state: p.state });
+      if (arr.length > HIST_MAX) arr.shift();
+    });
+  }
+
+  // ---- backup / rollback ----
+  function openRollback() {
+    document.getElementById("rbBackdrop").classList.add("show");
+    loadBackups();
+  }
+  function loadBackups() {
+    const box = document.getElementById("rbList");
+    box.innerHTML = '<div class="sub">Đang tải danh sách…</div>';
+    api("backups").then(d => {
+      const list = (d && d.backups) || [];
+      if (!list.length) { box.innerHTML = '<div class="sub">Chưa có backup nào.</div>'; return; }
+      box.innerHTML = list.map((name, i) => {
+        const parts = name.split("-");
+        const label = parts.slice(2).join("-") || "manual";
+        return `<div class="rbitem">
+          <div class="nm">${esc(name)}<small>${i === 0 ? "mới nhất · " : ""}${esc(label)}</small></div>
+          <div class="rowbtns">
+            <button class="iconbtn" data-dl="${esc(name)}" title="Tải file backup về máy tính (an toàn khi reflash/brick)">⭳ Về máy</button>
+            <button class="btn ghost danger" data-restore="${esc(name)}">↩ Khôi phục</button>
+          </div>
+        </div>`;
+      }).join("");
+    }).catch(err => { box.innerHTML = `<div class="conn-status bad">Lỗi: ${esc(err.message)}</div>`; });
+  }
+  function backupNow() {
+    toast("Đang tạo backup…");
+    api("backup", "POST", { label: "ui" }).then(d => { showLog("backup.sh", d); loadBackups(); })
+      .catch(err => toast("Lỗi: " + err.message));
+  }
+  function downloadBackup(name) {
+    toast("Đang tải backup về máy…");
+    fetch(apiUrl("download_backup") + "&name=" + encodeURIComponent(name), { headers: { "X-SB-Token": agent.token } })
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+      .then(b => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(b); a.download = "sbproxy-" + name + ".tar.gz"; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        toast("Đã tải backup về máy ✓");
+      }).catch(err => toast("Lỗi tải: " + err.message));
+  }
+  function restore(name) {
+    if (!confirm(`Khôi phục cấu hình từ backup:\n${name}\n\nSẽ GHI ĐÈ config hiện tại và reload dịch vụ. Tiếp tục?`)) return;
+    toast("Đang rollback…");
+    api("rollback", "POST", { name }).then(d => {
+      showLog("rollback.sh " + name, d);
+      document.getElementById("rbBackdrop").classList.remove("show");
+      poll();
+    }).catch(err => toast("Lỗi: " + err.message));
+  }
+
+  // ---- render ----
+  function render() {
+    renderStats();
+    renderRows();
+    renderOutput();
+    save();
+  }
+
+  function renderStats() {
+    const c2 = ssids.filter(s => s.band === "2g").length;
+    const c5 = ssids.filter(s => s.band === "5g").length;
+    const proxies = new Set(ssids.map(s => s.host + ":" + s.port)).size;
+    const iso = ssids.filter(s => s.isolate).length;
+    const web = ssids.filter(s => s.webrtc).length;
+    const meter = (n, cls) => {
+      const over = n > BSSID_LIMIT;
+      const w = Math.min(100, (n / BSSID_LIMIT) * 100);
+      return `<div class="stat ${over ? "warnstate" : ""}">
+        <div class="label">${cls}</div>
+        <div class="val">${n}<small> / ${BSSID_LIMIT} BSSID</small></div>
+        <div class="meter ${over ? "over" : ""}"><i style="width:${w}%"></i></div>
+      </div>`;
+    };
+    document.getElementById("stats").innerHTML =
+      `<div class="stat"><div class="label">Tổng WiFi</div><div class="val">${ssids.length}</div></div>` +
+      meter(c2, "2.4 GHz") + meter(c5, "5 GHz") +
+      `<div class="stat"><div class="label">SOCKS riêng biệt</div><div class="val">${proxies}</div></div>` +
+      `<div class="stat"><div class="label">Cách ly / WebRTC</div><div class="val">${iso}<small> / ${web}</small></div></div>`;
+  }
+
+  function renderRows() {
+    const tb = document.getElementById("rows");
+    document.getElementById("empty").style.display = ssids.length ? "none" : "block";
+    const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
+    tb.innerHTML = sorted.map(s => {
+      const auth = s.user ? `<span class="chip"><span class="dot"></span>${esc(s.user)}</span>` : `<span class="sub">—</span>`;
+      return `<tr>
+        <td><span class="idxpill">${s.idx}</span></td>
+        <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)}</div></td>
+        <td><span class="band ${s.band === "2g" ? "b2" : "b5"}">${s.band === "2g" ? "2.4G" : "5G"}</span></td>
+        <td class="mono sub">${subnet(s.idx)}</td>
+        <td class="mono">${esc(s.host)}:${esc(s.port)}</td>
+        <td>${auth}</td>
+        <td>${s.isolate ? '<span class="chip on"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
+        <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
+        <td>${healthCell(s.idx)}</td>
+        <td><div class="rowbtns">
+          ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="Đổi sock này lên router ngay (không rớt WiFi)">⚡</button>` : ""}
+          <button class="iconbtn" data-edit="${s.id}">Sửa</button>
+          <button class="iconbtn" data-dup="${s.id}">⧉</button>
+          <button class="iconbtn del" data-del="${s.id}">✕</button>
+        </div></td>
+      </tr>`;
+    }).join("");
+  }
+
+  // ---- generators (khớp scripts/lib.sh) ----
+  function genConf() {
+    const head =
+`# wifi-socks.conf — sinh bởi sbproxy Console
+# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
+`;
+    const lines = [...ssids].sort((a, b) => a.idx - b.idx).map(s =>
+      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, s.webrtc ? 1 : 0].join("|")
+    );
+    return head + lines.join("\n") + (lines.length ? "\n" : "");
+  }
+
+  function genSingbox() {
+    const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
+    const inbounds = sorted.map(s => ({
+      type: "tproxy", tag: `in-w${s.idx}`, listen: "0.0.0.0", listen_port: tport(s.idx), sniff: true
+    }));
+    const outbounds = sorted.map(s => {
+      const o = { type: "socks", tag: `out-w${s.idx}`, server: s.host, server_port: Number(s.port), version: "5" };
+      if (s.user) { o.username = s.user; o.password = s.pass || ""; }
+      return o;
+    });
+    outbounds.push({ type: "direct", tag: "direct" }, { type: "block", tag: "block" });
+    const rules = sorted.map(s => ({ inbound: [`in-w${s.idx}`], outbound: `out-w${s.idx}` }));
+    return JSON.stringify({
+      log: { level: "warn", timestamp: true },
+      inbounds, outbounds, route: { rules, final: "direct" }
+    }, null, 2);
+  }
+
+  function genNft() {
+    const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
+    const webrtc = sorted.filter(s => s.webrtc).flatMap(s => [
+      `    iifname "br-w${s.idx}" tcp dport { ${STUN_TCP} } drop`,
+      `    iifname "br-w${s.idx}" udp dport { ${STUN_UDP} } drop`
+    ]);
+    const bypass = [...new Set(sorted.map(s => s.host).filter(isIP))].map(h => `    ip daddr ${h} return`);
+    const tproxy = sorted.flatMap(s => [
+      `    iifname "br-w${s.idx}" meta l4proto tcp tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`,
+      `    iifname "br-w${s.idx}" meta l4proto udp tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`
+    ]);
+    return [
+      "# GENERATED bởi sbproxy Console — khớp scripts/lib.sh build_nft",
+      "table inet sbproxy {",
+      "  chain webrtc {",
+      "    type filter hook forward priority filter; policy accept;",
+      ...webrtc,
+      "  }",
+      "  chain prerouting {",
+      "    type filter hook prerouting priority mangle; policy accept;",
+      "    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return",
+      ...bypass,
+      ...tproxy,
+      "  }",
+      "}"
+    ].join("\n");
+  }
+
+  const TABS = {
+    conf: { name: "config/wifi-socks.conf", gen: genConf,
+      hint: `Copy nội dung này vào <code>config/wifi-socks.conf</code> trên router, rồi chạy <code>sh scripts/apply.sh</code>. Đổi 1 sock nhanh: <code>sh scripts/set-sock.sh &lt;idx&gt; host port user pass</code>.` },
+    singbox: { name: "/etc/sing-box/config.json", gen: genSingbox,
+      hint: `File này do <code>apply.sh</code> tự sinh trên router — đây chỉ là <b>xem trước</b> để đối chiếu. Validate: <code>sing-box check -c /etc/sing-box/config.json</code>.` },
+    nft: { name: "/etc/sbproxy.nft", gen: genNft,
+      hint: `Ruleset TPROXY + chặn WebRTC, do <code>apply.sh</code> sinh và nạp qua <code>/etc/init.d/sbproxy</code>. Xem trên router: <code>nft list table inet sbproxy</code>.` }
+  };
+
+  function renderOutput() {
+    const t = TABS[curTab];
+    document.getElementById("outName").textContent = t.name;
+    document.getElementById("outCode").textContent = t.gen();
+    document.getElementById("applyHint").innerHTML = t.hint;
+  }
+
+  // ---- modal ----
+  const $ = id => document.getElementById(id);
+  function openModal(id) {
+    editId = id;
+    const s = id ? ssids.find(x => x.id === id) : null;
+    $("modalTitle").textContent = s ? "Sửa WiFi" : "Thêm WiFi";
+    $("f_name").value = s ? s.name : "";
+    $("f_band").value = s ? s.band : "2g";
+    $("f_idx").value = s ? s.idx : nextIdx();
+    $("f_key").value = s ? s.key : "";
+    $("f_host").value = s ? s.host : "";
+    $("f_port").value = s ? s.port : "1080";
+    $("f_user").value = s ? (s.user || "") : "";
+    $("f_pass").value = s ? (s.pass || "") : "";
+    $("f_isolate").checked = s ? !!s.isolate : true;
+    $("f_webrtc").checked = s ? !!s.webrtc : true;
+    $("f_err").textContent = "";
+    updateDerived();
+    $("backdrop").classList.add("show");
+    $("f_name").focus();
+  }
+  function closeModal() { $("backdrop").classList.remove("show"); editId = null; }
+
+  function updateDerived() {
+    const i = parseInt($("f_idx").value, 10);
+    $("f_derived").textContent = isFinite(i)
+      ? `→ subnet ${subnet(i)} · gateway ${gw(i)} · bridge br-w${i} · tproxy :${tport(i)} · MAC 02:xx (tự random trên router)`
+      : "";
+  }
+
+  function saveForm() {
+    const name = $("f_name").value.trim();
+    const band = $("f_band").value;
+    const idx = parseInt($("f_idx").value, 10);
+    const key = $("f_key").value.trim();
+    const host = $("f_host").value.trim();
+    const port = parseInt($("f_port").value, 10);
+    const user = $("f_user").value.trim();
+    const pass = $("f_pass").value;
+    const err = m => { $("f_err").textContent = m; return false; };
+
+    if (!name) return err("Thiếu tên WiFi.");
+    if (/[|]/.test(name)) return err("Tên WiFi không được chứa ký tự '|'.");
+    if (!isFinite(idx) || idx < 1) return err("idx phải là số ≥ 1.");
+    if (ssids.some(s => s.idx === idx && s.id !== editId)) return err(`idx ${idx} đã dùng cho WiFi khác.`);
+    if (key.length < 8) return err("Mật khẩu WiFi phải ≥ 8 ký tự (WPA2).");
+    if (!host) return err("Thiếu SOCKS host.");
+    if (!isFinite(port) || port < 1 || port > 65535) return err("Cổng SOCKS không hợp lệ.");
+    if (user && !pass) return err("Có user thì cần pass (hoặc bỏ trống cả hai).");
+
+    const rec = { name, band, idx, key, host, port: String(port), user, pass, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked };
+    if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
+    else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
+    closeModal(); render(); toast(editId ? "Đã cập nhật" : "Đã thêm WiFi");
+  }
+
+  // ---- import ----
+  function parseConfInto(txt) {
+    const rows = [];
+    txt.split(/\r?\n/).forEach(line => {
+      const l = line.trim();
+      if (!l || l.startsWith("#")) return;
+      const p = l.split("|");
+      if (p.length < 4) return;
+      const idx = parseInt(p[2], 10);
+      if (!isFinite(idx)) return;
+      rows.push({
+        id: "s" + idx + "_" + rows.length,
+        name: p[0].trim(), band: (p[1] || "2g").trim(), idx,
+        key: (p[3] || "").trim(), host: (p[4] || "").trim(), port: (p[5] || "1080").trim(),
+        user: (p[6] || "").trim(), pass: (p[7] || "").trim(),
+        isolate: (p[8] || "1").trim() === "1", webrtc: (p[9] || "0").trim() === "1"
+      });
+    });
+    if (rows.length) ssids = rows;
+    return rows.length;
+  }
+  function importConf() {
+    const txt = prompt("Dán nội dung wifi-socks.conf:");
+    if (!txt) return;
+    const n = parseConfInto(txt);
+    if (!n) return toast("Không đọc được dòng WiFi nào.");
+    render(); toast(`Đã nhập ${n} WiFi`);
+  }
+
+  // ---- download / copy ----
+  function download(fname, text) {
+    const b = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = fname; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function copy(text) {
+    navigator.clipboard.writeText(text).then(() => toast("Đã copy"), () => toast("Không copy được"));
+  }
+  let toastT;
+  function toast(m) {
+    const el = $("toast"); el.textContent = m; el.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 1600);
+  }
+
+  // ---- theme ----
+  function initTheme() {
+    const saved = localStorage.getItem("sbproxy.theme");
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  }
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("sbproxy.theme", next);
+  }
+
+  // ---- events ----
+  $("addBtn").onclick = () => openModal(null);
+  $("saveBtn").onclick = saveForm;
+  $("cancelBtn").onclick = closeModal;
+  $("backdrop").onclick = e => { if (e.target.id === "backdrop") closeModal(); };
+  $("f_idx").oninput = updateDerived;
+  $("themeBtn").onclick = toggleTheme;
+  $("importBtn").onclick = importConf;
+  $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
+  $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
+  $("copyBtn").onclick = () => copy(TABS[curTab].gen());
+  $("clearBtn").onclick = () => { if (confirm("Xoá toàn bộ WiFi khỏi console? (không đụng tới router)")) { ssids = []; render(); } };
+
+  // live mode events
+  $("connBtn").onclick = () => {
+    $("c_base").value = agent.base; $("c_token").value = agent.token;
+    if (!agent.connected) setConnStatus("Chưa kết nối. Nhập token rồi bấm “Kết nối”.");
+    $("connBackdrop").classList.add("show");
+  };
+  $("connectBtn").onclick = connect;
+  $("disconnectBtn").onclick = disconnect;
+  $("connCancel").onclick = () => $("connBackdrop").classList.remove("show");
+  $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") $("connBackdrop").classList.remove("show"); };
+  $("pushApplyBtn").onclick = pushApply;
+  $("pullBtn").onclick = pullFromRouter;
+  $("rbBtn").onclick = openRollback;
+  $("rbClose").onclick = () => $("rbBackdrop").classList.remove("show");
+  $("rbBackupNow").onclick = backupNow;
+  $("rbBackdrop").onclick = e => { if (e.target.id === "rbBackdrop") $("rbBackdrop").classList.remove("show"); };
+  $("rbList").onclick = e => {
+    const r = e.target.getAttribute("data-restore");
+    const d = e.target.getAttribute("data-dl");
+    if (r) return restore(r);
+    if (d) return downloadBackup(d);
+  };
+  $("logClose").onclick = () => $("logBackdrop").classList.remove("show");
+  $("logBackdrop").onclick = e => { if (e.target.id === "logBackdrop") $("logBackdrop").classList.remove("show"); };
+
+  document.getElementById("rows").onclick = e => {
+    const ed = e.target.getAttribute("data-edit");
+    const du = e.target.getAttribute("data-dup");
+    const de = e.target.getAttribute("data-del");
+    const zp = e.target.getAttribute("data-zap");
+    if (zp) return zapSock(ssids.find(x => x.id === zp));
+    if (ed) return openModal(ed);
+    if (du) {
+      const s = ssids.find(x => x.id === du);
+      const clone = { ...s, id: "s" + Date.now(), idx: nextIdx(), name: s.name + "-copy" };
+      ssids.push(clone); render(); toast("Đã nhân bản");
+    }
+    if (de) { const s = ssids.find(x => x.id === de); if (confirm(`Xoá WiFi "${s.name}"?`)) { ssids = ssids.filter(x => x.id !== de); render(); } }
+  };
+
+  document.getElementById("outTabs").onclick = e => {
+    const t = e.target.getAttribute("data-t"); if (!t) return;
+    curTab = t;
+    document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.getAttribute("data-t") === t));
+    renderOutput();
+  };
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeModal();
+    if (e.key === "Enter" && $("backdrop").classList.contains("show") && e.target.tagName === "INPUT") saveForm();
+  });
+
+  // ---- seed demo on first run ----
+  if (!ssids.length && !localStorage.getItem("sbproxy.seeded")) {
+    localStorage.setItem("sbproxy.seeded", "1");
+    ssids = [
+      { id: "s1", name: "Alpha", band: "2g", idx: 1, key: "Alpha_pass_123", host: "1.2.3.4", port: "1080", user: "user1", pass: "pass1", isolate: true, webrtc: true },
+      { id: "s2", name: "Bravo", band: "2g", idx: 2, key: "Bravo_pass_123", host: "5.6.7.8", port: "1080", user: "user2", pass: "pass2", isolate: true, webrtc: true },
+      { id: "s3", name: "Charlie", band: "5g", idx: 3, key: "Charlie_pass_123", host: "9.9.9.9", port: "1080", user: "", pass: "", isolate: true, webrtc: false }
+    ];
+  }
+
+  // tự kết nối lại nếu đã lưu token (vd khi mở UI từ chính router)
+  function initAgent() {
+    updateLiveUI();
+    if (!agent.token) return;
+    api("status").then(d => {
+      if (d && d.ok) {
+        agent.connected = true; agent.health = (d.health && d.health.probes) || {};
+        updateLiveUI(); renderRows(); startPoll();
+      }
+    }).catch(() => {});
+  }
+
+  initTheme();
+  render();
+  initAgent();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# ==== Bí mật — KHÔNG commit (tránh lộ) ====
+config/wifi-socks.conf          # bản thật chứa user/pass SOCKS + wifi key
+**/cloud.env                    # CLOUD_URL + DEVICE_KEY
+**/token                        # token agent
+*.secret                        # jwt.secret ...
+cloud-server/data/              # DB, jwt.secret, khoá thiết bị (hash)
+sbproxy-backups/                # backup chứa cấu hình nhạy cảm
+
+# ==== Node ====
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# ==== Hệ điều hành / editor ====
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/

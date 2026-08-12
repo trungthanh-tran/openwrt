@@ -1,0 +1,21 @@
+# wifi-socks.conf — nguồn sự thật duy nhất (single source of truth).
+# Mỗi dòng = 1 WiFi. Phân tách bằng dấu '|'. KHÔNG để khoảng trắng quanh dấu '|'.
+# Dòng bắt đầu bằng '#' hoặc rỗng sẽ bị bỏ qua.
+#
+# Cột:
+#   name     : Tên WiFi (SSID). Tránh ký tự '|'. Có thể có khoảng trắng bên trong.
+#   band     : 2g hoặc 5g
+#   idx      : SỐ NGUYÊN DƯƠNG DUY NHẤT (1..N). Quyết định VLAN/subnet/cổng TPROXY.
+#              -> subnet = 192.168.(NET_BASE+idx).0/24 ; đừng đổi idx của WiFi đã chạy.
+#   wifi_key : Mật khẩu WiFi (>= 8 ký tự cho WPA2).
+#   sock_host: IP/host của SOCKS5 upstream.
+#   sock_port: cổng SOCKS5.
+#   sock_user: user SOCKS5 (để trống nếu không auth).
+#   sock_pass: pass SOCKS5 (để trống nếu không auth).
+#   isolate  : 1 = chặn client trong cùng WiFi thấy nhau ; 0 = tắt.
+#   webrtc   : 1 = chặn STUN/TURN (chống lộ IP WebRTC) ; 0 = tắt.
+#
+# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
+Alpha|2g|1|Alpha_pass_123|1.2.3.4|1080|user1|pass1|1|1
+Bravo|2g|2|Bravo_pass_123|5.6.7.8|1080|user2|pass2|1|1
+Charlie|5g|3|Charlie_pass_123|9.9.9.9|1080|||1|0

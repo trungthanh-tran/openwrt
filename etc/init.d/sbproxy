@@ -1,0 +1,27 @@
+#!/bin/sh /etc/rc.common
+# sbproxy — nạp nftables TPROXY + policy routing cho sing-box.
+# Cài bởi scripts/install-deps.sh. Chạy sau firewall.
+START=99
+STOP=10
+
+NFT_FILE="/etc/sbproxy.nft"
+MARK=1        # phải khớp TPROXY_MARK trong config/settings.sh
+TABLE=100     # phải khớp TPROXY_TABLE trong config/settings.sh
+
+start() {
+  [ -f "$NFT_FILE" ] || { echo "sbproxy: thiếu $NFT_FILE"; return 1; }
+  nft -f "$NFT_FILE" || { echo "sbproxy: nạp nft lỗi"; return 1; }
+  # policy routing để TPROXY giao gói cho socket local
+  ip -4 rule add fwmark $MARK table $TABLE 2>/dev/null
+  ip -4 route add local default dev lo table $TABLE 2>/dev/null
+  echo "sbproxy: started"
+}
+
+stop() {
+  nft delete table inet sbproxy 2>/dev/null
+  ip -4 rule del fwmark $MARK table $TABLE 2>/dev/null
+  ip -4 route flush table $TABLE 2>/dev/null
+  echo "sbproxy: stopped"
+}
+
+restart() { stop; start; }

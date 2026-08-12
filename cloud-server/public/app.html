@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy Cloud</title>
+<style>
+  :root{--bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;--text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;--good:#1a8f4c;--goods:#d8f0e0;--warn:#b5750a;--warns:#f6e9cf;--crit:#cc2f4a;--crits:#f7d9de;--mono:ui-monospace,"Cascadia Code",Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  @media (prefers-color-scheme:dark){:root{--bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;--text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;--good:#38d178;--goods:#10321f;--warn:#e0a53a;--warns:#33280f;--crit:#f26c81;--crits:#37151c}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 20px 80px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .logo{width:36px;height:36px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#04231f;font-family:var(--mono);font-weight:700;font-size:16px}
+  h1{font-size:17px;margin:0}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim)}
+  .rolebadge{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:20px;background:var(--asoft);color:var(--accent2);font-weight:600}
+  .rolebadge.super{background:var(--warns);color:var(--warn)}
+  button,select{font-family:var(--sans);font-size:13px}
+  .btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .btn:hover{border-color:var(--bstrong)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#04231f;font-weight:600}
+  .btn.danger:hover{border-color:var(--crit);color:var(--crit)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+  .tab{border:1px solid transparent;border-bottom:none;background:transparent;color:var(--dim);padding:8px 14px;cursor:pointer;border-radius:8px 8px 0 0}
+  .tab.active{background:var(--panel);border-color:var(--border);color:var(--text);font-weight:600}
+  .bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  select{padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text)}
+  .status{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);display:inline-block}
+  .dot.on{background:var(--good)}.dot.off{background:var(--crit)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:640px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel2);white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .sub{color:var(--dim);font-size:12px}
+  .band{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px}
+  .band.b2{color:var(--warn);background:var(--warns)}.band.b5{color:var(--accent2);background:var(--asoft)}
+  .hp{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:20px}
+  .hp.ok{color:var(--good);background:var(--goods)}.hp.warn{color:var(--warn);background:var(--warns)}.hp.bad{color:var(--crit);background:var(--crits)}.hp.wait{color:var(--faint)}
+  .healthwrap{display:inline-flex;align-items:center;gap:8px}
+  .iconbtn{border:1px solid var(--border);background:var(--panel);color:var(--dim);border-radius:7px;padding:4px 8px;cursor:pointer;font-size:12px}
+  .iconbtn:hover{border-color:var(--accent);color:var(--accent2)}
+  .empty{padding:30px;text-align:center;color:var(--dim)}
+  .backdrop{position:fixed;inset:0;background:rgba(8,14,20,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .backdrop.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--bstrong);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+  .modal h2{margin:0;padding:15px 18px;font-size:16px;border-bottom:1px solid var(--border)}
+  .form{padding:16px 18px;display:grid;gap:12px}
+  .form label{font-size:12px;color:var(--dim);display:block;margin-bottom:4px}
+  .form input,.form textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text);font-family:var(--sans)}
+  .form textarea{font-family:var(--mono);font-size:12.5px;min-height:200px;white-space:pre}
+  .perms{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .perms label{display:flex;gap:7px;align-items:flex-start;font-size:12.5px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:7px 9px;cursor:pointer}
+  .foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+  .err{color:var(--crit);font-size:12.5px}
+  .keybox{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;word-break:break-all;white-space:pre-wrap}
+  .pill{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);color:var(--dim)}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  svg.spark{display:block;overflow:visible}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">sb</div>
+    <h1>sbproxy Cloud</h1>
+    <div class="who" id="who"></div>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+</div>
+
+<div class="backdrop" id="modal"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (t, a, ...k) => { const e = document.createElement(t); if (a) for (const x in a) { if (x === "html") e.innerHTML = a[x]; else if (x === "text") e.textContent = a[x]; else if (x.startsWith("on")) e.addEventListener(x.slice(2), a[x]); else e.setAttribute(x, a[x]); } k.flat().forEach(c => c != null && e.append(c)); return e; };
+let ME = null, DEVS = [], CUR = null, DETAIL = null, HIST = {}, TAB = "control", timer = null;
+
+async function api(pathname, opts) {
+  const r = await fetch(pathname, Object.assign({ credentials: "same-origin", headers: { "Content-Type": "application/json" } }, opts));
+  if (r.status === 401) { location.href = "/login.html"; throw new Error("401"); }
+  const ct = r.headers.get("content-type") || "";
+  const d = ct.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error((d && d.error) || ("HTTP " + r.status));
+  return d;
+}
+const can = p => ME && (ME.is_super || ME.permissions.indexOf(p) !== -1);
+function toast(m) { const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 1700); }
+function openModal(node) { const b = document.getElementById("modalBox"); b.innerHTML = ""; b.append(node); document.getElementById("modal").classList.add("show"); }
+function closeModal() { document.getElementById("modal").classList.remove("show"); }
+document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+
+function parseConf(text) {
+  const rows = [];
+  (text || "").split(/\r?\n/).forEach(l => {
+    l = l.trim(); if (!l || l[0] === "#") return;
+    const p = l.split("|"); if (p.length < 4) return;
+    const idx = parseInt(p[2], 10); if (!isFinite(idx)) return;
+    rows.push({ name: p[0], band: p[1], idx, host: p[4] || "", port: p[5] || "", user: p[6] || "", isolate: (p[8] || "1") === "1", webrtc: (p[9] || "0") === "1" });
+  });
+  return rows.sort((a, b) => a.idx - b.idx);
+}
+
+// ---------- chrome ----------
+function renderChrome() {
+  const who = document.getElementById("who");
+  who.innerHTML = "";
+  who.append(
+    $("span", { class: "rolebadge" + (ME.is_super ? " super" : ""), text: ME.is_super ? "SUPERUSER" : (ME.permissions.length + " quyền") }),
+    $("span", { text: ME.username }),
+    $("button", { class: "btn", onclick: changePwd }, "Đổi MK"),
+    $("button", { class: "btn", onclick: async () => { await api("/api/logout", { method: "POST" }); location.href = "/login.html"; } }, "Đăng xuất")
+  );
+  const tabs = document.getElementById("tabs"); tabs.innerHTML = "";
+  const defs = [["control", "Bảng điều khiển", true]];
+  if (can("user.manage")) defs.push(["users", "Người dùng", true]);
+  if (can("device.manage")) defs.push(["devices", "Router", true]);
+  if (can("audit.view")) defs.push(["audit", "Nhật ký", true]);
+  defs.forEach(([id, label]) => tabs.append($("button", { class: "tab" + (TAB === id ? " active" : ""), onclick: () => { TAB = id; render(); } }, label)));
+}
+
+// ---------- CONTROL tab ----------
+async function loadDevices() {
+  DEVS = await api("/api/devices");
+  if (!CUR && DEVS.length) CUR = DEVS[0].id;
+}
+function healthPill(h) {
+  if (!h) return $("span", { class: "hp wait" }, "…");
+  if (h.state === "fail") return $("span", { class: "hp bad" }, "fail" + (h.code ? " " + h.code : ""));
+  return $("span", { class: "hp " + (h.state === "slow" ? "warn" : "ok") }, h.latency_ms + "ms");
+}
+function sparkline(idx) {
+  const a = HIST[idx]; if (!a || a.length < 2) return "";
+  const w = 72, ht = 18, n = a.length, max = Math.max(300, ...a.map(p => p.ms));
+  const pts = a.map((p, i) => `${(i / (n - 1) * w).toFixed(1)},${(ht - p.ms / max * ht).toFixed(1)}`).join(" ");
+  const last = a[a.length - 1], col = last.state === "fail" ? "var(--crit)" : last.state === "slow" ? "var(--warn)" : "var(--good)";
+  const s = `<svg class="spark" width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`;
+  const span = document.createElement("span"); span.innerHTML = s; return span.firstChild;
+}
+async function renderControl() {
+  const view = document.getElementById("view"); view.innerHTML = "";
+  if (!DEVS.length) { view.append($("div", { class: "card" }, $("div", { class: "empty" }, "Chưa có router nào bạn được phép xem." + (can("device.manage") ? " Thêm ở tab Router." : "")))); return; }
+
+  // bar: device selector + actions
+  const sel = $("select", { onchange: e => { CUR = Number(e.target.value); HIST = {}; loadDetail().then(render); } });
+  DEVS.forEach(d => { const o = $("option", { value: d.id }, d.name); if (d.id === CUR) o.selected = true; sel.append(o); });
+  const dev = DEVS.find(d => d.id === CUR) || DEVS[0];
+  const st = $("span", { class: "status" }, $("span", { class: "dot " + (dev.online ? "on" : "off") }), dev.online ? "online" : "offline",
+    dev.last_seen ? " · " + timeago(dev.last_seen) : "", dev.applied_version !== dev.config_version ? " · đang chờ áp v" + dev.config_version : "");
+  const bar = $("div", { class: "bar" }, sel, st);
+  const spacer = $("div", { style: "flex:1" }); bar.append(spacer);
+  if (can("wifi.manage")) bar.append($("button", { class: "btn", onclick: editConf }, "✎ Sửa cấu hình"));
+  if (can("config.apply")) bar.append($("button", { class: "btn primary", onclick: () => act("apply", "Áp cấu hình lên router?") }, "⇪ Áp"));
+  if (can("backup.create")) bar.append($("button", { class: "btn", onclick: () => act("backup", "Tạo backup trên router?") }, "💾 Backup"));
+  if (can("backup.rollback")) bar.append($("button", { class: "btn", onclick: openRollback }, "🗂 Rollback"));
+  view.append(bar);
+
+  // health/WiFi table
+  const rows = parseConf(DETAIL && DETAIL.conf);
+  const health = (DETAIL && DETAIL.health) || (dev.health) || {};
+  const tb = $("tbody");
+  if (!rows.length) tb.append($("tr", null, $("td", { colspan: 7 }, $("div", { class: "empty" }, can("wifi.view") ? "Chưa có WiFi. Bấm “Sửa cấu hình”." : "Bạn không có quyền xem cấu hình WiFi (health.view chỉ thấy latency)."))));
+  rows.forEach(s => {
+    const acts = $("div", null);
+    if (can("sock.change")) acts.append($("button", { class: "iconbtn", title: "Đổi SOCKS (không rớt WiFi)", onclick: () => sockModal(s) }, "⚡"));
+    tb.append($("tr", null,
+      $("td", null, $("span", { class: "pill" }, String(s.idx))),
+      $("td", null, $("div", { text: s.name, style: "font-weight:600" }), $("div", { class: "sub mono", text: "192.168." + (10 + s.idx) + ".1" })),
+      $("td", null, $("span", { class: "band " + (s.band === "2g" ? "b2" : "b5"), text: s.band === "2g" ? "2.4G" : "5G" })),
+      $("td", { class: "mono" }, s.host + ":" + s.port),
+      $("td", null, $("span", { class: "healthwrap" }, healthPill(health[s.idx]), sparkline(s.idx) || "")),
+      $("td", { class: "sub" }, s.isolate ? "iso " : "", s.webrtc ? "webrtc" : ""),
+      $("td", null, acts)
+    ));
+  });
+  view.append($("div", { class: "card" }, $("div", { class: "scroll" }, $("table", null,
+    $("thead", null, $("tr", null, ...["#", "WiFi", "Băng", "SOCKS5", "Sức khỏe", "Cờ", ""].map(h => $("th", { text: h })))), tb))));
+}
+
+async function loadDetail() {
+  if (!CUR) { DETAIL = null; return; }
+  DETAIL = await api("/api/devices/" + CUR);
+  if (can("health.view")) {
+    try {
+      const hist = await api("/api/devices/" + CUR + "/health?limit=60");
+      HIST = {};
+      hist.forEach(rec => { for (const idx in rec.probes) { (HIST[idx] || (HIST[idx] = [])).push({ ms: rec.probes[idx].latency_ms || 0, state: rec.probes[idx].state }); } });
+    } catch (e) {}
+  }
+}
+async function act(kind, confirmMsg) {
+  if (confirmMsg && !confirm(confirmMsg)) return;
+  try { await api("/api/devices/" + CUR + "/" + kind, { method: "POST", body: "{}" }); toast("Đã gửi lệnh: " + kind); }
+  catch (e) { toast("Lỗi: " + e.message); }
+}
+function sockModal(s) {
+  const host = $("input", { class: "mono", value: s.host }), port = $("input", { class: "mono", value: s.port });
+  const user = $("input", { class: "mono" }), pass = $("input", { class: "mono" });
+  const err = $("div", { class: "err" });
+  openModal($("div", null,
+    $("h2", { text: `Đổi SOCKS · ${s.name} (idx ${s.idx})` }),
+    $("div", { class: "form" },
+      $("div", null, $("label", { text: "Host" }), host), $("div", null, $("label", { text: "Cổng" }), port),
+      $("div", null, $("label", { text: "User (tuỳ chọn)" }), user), $("div", null, $("label", { text: "Pass" }), pass), err),
+    $("div", { class: "foot" }, $("button", { class: "btn", onclick: closeModal }, "Huỷ"),
+      $("button", { class: "btn primary", onclick: async () => {
+        try { await api("/api/devices/" + CUR + "/sock", { method: "POST", body: JSON.stringify({ idx: s.idx, host: host.value.trim(), port: port.value.trim(), user: user.value.trim(), pass: pass.value }) }); closeModal(); toast("Đã gửi đổi sock (router áp ở lần poll kế)"); }
+        catch (e) { err.textContent = e.message; }
+      } }, "Đổi SOCKS"))));
+}
+function editConf() {
+  const ta = $("textarea", { text: (DETAIL && DETAIL.conf) || "# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc\n" });
+  const err = $("div", { class: "err" });
+  openModal($("div", null,
+    $("h2", { text: "Sửa cấu hình WiFi (wifi-socks.conf)" }),
+    $("div", { class: "form" }, $("div", null, $("label", { text: "Mỗi dòng 1 WiFi. Lưu xong bấm “⇪ Áp” để router áp dụng." }), ta), err),
+    $("div", { class: "foot" }, $("button", { class: "btn", onclick: closeModal }, "Huỷ"),
+      $("button", { class: "btn primary", onclick: async () => {
+        try { await api("/api/devices/" + CUR + "/config", { method: "PUT", body: JSON.stringify({ conf: ta.value }) }); closeModal(); toast("Đã lưu cấu hình mong muốn"); loadDetail().then(render); }
+        catch (e) { err.textContent = e.message; }
+      } }, "Lưu"))));
+}
+function openRollback() {
+  const list = $("div", { class: "form" }, $("div", { class: "sub" }, "Đang tải…"));
+  const box = $("div", null, $("h2", { text: "Backup & Rollback" }), list,
+    $("div", { class: "foot" }, $("button", { class: "btn", onclick: closeModal }, "Đóng")));
+  openModal(box);
+  api("/api/devices/" + CUR).then(d => {
+    list.innerHTML = "";
+    const bks = d.backups || [];
+    if (!bks.length) { list.append($("div", { class: "sub" }, "Router chưa báo bản backup nào.")); return; }
+    bks.forEach(n => list.append($("div", { style: "display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px 10px" },
+      $("span", { class: "mono", style: "font-size:12px" }, n),
+      $("button", { class: "btn danger", onclick: async () => { if (!confirm("Khôi phục " + n + "?")) return; try { await api("/api/devices/" + CUR + "/rollback", { method: "POST", body: JSON.stringify({ name: n }) }); closeModal(); toast("Đã gửi lệnh rollback"); } catch (e) { toast("Lỗi: " + e.message); } } }, "↩ Khôi phục"))));
+  }).catch(e => { list.innerHTML = ""; list.append($("div", { class: "err" }, e.message)); });
+}
+
+// ---------- USERS tab ----------
+async function renderUsers() {
+  const view = document.getElementById("view"); view.innerHTML = "";
+  view.append($("div", { class: "bar" }, $("button", { class: "btn primary", onclick: () => userModal(null) }, "＋ Tạo người dùng")));
+  const users = await api("/api/admin/users");
+  const tb = $("tbody");
+  users.forEach(u => {
+    tb.append($("tr", null,
+      $("td", null, $("b", { text: u.username }), u.disabled ? $("span", { class: "sub" }, " (khoá)") : ""),
+      $("td", null, u.is_super ? $("span", { class: "rolebadge super" }, "SUPERUSER") : $("span", { class: "sub", text: u.permissions.length + " quyền" })),
+      $("td", { class: "sub" }, u.device_scope === "all" ? "mọi router" : (Array.isArray(u.device_scope) ? u.device_scope.length + " router" : "—")),
+      $("td", null, u.is_super ? $("span", { class: "sub" }, "quản lý qua seed.js") : $("div", null,
+        $("button", { class: "iconbtn", onclick: () => userModal(u) }, "Sửa"),
+        $("button", { class: "iconbtn", onclick: () => toggleUser(u) }, u.disabled ? "Mở" : "Khoá"),
+        $("button", { class: "iconbtn", onclick: () => delUser(u) }, "✕")))
+    ));
+  });
+  view.append($("div", { class: "card" }, $("div", { class: "scroll" }, $("table", null,
+    $("thead", null, $("tr", null, ...["Tài khoản", "Vai trò", "Phạm vi", ""].map(h => $("th", { text: h })))), tb))));
+}
+function permCheckboxes(selected) {
+  const wrap = $("div", { class: "perms" });
+  const cat = ME.catalog;
+  Object.keys(cat).forEach(k => {
+    if (k === "user.manage" || k === "device.manage") return; // super-only, không cấp cho user thường
+    const cb = $("input", { type: "checkbox", value: k }); if (selected.indexOf(k) !== -1) cb.checked = true;
+    wrap.append($("label", null, cb, $("span", null, $("div", { text: k, class: "mono", style: "font-size:11px;color:var(--accent2)" }), cat[k])));
+  });
+  return wrap;
+}
+function userModal(u) {
+  const isNew = !u;
+  const uname = $("input", { value: u ? u.username : "" }); if (u) uname.disabled = true;
+  const pass = $("input", { type: "text", placeholder: isNew ? "≥ 8 ký tự" : "(để trống nếu không đổi)" });
+  const perms = permCheckboxes(u ? u.permissions : ["health.view", "wifi.view", "sock.change", "backup.create"]);
+  const scopeAll = $("input", { type: "checkbox" }); if (!u || u.device_scope === "all") scopeAll.checked = true;
+  const scopeWrap = $("div", { class: "perms" });
+  DEVS.forEach(d => { const cb = $("input", { type: "checkbox", value: d.id }); if (Array.isArray(u && u.device_scope) && u.device_scope.indexOf(d.id) !== -1) cb.checked = true; scopeWrap.append($("label", null, cb, d.name)); });
+  const err = $("div", { class: "err" });
+  const getPerms = () => Array.from(perms.querySelectorAll("input:checked")).map(c => c.value);
+  const getScope = () => scopeAll.checked ? "all" : Array.from(scopeWrap.querySelectorAll("input:checked")).map(c => Number(c.value));
+  openModal($("div", null,
+    $("h2", { text: isNew ? "Tạo người dùng" : "Sửa: " + u.username }),
+    $("div", { class: "form" },
+      $("div", null, $("label", { text: "Tài khoản" }), uname),
+      $("div", null, $("label", { text: "Mật khẩu" }), pass),
+      $("div", null, $("label", { text: "Quyền theo tính năng" }), perms),
+      $("div", null, $("label", null, scopeAll, " Cho phép mọi router"), $("div", { class: "sub", style: "margin:4px 0" }, "hoặc chọn router cụ thể:"), scopeWrap),
+      err),
+    $("div", { class: "foot" }, $("button", { class: "btn", onclick: closeModal }, "Huỷ"),
+      $("button", { class: "btn primary", onclick: async () => {
+        try {
+          if (isNew) await api("/api/admin/users", { method: "POST", body: JSON.stringify({ username: uname.value.trim(), password: pass.value, permissions: getPerms(), device_scope: getScope() }) });
+          else { const body = { permissions: getPerms(), device_scope: getScope() }; if (pass.value) body.password = pass.value; await api("/api/admin/users/" + u.id, { method: "PATCH", body: JSON.stringify(body) }); }
+          closeModal(); toast("Đã lưu"); render();
+        } catch (e) { err.textContent = e.message; }
+      } }, "Lưu"))));
+}
+async function toggleUser(u) { try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: JSON.stringify({ disabled: !u.disabled }) }); render(); } catch (e) { toast(e.message); } }
+async function delUser(u) { if (!confirm("Xoá user " + u.username + "?")) return; try { await api("/api/admin/users/" + u.id, { method: "DELETE" }); render(); } catch (e) { toast(e.message); } }
+
+// ---------- DEVICES tab ----------
+async function renderDevices() {
+  const view = document.getElementById("view"); view.innerHTML = "";
+  view.append($("div", { class: "bar" }, $("button", { class: "btn primary", onclick: createDevice }, "＋ Thêm router")));
+  const devs = await api("/api/admin/devices");
+  const tb = $("tbody");
+  devs.forEach(d => tb.append($("tr", null,
+    $("td", null, $("b", { text: d.name }), $("div", { class: "sub mono" }, "id " + d.id)),
+    $("td", null, $("span", { class: "status" }, $("span", { class: "dot " + (d.online ? "on" : "off") }), d.online ? "online" : "offline")),
+    $("td", { class: "sub" }, d.last_ip || "—", d.last_seen ? " · " + timeago(d.last_seen) : ""),
+    $("td", { class: "sub mono" }, "v" + d.applied_version + "/" + d.config_version),
+    $("td", null, $("div", null,
+      $("button", { class: "iconbtn", onclick: () => rekey(d) }, "Đổi key"),
+      $("button", { class: "iconbtn", onclick: () => delDevice(d) }, "✕")))
+  )));
+  view.append($("div", { class: "card" }, $("div", { class: "scroll" }, $("table", null,
+    $("thead", null, $("tr", null, ...["Router", "Trạng thái", "Lần cuối", "Version", ""].map(h => $("th", { text: h })))), tb))));
+}
+function showDeviceKey(name, id, key) {
+  const snippet = `# Trên router (một lần):\ncat > /etc/sbproxy/cloud.env <<'EOF'\nCLOUD_URL=${location.origin}\nDEVICE_KEY=${key}\nCLOUD_INTERVAL=10\nEOF\nchmod 600 /etc/sbproxy/cloud.env\nsh cloud-server/agent/install-cloud-agent.sh`;
+  openModal($("div", null, $("h2", { text: "Router: " + name }),
+    $("div", { class: "form" },
+      $("div", { class: "err" }, "⚠️ Device key chỉ hiện MỘT LẦN. Lưu lại ngay."),
+      $("div", null, $("label", { text: "Device key" }), $("div", { class: "keybox", text: key })),
+      $("div", null, $("label", { text: "Lệnh cấu hình trên router" }), $("div", { class: "keybox", text: snippet }))),
+    $("div", { class: "foot" }, $("button", { class: "btn primary", onclick: () => { closeModal(); render(); } }, "Đã lưu, đóng"))));
+}
+async function createDevice() {
+  const name = prompt("Tên router (vd Flint2-nhà):"); if (!name) return;
+  try { const d = await api("/api/admin/devices", { method: "POST", body: JSON.stringify({ name }) }); showDeviceKey(d.name, d.id, d.device_key); } catch (e) { toast(e.message); }
+}
+async function rekey(d) { if (!confirm("Cấp key mới cho " + d.name + "? Key cũ ngừng hoạt động.")) return; try { const r = await api("/api/admin/devices/" + d.id + "/rekey", { method: "POST", body: "{}" }); showDeviceKey(d.name, d.id, r.device_key); } catch (e) { toast(e.message); } }
+async function delDevice(d) { if (!confirm("Xoá router " + d.name + "?")) return; try { await api("/api/admin/devices/" + d.id, { method: "DELETE" }); render(); } catch (e) { toast(e.message); } }
+
+// ---------- AUDIT ----------
+async function renderAudit() {
+  const view = document.getElementById("view"); view.innerHTML = "";
+  const rows = await api("/api/admin/audit");
+  const tb = $("tbody");
+  rows.forEach(r => tb.append($("tr", null,
+    $("td", { class: "sub mono" }, new Date(r.ts * 1000).toLocaleString()),
+    $("td", null, r.username || "—"),
+    $("td", { class: "mono" }, r.action),
+    $("td", { class: "sub" }, r.detail || ""))));
+  view.append($("div", { class: "card" }, $("div", { class: "scroll" }, $("table", null,
+    $("thead", null, $("tr", null, ...["Thời gian", "Người", "Hành động", "Chi tiết"].map(h => $("th", { text: h })))), tb))));
+}
+
+// ---------- change own password ----------
+function changePwd() {
+  const p = $("input", { type: "password" }), err = $("div", { class: "err" });
+  openModal($("div", null, $("h2", { text: "Đổi mật khẩu" }),
+    $("div", { class: "form" }, $("div", null, $("label", { text: "Mật khẩu mới (≥ 8)" }), p), err),
+    $("div", { class: "foot" }, $("button", { class: "btn", onclick: closeModal }, "Huỷ"),
+      $("button", { class: "btn primary", onclick: async () => { try { await api("/api/me/password", { method: "POST", body: JSON.stringify({ password: p.value }) }); closeModal(); toast("Đã đổi mật khẩu"); } catch (e) { err.textContent = e.message; } } }, "Lưu"))));
+}
+
+function timeago(ts) { const s = Math.floor(Date.now() / 1000 - ts); if (s < 60) return s + "s trước"; if (s < 3600) return Math.floor(s / 60) + "m trước"; if (s < 86400) return Math.floor(s / 3600) + "h trước"; return Math.floor(s / 86400) + "d trước"; }
+
+// ---------- render dispatch ----------
+async function render() {
+  renderChrome();
+  try {
+    if (TAB === "control") { await loadDevices(); if (CUR) await loadDetail(); await renderControl(); }
+    else if (TAB === "users") await renderUsers();
+    else if (TAB === "devices") await renderDevices();
+    else if (TAB === "audit") await renderAudit();
+  } catch (e) { if (e.message !== "401") document.getElementById("view").innerHTML = '<div class="card"><div class="empty">Lỗi: ' + e.message + "</div></div>"; }
+}
+
+async function init() {
+  ME = await api("/api/me");
+  await render();
+  // poll nhẹ cho tab control (cập nhật latency)
+  timer = setInterval(async () => {
+    if (TAB !== "control" || document.getElementById("modal").classList.contains("show")) return;
+    try { await loadDevices(); await loadDetail(); await renderControl(); renderChrome(); } catch (e) {}
+  }, 8000);
+}
+init();
+</script>
+</body>
+</html>

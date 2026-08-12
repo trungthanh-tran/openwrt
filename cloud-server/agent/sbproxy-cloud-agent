@@ -1,0 +1,79 @@
+#!/bin/sh
+# sbproxy-cloud-agent — router poll RA cloud server (không mở WAN).
+# Mỗi vòng: pull config mong muốn → nếu đổi thì apply; chạy command (backup/rollback/set_sock);
+#           push health (latency) + danh sách backup + applied_version.
+# Cài /usr/sbin/sbproxy-cloud-agent, chạy bằng procd. Cấu hình: /etc/sbproxy/cloud.env
+
+[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+[ -f /etc/sbproxy/cloud.env ] && . /etc/sbproxy/cloud.env
+SB_ROOT="${SB_ROOT:-/root/sbproxy}"
+CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
+HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+BACKUP_DIR="${BACKUP_DIR:-/root/sbproxy-backups}"
+APPLIED_FILE="/etc/sbproxy/cloud.applied"
+INTERVAL="${CLOUD_INTERVAL:-10}"
+
+[ -n "$CLOUD_URL" ] && [ -n "$DEVICE_KEY" ] || { echo "cloud-agent: thiếu CLOUD_URL/DEVICE_KEY trong /etc/sbproxy/cloud.env"; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "cloud-agent: thiếu jq"; exit 1; }
+command -v curl >/dev/null 2>&1 || { echo "cloud-agent: thiếu curl"; exit 1; }
+
+CURL="curl -sS -m 20 -H X-Device-Key:$DEVICE_KEY"
+
+process_commands() {
+  echo "$1" | jq -c '.commands[]?' 2>/dev/null | while read -r c; do
+    id="$(echo "$c" | jq -r '.id')"
+    type="$(echo "$c" | jq -r '.type')"
+    out=""; st="done"
+    case "$type" in
+      backup)   out="$(cd "$SB_ROOT" && sh scripts/backup.sh cloud 2>&1)" || st="error";;
+      rollback) nm="$(echo "$c" | jq -r '.payload.name // ""')"
+                out="$(cd "$SB_ROOT" && SB_YES=1 sh scripts/rollback.sh "$nm" 2>&1)" || st="error";;
+      set_sock) i="$(echo "$c" | jq -r '.payload.idx')"; h="$(echo "$c" | jq -r '.payload.host')"
+                p="$(echo "$c" | jq -r '.payload.port')"; u="$(echo "$c" | jq -r '.payload.user // ""')"
+                pw="$(echo "$c" | jq -r '.payload.pass // ""')"
+                out="$(cd "$SB_ROOT" && sh scripts/set-sock.sh "$i" "$h" "$p" "$u" "$pw" 2>&1)" || st="error";;
+      *) out="unknown command"; st="error";;
+    esac
+    $CURL -H 'Content-Type: application/json' \
+      --data "$(jq -n --argjson id "$id" --arg s "$st" --arg r "$out" '{command_id:$id,status:$s,result:$r}')" \
+      "$CLOUD_URL/api/device/ack" >/dev/null 2>&1
+  done
+}
+
+run_once() {
+  resp="$($CURL "$CLOUD_URL/api/device/poll" 2>/dev/null)"
+  [ -n "$resp" ] || { echo "cloud-agent: không gọi được server"; return 1; }
+  ver="$(echo "$resp" | jq -r '.config_version // empty')"
+  [ -n "$ver" ] || return 1
+
+  # 1) config đổi -> ghi conf + apply
+  applied="$(cat "$APPLIED_FILE" 2>/dev/null)"
+  if [ "$ver" != "$applied" ]; then
+    conf="$(echo "$resp" | jq -r '.wifi_socks_conf // ""')"
+    if [ -n "$conf" ]; then
+      printf '%s\n' "$conf" > "$CONF"
+      (cd "$SB_ROOT" && sh scripts/apply.sh) >/dev/null 2>&1
+    fi
+    echo "$ver" > "$APPLIED_FILE"
+  fi
+
+  # 2) commands
+  process_commands "$resp"
+
+  # 3) report health + backups + applied_version
+  health="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$health" ] || health='{}'
+  backups="$(ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
+  [ -n "$backups" ] || backups='[]'
+  $CURL -H 'Content-Type: application/json' \
+    --data "$(jq -n --argjson v "${ver:-0}" --argjson h "$health" --argjson b "$backups" \
+      '{applied_version:$v, health:$h, backups:$b}')" \
+    "$CLOUD_URL/api/device/report" >/dev/null 2>&1
+
+  # server có thể chỉ định interval
+  ni="$(echo "$resp" | jq -r '.interval // empty')"
+  [ -n "$ni" ] && INTERVAL="$ni"
+}
+
+if [ "$1" = "--once" ]; then run_once; exit $?; fi
+echo "cloud-agent: bắt đầu, server=$CLOUD_URL interval=${INTERVAL}s"
+while :; do run_once; sleep "$INTERVAL"; done

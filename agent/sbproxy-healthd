@@ -1,0 +1,63 @@
+#!/bin/sh
+# sbproxy-healthd — probe từng SOCKS5, đo latency, ghi JSON cho UI đọc realtime.
+# Cài tại /usr/sbin/sbproxy-healthd. Chạy như daemon (procd) hoặc --once.
+#
+# Kết quả -> $HEALTH_FILE:
+#   { "ts": 1699999999,
+#     "probes": { "1": {"state":"ok","latency_ms":123,"code":204}, ... } }
+# state: ok | slow | fail
+
+[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+SB_ROOT="${SB_ROOT:-/root/sbproxy}"
+CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
+HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+PROBE_URL="${PROBE_URL:-https://www.gstatic.com/generate_204}"
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-8}"
+INTERVAL="${INTERVAL:-15}"
+SLOW_MS="${SLOW_MS:-800}"
+
+command -v jq   >/dev/null 2>&1 || { echo "healthd: thiếu jq";   exit 1; }
+command -v curl >/dev/null 2>&1 || { echo "healthd: thiếu curl"; exit 1; }
+
+probe_one() {
+  # args: host port user pass -> in ra: "state latency_ms code"
+  host="$1"; port="$2"; user="$3"; pass="$4"
+  if [ -n "$user" ]; then px="socks5h://$user:$pass@$host:$port"; else px="socks5h://$host:$port"; fi
+  # %{http_code} %{time_total}
+  res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
+         -w '%{http_code} %{time_total}' "$PROBE_URL" 2>/dev/null)"
+  code="$(echo "$res" | awk '{print $1}')"
+  t="$(echo "$res" | awk '{print $2}')"
+  ms="$(awk -v t="$t" 'BEGIN{printf "%d", (t*1000)+0.5}')"
+  case "$code" in
+    200|204|301|302) [ "$ms" -gt "$SLOW_MS" ] && echo "slow $ms $code" || echo "ok $ms $code" ;;
+    *) echo "fail 0 ${code:-0}" ;;
+  esac
+}
+
+run_once() {
+  probes="{}"
+  # đọc conf
+  while IFS='|' read -r name band idx key host port user pass iso web; do
+    case "$name" in ''|\#*) continue;; esac
+    idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue
+    host="$(echo "$host" | tr -d ' ')"; port="$(echo "$port" | tr -d ' ')"
+    set -- $(probe_one "$host" "$port" "$user" "$pass")
+    state="$1"; ms="$2"; code="$3"
+    probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" \
+              --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
+              '.[$i] = {state:$s, latency_ms:$ms, code:$c}')"
+  done < "$CONF"
+
+  ts="$(date +%s)"
+  tmp="$HEALTH_FILE.tmp.$$"
+  jq -n --argjson ts "$ts" --argjson p "$probes" '{ts:$ts, probes:$p}' > "$tmp" && mv "$tmp" "$HEALTH_FILE"
+}
+
+if [ "$1" = "--once" ]; then run_once; exit 0; fi
+
+# daemon loop
+while :; do
+  [ -f "$CONF" ] && run_once
+  sleep "$INTERVAL"
+done
