@@ -42,6 +42,10 @@ agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check la
   cgi/sbproxy               #   REST API gọi các script trên router
   sbproxy-healthd           #   daemon probe SOCKS, đo latency
   install-agent.sh          #   cài agent + self-host UI + tạo token
+pc/                         # CHẠY TỪ MÁY QUẢN TRỊ (Windows/Linux): update, backup, restore qua SSH
+  update.ps1 / update.sh    #   đẩy code lên router (giữ nguyên config đang dùng)
+  backup.ps1 / backup.sh    #   backup router rồi kéo snapshot về máy
+  restore.ps1 / restore.sh  #   đẩy snapshot lên router + rollback
 cloud-server/               # ĐIỀU KHIỂN TỪ XA: server Node+SQLite, login riêng + RBAC
   server.js db.js rbac.js   #   API + DB + phân quyền
   public/                   #   login.html + app.html (dashboard RBAC-aware)
@@ -81,6 +85,15 @@ sh scripts/set-sock.sh 2 5.6.7.8 1080 user pass
 # Lỗi? Rollback:
 sh scripts/rollback.sh
 ```
+
+## Quản lý từ máy Windows/Linux (không cần SSH tay)
+```powershell
+# Windows (PowerShell) — cài 1 lần: copy pc\sbproxy-pc.conf.example pc\sbproxy-pc.conf rồi điền IP router
+.\pc\update.ps1 -Apply     # đẩy code mới lên router + áp cấu hình (tự backup trước)
+.\pc\backup.ps1            # backup router, kéo snapshot về pc\backups\
+.\pc\restore.ps1           # khôi phục router từ snapshot mới nhất trên máy
+```
+Bản Linux/macOS tương đương: `sh pc/update.sh` / `pc/backup.sh` / `pc/restore.sh`. Chi tiết: [pc/README.md](pc/README.md).
 
 ## Tài liệu
 - **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ theo bước: firmware → cấu hình → agent → cloud → bảo mật. Bắt đầu ở đây.**

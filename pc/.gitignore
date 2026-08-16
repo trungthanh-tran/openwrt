@@ -1,0 +1,3 @@
+# Cấu hình cá nhân (chứa IP/key) và backup kéo về — không commit
+sbproxy-pc.conf
+backups/
