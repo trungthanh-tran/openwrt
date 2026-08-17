@@ -15,6 +15,12 @@ require_conf
 
 IDX="$1"; HOST="$2"; PORT="$3"; USER="${4:-}"; PASS="${5:-}"
 [ -n "$IDX" ] && [ -n "$HOST" ] && [ -n "$PORT" ] || die "Cú pháp: set-sock.sh <idx> <host> <port> [user] [pass]"
+case "$IDX" in *[!0-9]*|'') die "idx phải là số nguyên dương" ;; esac
+case "$PORT" in *[!0-9]*|'') die "port phải là số từ 1 đến 65535" ;; esac
+[ "$IDX" -ge 1 ] && [ "$IDX" -le 200 ] || die "idx ngoài phạm vi 1..200"
+[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "port ngoài phạm vi 1..65535"
+case "$HOST" in *[!A-Za-z0-9._:-]*) die "host chứa ký tự không hợp lệ" ;; esac
+case "$USER$PASS" in *'|'*) die "user/pass không được chứa ký tự |" ;; esac
 
 # Kiểm tra idx tồn tại trong conf
 grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*$IDX[[:space:]]*\|" "$CONF" || die "Không tìm thấy WiFi idx=$IDX trong $CONF"
@@ -31,6 +37,7 @@ awk -F'|' -v OFS='|' -v idx="$IDX" -v h="$HOST" -v p="$PORT" -v u="$USER" -v pw=
   { print }
 ' "$CONF" > "$TMP"
 mv "$TMP" "$CONF"
+validate_conf
 
 log "Sinh lại sing-box + nftables (cập nhật bypass sock IP)..."
 build_singbox

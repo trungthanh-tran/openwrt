@@ -30,6 +30,7 @@ Chỉnh tunables:
 vi config/settings.sh
 ```
 - `RADIO_2G` / `RADIO_5G`: **phải khớp** phần cứng — xác nhận ở bước 3.
+- `WIFI_COUNTRY`: **bắt buộc**, mã ISO 2 chữ nơi router hoạt động (ví dụ `VN`).
 - `BSSID_LIMIT`: xem `iw list`.
 - `ZONE_INPUT`: để `ACCEPT` (mặc định, chạy chắc). Xem giải thích trong file.
 
@@ -52,7 +53,7 @@ Cài: `nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full sing-box`, cài `/
 
 ## 5. Xem trước rồi áp
 ```sh
-DRYRUN=1 sh scripts/apply.sh | less      # xem UCI + sing-box + nft sẽ tạo
+DRYRUN=1 sh scripts/apply.sh | less      # validate trong /tmp, không ghi UCI hay /etc
 sh scripts/apply.sh                       # áp thật (tự backup trước)
 ```
 `apply.sh` làm tuần tự: backup → nạp UCI (network/dhcp/firewall/wireless) → sinh `config.json` + `sbproxy.nft` → reload network/dnsmasq/firewall/sbproxy/sing-box/wifi.
@@ -61,9 +62,12 @@ sh scripts/apply.sh                       # áp thật (tự backup trước)
 Theo [TESTING.md](TESTING.md). Tối thiểu: nối thử 1 WiFi → kiểm tra IP public đúng SOCKS, không leak DNS/WebRTC, 2 client không thấy nhau.
 
 ## 7. Thay đổi về sau
-- **Đổi SOCKS 1 WiFi (không rớt WiFi):** `sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]`
-- **Thêm/bớt/sửa WiFi:** sửa `wifi-socks.conf` → `sh scripts/apply.sh`.
-  - *Lưu ý:* khi **xoá** 1 dòng, `apply.sh` không tự dọn section cũ. Chạy `sh scripts/uninstall.sh` (gỡ hết) rồi `apply.sh` lại, hoặc xoá tay `wireless.wIDX` v.v.
+- **Đổi SOCKS 1 WiFi:** `sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]` — không reload WiFi,
+  nhưng các phiên mạng đang mở có thể gián đoạn khi sing-box restart.
+- **Thêm/bớt/sửa WiFi:** sửa `wifi-socks.conf` → `sh scripts/apply.sh`; các section của idx đã bỏ sẽ được dọn theo `/etc/sbproxy.managed`.
+
+Installer tự chọn `opkg` trên OpenWrt 24.10 hoặc `apk` trên OpenWrt 25.12. Firmware GL.iNet OEM
+được nhận diện nhưng hiện chỉ hỗ trợ experimental.
 - **Gỡ toàn bộ:** `sh scripts/uninstall.sh`.
 
 ## 8. Bảo mật (nên làm)

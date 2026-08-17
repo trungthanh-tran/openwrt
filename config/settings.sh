@@ -6,6 +6,9 @@
 # rồi sửa lại 2 dòng dưới cho đúng.
 RADIO_2G="radio0"
 RADIO_5G="radio1"
+# Bắt buộc đổi thành mã quốc gia ISO 3166-1 alpha-2 nơi router hoạt động.
+# Để trống sẽ làm preflight/apply dừng nhằm tránh phát WiFi sai quy định.
+WIFI_COUNTRY=""
 
 # --- Giới hạn phần cứng -----------------------------------------------------
 # Số BSSID tối đa mỗi radio (verify bằng `iw list` -> "valid interface combinations").
@@ -19,6 +22,12 @@ TPROXY_PORT_BASE=12000
 # fwmark + bảng định tuyến cho TPROXY (phải khớp etc/init.d/sbproxy)
 TPROXY_MARK=1
 TPROXY_TABLE=100
+TPROXY_RULE_PRIORITY=10000
+TPROXY_MARK_MASK=255
+
+# v0.2 chỉ proxy IPv4. "disable" tắt RA/DHCPv6 trên các SSID sbproxy để tránh
+# IPv6 đi thẳng ra WAN; chưa hỗ trợ giá trị khác.
+IPV6_MODE="disable"
 
 # --- Firewall ---------------------------------------------------------------
 # Chính sách input cho zone khách. ACCEPT = client chắc chắn lấy được DHCP/DNS và

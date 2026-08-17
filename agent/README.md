@@ -35,7 +35,7 @@ Script sẽ: cài `curl jq`, tạo `/etc/sbproxy/env` + `/etc/sbproxy/token`, đ
    - Cột **Sức khỏe** hiện latency mỗi WiFi (xanh ok / vàng chậm / đỏ fail), tự cập nhật ~8s.
    - **⇪ Đẩy & Áp lên router**: ghi `wifi-socks.conf` từ UI rồi chạy `apply.sh`.
    - **⭳ Tải từ router**: nạp `wifi-socks.conf` hiện có trên router vào UI.
-   - Nút **⚡** mỗi hàng: đổi SOCKS của WiFi đó lên router ngay (gọi `set-sock.sh`, **không rớt WiFi**).
+   - Nút **⚡** mỗi hàng: đổi SOCKS mà không reload WiFi; phiên đang mở có thể gián đoạn khi sing-box restart.
 
 ## API (tham chiếu)
 Header bắt buộc: `X-SB-Token: <token>`.

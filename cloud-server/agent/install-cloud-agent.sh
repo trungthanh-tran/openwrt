@@ -9,9 +9,13 @@ log() { printf '[cloud-agent] %s\n' "$*"; }
 
 [ -f /etc/sbproxy/cloud.env ] || { echo "Thiếu /etc/sbproxy/cloud.env (CLOUD_URL + DEVICE_KEY). Xem hướng dẫn 'Thêm router' trên web."; exit 1; }
 
-for p in curl jq; do
-  opkg list-installed 2>/dev/null | grep -q "^$p " || { log "cài $p"; opkg update >/dev/null 2>&1 || true; opkg install "$p" || true; }
-done
+if command -v apk >/dev/null 2>&1; then
+  pkg_update() { apk update >/dev/null 2>&1 || true; }; pkg_has() { apk list -I "$1" 2>/dev/null | grep -q "^$1-"; }; pkg_add() { apk add "$1"; }
+else
+  pkg_update() { opkg update >/dev/null 2>&1 || true; }; pkg_has() { opkg list-installed "$1" 2>/dev/null | grep -q "^$1 "; }; pkg_add() { opkg install "$1"; }
+fi
+pkg_update
+for p in curl jq; do pkg_has "$p" || { log "cài $p"; pkg_add "$p" || true; }; done
 
 log "cài /usr/sbin/sbproxy-cloud-agent"
 cp "$HERE/sbproxy-cloud-agent" /usr/sbin/sbproxy-cloud-agent

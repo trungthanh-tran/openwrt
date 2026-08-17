@@ -86,14 +86,15 @@ Từ client khách mở `http://192.168.(10+idx).1` (LuCI) và thử `ssh`.
 sh scripts/set-sock.sh 1 <sock_mới> 1080 user pass
 ```
 Trên client **đang nối WiFi Alpha**, đang mở 1 tab:
-**Đạt khi:** WiFi **không bị ngắt** (không phải nhập lại mật khẩu), reload trang → `ipinfo.io` đổi sang IP sock mới.
+**Đạt khi:** WiFi association/DHCP giữ nguyên, reload trang → `ipinfo.io` đổi sang IP sock mới.
+Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được restart; đây không phải zero-downtime migration.
 
 ## D. Bảng tổng hợp nhanh
 | # | Yêu cầu | Test | Đạt khi |
 |---|---------|------|---------|
 | 1 | SOCKS5 per WiFi | B1 | IP public = sock tương ứng |
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
-| 3 | Đổi sock dễ, không rớt WiFi | C | WiFi giữ nguyên, IP đổi |
+| 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
 | 5 | Chặn WebRTC | B3 | không lộ IP qua WebRTC |
 | 6 | Cách ly client | B4 + B5 | không ping được nhau |

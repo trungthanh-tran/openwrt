@@ -145,7 +145,7 @@ Mỗi dòng: `name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|iso
 
 ## Bước 7 — Áp dụng
 ```sh
-DRYRUN=1 sh scripts/apply.sh | less   # XEM TRƯỚC: UCI + sing-box + nft (không đổi gì)
+DRYRUN=1 sh scripts/apply.sh | less   # validate trong /tmp; không ghi UCI hay file /etc
 sh scripts/apply.sh                    # ÁP THẬT (tự backup trước)
 ```
 `apply.sh` chạy tuần tự: backup → nạp UCI → sinh `config.json` + `sbproxy.nft` → reload network/dnsmasq/firewall/sbproxy/sing-box/wifi.
@@ -172,15 +172,18 @@ logread -e sing-box | tail -20               # log proxy
 | Không leak DNS | `https://dnsleaktest.com` | DNS không phải ISP thật *(xem lưu ý v0.1 bên dưới)* |
 | Không leak WebRTC | `https://browserleaks.com/webrtc` | không lộ IP thật |
 | Cách ly client | 2 máy cùng WiFi, ping nhau | không ping được |
-| Đổi sock không rớt WiFi | chạy `set-sock.sh`, reload trang | WiFi giữ nguyên, IP đổi |
+| Đổi sock không reload WiFi | chạy `set-sock.sh`, reload trang | WiFi/DHCP giữ nguyên; phiên đang mở có thể rớt |
 
 > ⚠️ **DNS leak (v0.1):** DNS mặc định qua dnsmasq router → **có thể còn leak**. Đây là hạn chế đã biết; cách khắc phục ở mục [Xử lý lỗi](#dns-vẫn-lộ-isp-thật).
+
+> **IPv6:** v0.2 chỉ proxy IPv4 và tắt RA/DHCPv6 trên các SSID sbproxy. Không bật lại IPv6
+> trước khi có TPROXY + policy routing IPv6 đầy đủ, nếu không client có thể đi thẳng ra WAN.
 
 ---
 
 ## Vận hành hằng ngày
 
-**Đổi SOCKS của 1 WiFi (KHÔNG rớt WiFi):**
+**Đổi SOCKS của 1 WiFi (không reload WiFi; phiên mạng đang mở có thể gián đoạn):**
 ```sh
 sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]
 # vd: sh scripts/set-sock.sh 2 5.6.7.8 1080 user pass
@@ -241,7 +244,7 @@ ip route show table 100
 |---|---|
 | SOCKS chết/sai user-pass | Đổi sock: `set-sock.sh <idx> host port user pass` |
 | `ZONE_INPUT=REJECT` chặn tproxy giao gói | Đổi `ZONE_INPUT="ACCEPT"` trong settings → `apply.sh` |
-| Thiếu `kmod-nft-tproxy` | `opkg install kmod-nft-tproxy` → `sbproxy restart` |
+| Thiếu `kmod-nft-tproxy` | chạy lại `install-deps.sh` (tự chọn apk/opkg) → `sbproxy restart` |
 | Mất `ip rule/route` sau reboot | `/etc/init.d/sbproxy enable` (đã bật autostart); `sbproxy restart` |
 | Sai bypass IP sock | Kiểm tra `nft list table inet sbproxy` có dòng `ip daddr <sock> return` |
 
@@ -287,7 +290,7 @@ Chi tiết: [ROLLBACK.md](ROLLBACK.md) Mức 4.
 
 ## FAQ
 **Q: Đổi sock có làm rớt WiFi/kick client không?**
-A: Không. `set-sock.sh` chỉ reload sing-box + tproxy, WiFi giữ nguyên.
+A: WiFi và DHCP giữ nguyên, nhưng `set-sock.sh` restart sing-box + tproxy nên phiên TCP/UDP đang mở có thể gián đoạn.
 
 **Q: MAC random ở đâu?**
 A: `apply.sh` tự sinh MAC `02:xx..` cho WiFi mới và **giữ ổn định** các lần apply sau. UI không cần nhập MAC.

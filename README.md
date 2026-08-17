@@ -5,7 +5,8 @@ Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua m
 > Đi kèm bản plan tổng thể: [`../plan-mt6000-socks5-multi-wifi.md`](../plan-mt6000-socks5-multi-wifi.md)
 
 ## ⚠️ Trạng thái & cảnh báo
-- **v0.1 — scaffold.** Cú pháp UCI/nftables/sing-box được viết cẩn thận nhưng **phải kiểm thử trên router thật**, đặc biệt phần **TPROXY** và **DNS chống leak**. Đừng chạy lần đầu trên router đang dùng cho việc quan trọng.
+- **v0.2 — pre-production.** Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
+- Hiện chỉ proxy **IPv4**; IPv6 bị tắt trên các SSID sbproxy để tránh đi thẳng. DNS per-SSID qua đúng SOCKS vẫn là hạng mục cần hoàn tất trước production.
 - Luôn có **backup tự động** trước mỗi thay đổi và **rollback 1 lệnh** — xem [docs/ROLLBACK.md](docs/ROLLBACK.md).
 - Chỉ dùng cho mục đích hợp pháp; đảm bảo tuân thủ điều khoản của nhà cung cấp SOCKS.
 
@@ -30,9 +31,9 @@ config/
   settings.sh               # tunables: radio↔băng tần, giới hạn BSSID, cổng, firewall
 scripts/
   preflight.sh              # kiểm tra phần cứng/gói/iw list  (chỉ đọc)
-  install-deps.sh           # opkg install + cài init sbproxy
+  install-deps.sh           # apk/opkg install + cài init sbproxy
   apply.sh                  # backup + áp toàn bộ config (hỗ trợ DRYRUN=1)
-  set-sock.sh               # đổi SOCKS 1 WiFi, KHÔNG rớt WiFi
+  set-sock.sh               # đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn
   backup.sh / rollback.sh   # snapshot & khôi phục
   uninstall.sh              # gỡ mọi thứ project tạo
   lib.sh                    # helpers + generator sing-box/nftables
@@ -65,6 +66,7 @@ cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
 vi config/wifi-socks.conf        # điền WiFi + SOCKS của bạn
 vi config/settings.sh            # chỉnh RADIO_2G/RADIO_5G cho đúng
+# bắt buộc đặt WIFI_COUNTRY (ví dụ VN) trong settings.sh
 
 # 1. Kiểm tra môi trường (không đổi gì)
 sh scripts/preflight.sh
@@ -79,7 +81,7 @@ DRYRUN=1 sh scripts/apply.sh | less
 sh scripts/apply.sh
 
 # 5. Kiểm thử  ->  docs/TESTING.md
-# 6. Đổi SOCKS 1 WiFi bất kỳ (không rớt WiFi):
+# 6. Đổi SOCKS (không reload WiFi; phiên đang mở có thể gián đoạn):
 sh scripts/set-sock.sh 2 5.6.7.8 1080 user pass
 
 # Lỗi? Rollback:

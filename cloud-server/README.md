@@ -17,7 +17,7 @@ Bạn ─(đăng nhập)─▶ Web UI + API (server này, có DB) ◀─ router 
 | `health.view` | Xem trạng thái & latency |
 | `wifi.view` | Xem danh sách WiFi/SOCKS |
 | `wifi.manage` | Thêm/sửa/xoá WiFi (sửa cấu hình) |
-| `sock.change` | Đổi SOCKS (không rớt WiFi) |
+| `sock.change` | Đổi SOCKS không reload WiFi (phiên đang mở có thể gián đoạn) |
 | `config.apply` | Đẩy & áp cấu hình |
 | `backup.create` | Tạo/tải backup |
 | `backup.rollback` | Khôi phục |
@@ -67,7 +67,8 @@ WantedBy=multi-user.target
 ## Cách hoạt động (pull model)
 - **Config mong muốn** lưu ở server (dạng `wifi-socks.conf`). Sửa trên web → tăng `config_version`.
 - Router mỗi vòng: `poll` → nếu version mới thì ghi conf + chạy `apply.sh`; nhận **command** (backup/rollback/set_sock) và thực thi; `report` health + danh sách backup + version đã áp.
-- **Đổi SOCKS**: enqueue command `set_sock` → router chạy `set-sock.sh` (không rớt WiFi).
+- **Đổi SOCKS**: enqueue command `set_sock` → router chạy `set-sock.sh` không reload WiFi;
+  phiên TCP/UDP đang mở có thể gián đoạn khi sing-box restart.
 
 ## Bảo mật — bắt buộc
 - HTTPS (reverse proxy). Đặt `HTTPS=1`.

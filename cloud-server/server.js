@@ -103,7 +103,7 @@ app.put("/api/devices/:id/config", auth, requireDevice, requirePerm("wifi.manage
   Audit.log(req.user, "set_config", `device=${d.id} v=${d.config_version}`);
   res.json({ ok: true, config_version: d.config_version });
 });
-// đổi sock 1 WiFi (enqueue command set_sock, không rớt WiFi)
+// đổi sock 1 WiFi (enqueue command set_sock, không reload WiFi)
 app.post("/api/devices/:id/sock", auth, requireDevice, requirePerm("sock.change"), (req, res) => {
   const { idx, host, port, user, pass } = req.body || {};
   if (!idx || !host || !port) return res.status(400).json({ error: "thiếu idx/host/port" });
@@ -124,6 +124,8 @@ app.post("/api/devices/:id/backup", auth, requireDevice, requirePerm("backup.cre
 });
 app.post("/api/devices/:id/rollback", auth, requireDevice, requirePerm("backup.rollback"), (req, res) => {
   const name = String((req.body && req.body.name) || "");
+  if (name && (!/^[A-Za-z0-9._-]+$/.test(name) || name.includes("..")))
+    return res.status(400).json({ error: "tên backup không hợp lệ" });
   const cid = Commands.enqueue(req.device.id, "rollback", { name }, req.user.id);
   Audit.log(req.user, "rollback", `device=${req.device.id} name=${name}`);
   res.json({ ok: true, command_id: cid });
@@ -234,7 +236,7 @@ app.post("/api/device/report", deviceAuth, (req, res) => {
 });
 app.post("/api/device/ack", deviceAuth, (req, res) => {
   const { command_id, status, result } = req.body || {};
-  if (command_id) Commands.ack(Number(command_id), status === "done" ? "done" : "error", result);
+  if (command_id) Commands.ack(Number(command_id), req.dev.id, status === "done" ? "done" : "error", result);
   res.json({ ok: true });
 });
 

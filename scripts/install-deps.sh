@@ -5,16 +5,29 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
 require_root
 
-log "opkg update..."
-run "opkg update"
+if command -v apk >/dev/null 2>&1; then
+  PKG_MANAGER=apk
+  pkg_update() { run "apk update"; }
+  pkg_installed() { apk list -I "$1" 2>/dev/null | grep -q "^$1-"; }
+  pkg_install() { run "apk add '$1'"; }
+elif command -v opkg >/dev/null 2>&1; then
+  PKG_MANAGER=opkg
+  pkg_update() { run "opkg update"; }
+  pkg_installed() { opkg list-installed "$1" 2>/dev/null | grep -q "^$1 "; }
+  pkg_install() { run "opkg install '$1'"; }
+else
+  die "Không tìm thấy apk hoặc opkg."
+fi
+log "$PKG_MANAGER update..."
+pkg_update
 
-PKGS="nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full sing-box"
+PKGS="nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full jq sing-box"
 for p in $PKGS; do
-  if opkg list-installed 2>/dev/null | grep -q "^$p "; then
+  if pkg_installed "$p"; then
     log "[đã có] $p"
   else
     log "Cài $p..."
-    run "opkg install $p" || warn "Không cài được $p — kiểm tra feed/opkg. sing-box có thể phải tải binary aarch64 thủ công."
+    pkg_install "$p" || warn "Không cài được $p — kiểm tra feed của firmware."
   fi
 done
 
@@ -31,7 +44,7 @@ fi
 
 # Đăng ký file cần GIỮ khi sysupgrade/backup chuẩn OpenWrt (mặc định KHÔNG gồm các path này)
 log "Đăng ký /etc/sysupgrade.conf (để backup/nâng cấp giữ được config sbproxy)..."
-for p in /etc/sing-box/ /etc/sbproxy.nft /etc/init.d/sbproxy $SB_ROOT/config/; do
+for p in /etc/sing-box/ /etc/sbproxy.nft /etc/sbproxy.env /etc/sbproxy.managed /etc/init.d/sbproxy $SB_ROOT/config/; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 

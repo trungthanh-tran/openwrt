@@ -23,6 +23,46 @@ run() {
 require_root() { [ "$(id -u)" = "0" ] || die "Cần chạy bằng root."; }
 require_conf() { [ -f "$CONF" ] || die "Thiếu config: $CONF (copy từ config/wifi-socks.conf.example)"; }
 
+validate_platform() {
+  board="$(ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null || true)"
+  model="$(cat /proc/device-tree/model 2>/dev/null | tr -d '\000' || true)"
+  case "$board:$model" in
+    glinet,gl-mt6000:*|*:*GL-MT6000*) : ;;
+    *) die "Thiết bị chưa được hỗ trợ: board=${board:-?}, model=${model:-?} (cần GL-MT6000)." ;;
+  esac
+  [ -z "$(cat /etc/glversion 2>/dev/null)" ] || warn "Đang chạy firmware GL.iNet OEM; hỗ trợ experimental, cần test riêng."
+}
+
+validate_settings() {
+  case "${WIFI_COUNTRY:-}" in
+    [A-Z][A-Z]) : ;;
+    *) die "WIFI_COUNTRY phải là mã quốc gia 2 chữ in hoa trong config/settings.sh (ví dụ VN)." ;;
+  esac
+  [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 chỉ hỗ trợ IPV6_MODE=disable."
+}
+
+validate_conf() {
+  awk -F'|' -v net_base="${NET_BASE:-10}" -v port_base="${TPROXY_PORT_BASE:-12000}" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    /^#/ || /^[[:space:]]*$/ { next }
+    NF != 10 { printf "dòng %d: cần đúng 10 cột, hiện có %d\n", NR, NF; bad=1; next }
+    {
+      idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10)
+      if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "dòng %d: idx không hợp lệ\n", NR; bad=1 }
+      if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx > 254 || port_base + idx > 65535)) { printf "dòng %d: idx làm subnet/cổng vượt phạm vi\n", NR; bad=1 }
+      if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "dòng %d: port không hợp lệ\n", NR; bad=1 }
+      if (band != "2g" && band != "5g") { printf "dòng %d: band phải là 2g hoặc 5g\n", NR; bad=1 }
+      if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "dòng %d: isolate/webrtc phải là 0 hoặc 1\n", NR; bad=1 }
+      if (length($1) < 1 || length($1) > 32) { printf "dòng %d: SSID phải dài 1..32 byte/ký tự ASCII\n", NR; bad=1 }
+      if (length($4) < 8 || length($4) > 63) { printf "dòng %d: mật khẩu WiFi phải dài 8..63 ký tự\n", NR; bad=1 }
+      if (trim($5) == "") { printf "dòng %d: sock_host bị trống\n", NR; bad=1 }
+      if ($1 ~ /[|\r\n]/ || $4 ~ /[|\r\n]/ || $5 ~ /[|\r\n]/ || $7 ~ /[|\r\n]/ || $8 ~ /[|\r\n]/) { printf "dòng %d: field chứa ký tự cấm\n", NR; bad=1 }
+      seen[idx]++; if (seen[idx] > 1) { printf "dòng %d: idx %s bị trùng\n", NR, idx; bad=1 }
+    }
+    END { exit bad ? 1 : 0 }
+  ' "$CONF" || die "wifi-socks.conf không hợp lệ."
+}
+
 # --- Helpers dẫn xuất từ idx ------------------------------------------------
 net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
@@ -33,6 +73,8 @@ gen_mac() {
   printf '02:%02x:%02x:%02x:%02x:%02x\n' \
     $(head -c5 /dev/urandom | hexdump -v -e '/1 "%u "')
 }
+
+uci_dquote() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 # Lặp qua từng dòng SSID hợp lệ, gọi: cb name band idx key host port user pass isolate webrtc
 for_each_ssid() {
@@ -66,6 +108,7 @@ check_bssid_limit() {
 # ---------------------------------------------------------------------------
 emit_uci_one() {
   name="$1"; band="$2"; idx="$3"; key="$4"; isolate="$9"
+  name_q="$(uci_dquote "$name")"; key_q="$(uci_dquote "$key")"
   radio="$(radio_of "$band")"
   octet="$(net_octet "$idx")"
   mac="$(uci -q get "wireless.w$idx.macaddr")"
@@ -86,6 +129,9 @@ set dhcp.w$idx.interface=w$idx
 set dhcp.w$idx.start=100
 set dhcp.w$idx.limit=100
 set dhcp.w$idx.leasetime=12h
+set dhcp.w$idx.dhcpv6=disabled
+set dhcp.w$idx.ra=disabled
+set dhcp.w$idx.ndp=disabled
 set firewall.z$idx=zone
 set firewall.z$idx.name=z$idx
 set firewall.z$idx.network=w$idx
@@ -96,9 +142,9 @@ set wireless.w$idx=wifi-iface
 set wireless.w$idx.device=$radio
 set wireless.w$idx.mode=ap
 set wireless.w$idx.network=w$idx
-set wireless.w$idx.ssid=$name
+set wireless.w$idx.ssid="$name_q"
 set wireless.w$idx.encryption=$WIFI_ENCRYPTION
-set wireless.w$idx.key=$key
+set wireless.w$idx.key="$key_q"
 set wireless.w$idx.isolate=$isolate
 set wireless.w$idx.macaddr=$mac
 set wireless.w$idx.disabled=0
@@ -127,10 +173,12 @@ build_singbox() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"
     tp="$(tproxy_port "$idx")"
     inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp,\"sniff\":true}"
+    host_json="$(jq -Rn --arg v "$host" '$v')"
     if [ -n "$user" ]; then
-      auth=",\"username\":\"$user\",\"password\":\"$pass\""
+      user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
+      auth=",\"username\":$user_json,\"password\":$pass_json"
     else auth=""; fi
-    outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":\"$host\",\"server_port\":$port,\"version\":\"5\"$auth}"
+    outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\"$auth}"
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
     sep=","
   }
@@ -153,6 +201,22 @@ build_singbox() {
 }
 EOF
   log "Đã ghi $SINGBOX_CONF"
+}
+
+desired_idx() {
+  awk -F'|' '!/^#/ && NF==10 { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
+}
+
+emit_stale_uci() {
+  current="$(desired_idx | tr '\n' ' ')"
+  old="$(cat "${MANAGED_FILE:-/etc/sbproxy.managed}" 2>/dev/null || true)"
+  for idx in $old; do
+    case " $current " in *" $idx "*) continue ;; esac
+    for section in "wireless.w$idx" "network.w$idx" "network.brw$idx" "dhcp.w$idx" \
+                   "firewall.z$idx" "firewall.z${idx}adm"; do
+      echo "delete $section"
+    done
+  done
 }
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@
 # GET  ?action=backups       -> {backups:[...]}
 # POST ?action=save_conf     body=text  -> ghi wifi-socks.conf (validate)
 # POST ?action=apply         -> chạy apply.sh, trả log
-# POST ?action=set_sock      body=json {idx,host,port,user,pass} -> đổi sock (không rớt WiFi)
+# POST ?action=set_sock      body=json {idx,host,port,user,pass} -> đổi sock không reload WiFi
 # POST ?action=rollback      body=json {name?} -> rollback
 # POST ?action=uninstall     -> gỡ sạch
 # GET  ?action=health_now    -> ép probe ngay 1 lần
@@ -33,7 +33,7 @@ json_ok()  { hdr "200 OK" "application/json"; printf '%s\n' "$1"; exit 0; }
 json_err() { hdr "$1" "application/json"; jq -n --arg e "$2" '{ok:false,error:$e}'; exit 0; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu jq (opkg install jq)"; exit 0; }
+have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu package jq"; exit 0; }
 
 # ---- CORS preflight ----
 [ "$REQUEST_METHOD" = "OPTIONS" ] && { hdr "204 No Content" "text/plain"; exit 0; }
@@ -83,14 +83,15 @@ case "$ACTION" in
     # validate tối thiểu: mỗi dòng dữ liệu có >=10 cột
     bad="$(printf '%s\n' "$BODY" | grep -v '^[[:space:]]*#' | grep '|' | awk -F'|' 'NF<10{print NR}' | head -1)"
     [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad thiếu cột (cần 10 cột phân tách '|')"
-    cp "$CONF" "$CONF.bak" 2>/dev/null
+    # Backup phải xảy ra trước khi ghi desired config mới; apply sau đó dùng --no-backup.
+    OUT="$(cd "$SB_ROOT" && sh scripts/backup.sh pre-apply 2>&1)" || json_err "500 Internal Server Error" "backup trước apply thất bại"
     printf '%s\n' "$BODY" > "$CONF"
     json_ok "$(jq -n '{ok:true, saved:true}')"
     ;;
 
   apply)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    OUT="$(cd "$SB_ROOT" && sh scripts/apply.sh 2>&1)"; RC=$?
+    OUT="$(cd "$SB_ROOT" && sh scripts/apply.sh --no-backup 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
@@ -120,7 +121,7 @@ case "$ACTION" in
     ;;
 
   backups)
-    B="$(ls -1dt "${BACKUP_DIR:-/root/sbproxy-backups}"/*/ 2>/dev/null | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
+    B="$(ls -1dt "${BACKUP_DIR:-/root/sbproxy-backups}"/*/ 2>/dev/null | grep -v '/latest/$' | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
     [ -n "$B" ] || B="[]"
     json_ok "$(jq -n --argjson b "$B" '{ok:true, backups:$b}')"
     ;;

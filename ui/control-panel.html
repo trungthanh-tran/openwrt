@@ -530,7 +530,7 @@
   }
   function zapSock(s) {
     if (!agent.connected) return;
-    if (!confirm(`Đổi SOCKS của "${s.name}" lên router ngay (không rớt WiFi)?\n→ ${s.host}:${s.port}`)) return;
+    if (!confirm(`Đổi SOCKS của "${s.name}" ngay? WiFi không reload nhưng phiên đang mở có thể gián đoạn.\n→ ${s.host}:${s.port}`)) return;
     toast("Đang đổi sock…");
     api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "" })
       .then(d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); })
@@ -643,7 +643,7 @@
         <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
         <td>${healthCell(s.idx)}</td>
         <td><div class="rowbtns">
-          ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="Đổi sock này lên router ngay (không rớt WiFi)">⚡</button>` : ""}
+          ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn">⚡</button>` : ""}
           <button class="iconbtn" data-edit="${s.id}">Sửa</button>
           <button class="iconbtn" data-dup="${s.id}">⧉</button>
           <button class="iconbtn del" data-del="${s.id}">✕</button>

@@ -146,8 +146,9 @@ const Commands = {
     return info.lastInsertRowid;
   },
   pending: deviceId => db.prepare("SELECT * FROM commands WHERE device_id=? AND status='pending' ORDER BY id").all(deviceId),
-  ack(id, status, result) {
-    db.prepare("UPDATE commands SET status=?, result=? WHERE id=?").run(status, result ? String(result).slice(0, 4000) : null, id);
+  ack(id, deviceId, status, result) {
+    db.prepare("UPDATE commands SET status=?, result=? WHERE id=? AND device_id=?")
+      .run(status, result ? String(result).slice(0, 4000) : null, id, deviceId);
   },
   recent: (deviceId, limit) => db.prepare("SELECT * FROM commands WHERE device_id=? ORDER BY id DESC LIMIT ?").all(deviceId, limit || 20),
 };

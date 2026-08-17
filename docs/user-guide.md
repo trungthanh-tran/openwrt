@@ -11,7 +11,7 @@ Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo 
 Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:
 
 - Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.
-- Đổi SOCKS của một WiFi **không làm rớt kết nối**.
+- Đổi SOCKS mà không reload WiFi; các phiên mạng đang mở có thể gián đoạn ngắn.
 - Xem **độ trễ (latency) proxy theo thời gian thực** cho từng WiFi.
 - Sao lưu & khôi phục cấu hình chỉ bằng một nút.
 
@@ -67,7 +67,8 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 
 **Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* & *Chặn WebRTC*. Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
 
-**Đổi SOCKS nhanh (không rớt WiFi):** sửa host/cổng (nút **Sửa**), rồi bấm **⚡** ở hàng đó để đẩy riêng thay đổi SOCKS. Người đang dùng **không bị ngắt**, chỉ đường ra internet đổi proxy.
+**Đổi SOCKS nhanh (không reload WiFi):** sửa host/cổng (nút **Sửa**), rồi bấm **⚡** ở hàng đó.
+Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.
 
 **Áp toàn bộ thay đổi:** sau khi thêm/sửa/xoá nhiều WiFi, bấm **⇪ Đẩy & Áp lên router** (bước này reload WiFi trong giây lát).
 

@@ -6,7 +6,7 @@ const PERMISSIONS = {
   "health.view":     "Xem trạng thái & latency proxy",
   "wifi.view":       "Xem danh sách WiFi/SOCKS",
   "wifi.manage":     "Thêm / sửa / xoá WiFi",
-  "sock.change":     "Đổi SOCKS (không rớt WiFi)",
+  "sock.change":     "Đổi SOCKS không reload WiFi",
   "config.apply":    "Đẩy & áp cấu hình lên router",
   "backup.create":   "Tạo / tải backup",
   "backup.rollback": "Khôi phục (rollback)",

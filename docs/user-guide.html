@@ -42,7 +42,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 <hr>
 <h2 id="sec-1">01 · Console này làm gì?</h2>
 <p>Mỗi mạng WiFi bạn tạo sẽ gắn với một <strong>SOCKS5</strong> riêng — thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:</p>
-<ul><li>Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.</li><li>Đổi SOCKS của một WiFi <strong>không làm rớt kết nối</strong>.</li><li>Xem <strong>độ trễ (latency) proxy theo thời gian thực</strong> cho từng WiFi.</li><li>Sao lưu &amp; khôi phục cấu hình chỉ bằng một nút.</li></ul>
+<ul><li>Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.</li><li>Đổi SOCKS mà không reload WiFi; các phiên mạng đang mở có thể gián đoạn ngắn.</li><li>Xem <strong>độ trễ (latency) proxy theo thời gian thực</strong> cho từng WiFi.</li><li>Sao lưu &amp; khôi phục cấu hình chỉ bằng một nút.</li></ul>
 <p><strong>Ba cách dùng:</strong></p>
 <ul><li><strong>Offline</strong> — soạn cấu hình rồi tải file về (không đụng router).</li><li><strong>Live LAN</strong> — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).</li><li><strong>Cloud (từ xa)</strong> — nếu quản trị viên đã dựng server, bạn <strong>đăng nhập bằng tài khoản riêng</strong> trên web để điều khiển router từ bất cứ đâu; thao tác giống hệt, chỉ khác mỗi hành động có thể bị giới hạn theo <strong>quyền</strong> tài khoản của bạn.</li></ul>
 <hr>
@@ -61,7 +61,7 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 <hr>
 <h2 id="sec-5">05 · Thao tác WiFi</h2>
 <p><strong>Thêm WiFi:</strong> bấm <strong>＋ Thêm WiFi</strong>, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt <em>Cách ly</em> &amp; <em>Chặn WebRTC</em>. Theo dõi đồng hồ <strong>BSSID</strong> ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).</p>
-<p><strong>Đổi SOCKS nhanh (không rớt WiFi):</strong> sửa host/cổng (nút <strong>Sửa</strong>), rồi bấm <strong>⚡</strong> ở hàng đó để đẩy riêng thay đổi SOCKS. Người đang dùng <strong>không bị ngắt</strong>, chỉ đường ra internet đổi proxy.</p>
+<p><strong>Đổi SOCKS nhanh (không reload WiFi):</strong> sửa host/cổng (nút <strong>Sửa</strong>), rồi bấm <strong>⚡</strong> ở hàng đó. Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.</p>
 <p><strong>Áp toàn bộ thay đổi:</strong> sau khi thêm/sửa/xoá nhiều WiFi, bấm <strong>⇪ Đẩy &amp; Áp lên router</strong> (bước này reload WiFi trong giây lát).</p>
 <blockquote class="call"><p><strong>Mẹo:</strong> <strong>⭳ Tải từ router</strong> để nạp cấu hình đang chạy trên router về console (khi mở console trên máy khác).</p></blockquote>
 <hr>

@@ -170,7 +170,7 @@ async function renderControl() {
   if (!rows.length) tb.append($("tr", null, $("td", { colspan: 7 }, $("div", { class: "empty" }, can("wifi.view") ? "Chưa có WiFi. Bấm “Sửa cấu hình”." : "Bạn không có quyền xem cấu hình WiFi (health.view chỉ thấy latency)."))));
   rows.forEach(s => {
     const acts = $("div", null);
-    if (can("sock.change")) acts.append($("button", { class: "iconbtn", title: "Đổi SOCKS (không rớt WiFi)", onclick: () => sockModal(s) }, "⚡"));
+    if (can("sock.change")) acts.append($("button", { class: "iconbtn", title: "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn", onclick: () => sockModal(s) }, "⚡"));
     tb.append($("tr", null,
       $("td", null, $("span", { class: "pill" }, String(s.idx))),
       $("td", null, $("div", { text: s.name, style: "font-weight:600" }), $("div", { class: "sub mono", text: "192.168." + (10 + s.idx) + ".1" })),

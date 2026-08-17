@@ -1,13 +1,68 @@
-﻿# backup.ps1 — chạy backup trên router rồi KÉO snapshot về máy Windows này.
-# Snapshot lưu tại LOCAL_BACKUP_DIR dạng <timestamp>-<nhãn>.tar.gz, dùng lại được với pc/restore.ps1.
-#
-# Dùng (PowerShell):
-#   .\pc\backup.ps1                       # nhãn mặc định "pc"
-#   .\pc\backup.ps1 -Label truoc-nang-cap
+﻿<#
+.SYNOPSIS
+Backup router rồi KÉO snapshot về máy Windows này.
+
+.DESCRIPTION
+Chạy scripts/backup.sh trên router (tar /etc/config + /etc/sing-box + nft + wifi-socks.conf,
+kèm sysupgrade -b), rồi kéo snapshot về LOCAL_BACKUP_DIR dạng <timestamp>-<nhãn>.tar.gz.
+Snapshot dùng lại được với pc\restore.ps1 (hoặc pc/restore.sh trên Linux).
+
+Cấu hình kết nối lấy theo ưu tiên: tham số dòng lệnh > file config > mặc định.
+File config mặc định: pc\sbproxy-pc.conf (đổi bằng -Conf hoặc env SBPC_CONF).
+KHÔNG cần file config nếu đã truyền -RouterHost.
+
+.PARAMETER Label
+Nhãn gắn vào tên bản backup (chữ/số/._- ; mặc định "pc").
+
+.PARAMETER Conf
+Đường dẫn file config (mặc định pc\sbproxy-pc.conf).
+
+.PARAMETER RouterHost
+IP/hostname router (= ROUTER_HOST trong file config).
+
+.PARAMETER RouterUser
+User SSH, mặc định root (= ROUTER_USER).
+
+.PARAMETER RouterPort
+Cổng SSH, mặc định 22 (= ROUTER_PORT).
+
+.PARAMETER SshKey
+Đường dẫn SSH private key (= SSH_KEY).
+
+.PARAMETER RemoteDir
+Thư mục repo trên router, mặc định /root/sbproxy (= REMOTE_DIR).
+
+.PARAMETER RemoteBackupDir
+Thư mục backup trên router, mặc định /root/sbproxy-backups (= REMOTE_BACKUP_DIR).
+Phải khớp BACKUP_DIR trong config/settings.sh của router.
+
+.PARAMETER LocalBackupDir
+Thư mục lưu backup ở máy này, mặc định pc\backups (= LOCAL_BACKUP_DIR).
+
+.EXAMPLE
+.\pc\backup.ps1
+Backup với nhãn "pc", đọc kết nối từ pc\sbproxy-pc.conf.
+
+.EXAMPLE
+.\pc\backup.ps1 -Label truoc-nang-cap
+
+.EXAMPLE
+.\pc\backup.ps1 -RouterHost 192.168.8.1 -LocalBackupDir D:\router-backups
+Không cần file config — mọi thứ truyền qua tham số.
+#>
 param(
-  [string]$Label = 'pc'
+  [string]$Label = 'pc',
+  [string]$Conf,
+  [string]$RouterHost,
+  [string]$RouterUser,
+  [string]$RouterPort,
+  [string]$SshKey,
+  [string]$RemoteDir,
+  [string]$RemoteBackupDir,
+  [string]$LocalBackupDir
 )
 . "$PSScriptRoot\_lib.ps1"
+Initialize-SbPc $PSBoundParameters
 
 if ($Label -notmatch '^[A-Za-z0-9._-]+$') {
   Die "Nhan chi gom chu/so/._- (khong khoang trang): $Label"

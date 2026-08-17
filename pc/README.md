@@ -21,15 +21,62 @@ Hai bản Windows/Linux **tương đương nhau** — dùng bản nào cũng đ�
   type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@192.168.1.1 "cat >> /etc/dropbear/authorized_keys"
   ```
 
-## Cài đặt (1 lần)
+## Cấu hình: file config HOẶC tham số dòng lệnh
+
+Mỗi script nhận cấu hình theo thứ tự ưu tiên (cao → thấp):
+
+1. **Tham số dòng lệnh** — `-RouterHost ...` (Windows) / `--host ...` (Linux)
+2. **File config** — mặc định `pc/sbproxy-pc.conf`; đổi file bằng `-Conf FILE` / `--conf FILE`
+   hoặc biến môi trường `SBPC_CONF`
+3. **Giá trị mặc định** — user `root`, port `22`, `/root/sbproxy`, …
+
+File config **không bắt buộc** nếu đã truyền địa chỉ router qua tham số.
+
+### Bảng tham số chung (mọi script đều nhận)
+
+| Windows (PowerShell) | Linux (bash) | Khóa trong file config | Mặc định |
+|---|---|---|---|
+| `-RouterHost HOST` | `--host HOST` | `ROUTER_HOST` | *(bắt buộc)* |
+| `-RouterUser USER` | `--user USER` | `ROUTER_USER` | `root` |
+| `-RouterPort PORT` | `--port PORT` | `ROUTER_PORT` | `22` |
+| `-SshKey FILE` | `--key FILE` | `SSH_KEY` | *(ssh tự chọn)* |
+| `-RemoteDir DIR` | `--remote-dir DIR` | `REMOTE_DIR` | `/root/sbproxy` |
+| `-RemoteBackupDir DIR` | `--backup-dir DIR` | `REMOTE_BACKUP_DIR` | `/root/sbproxy-backups` |
+| `-LocalBackupDir DIR` | `--local-dir DIR` | `LOCAL_BACKUP_DIR` | `pc/backups` |
+| `-Conf FILE` | `--conf FILE` | — | `pc/sbproxy-pc.conf` |
+
+`REMOTE_BACKUP_DIR` phải khớp `BACKUP_DIR` trong [config/settings.sh](../config/settings.sh) của router.
+
+### Cách 1 — dùng file config (khuyên dùng khi quản lý 1 router lâu dài)
 ```
 copy pc\sbproxy-pc.conf.example pc\sbproxy-pc.conf    # Windows
 cp   pc/sbproxy-pc.conf.example pc/sbproxy-pc.conf    # Linux
 ```
 Sửa `pc/sbproxy-pc.conf`: điền `ROUTER_HOST` (IP router), còn lại thường giữ mặc định.
-`REMOTE_BACKUP_DIR` phải khớp `BACKUP_DIR` trong [config/settings.sh](../config/settings.sh).
-
 File này nằm trong `.gitignore` — không bị commit, không bị đẩy lên router.
+
+### Cách 2 — chỉ dùng tham số (không cần file, tiện chạy nhanh / nhiều router)
+```powershell
+.\pc\backup.ps1 -RouterHost 192.168.8.1
+.\pc\update.ps1 -RouterHost 192.168.8.1 -RouterPort 2222 -SshKey C:\keys\router -Apply
+```
+```sh
+sh pc/backup.sh --host 192.168.8.1
+sh pc/update.sh --host 192.168.8.1 --port 2222 --key ~/.ssh/router --apply
+```
+
+### Nhiều router — mỗi router 1 file config riêng
+```powershell
+.\pc\backup.ps1 -Conf D:\configs\router-a.conf
+.\pc\backup.ps1 -Conf D:\configs\router-b.conf
+```
+Tham số vẫn đè được lên file: `.\pc\update.ps1 -Conf router-a.conf -RouterPort 2222`.
+
+### Xem hướng dẫn ngay trên terminal
+```powershell
+Get-Help .\pc\update.ps1 -Detailed     # Windows: help đầy đủ + ví dụ
+sh pc/update.sh --help                 # Linux
+```
 
 ## update — cập nhật code lên router
 ```powershell

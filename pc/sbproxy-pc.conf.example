@@ -1,5 +1,9 @@
 # sbproxy-pc.conf — cấu hình cho các script pc/ (update/backup/restore từ máy quản trị).
 # Copy thành sbproxy-pc.conf rồi sửa. File này KHÔNG được commit / KHÔNG bị đẩy lên router.
+#
+# File này KHÔNG bắt buộc: mọi giá trị đều truyền được qua tham số dòng lệnh
+# (--host / -RouterHost, ...) và tham số luôn ưu tiên hơn file. Xem pc/README.md.
+# Đổi file config khác bằng --conf / -Conf hoặc biến môi trường SBPC_CONF.
 # Định dạng KEY=value đơn giản (không khoảng trắng quanh dấu =) để cả bash lẫn PowerShell đọc được.
 
 # Địa chỉ router (IP LAN hoặc hostname)

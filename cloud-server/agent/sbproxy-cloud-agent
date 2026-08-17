@@ -51,10 +51,18 @@ run_once() {
   if [ "$ver" != "$applied" ]; then
     conf="$(echo "$resp" | jq -r '.wifi_socks_conf // ""')"
     if [ -n "$conf" ]; then
+      if ! (cd "$SB_ROOT" && sh scripts/backup.sh pre-cloud-apply) >/dev/null 2>&1; then
+        echo "cloud-agent: backup trước apply v$ver thất bại" >&2
+        return 1
+      fi
       printf '%s\n' "$conf" > "$CONF"
-      (cd "$SB_ROOT" && sh scripts/apply.sh) >/dev/null 2>&1
+      if (cd "$SB_ROOT" && sh scripts/apply.sh --no-backup) >/dev/null 2>&1; then
+        printf '%s\n' "$ver" > "$APPLIED_FILE"
+        applied="$ver"
+      else
+        echo "cloud-agent: apply v$ver thất bại; sẽ thử lại" >&2
+      fi
     fi
-    echo "$ver" > "$APPLIED_FILE"
   fi
 
   # 2) commands
@@ -62,10 +70,10 @@ run_once() {
 
   # 3) report health + backups + applied_version
   health="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$health" ] || health='{}'
-  backups="$(ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
+  backups="$(ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v '/latest/$' | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
   [ -n "$backups" ] || backups='[]'
   $CURL -H 'Content-Type: application/json' \
-    --data "$(jq -n --argjson v "${ver:-0}" --argjson h "$health" --argjson b "$backups" \
+    --data "$(jq -n --argjson v "${applied:-0}" --argjson h "$health" --argjson b "$backups" \
       '{applied_version:$v, health:$h, backups:$b}')" \
     "$CLOUD_URL/api/device/report" >/dev/null 2>&1
 

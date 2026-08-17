@@ -9,11 +9,16 @@ log() { printf '[agent] %s\n' "$*"; }
 [ "$(id -u)" = "0" ] || { echo "Cần root."; exit 1; }
 
 log "1) Cài gói: curl jq (uhttpd thường đã có)"
-opkg update >/dev/null 2>&1 || true
+if command -v apk >/dev/null 2>&1; then
+  pkg_update() { apk update >/dev/null 2>&1 || true; }; pkg_has() { apk list -I "$1" 2>/dev/null | grep -q "^$1-"; }; pkg_add() { apk add "$1"; }
+else
+  pkg_update() { opkg update >/dev/null 2>&1 || true; }; pkg_has() { opkg list-installed "$1" 2>/dev/null | grep -q "^$1 "; }; pkg_add() { opkg install "$1"; }
+fi
+pkg_update
 for p in curl jq; do
-  opkg list-installed 2>/dev/null | grep -q "^$p " || opkg install "$p" || echo "  cảnh báo: chưa cài được $p"
+  pkg_has "$p" || pkg_add "$p" || echo "  cảnh báo: chưa cài được $p"
 done
-[ -f /etc/init.d/uhttpd ] || echo "  cảnh báo: chưa thấy uhttpd — cài: opkg install uhttpd"
+[ -f /etc/init.d/uhttpd ] || echo "  cảnh báo: chưa thấy uhttpd — cài package uhttpd"
 
 log "2) env agent -> /etc/sbproxy/env"
 mkdir -p /etc/sbproxy

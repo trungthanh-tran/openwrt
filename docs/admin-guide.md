@@ -102,7 +102,7 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 
 ## Bước 8 — Áp dụng
 ```sh
-DRYRUN=1 sh scripts/apply.sh | less   # xem trước (không đổi gì)
+DRYRUN=1 sh scripts/apply.sh | less   # validate trong /tmp; không ghi UCI hay /etc
 sh scripts/apply.sh                    # áp thật (tự backup trước)
 sh scripts/uninstall.sh                # gỡ sạch phần project tạo
 ```
@@ -271,7 +271,7 @@ PORT=8088 HTTPS=1 npm start            # mở http://<VPS>:8088
 |---|---|
 | `health.view` | Xem trạng thái & latency |
 | `wifi.view` / `wifi.manage` | Xem / sửa danh sách WiFi |
-| `sock.change` | Đổi SOCKS (không rớt WiFi) |
+| `sock.change` | Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn |
 | `config.apply` | Đẩy & áp cấu hình |
 | `backup.create` / `backup.rollback` | Tạo backup / khôi phục |
 | `device.manage` / `user.manage` | *(super)* Quản router / người dùng |
@@ -299,7 +299,7 @@ Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quy�
 ### A · Chống lộ danh tính / IP thật
 | Kênh lộ | Trạng thái | Cách bịt |
 |---|---|---|
-| **IPv6 bypass** (dễ quên) | ⚠️ Chưa xử lý ở v0.1 | tproxy chỉ bắt IPv4 → client có IPv6 ra thẳng, lộ IP thật. **Tắt IPv6 trên SSID khách:** `uci set dhcp.wIDX.dhcpv6='disabled'; uci set dhcp.wIDX.ra='disabled'` rồi `uci commit dhcp; /etc/init.d/odhcpd restart`. Hoặc tắt IPv6 WAN. |
+| **IPv6 bypass** | ✅ Chặn ở v0.2 | tproxy hiện chỉ bắt IPv4; `apply.sh` tắt DHCPv6/RA/NDP trên từng SSID sbproxy. Chưa hỗ trợ proxy IPv6. |
 | **DNS leak** | ⚠️ v0.1 có thể lộ | `uci add_list dhcp.@dnsmasq[0].server='1.1.1.1'; uci set dhcp.@dnsmasq[0].noresolv='1'` (tốt hơn: DoH qua `https-dns-proxy`, hoặc DNS trong sing-box đi qua proxy). |
 | **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh (Bước 7). |
 | **Rò khi proxy chết** | ✅ Fail-closed | Zone khách `forward=REJECT` → sing-box/tproxy chết thì client **mất mạng** chứ không ra thẳng. Đừng thêm rule forward guest→wan. |

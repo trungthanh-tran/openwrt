@@ -1,5 +1,16 @@
 ﻿# _lib.ps1 — helpers chung cho các script pc/*.ps1 (Windows PowerShell 5.1+).
-# Dot-source từ update.ps1 / backup.ps1 / restore.ps1. Đọc cấu hình pc/sbproxy-pc.conf.
+#
+# CẤU HÌNH — lấy theo thứ tự ưu tiên (cao → thấp):
+#   1. Tham số dòng lệnh  (-RouterHost, -RouterUser, -RouterPort, ...)
+#   2. File config        (mặc định pc/sbproxy-pc.conf; đổi bằng -Conf FILE
+#                          hoặc biến môi trường SBPC_CONF)
+#   3. Giá trị mặc định   (user root, port 22, /root/sbproxy, ...)
+# File config KHÔNG bắt buộc nếu đã truyền -RouterHost.
+#
+# Cách script dùng lib này:
+#   param([string]$Conf, [string]$RouterHost, ... , tham số riêng)
+#   . "$PSScriptRoot\_lib.ps1"
+#   Initialize-SbPc $PSBoundParameters     # nạp config + kiểm tra
 $ErrorActionPreference = 'Stop'
 
 $script:PcDir   = $PSScriptRoot
@@ -9,40 +20,63 @@ function Log($m)  { Write-Host "[pc] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "[pc][CANH BAO] $m" -ForegroundColor Yellow }
 function Die($m)  { Write-Host "[pc][LOI] $m" -ForegroundColor Red; exit 1 }
 
-$ConfFile = Join-Path $PcDir 'sbproxy-pc.conf'
-if ($env:SBPC_CONF) { $ConfFile = $env:SBPC_CONF }
-if (-not (Test-Path $ConfFile)) {
-  Die "Chua co $ConfFile — copy pc/sbproxy-pc.conf.example thanh pc/sbproxy-pc.conf roi sua."
-}
-
-# Đọc file KEY=value (định dạng dùng chung với bản bash)
-$script:Conf = @{}
-foreach ($line in Get-Content $ConfFile) {
-  if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
-    $Conf[$Matches[1]] = $Matches[2].Trim().Trim('"').Trim("'")
+# Initialize-SbPc — nạp file config (nếu có), áp tham số CLI đè lên, điền mặc định.
+# $Cli: thường là $PSBoundParameters của script gọi. Các key được hiểu:
+#   Conf, RouterHost, RouterUser, RouterPort, SshKey,
+#   RemoteDir, RemoteBackupDir, LocalBackupDir  (key khác bị bỏ qua)
+function Initialize-SbPc([hashtable]$Cli = @{}) {
+  # 1) File config: -Conf > env SBPC_CONF > pc/sbproxy-pc.conf
+  if ($Cli['Conf']) {
+    $confFile = [string]$Cli['Conf']
+    if (-not (Test-Path $confFile)) { Die "Khong thay file config: $confFile" }
+  } elseif ($env:SBPC_CONF) {
+    $confFile = $env:SBPC_CONF
+  } else {
+    $confFile = Join-Path $PcDir 'sbproxy-pc.conf'
   }
-}
-function Get-Conf($key, $default) {
-  if ($Conf.ContainsKey($key) -and $Conf[$key]) { $Conf[$key] } else { $default }
-}
 
-$script:RouterHost      = Get-Conf 'ROUTER_HOST' $null
-if (-not $RouterHost) { Die 'Thieu ROUTER_HOST trong sbproxy-pc.conf' }
-$script:RouterUser      = Get-Conf 'ROUTER_USER' 'root'
-$script:RouterPort      = Get-Conf 'ROUTER_PORT' '22'
-$script:RemoteDir       = Get-Conf 'REMOTE_DIR' '/root/sbproxy'
-$script:RemoteBackupDir = Get-Conf 'REMOTE_BACKUP_DIR' '/root/sbproxy-backups'
-$script:LocalBackupDir  = Get-Conf 'LOCAL_BACKUP_DIR' (Join-Path $PcDir 'backups')
-$script:SshKey          = Get-Conf 'SSH_KEY' $null
+  # Đọc file KEY=value (định dạng dùng chung với bản bash) — nếu file tồn tại
+  $conf = @{}
+  if (Test-Path $confFile) {
+    foreach ($line in Get-Content $confFile) {
+      if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        $conf[$Matches[1]] = $Matches[2].Trim().Trim('"').Trim("'")
+      }
+    }
+  }
 
-$script:Target  = "$RouterUser@$RouterHost"
-$script:SshArgs = @('-p', $RouterPort, '-o', 'ConnectTimeout=10')
-$script:ScpArgs = @('-P', $RouterPort, '-o', 'ConnectTimeout=10')
-if ($SshKey) { $SshArgs += @('-i', $SshKey); $ScpArgs += @('-i', $SshKey) }
+  # 2+3) CLI > file > mặc định
+  function Pick($cliKey, $confKey, $default) {
+    if ($Cli[$cliKey])                                  { return [string]$Cli[$cliKey] }
+    if ($conf.ContainsKey($confKey) -and $conf[$confKey]) { return $conf[$confKey] }
+    $default
+  }
+  $script:RouterHost      = Pick 'RouterHost'      'ROUTER_HOST'       $null
+  $script:RouterUser      = Pick 'RouterUser'      'ROUTER_USER'       'root'
+  $script:RouterPort      = Pick 'RouterPort'      'ROUTER_PORT'       '22'
+  $script:SshKey          = Pick 'SshKey'          'SSH_KEY'           $null
+  $script:RemoteDir       = Pick 'RemoteDir'       'REMOTE_DIR'        '/root/sbproxy'
+  $script:RemoteBackupDir = Pick 'RemoteBackupDir' 'REMOTE_BACKUP_DIR' '/root/sbproxy-backups'
+  $script:LocalBackupDir  = Pick 'LocalBackupDir'  'LOCAL_BACKUP_DIR'  (Join-Path $PcDir 'backups')
 
-foreach ($exe in 'ssh', 'scp', 'tar') {
-  if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) {
-    Die "Thieu $exe.exe — can Windows 10+ voi OpenSSH Client (Settings > Optional Features)."
+  if (-not $RouterHost) {
+    Die ("Chua biet dia chi router. Truyen -RouterHost <IP> hoac tao $PcDir\sbproxy-pc.conf " +
+         '(copy tu sbproxy-pc.conf.example).')
+  }
+
+  $script:Target  = "$RouterUser@$RouterHost"
+  $script:SshArgs = @('-p', $RouterPort, '-o', 'ConnectTimeout=10')
+  $script:ScpArgs = @('-P', $RouterPort, '-o', 'ConnectTimeout=10')
+  if ($SshKey) {
+    if (-not (Test-Path $SshKey)) { Die "Khong thay SSH key: $SshKey" }
+    $script:SshArgs += @('-i', $SshKey)
+    $script:ScpArgs += @('-i', $SshKey)
+  }
+
+  foreach ($exe in 'ssh', 'scp', 'tar') {
+    if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) {
+      Die "Thieu $exe.exe — can Windows 10+ voi OpenSSH Client (Settings > Optional Features)."
+    }
   }
 }
 

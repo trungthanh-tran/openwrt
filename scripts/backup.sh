@@ -32,7 +32,7 @@ fi
 ln -sfn "$DEST" "$BACKUP_DIR/latest"
 
 # Dọn: giữ 20 bản gần nhất
-ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | tail -n +21 | while read -r old; do rm -rf "$old"; done
+ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | tail -n +21 | while read -r old; do rm -rf "$old"; done
 
 log "Backup xong: $DEST"
 log "Danh sách: scripts/rollback.sh --list"
