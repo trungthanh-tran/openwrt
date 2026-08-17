@@ -1,5 +1,7 @@
 # HƯỚNG DẪN SỬ DỤNG TOÀN TẬP — sbproxy (GL-MT6000)
 
+**Ngôn ngữ:** Tiếng Việt | [English](GUIDE.en.md)
+
 Cẩm nang xuyên suốt: **firmware → cài đặt → cấu hình (UI hoặc file) → áp dụng → kiểm tra → vận hành → xử lý lỗi → rollback**.
 Đọc lướt mục lục, làm theo đúng thứ tự ở lần đầu.
 

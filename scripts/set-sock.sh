@@ -1,12 +1,12 @@
 #!/bin/sh
-# set-sock.sh — đổi SOCKS5 của MỘT WiFi mà KHÔNG rớt WiFi (chỉ reload sing-box).
-# Cập nhật wifi-socks.conf (single source of truth) rồi sinh lại config sing-box.
+# set-sock.sh — change one Wi-Fi's SOCKS5 endpoint without reloading Wi-Fi.
+# Updates wifi-socks.conf (the source of truth), then regenerates sing-box config.
 #
-# Dùng:
+# Usage:
 #   scripts/set-sock.sh <idx> <sock_host> <sock_port> [user] [pass]
 # VD:
 #   scripts/set-sock.sh 2 5.6.7.8 1080 myuser mypass
-#   scripts/set-sock.sh 3 9.9.9.9 1080            # không auth
+#   scripts/set-sock.sh 3 9.9.9.9 1080            # no authentication
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
@@ -22,13 +22,13 @@ case "$PORT" in *[!0-9]*|'') die "port phải là số từ 1 đến 65535" ;; e
 case "$HOST" in *[!A-Za-z0-9._:-]*) die "host chứa ký tự không hợp lệ" ;; esac
 case "$USER$PASS" in *'|'*) die "user/pass không được chứa ký tự |" ;; esac
 
-# Kiểm tra idx tồn tại trong conf
+# Ensure the requested index exists.
 grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*$IDX[[:space:]]*\|" "$CONF" || die "Không tìm thấy WiFi idx=$IDX trong $CONF"
 
 log "Backup config trước khi đổi SOCKS..."
 "$SB_ROOT/scripts/backup.sh" pre-setsock
 
-# Ghi lại dòng có idx tương ứng: giữ name|band|idx|key, thay 4 cột sock, giữ isolate|webrtc
+# Rewrite the matching row while preserving Wi-Fi and isolation fields.
 TMP="/tmp/sbproxy-conf.$$"
 awk -F'|' -v OFS='|' -v idx="$IDX" -v h="$HOST" -v p="$PORT" -v u="$USER" -v pw="$PASS" '
   /^#/ || NF<10 { print; next }

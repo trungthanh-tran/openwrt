@@ -1,5 +1,7 @@
 # TESTING — Kiểm thử từng yêu cầu
 
+**Ngôn ngữ:** Tiếng Việt | [English](TESTING.en.md)
+
 Chạy sau `apply.sh`. Cột "Đạt khi" là tiêu chí pass. Nhiều test cần **một máy client nối vào WiFi cần kiểm**.
 
 ## A. Kiểm tra trên router (SSH)

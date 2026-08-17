@@ -1,5 +1,7 @@
 # sbproxy — Multi-WiFi → SOCKS5 trên OpenWrt (GL-MT6000)
 
+**Ngôn ngữ:** Tiếng Việt | [English](README.en.md)
+
 Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua một SOCKS5 riêng**, MAC ngẫu nhiên, cách ly client, chặn WebRTC — điều khiển bằng **một file config duy nhất** + vài script.
 
 > Đi kèm bản plan tổng thể: [`../plan-mt6000-socks5-multi-wifi.md`](../plan-mt6000-socks5-multi-wifi.md)

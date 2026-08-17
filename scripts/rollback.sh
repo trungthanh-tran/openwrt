@@ -1,9 +1,9 @@
 #!/bin/sh
-# rollback.sh — khôi phục cấu hình từ backup gần nhất (hoặc bản chỉ định).
+# rollback.sh — restore configuration from the latest or a named snapshot.
 #
-# Dùng:
-#   scripts/rollback.sh --list          # liệt kê các bản backup
-#   scripts/rollback.sh                  # rollback về bản 'latest'
+# Usage:
+#   scripts/rollback.sh --list          # list snapshots
+#   scripts/rollback.sh                  # restore `latest`
 #   scripts/rollback.sh 20260812-101500-pre-apply
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
@@ -24,18 +24,18 @@ else SRC="$(readlink -f "$BACKUP_DIR/latest" 2>/dev/null)"; fi
 [ -n "$SRC" ] && [ -d "$SRC" ] || die "Không tìm thấy backup: ${1:-latest}. Xem: rollback.sh --list"
 
 log "Rollback từ: $SRC"
-# SB_YES=1 -> bỏ qua xác nhận (agent/CGI gọi không tương tác)
+# SB_YES=1 skips confirmation for non-interactive agent/CGI calls.
 if [ "$SB_YES" != "1" ]; then
   printf "Việc này GHI ĐÈ /etc/config, /etc/sing-box, %s. Tiếp tục? [y/N] " "$NFT_FILE"
   read -r ans; case "$ans" in y|Y) : ;; *) die "Đã huỷ."; esac
 fi
 
-# 1) Khôi phục file cấu hình
+# 1) Restore configuration files.
 [ -f "$SRC/etc-config.tar.gz" ] && tar xzf "$SRC/etc-config.tar.gz" -C / && log "Đã phục hồi /etc/config + /etc/sing-box"
 [ -f "$SRC/sbproxy.nft" ] && cp "$SRC/sbproxy.nft" "$NFT_FILE" && log "Đã phục hồi $NFT_FILE"
 [ -f "$SRC/wifi-socks.conf" ] && cp "$SRC/wifi-socks.conf" "$CONF" && log "Đã phục hồi wifi-socks.conf"
 
-# 2) Reload toàn bộ dịch vụ
+# 2) Reload all affected services.
 log "Reload dịch vụ..."
 uci commit 2>/dev/null || true
 /etc/init.d/network reload  || true

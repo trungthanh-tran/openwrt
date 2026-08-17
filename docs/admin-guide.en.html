@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy · Administrator Guide</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;--text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;--warn:#b5750a;--warns:#f6e9cf;--mono:ui-monospace,"Cascadia Code",Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;--text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;--warn:#e0a53a;--warns:#33280f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62}
+.doc{max-width:880px;margin:0 auto;padding:30px 22px 90px}
+h1{font-size:28px;letter-spacing:-.5px;margin:.2em 0 .4em;text-wrap:balance}
+h2{font-size:20px;margin:38px 0 6px;padding-top:16px;border-top:1px solid var(--border);scroll-margin-top:16px}
+h3{font-size:15.5px;margin:22px 0 4px}
+p{margin:9px 0}
+a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
+ul,ol{margin:9px 0;padding-left:22px}li{margin:5px 0}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+pre{margin:12px 0;background:#11181f;border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
+pre code{background:none;border:none;padding:0;color:#d6e2ea;font-size:12.6px;line-height:1.6}
+hr{border:none;border-top:1px solid var(--border);margin:26px 0}
+blockquote.call{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:4px 16px;margin:14px 0;background:var(--panel)}
+blockquote.call.warn{border-left-color:var(--warn)}
+blockquote.call p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:13.6px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
+td code{white-space:nowrap}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin:14px 0}
+.tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 8px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px;font-size:13.5px}
+.toc a{color:var(--dim)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--faint);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="doc">
+<nav class="toc"><a href="#sec-1">Safety baseline</a><a href="#sec-2">Installation and acceptance</a><a href="#sec-3">Local agent</a><a href="#sec-4">Operations and recovery</a><a href="#sec-5">Privacy checklist</a></nav><h1>sbproxy — Administrator guide</h1>
+<p><strong>Language:</strong> <a href="admin-guide.md">Tiếng Việt</a> | English</p>
+<h2 id="sec-1">Safety baseline</h2>
+<ul><li>Keep a wired LAN recovery connection while changing firmware or networking.</li><li>Download backups off-device before firmware upgrades.</li><li>Test one or two SSIDs before scaling up.</li><li>Keep LuCI, SSH, uhttpd, and the agent off the WAN.</li><li>Treat <code>wifi-socks.conf</code>, generated sing-box config, backups, and the agent token as secrets.</li></ul>
+<h2 id="sec-2">Installation and acceptance</h2>
+<p>Follow <a href="INSTALL.en.md">INSTALL.en.md</a>, then complete <a href="TESTING.en.md">TESTING.en.md</a>. Do not bypass preflight, staged validation, or the first dry-run. Set <code>WIFI_COUNTRY</code> to the router's real operating country and verify radio mapping with <code>iw</code>/UCI rather than assuming <code>radio0</code> is 2.4 GHz.</p>
+<h2 id="sec-3">Local agent</h2>
+<pre><code>cd /root/sbproxy
+sh agent/install-agent.sh</code></pre>
+<p>Open <code>http://&lt;router&gt;/sbproxy/</code>, leave Base URL empty, and supply <code>/etc/sbproxy/token</code>. The token is a shared bearer secret with full control; there are no per-user accounts or roles.</p>
+<p>Rotate a suspected token by deleting it and reinstalling the agent:</p>
+<pre><code>rm /etc/sbproxy/token
+sh agent/install-agent.sh</code></pre>
+<h2 id="sec-4">Operations and recovery</h2>
+<ul><li>Use full apply for SSID topology changes.</li><li>Use <code>set-sock.sh</code> for a single upstream change.</li><li>Keep off-device snapshots with the PC scripts.</li><li>Follow <a href="ROLLBACK.en.md">ROLLBACK.en.md</a> when apply or firmware changes fail.</li></ul>
+<h2 id="sec-5">Privacy checklist</h2>
+<ul><li>IPv6: disabled on managed SSIDs because v0.2 proxies IPv4 only.</li><li>DNS: still a known leak risk through dnsmasq.</li><li>WebRTC: port-based STUN/TURN blocking is optional and not a universal guarantee.</li><li>Fail-closed: guest zones must never receive a direct guest-to-WAN forwarding rule.</li><li>Logs: never print tokens, Wi-Fi passwords, or SOCKS credentials.</li></ul>
+<p>For access from outside the site, connect to the management LAN through a VPN you control. Do not publish the local agent directly.</p>
+<footer>Generated from Markdown by tools/build-docs.js. Edit the .md source and rebuild; do not edit this HTML file directly.</footer>
+</div>
+</body>
+</html>

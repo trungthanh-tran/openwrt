@@ -1,17 +1,17 @@
 #!/bin/sh
-# sbproxy CGI — REST agent cho uhttpd. Cài tại /www/cgi-bin/sbproxy
+# sbproxy CGI — uhttpd REST agent installed at /www/cgi-bin/sbproxy.
 # Endpoint:  http://<router>/cgi-bin/sbproxy?action=<...>
-# Auth: header  X-SB-Token: <token>  (khớp /etc/sbproxy/token)
+# Authentication header: X-SB-Token: <token>, matching /etc/sbproxy/token.
 #
 # GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}}
-# GET  ?action=get_conf      -> text/plain (nội dung wifi-socks.conf)
+# GET  ?action=get_conf      -> wifi-socks.conf as text/plain
 # GET  ?action=backups       -> {backups:[...]}
 # POST ?action=save_conf     body=text  -> ghi wifi-socks.conf (validate)
-# POST ?action=apply         -> chạy apply.sh, trả log
-# POST ?action=set_sock      body=json {idx,host,port,user,pass} -> đổi sock không reload WiFi
+# POST ?action=apply         -> run apply.sh and return its log
+# POST ?action=set_sock      body=json {idx,host,port,user,pass} -> change SOCKS without Wi-Fi reload
 # POST ?action=rollback      body=json {name?} -> rollback
-# POST ?action=uninstall     -> gỡ sạch
-# GET  ?action=health_now    -> ép probe ngay 1 lần
+# POST ?action=uninstall     -> remove project-managed configuration
+# GET  ?action=health_now    -> run an immediate health probe
 
 # ---- env / config ----
 [ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
@@ -48,7 +48,7 @@ ACTION="$(echo "$QUERY_STRING" | sed -n 's/.*\(^\|&\)action=\([a-z_]*\).*/\2/p')
 BODY=""
 [ "$REQUEST_METHOD" = "POST" ] && BODY="$(cat)"
 
-# ---- build ssids JSON từ conf (KHÔNG lộ wifi_key / sock_pass) ----
+# Build SSID JSON without exposing wifi_key or sock_pass.
 ssids_json() {
   { grep -v '^[[:space:]]*#' "$CONF" 2>/dev/null | grep '|' | \
     while IFS='|' read -r name band idx key host port user pass iso web; do
@@ -80,10 +80,10 @@ case "$ACTION" in
   save_conf)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
     [ -n "$BODY" ] || json_err "400 Bad Request" "body rỗng"
-    # validate tối thiểu: mỗi dòng dữ liệu có >=10 cột
+    # Minimal structural validation before saving.
     bad="$(printf '%s\n' "$BODY" | grep -v '^[[:space:]]*#' | grep '|' | awk -F'|' 'NF<10{print NR}' | head -1)"
     [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad thiếu cột (cần 10 cột phân tách '|')"
-    # Backup phải xảy ra trước khi ghi desired config mới; apply sau đó dùng --no-backup.
+    # Back up before writing desired config; the following apply uses --no-backup.
     OUT="$(cd "$SB_ROOT" && sh scripts/backup.sh pre-apply 2>&1)" || json_err "500 Internal Server Error" "backup trước apply thất bại"
     printf '%s\n' "$BODY" > "$CONF"
     json_ok "$(jq -n '{ok:true, saved:true}')"
@@ -134,7 +134,7 @@ case "$ACTION" in
     ;;
 
   download_backup)
-    # Tải file backup VỀ MÁY (off-device) — quan trọng để restore sau khi reflash/brick.
+    # Download an off-device backup for recovery after reflash or brick.
     name="$(echo "$QUERY_STRING" | sed -n 's/.*[?&]name=\([A-Za-z0-9._-]*\).*/\1/p')"
     case "$name" in ""|*..*|*/*) json_err "400 Bad Request" "tên backup không hợp lệ";; esac
     dir="${BACKUP_DIR:-/root/sbproxy-backups}/$name"

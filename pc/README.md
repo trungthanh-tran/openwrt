@@ -1,5 +1,7 @@
 # pc/ — update · backup · restore router từ máy quản trị (Windows & Linux)
 
+**Ngôn ngữ:** Tiếng Việt | [English](README.en.md)
+
 Bộ script chạy trên **máy của bạn** (không phải trên router) để quản lý router qua SSH:
 
 | Việc | Windows (PowerShell) | Linux / macOS / Git Bash |

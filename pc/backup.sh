@@ -1,20 +1,17 @@
 #!/bin/sh
-# backup.sh — chạy backup trên router rồi KÉO snapshot về máy này.
-# Snapshot lưu tại LOCAL_BACKUP_DIR dạng <timestamp>-<nhãn>.tar.gz, dùng lại được với pc/restore.sh.
+# backup.sh — create a router snapshot and download it to this computer.
+# Stores <timestamp>-<label>.tar.gz in LOCAL_BACKUP_DIR for pc/restore.sh.
 #
-# Dùng:
-#   pc/backup.sh [nhãn] [tuỳ chọn]      # nhãn mặc định: "pc"
+# Usage: pc/backup.sh [label] [options]; the default label is `pc`.
 #
-# Tuỳ chọn riêng:
-#   -h, --help        In hướng dẫn
+# Script option: -h, --help shows help.
 #
-# Tuỳ chọn chung (xem _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
+# Shared options (see _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
 #   --key FILE, --remote-dir DIR, --backup-dir DIR, --local-dir DIR
-# Ưu tiên: tham số dòng lệnh > file config (pc/sbproxy-pc.conf) > mặc định.
-# Không cần file config nếu đã truyền --host.
+# Precedence: CLI arguments, config file, defaults. A config file is optional with --host.
 #
-# Ví dụ:
-#   pc/backup.sh                          # nhãn "pc", đọc pc/sbproxy-pc.conf
+# Examples:
+#   pc/backup.sh                          # label `pc`, read pc/sbproxy-pc.conf
 #   pc/backup.sh truoc-nang-cap
 #   pc/backup.sh --host 192.168.8.1 --local-dir ~/router-backups
 set -e
@@ -38,15 +35,15 @@ sbpc_init
 LABEL="${LABEL:-pc}"
 case "$LABEL" in *[!a-zA-Z0-9._-]*) die "Nhãn chỉ gồm chữ/số/._- (không khoảng trắng): $LABEL" ;; esac
 
-# 1) Tạo snapshot trên router (scripts/backup.sh của repo: tar config + sysupgrade -b)
+# 1) Create a router snapshot with scripts/backup.sh.
 log "Tạo backup trên router (nhãn: $LABEL)..."
 rssh "sh '$REMOTE_DIR/scripts/backup.sh' '$LABEL'"
 
-# 2) Lấy tên bản vừa tạo (con trỏ 'latest')
+# 2) Resolve the newly created snapshot through `latest`.
 NAME="$(rssh "basename \$(readlink -f '$REMOTE_BACKUP_DIR/latest')")"
 [ -n "$NAME" ] && [ "$NAME" != "latest" ] || die "Không xác định được bản backup vừa tạo trên router."
 
-# 3) Kéo về máy (tar qua SSH — không cần SFTP, hợp với dropbear)
+# 3) Download via tar over SSH for Dropbear compatibility.
 mkdir -p "$LOCAL_BACKUP_DIR"
 OUT="$LOCAL_BACKUP_DIR/$NAME.tar.gz"
 log "Kéo về: $OUT ..."

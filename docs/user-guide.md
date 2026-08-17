@@ -1,5 +1,7 @@
 # sbproxy Console — Hướng dẫn Người dùng
 
+**Ngôn ngữ:** Tiếng Việt | [English](user-guide.en.md)
+
 Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo dõi sức khỏe proxy, và sao lưu/khôi phục — tất cả bằng giao diện. Không cần dòng lệnh.
 
 > Bản HTML đọc offline: [user-guide.html](user-guide.html). Kỹ thuật/quản trị: [admin-guide.md](admin-guide.md).

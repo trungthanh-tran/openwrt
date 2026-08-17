@@ -1,8 +1,8 @@
 #!/bin/sh
-# uninstall.sh — gỡ mọi SSID/zone/interface do project tạo (theo idx trong conf).
-# KHÔNG gỡ gói opkg. Tự backup trước.
+# uninstall.sh — remove project-managed SSIDs, zones, and interfaces by config index.
+# Does not remove packages. Creates a backup first.
 #
-# Dùng: scripts/uninstall.sh
+# Usage: scripts/uninstall.sh
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"

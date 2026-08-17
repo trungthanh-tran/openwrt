@@ -1,5 +1,7 @@
 # ROLLBACK — Khi có lỗi thì khôi phục thế nào
 
+**Ngôn ngữ:** Tiếng Việt | [English](ROLLBACK.en.md)
+
 Có nhiều mức, từ nhẹ tới nặng. **Luôn còn đường LAN dự phòng** khi thao tác định tuyến/WiFi.
 
 ## Cơ chế backup

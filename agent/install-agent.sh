@@ -1,6 +1,6 @@
 #!/bin/sh
-# install-agent.sh — cài agent kiến trúc B (CGI trên uhttpd + health daemon + UI self-host).
-# Chạy trên router SAU khi project đã ở /root/sbproxy và apply.sh chạy được.
+# install-agent.sh — install the uhttpd CGI, health daemon, and self-hosted UI.
+# Run on the router after the project and apply.sh are working.
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AGENT="$SB_ROOT/agent"
@@ -57,12 +57,12 @@ chmod +x /etc/init.d/sbproxy-healthd
 /etc/init.d/sbproxy-healthd enable
 /etc/init.d/sbproxy-healthd restart
 
-# Đăng ký file agent vào /etc/sysupgrade.conf (giữ khi backup/nâng cấp)
+# Preserve agent files across standard OpenWrt backups and upgrades.
 for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 
-# uhttpd CGI mặc định đã bật cgi_prefix=/cgi-bin; chỉ reload cho chắc
+# uhttpd normally enables /cgi-bin already; reload to ensure the CGI is visible.
 /etc/init.d/uhttpd reload 2>/dev/null || true
 
 IP="$(uci -q get network.lan.ipaddr || echo 192.168.1.1)"

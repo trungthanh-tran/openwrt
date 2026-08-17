@@ -1,8 +1,8 @@
 #!/bin/sh
-# sbproxy-healthd — probe từng SOCKS5, đo latency, ghi JSON cho UI đọc realtime.
-# Cài tại /usr/sbin/sbproxy-healthd. Chạy như daemon (procd) hoặc --once.
+# sbproxy-healthd — probe each SOCKS5 endpoint and write latency JSON for the UI.
+# Installed at /usr/sbin/sbproxy-healthd; runs under procd or once with --once.
 #
-# Kết quả -> $HEALTH_FILE:
+# Output format in $HEALTH_FILE:
 #   { "ts": 1699999999,
 #     "probes": { "1": {"state":"ok","latency_ms":123,"code":204}, ... } }
 # state: ok | slow | fail
@@ -20,7 +20,7 @@ command -v jq   >/dev/null 2>&1 || { echo "healthd: thiếu jq";   exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "healthd: thiếu curl"; exit 1; }
 
 probe_one() {
-  # args: host port user pass -> in ra: "state latency_ms code"
+  # Arguments: host port user pass; output: "state latency_ms code".
   host="$1"; port="$2"; user="$3"; pass="$4"
   if [ -n "$user" ]; then px="socks5h://$user:$pass@$host:$port"; else px="socks5h://$host:$port"; fi
   # %{http_code} %{time_total}
@@ -37,7 +37,7 @@ probe_one() {
 
 run_once() {
   probes="{}"
-  # đọc conf
+  # Read the source configuration.
   while IFS='|' read -r name band idx key host port user pass iso web; do
     case "$name" in ''|\#*) continue;; esac
     idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue

@@ -1,5 +1,7 @@
 # sbproxy — Hướng dẫn Quản trị (theo bước)
 
+**Ngôn ngữ:** Tiếng Việt | [English](admin-guide.en.md)
+
 Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent LAN → kiểm tra → vận hành → bảo mật.
 
 > Bản HTML đọc offline: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).

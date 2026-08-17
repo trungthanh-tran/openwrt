@@ -1,25 +1,24 @@
-# sbproxy-pc.conf — cấu hình cho các script pc/ (update/backup/restore từ máy quản trị).
-# Copy thành sbproxy-pc.conf rồi sửa. File này KHÔNG được commit / KHÔNG bị đẩy lên router.
+# sbproxy-pc.conf — configuration for update, backup, and restore scripts.
+# Copy to sbproxy-pc.conf and edit it. Never commit or upload the real file.
 #
-# File này KHÔNG bắt buộc: mọi giá trị đều truyền được qua tham số dòng lệnh
-# (--host / -RouterHost, ...) và tham số luôn ưu tiên hơn file. Xem pc/README.md.
-# Đổi file config khác bằng --conf / -Conf hoặc biến môi trường SBPC_CONF.
-# Định dạng KEY=value đơn giản (không khoảng trắng quanh dấu =) để cả bash lẫn PowerShell đọc được.
+# This file is optional because all values can be supplied on the command line.
+# CLI arguments override the file. Select another file with --conf/-Conf or SBPC_CONF.
+# Use simple KEY=value syntax without spaces around `=` for Bash/PowerShell compatibility.
 
-# Địa chỉ router (IP LAN hoặc hostname)
+# Router LAN IP address or hostname.
 ROUTER_HOST=192.168.1.1
 ROUTER_USER=root
 ROUTER_PORT=22
 
-# Đường dẫn SSH key (để trống thì ssh sẽ hỏi mật khẩu / dùng key mặc định).
-# LƯU Ý: đường dẫn không nên chứa khoảng trắng.
+# SSH private key path; leave empty for password/default-key authentication.
+# Avoid spaces in the path.
 SSH_KEY=
 
-# Thư mục repo trên router (nơi đã copy project lên)
+# Repository directory on the router.
 REMOTE_DIR=/root/sbproxy
 
-# Thư mục backup trên router — PHẢI KHỚP BACKUP_DIR trong config/settings.sh
+# Router backup directory; must match BACKUP_DIR in config/settings.sh.
 REMOTE_BACKUP_DIR=/root/sbproxy-backups
 
-# Thư mục lưu backup kéo về máy này (mặc định pc/backups nếu để trống)
+# Local download directory; defaults to pc/backups when empty.
 LOCAL_BACKUP_DIR=

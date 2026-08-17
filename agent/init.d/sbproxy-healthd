@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# Chạy daemon health-check SOCKS bằng procd.
+# Run the SOCKS health-check daemon under procd.
 START=95
 STOP=10
 USE_PROCD=1

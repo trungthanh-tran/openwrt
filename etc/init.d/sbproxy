@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
-# sbproxy — nạp nftables TPROXY + policy routing cho sing-box.
-# Cài bởi scripts/install-deps.sh. Chạy sau firewall.
+# sbproxy — load nftables TPROXY rules and policy routing for sing-box.
+# Installed by scripts/install-deps.sh and started after the firewall.
 START=99
 STOP=10
 
@@ -14,7 +14,7 @@ PRIORITY="${TPROXY_RULE_PRIORITY:-10000}"
 start() {
   [ -f "$NFT_FILE" ] || { echo "sbproxy: thiếu $NFT_FILE"; return 1; }
   nft -f "$NFT_FILE" || { echo "sbproxy: nạp nft lỗi"; return 1; }
-  # policy routing để TPROXY giao gói cho socket local
+  # Policy routing delivers TPROXY-marked packets to the local socket.
   ip -4 rule del priority "$PRIORITY" 2>/dev/null || true
   ip -4 rule add priority "$PRIORITY" fwmark "$MARK/$MASK" table "$TABLE" || return 1
   ip -4 route replace local default dev lo table "$TABLE" || return 1

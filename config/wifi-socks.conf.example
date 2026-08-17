@@ -1,19 +1,19 @@
-# wifi-socks.conf — nguồn sự thật duy nhất (single source of truth).
-# Mỗi dòng = 1 WiFi. Phân tách bằng dấu '|'. KHÔNG để khoảng trắng quanh dấu '|'.
-# Dòng bắt đầu bằng '#' hoặc rỗng sẽ bị bỏ qua.
+# wifi-socks.conf — single source of truth.
+# One Wi-Fi per row, separated by `|`; do not add spaces around separators.
+# Empty rows and rows beginning with `#` are ignored.
 #
-# Cột:
-#   name     : Tên WiFi (SSID). Tránh ký tự '|'. Có thể có khoảng trắng bên trong.
-#   band     : 2g hoặc 5g
-#   idx      : SỐ NGUYÊN DƯƠNG DUY NHẤT (1..N). Quyết định VLAN/subnet/cổng TPROXY.
-#              -> subnet = 192.168.(NET_BASE+idx).0/24 ; đừng đổi idx của WiFi đã chạy.
-#   wifi_key : Mật khẩu WiFi (>= 8 ký tự cho WPA2).
-#   sock_host: IP/host của SOCKS5 upstream.
-#   sock_port: cổng SOCKS5.
-#   sock_user: user SOCKS5 (để trống nếu không auth).
-#   sock_pass: pass SOCKS5 (để trống nếu không auth).
-#   isolate  : 1 = chặn client trong cùng WiFi thấy nhau ; 0 = tắt.
-#   webrtc   : 1 = chặn STUN/TURN (chống lộ IP WebRTC) ; 0 = tắt.
+# Columns:
+#   name     : Wi-Fi SSID; `|` is forbidden, internal spaces are allowed.
+#   band     : 2g or 5g.
+#   idx      : Unique positive integer. Determines subnet and TPROXY port.
+#              subnet = 192.168.(NET_BASE+idx).0/24; keep deployed indexes stable.
+#   wifi_key : Wi-Fi password, 8–63 characters for WPA2.
+#   sock_host: Upstream SOCKS5 IP address or hostname.
+#   sock_port: Upstream SOCKS5 port.
+#   sock_user: SOCKS5 username; leave empty when authentication is disabled.
+#   sock_pass: SOCKS5 password; leave empty when authentication is disabled.
+#   isolate  : 1 blocks clients on the same Wi-Fi from reaching one another.
+#   webrtc   : 1 blocks configured STUN/TURN ports to reduce WebRTC leaks.
 #
 # name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 Alpha|2g|1|Alpha_pass_123|1.2.3.4|1080|user1|pass1|1|1

@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-deps.sh — cài gói cần thiết + bật service.
+# install-deps.sh — install required packages and enable services.
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
@@ -31,7 +31,7 @@ for p in $PKGS; do
   fi
 done
 
-# Cài init script TPROXY của project
+# Install the project's TPROXY init script.
 if [ -f "$SB_ROOT/etc/init.d/sbproxy" ]; then
   run "cp '$SB_ROOT/etc/init.d/sbproxy' /etc/init.d/sbproxy"
   run "chmod +x /etc/init.d/sbproxy"
@@ -39,10 +39,10 @@ if [ -f "$SB_ROOT/etc/init.d/sbproxy" ]; then
   log "Đã cài /etc/init.d/sbproxy"
 fi
 
-# Bật sing-box autostart
+# Enable sing-box at boot.
 [ -f /etc/init.d/sing-box ] && run "/etc/init.d/sing-box enable" || warn "Chưa thấy /etc/init.d/sing-box"
 
-# Đăng ký file cần GIỮ khi sysupgrade/backup chuẩn OpenWrt (mặc định KHÔNG gồm các path này)
+# Register project files that standard OpenWrt sysupgrade backups must preserve.
 log "Đăng ký /etc/sysupgrade.conf (để backup/nâng cấp giữ được config sbproxy)..."
 for p in /etc/sing-box/ /etc/sbproxy.nft /etc/sbproxy.env /etc/sbproxy.managed /etc/init.d/sbproxy $SB_ROOT/config/; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf

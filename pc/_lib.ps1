@@ -1,16 +1,12 @@
-﻿# _lib.ps1 — helpers chung cho các script pc/*.ps1 (Windows PowerShell 5.1+).
+﻿# _lib.ps1 — shared helpers for pc/*.ps1 on Windows PowerShell 5.1+.
 #
-# CẤU HÌNH — lấy theo thứ tự ưu tiên (cao → thấp):
-#   1. Tham số dòng lệnh  (-RouterHost, -RouterUser, -RouterPort, ...)
-#   2. File config        (mặc định pc/sbproxy-pc.conf; đổi bằng -Conf FILE
-#                          hoặc biến môi trường SBPC_CONF)
-#   3. Giá trị mặc định   (user root, port 22, /root/sbproxy, ...)
-# File config KHÔNG bắt buộc nếu đã truyền -RouterHost.
+# Configuration precedence: CLI arguments, config file, then defaults.
+# The config file defaults to pc/sbproxy-pc.conf and is optional with -RouterHost.
 #
-# Cách script dùng lib này:
-#   param([string]$Conf, [string]$RouterHost, ... , tham số riêng)
+# Typical caller pattern:
+#   param([string]$Conf, [string]$RouterHost, ... , script-specific options)
 #   . "$PSScriptRoot\_lib.ps1"
-#   Initialize-SbPc $PSBoundParameters     # nạp config + kiểm tra
+#   Initialize-SbPc $PSBoundParameters     # load and validate configuration
 $ErrorActionPreference = 'Stop'
 
 $script:PcDir   = $PSScriptRoot
@@ -20,10 +16,10 @@ function Log($m)  { Write-Host "[pc] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "[pc][CANH BAO] $m" -ForegroundColor Yellow }
 function Die($m)  { Write-Host "[pc][LOI] $m" -ForegroundColor Red; exit 1 }
 
-# Initialize-SbPc — nạp file config (nếu có), áp tham số CLI đè lên, điền mặc định.
-# $Cli: thường là $PSBoundParameters của script gọi. Các key được hiểu:
+# Load optional config, apply CLI overrides, and fill defaults.
+# $Cli is normally the caller's $PSBoundParameters. Recognized keys:
 #   Conf, RouterHost, RouterUser, RouterPort, SshKey,
-#   RemoteDir, RemoteBackupDir, LocalBackupDir  (key khác bị bỏ qua)
+#   RemoteDir, RemoteBackupDir, LocalBackupDir; other keys are ignored.
 function Initialize-SbPc([hashtable]$Cli = @{}) {
   # 1) File config: -Conf > env SBPC_CONF > pc/sbproxy-pc.conf
   if ($Cli['Conf']) {
@@ -35,7 +31,7 @@ function Initialize-SbPc([hashtable]$Cli = @{}) {
     $confFile = Join-Path $PcDir 'sbproxy-pc.conf'
   }
 
-  # Đọc file KEY=value (định dạng dùng chung với bản bash) — nếu file tồn tại
+  # Read the shared KEY=value config format when the file exists.
   $conf = @{}
   if (Test-Path $confFile) {
     foreach ($line in Get-Content $confFile) {
@@ -45,7 +41,7 @@ function Initialize-SbPc([hashtable]$Cli = @{}) {
     }
   }
 
-  # 2+3) CLI > file > mặc định
+  # CLI values override file values and defaults.
   function Pick($cliKey, $confKey, $default) {
     if ($Cli[$cliKey])                                  { return [string]$Cli[$cliKey] }
     if ($conf.ContainsKey($confKey) -and $conf[$confKey]) { return $conf[$confKey] }
@@ -80,7 +76,7 @@ function Initialize-SbPc([hashtable]$Cli = @{}) {
   }
 }
 
-# Chạy lệnh trên router. -Tty: cấp terminal cho lệnh có hỏi xác nhận.
+# Run a router command; -Tty allocates a terminal for interactive commands.
 function Invoke-Router([string]$cmd, [switch]$Tty) {
   $extra = @(); if ($Tty) { $extra += '-t' }
   ssh @extra @SshArgs $Target $cmd

@@ -1,64 +1,64 @@
 ﻿<#
 .SYNOPSIS
-Đẩy 1 bản backup từ máy Windows này lên router và khôi phục.
+Upload a backup from this Windows computer and restore it on the router.
 
 .DESCRIPTION
-Đẩy snapshot lên router rồi chạy scripts/rollback.sh (khôi phục file cấu hình +
-reload network/dnsmasq/firewall/sing-box/wifi). Có hỏi xác nhận trước khi ghi đè
-(bỏ qua bằng -Yes).
+Uploads the snapshot and runs scripts/rollback.sh to restore configuration and
+reload network, dnsmasq, firewall, sing-box, and Wi-Fi. Prompts before overwriting;
+use -Yes to skip confirmation.
 
-Cấu hình kết nối lấy theo ưu tiên: tham số dòng lệnh > file config > mặc định.
-File config mặc định: pc\sbproxy-pc.conf (đổi bằng -Conf hoặc env SBPC_CONF).
-KHÔNG cần file config nếu đã truyền -RouterHost.
+Connection settings precedence: command-line parameters, config file, then defaults.
+The default config file is pc\sbproxy-pc.conf; override it with -Conf or SBPC_CONF.
+A config file is not required when -RouterHost is provided.
 
 .PARAMETER Backup
-Bản backup cần khôi phục: tên (trong LocalBackupDir) hoặc đường dẫn file .tar.gz.
-Bỏ trống = bản local MỚI NHẤT.
+Backup to restore: a name in LocalBackupDir or a .tar.gz file path.
+When omitted, the newest local backup is selected.
 
 .PARAMETER List
-Liệt kê backup local rồi thoát.
+List local backups and exit.
 
 .PARAMETER Yes
-Không hỏi xác nhận (cho script/tự động hoá).
+Skip confirmation for scripts and automation.
 
 .PARAMETER Conf
-Đường dẫn file config (mặc định pc\sbproxy-pc.conf).
+Config file path; defaults to pc\sbproxy-pc.conf.
 
 .PARAMETER RouterHost
-IP/hostname router (= ROUTER_HOST trong file config).
+Router IP address or hostname (= ROUTER_HOST in the config file).
 
 .PARAMETER RouterUser
-User SSH, mặc định root (= ROUTER_USER).
+SSH user; defaults to root (= ROUTER_USER).
 
 .PARAMETER RouterPort
-Cổng SSH, mặc định 22 (= ROUTER_PORT).
+SSH port; defaults to 22 (= ROUTER_PORT).
 
 .PARAMETER SshKey
-Đường dẫn SSH private key (= SSH_KEY).
+SSH private-key path (= SSH_KEY).
 
 .PARAMETER RemoteDir
-Thư mục repo trên router, mặc định /root/sbproxy (= REMOTE_DIR).
+Repository directory on the router; defaults to /root/sbproxy (= REMOTE_DIR).
 
 .PARAMETER RemoteBackupDir
-Thư mục backup trên router, mặc định /root/sbproxy-backups (= REMOTE_BACKUP_DIR).
+Backup directory on the router; defaults to /root/sbproxy-backups (= REMOTE_BACKUP_DIR).
 
 .PARAMETER LocalBackupDir
-Thư mục backup ở máy này, mặc định pc\backups (= LOCAL_BACKUP_DIR).
+Local backup directory; defaults to pc\backups (= LOCAL_BACKUP_DIR).
 
 .EXAMPLE
 .\pc\restore.ps1 -List
-Xem các bản backup đang có trên máy.
+List backups available on this computer.
 
 .EXAMPLE
 .\pc\restore.ps1
-Khôi phục bản mới nhất (hỏi xác nhận).
+Restore the newest backup after confirmation.
 
 .EXAMPLE
 .\pc\restore.ps1 20260816-101500-pc
 
 .EXAMPLE
 .\pc\restore.ps1 D:\backup\router.tar.gz -RouterHost 192.168.8.1 -Yes
-Không cần file config, không hỏi xác nhận.
+No config file or confirmation is required.
 #>
 param(
   [string]$Backup,
@@ -85,7 +85,7 @@ if ($List) {
   exit 0
 }
 
-# Xác định file backup
+# Resolve the requested snapshot.
 if (-not $Backup) {
   $file = Get-ChildItem -Path $LocalBackupDir -Filter '*.tar.gz' -ErrorAction SilentlyContinue |
           Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -106,12 +106,12 @@ if (-not $Yes) {
   if ($ans -notmatch '^[yY]$') { Die 'Da huy.' }
 }
 
-# 1) Đẩy lên router và giải nén vào thư mục backup của router
+# 1) Upload and extract into the router backup directory.
 Log "Day $name len router..."
 Copy-ToRouter $file '/tmp/sb-restore.tar.gz'
 Invoke-Router "mkdir -p $RemoteBackupDir; tar xzf /tmp/sb-restore.tar.gz -C $RemoteBackupDir; rm -f /tmp/sb-restore.tar.gz"
 
-# 2) Chạy rollback của repo (SB_YES=1: đã xác nhận ở trên rồi)
+# 2) Run project rollback; confirmation was already handled above.
 Log 'Chay rollback tren router...'
 Invoke-Router "SB_YES=1 sh $RemoteDir/scripts/rollback.sh $name" -Tty
 

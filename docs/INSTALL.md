@@ -1,5 +1,7 @@
 # INSTALL — Cài đặt chi tiết
 
+**Ngôn ngữ:** Tiếng Việt | [English](INSTALL.en.md)
+
 ## 0. Yêu cầu trước
 - Router **GL-MT6000** đã chạy **OpenWrt** (vanilla/ImmortalWrt). Nếu còn firmware GL.iNet stock, cân nhắc theo mục 2 của plan.
 - Truy cập **SSH** vào router (`ssh root@192.168.8.1` hoặc IP LAN của bạn).

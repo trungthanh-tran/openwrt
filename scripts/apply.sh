@@ -1,10 +1,10 @@
 #!/bin/sh
-# apply.sh — áp toàn bộ config từ wifi-socks.conf lên router.
-# Tự backup trước khi đổi. Hỗ trợ DRYRUN=1 để xem trước không thực thi.
+# apply.sh — apply the complete wifi-socks.conf configuration to the router.
+# Creates a backup before changes. DRYRUN=1 previews without applying changes.
 #
-# Dùng:
-#   scripts/apply.sh            # backup + áp + reload
-#   DRYRUN=1 scripts/apply.sh   # chỉ in ra những gì sẽ làm
+# Usage:
+#   scripts/apply.sh            # back up, apply, and reload
+#   DRYRUN=1 scripts/apply.sh   # print the proposed changes only
 #   scripts/apply.sh --no-backup
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
@@ -25,7 +25,7 @@ if [ "$NO_BACKUP" = "0" ] && [ "${DRYRUN:-0}" != "1" ]; then
   "$SB_ROOT/scripts/backup.sh" pre-apply
 fi
 
-# 1) Sinh lệnh UCI vào file tạm rồi nạp bằng `uci batch`
+# 1) Generate UCI commands in a temporary file, then load them with `uci batch`.
 TMP="/tmp/sbproxy-uci.$$"
 : > "$TMP"; trap 'rm -rf "$TMP" "${STAGE:-}"' EXIT INT TERM
 {
@@ -36,7 +36,7 @@ emit_stale_uci >> "$TMP"
 emit_all() { emit_uci_one "$@" >> "$TMP"; }
 for_each_ssid emit_all
 
-# Sinh và kiểm tra artifact trong staging; chưa chạm file đang chạy.
+# Generate and validate staged artifacts without touching active files.
 STAGE="/tmp/sbproxy-stage.$$"
 mkdir -p "$STAGE"
 REAL_SINGBOX_CONF="$SINGBOX_CONF"; REAL_NFT_FILE="$NFT_FILE"
@@ -62,7 +62,7 @@ uci commit dhcp
 uci commit firewall
 uci commit wireless
 
-# 2) Cài artifact đã validate bằng rename trên cùng filesystem đích.
+# 2) Install validated artifacts using atomic renames on the target filesystem.
 mkdir -p "$(dirname "$REAL_SINGBOX_CONF")" "$(dirname "$REAL_NFT_FILE")"
 cp "$SINGBOX_CONF" "$REAL_SINGBOX_CONF.new"
 cp "$NFT_FILE" "$REAL_NFT_FILE.new"
@@ -79,7 +79,7 @@ TPROXY_RULE_PRIORITY=$TPROXY_RULE_PRIORITY
 EOF
 mv /etc/sbproxy.env.new /etc/sbproxy.env
 
-# 3) Reload dịch vụ (thứ tự: mạng -> firewall -> tproxy -> proxy -> wifi)
+# 3) Reload services in dependency order: network, firewall, TPROXY, proxy, Wi-Fi.
 log "Reload dịch vụ..."
 run "/etc/init.d/network reload"
 run "/etc/init.d/dnsmasq restart"

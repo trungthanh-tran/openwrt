@@ -1,31 +1,27 @@
 #!/bin/sh
-# _lib.sh — helpers chung cho các script pc/*.sh (Linux/macOS/Git Bash).
+# _lib.sh — shared helpers for pc/*.sh on Linux, macOS, and Git Bash.
 #
-# CẤU HÌNH — lấy theo thứ tự ưu tiên (cao → thấp):
-#   1. Tham số dòng lệnh  (--host, --user, --port, ...)
-#   2. File config        (mặc định pc/sbproxy-pc.conf; đổi bằng --conf FILE
-#                          hoặc biến môi trường SBPC_CONF)
-#   3. Giá trị mặc định   (user root, port 22, /root/sbproxy, ...)
-# File config KHÔNG bắt buộc nếu đã truyền --host.
+# Configuration precedence: CLI arguments, config file, then defaults.
+# The config file defaults to pc/sbproxy-pc.conf and is optional with --host.
 #
-# THAM SỐ CHUNG (mọi script update/backup/restore đều nhận):
-#   --conf FILE        Đường dẫn file config
+# Shared arguments accepted by update, backup, and restore:
+#   --conf FILE        Configuration file path
 #   --host HOST        IP/hostname router                    (= ROUTER_HOST)
-#   --user USER        User SSH, mặc định root               (= ROUTER_USER)
-#   --port PORT        Cổng SSH, mặc định 22                 (= ROUTER_PORT)
+#   --user USER        SSH user, default root                 (= ROUTER_USER)
+#   --port PORT        SSH port, default 22                   (= ROUTER_PORT)
 #   --key FILE         SSH private key                       (= SSH_KEY)
-#   --remote-dir DIR   Thư mục repo trên router              (= REMOTE_DIR)
-#   --backup-dir DIR   Thư mục backup trên router            (= REMOTE_BACKUP_DIR)
-#   --local-dir DIR    Thư mục lưu backup ở máy này          (= LOCAL_BACKUP_DIR)
+#   --remote-dir DIR   Repository directory on the router    (= REMOTE_DIR)
+#   --backup-dir DIR   Backup directory on the router        (= REMOTE_BACKUP_DIR)
+#   --local-dir DIR    Local backup directory                (= LOCAL_BACKUP_DIR)
 #
-# Cách script dùng lib này:
+# Typical caller pattern:
 #   . "$(dirname "$0")/_lib.sh"
 #   while [ $# -gt 0 ]; do
 #     sbpc_try_common "$1" "${2:-}"
 #     if [ "$SBPC_CONSUMED" -gt 0 ]; then shift "$SBPC_CONSUMED"; continue; fi
-#     case "$1" in ... tham số riêng của script ... ; esac
+#     case "$1" in ... script-specific options ... ; esac
 #   done
-#   sbpc_init      # nạp config + kiểm tra, PHẢI gọi sau khi parse xong
+#   sbpc_init      # load and validate config after argument parsing
 
 PC_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$PC_DIR/.." && pwd)"
@@ -34,8 +30,7 @@ log() { printf '\033[1;32m[pc]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[1;33m[pc][CẢNH BÁO]\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m[pc][LỖI]\033[0m %s\n' "$*" >&2; exit 1; }
 
-# sbpc_try_common "$1" "${2:-}" — nhận diện 1 tham số chung.
-# Kết quả: SBPC_CONSUMED = số tham số đã tiêu thụ (2 nếu là tham số chung, 0 nếu không).
+# Recognize one shared option and set SBPC_CONSUMED to 2 or 0.
 sbpc_try_common() {
   SBPC_CONSUMED=2
   case "$1" in
@@ -52,7 +47,7 @@ sbpc_try_common() {
   [ -n "$2" ] || die "Thiếu giá trị cho $1"
 }
 
-# sbpc_init — nạp file config (nếu có), áp CLI đè lên, điền mặc định, dựng lệnh SSH.
+# Load optional config, apply CLI overrides and defaults, then build SSH options.
 sbpc_init() {
   # 1) File config: --conf > env SBPC_CONF > pc/sbproxy-pc.conf
   CONF_FILE="${CLI_CONF:-${SBPC_CONF:-$PC_DIR/sbproxy-pc.conf}}"
@@ -62,7 +57,7 @@ sbpc_init() {
     die "Không thấy file config: $CLI_CONF"
   fi
 
-  # 2) CLI đè lên giá trị trong file
+  # CLI values override file values.
   if [ -n "${CLI_HOST:-}" ];              then ROUTER_HOST="$CLI_HOST"; fi
   if [ -n "${CLI_USER:-}" ];              then ROUTER_USER="$CLI_USER"; fi
   if [ -n "${CLI_PORT:-}" ];              then ROUTER_PORT="$CLI_PORT"; fi
@@ -71,7 +66,7 @@ sbpc_init() {
   if [ -n "${CLI_REMOTE_BACKUP_DIR:-}" ]; then REMOTE_BACKUP_DIR="$CLI_REMOTE_BACKUP_DIR"; fi
   if [ -n "${CLI_LOCAL_BACKUP_DIR:-}" ];  then LOCAL_BACKUP_DIR="$CLI_LOCAL_BACKUP_DIR"; fi
 
-  # 3) Bắt buộc + mặc định
+  # Required values and defaults.
   [ -n "${ROUTER_HOST:-}" ] || die "Chưa biết địa chỉ router. Truyền --host <IP> hoặc tạo $PC_DIR/sbproxy-pc.conf (copy từ sbproxy-pc.conf.example)."
   ROUTER_USER="${ROUTER_USER:-root}"
   ROUTER_PORT="${ROUTER_PORT:-22}"
@@ -88,7 +83,7 @@ sbpc_init() {
   fi
 }
 
-# Chạy lệnh trên router. Dùng: rssh "lệnh"  hoặc  rssh "sh -s" < script
+# Run a command on the router.
 rssh()  { ssh $SSH_OPTS "$TARGET" "$@"; }
-# Như rssh nhưng cấp TTY (cho lệnh có hỏi xác nhận trên router)
+# Run with a TTY for interactive router commands.
 rssht() { ssh -t $SSH_OPTS "$TARGET" "$@"; }

@@ -1,54 +1,54 @@
 ﻿<#
 .SYNOPSIS
-Đẩy code mới nhất của repo lên router qua SSH (chạy từ Windows).
+Deploy the latest repository code to the router over SSH from Windows.
 
 .DESCRIPTION
-GIỮ NGUYÊN config đã chỉnh trên router (wifi-socks.conf + settings.sh) trừ khi -WithSettings.
-Thư mục pc/ (có thể chứa secret) không bao giờ được đẩy lên router.
+Preserves router-specific configuration (wifi-socks.conf and settings.sh) unless -WithSettings is used.
+The pc/ directory may contain secrets and is never uploaded to the router.
 
-Cấu hình kết nối lấy theo ưu tiên: tham số dòng lệnh > file config > mặc định.
-File config mặc định: pc\sbproxy-pc.conf (đổi bằng -Conf hoặc env SBPC_CONF).
-KHÔNG cần file config nếu đã truyền -RouterHost.
+Connection settings precedence: command-line parameters, config file, then defaults.
+The default config file is pc\sbproxy-pc.conf; override it with -Conf or SBPC_CONF.
+A config file is not required when -RouterHost is provided.
 
 .PARAMETER Apply
-Sau khi chép code, chạy apply.sh trên router (apply tự backup trước khi áp).
+Run apply.sh on the router after uploading; apply creates a backup first.
 
 .PARAMETER WithSettings
-Ghi đè luôn config/settings.sh trên router bằng bản trong repo.
+Overwrite config/settings.sh on the router with the repository version.
 
 .PARAMETER Conf
-Đường dẫn file config (mặc định pc\sbproxy-pc.conf).
+Config file path; defaults to pc\sbproxy-pc.conf.
 
 .PARAMETER RouterHost
-IP/hostname router (= ROUTER_HOST trong file config).
+Router IP address or hostname (= ROUTER_HOST in the config file).
 
 .PARAMETER RouterUser
-User SSH, mặc định root (= ROUTER_USER).
+SSH user; defaults to root (= ROUTER_USER).
 
 .PARAMETER RouterPort
-Cổng SSH, mặc định 22 (= ROUTER_PORT).
+SSH port; defaults to 22 (= ROUTER_PORT).
 
 .PARAMETER SshKey
-Đường dẫn SSH private key (= SSH_KEY).
+SSH private-key path (= SSH_KEY).
 
 .PARAMETER RemoteDir
-Thư mục repo trên router, mặc định /root/sbproxy (= REMOTE_DIR).
+Repository directory on the router; defaults to /root/sbproxy (= REMOTE_DIR).
 
 .EXAMPLE
 .\pc\update.ps1
-Cập nhật code, đọc kết nối từ pc\sbproxy-pc.conf.
+Upload code using connection settings from pc\sbproxy-pc.conf.
 
 .EXAMPLE
 .\pc\update.ps1 -Apply
-Cập nhật code rồi áp cấu hình luôn.
+Upload code and apply the configuration.
 
 .EXAMPLE
 .\pc\update.ps1 -RouterHost 192.168.8.1 -Apply
-Không cần file config — mọi thứ truyền qua tham số.
+No config file is required; all settings are passed as parameters.
 
 .EXAMPLE
 .\pc\update.ps1 -Conf D:\router2.conf
-Quản lý router thứ hai bằng file config riêng.
+Manage a second router with a separate config file.
 #>
 param(
   [switch]$WithSettings,
@@ -65,7 +65,7 @@ param(
 . "$PSScriptRoot\_lib.ps1"
 Initialize-SbPc $PSBoundParameters
 
-# 1) Đóng gói repo (không kèm pc/ — script phía máy quản trị, có thể chứa secret)
+# 1) Package router-side files; pc/ may contain local secrets and is excluded.
 $tmpTar = Join-Path $env:TEMP "sbproxy-update-$PID.tar.gz"
 Log 'Dong goi repo...'
 tar -czf $tmpTar -C $RepoDir --exclude=node_modules `
@@ -73,7 +73,7 @@ tar -czf $tmpTar -C $RepoDir --exclude=node_modules `
 if ($LASTEXITCODE -ne 0) { Die 'tar that bai (can Windows 10+ co tar.exe)' }
 
 try {
-  # 2) Đẩy lên router + giải nén, giữ lại config đang dùng
+  # 2) Upload and extract while preserving active configuration.
   Log "Day len ${Target}:$RemoteDir ..."
   Copy-ToRouter $tmpTar '/tmp/sbproxy-update.tar.gz'
 
@@ -95,7 +95,7 @@ finally {
   Remove-Item $tmpTar -Force -ErrorAction SilentlyContinue
 }
 
-# 3) Áp dụng (tuỳ chọn)
+# 3) Apply when requested.
 if ($Apply) {
   Log 'Chay apply.sh tren router (tu backup truoc khi ap)...'
   Invoke-Router "cd $RemoteDir; sh scripts/apply.sh" -Tty

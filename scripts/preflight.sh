@@ -1,5 +1,5 @@
 #!/bin/sh
-# preflight.sh — kiểm tra phần cứng/môi trường TRƯỚC khi apply. Chỉ đọc, không đổi gì.
+# preflight.sh — read-only hardware and environment checks before apply.
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"

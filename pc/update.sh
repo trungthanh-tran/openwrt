@@ -1,24 +1,22 @@
 #!/bin/sh
-# update.sh — đẩy code mới nhất của repo lên router qua SSH.
-# GIỮ NGUYÊN config đã chỉnh trên router (wifi-socks.conf + settings.sh) trừ khi bảo khác.
+# update.sh — upload the current repository to the router over SSH.
+# Preserve router-side wifi-socks.conf and settings.sh unless explicitly requested.
 #
-# Dùng:
-#   pc/update.sh [tuỳ chọn]
+# Usage: pc/update.sh [options]
 #
-# Tuỳ chọn riêng:
-#   --apply           Sau khi chép code, chạy apply.sh trên router (apply tự backup trước)
-#   --with-settings   Ghi đè luôn config/settings.sh bằng bản trong repo
-#   -h, --help        In hướng dẫn
+# Script options:
+#   --apply           Run apply.sh after upload.
+#   --with-settings   Replace router-side settings.sh.
+#   -h, --help        Show help.
 #
-# Tuỳ chọn chung (xem _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
+# Shared options (see _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
 #   --key FILE, --remote-dir DIR, --backup-dir DIR, --local-dir DIR
-# Ưu tiên: tham số dòng lệnh > file config (pc/sbproxy-pc.conf) > mặc định.
-# Không cần file config nếu đã truyền --host.
+# Precedence: CLI arguments, config file, defaults. A config file is optional with --host.
 #
-# Ví dụ:
-#   pc/update.sh                          # đọc pc/sbproxy-pc.conf
-#   pc/update.sh --apply                  # cập nhật + áp cấu hình
-#   pc/update.sh --host 192.168.8.1       # không cần file config
+# Examples:
+#   pc/update.sh                          # read pc/sbproxy-pc.conf
+#   pc/update.sh --apply                  # upload and apply
+#   pc/update.sh --host 192.168.8.1       # no config file required
 #   pc/update.sh --conf ~/router2.conf --apply
 set -e
 . "$(dirname "$0")/_lib.sh"
@@ -38,14 +36,14 @@ while [ $# -gt 0 ]; do
 done
 sbpc_init
 
-# 1) Đóng gói repo (không kèm pc/ — script phía máy quản trị, có thể chứa secret)
+# 1) Package router-side files; pc/ may contain local secrets and is excluded.
 TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
 log "Đóng gói repo..."
 tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules \
   README.md agent config docs etc scripts tools ui
 
-# 2) Đẩy lên router + giải nén, giữ lại config đang dùng
+# 2) Upload and extract while preserving active configuration.
 log "Đẩy lên $TARGET:$REMOTE_DIR ..."
 rssh "cat > /tmp/sbproxy-update.tar.gz" < "$TMP_TAR"
 rssh "REMOTE_DIR='$REMOTE_DIR' WITH_SETTINGS=$WITH_SETTINGS sh -s" <<'EOF'
@@ -62,7 +60,7 @@ rm -rf "$KEEP" /tmp/sbproxy-update.tar.gz
 echo "[router] Code đã cập nhật -> $REMOTE_DIR"
 EOF
 
-# 3) Áp dụng (tuỳ chọn)
+# 3) Apply when requested.
 if [ "$APPLY" = "1" ]; then
   log "Chạy apply.sh trên router (tự backup trước khi áp)..."
   rssht "cd '$REMOTE_DIR' && sh scripts/apply.sh"

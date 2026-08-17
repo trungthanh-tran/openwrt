@@ -1,5 +1,7 @@
 # sbproxy Agent (kiến trúc B) — CGI trên uhttpd + health-check realtime
 
+**Ngôn ngữ:** Tiếng Việt | [English](README.en.md)
+
 Biến UI từ "trình sinh config" thành **bảng điều khiển trực tiếp**: bấm nút trên UI → agent chạy `apply.sh`/`set-sock.sh`/`rollback.sh` trên router, và hiển thị **latency SOCKS realtime** cho từng WiFi.
 
 ```

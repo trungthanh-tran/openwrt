@@ -1,24 +1,18 @@
 #!/bin/sh
-# restore.sh — đẩy 1 bản backup từ máy này lên router và chạy rollback (khôi phục + reload dịch vụ).
+# restore.sh — upload a local snapshot and run router rollback.
 #
-# Dùng:
-#   pc/restore.sh [bản-backup] [tuỳ chọn]
-#     bản-backup: tên (trong LOCAL_BACKUP_DIR) hoặc đường dẫn file .tar.gz.
-#                 Bỏ trống = bản local MỚI NHẤT.
+# Usage: pc/restore.sh [snapshot] [options]. Snapshot may be a name or tar.gz path;
+# omitting it selects the newest local snapshot.
 #
-# Tuỳ chọn riêng:
-#   --list            Liệt kê backup local rồi thoát
-#   --yes             Không hỏi xác nhận (cho script/tự động hoá)
-#   -h, --help        In hướng dẫn
+# Script options: --list, --yes, and -h/--help.
 #
-# Tuỳ chọn chung (xem _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
+# Shared options (see _lib.sh): --conf FILE, --host HOST, --user USER, --port PORT,
 #   --key FILE, --remote-dir DIR, --backup-dir DIR, --local-dir DIR
-# Ưu tiên: tham số dòng lệnh > file config (pc/sbproxy-pc.conf) > mặc định.
-# Không cần file config nếu đã truyền --host.
+# Precedence: CLI arguments, config file, defaults. A config file is optional with --host.
 #
-# Ví dụ:
+# Examples:
 #   pc/restore.sh --list
-#   pc/restore.sh                                # bản mới nhất, hỏi xác nhận
+#   pc/restore.sh                                # newest snapshot, ask for confirmation
 #   pc/restore.sh 20260816-101500-pc
 #   pc/restore.sh /backup/router.tar.gz --host 192.168.8.1 --yes
 set -e
@@ -52,7 +46,7 @@ if [ "$LIST" = "1" ]; then
   exit 0
 fi
 
-# Xác định file backup
+# Resolve the requested snapshot.
 if [ -z "$BACKUP" ]; then
   FILE="$(ls -1t "$LOCAL_BACKUP_DIR"/*.tar.gz 2>/dev/null | head -n 1)"
   [ -n "$FILE" ] || die "Chưa có backup nào trong $LOCAL_BACKUP_DIR. Chạy pc/backup.sh trước."
@@ -71,12 +65,12 @@ if [ "$YES" != "1" ]; then
   read -r ans; case "$ans" in y|Y) : ;; *) die "Đã huỷ." ;; esac
 fi
 
-# 1) Đẩy lên router và giải nén vào thư mục backup của router
+# 1) Upload and extract into the router backup directory.
 log "Đẩy $NAME lên router..."
 rssh "cat > /tmp/sb-restore.tar.gz" < "$FILE"
 rssh "mkdir -p '$REMOTE_BACKUP_DIR' && tar xzf /tmp/sb-restore.tar.gz -C '$REMOTE_BACKUP_DIR' && rm -f /tmp/sb-restore.tar.gz"
 
-# 2) Chạy rollback của repo (khôi phục file + reload network/dnsmasq/firewall/sing-box/wifi)
+# 2) Run project rollback and reload affected services.
 log "Chạy rollback trên router..."
 rssht "SB_YES=1 sh '$REMOTE_DIR/scripts/rollback.sh' '$NAME'"
 

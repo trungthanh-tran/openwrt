@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy · User Guide</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;--text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;--warn:#b5750a;--warns:#f6e9cf;--mono:ui-monospace,"Cascadia Code",Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;--text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;--warn:#e0a53a;--warns:#33280f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62}
+.doc{max-width:880px;margin:0 auto;padding:30px 22px 90px}
+h1{font-size:28px;letter-spacing:-.5px;margin:.2em 0 .4em;text-wrap:balance}
+h2{font-size:20px;margin:38px 0 6px;padding-top:16px;border-top:1px solid var(--border);scroll-margin-top:16px}
+h3{font-size:15.5px;margin:22px 0 4px}
+p{margin:9px 0}
+a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
+ul,ol{margin:9px 0;padding-left:22px}li{margin:5px 0}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+pre{margin:12px 0;background:#11181f;border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
+pre code{background:none;border:none;padding:0;color:#d6e2ea;font-size:12.6px;line-height:1.6}
+hr{border:none;border-top:1px solid var(--border);margin:26px 0}
+blockquote.call{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:4px 16px;margin:14px 0;background:var(--panel)}
+blockquote.call.warn{border-left-color:var(--warn)}
+blockquote.call p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:13.6px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
+td code{white-space:nowrap}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin:14px 0}
+.tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 8px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px;font-size:13.5px}
+.toc a{color:var(--dim)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--faint);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="doc">
+<nav class="toc"><a href="#sec-1">Open the console</a><a href="#sec-2">Common operations</a><a href="#sec-3">Health display</a><a href="#sec-4">Backup and rollback</a><a href="#sec-5">Token safety</a></nav><h1>sbproxy Console — User guide</h1>
+<p><strong>Language:</strong> <a href="user-guide.md">Tiếng Việt</a> | English</p>
+<p>The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.</p>
+<h2 id="sec-1">Open the console</h2>
+<ol><li>Connect through the trusted management LAN.</li><li>Open <code>http://&lt;router&gt;/sbproxy/</code>.</li><li>Select <strong>Connect router</strong>, leave Base URL empty, and paste the administrator-provided token.</li><li>A successful connection shows Live status and starts health polling.</li></ol>
+<h2 id="sec-2">Common operations</h2>
+<ul><li>Add or edit an SSID, band, Wi-Fi password, SOCKS endpoint, isolation, and WebRTC setting.</li><li>Use the lightning action to change one SOCKS endpoint without reloading Wi-Fi. Active network sessions may still be interrupted.</li><li>Use full Apply after adding, deleting, or changing multiple SSIDs. Wi-Fi reloads briefly.</li><li>Load the active router configuration before editing from another computer.</li></ul>
+<h2 id="sec-3">Health display</h2>
+<ul><li>Green latency: responsive proxy.</li><li>Yellow latency: slow proxy; monitor or replace it.</li><li>Red failure: endpoint or authentication failed.</li></ul>
+<h2 id="sec-4">Backup and rollback</h2>
+<p>Create a snapshot before large changes and download important snapshots to your computer. Router-side snapshots are not sufficient for recovery after erased storage or severe hardware failure.</p>
+<p>Rollback overwrites active configuration and reloads services. Create a new snapshot first when possible.</p>
+<h2 id="sec-5">Token safety</h2>
+<p>The agent has no per-user accounts. Anyone with the token has full router control. Keep it on a trusted LAN/VPN, never paste it into external websites, and ask the administrator to rotate it if exposure is suspected.</p>
+<footer>Generated from Markdown by tools/build-docs.js. Edit the .md source and rebuild; do not edit this HTML file directly.</footer>
+</div>
+</body>
+</html>
