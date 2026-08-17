@@ -62,7 +62,9 @@ function Initialize-SbPc([hashtable]$Cli = @{}) {
 
   $script:Target  = "$RouterUser@$RouterHost"
   $script:SshArgs = @('-p', $RouterPort, '-o', 'ConnectTimeout=10')
-  $script:ScpArgs = @('-P', $RouterPort, '-o', 'ConnectTimeout=10')
+  # OpenWrt/GL.iNet images commonly omit sftp-server. Force the legacy
+  # SCP protocol because newer Windows OpenSSH scp defaults to SFTP.
+  $script:ScpArgs = @('-O', '-P', $RouterPort, '-o', 'ConnectTimeout=10')
   if ($SshKey) {
     if (-not (Test-Path $SshKey)) { Die "Khong thay SSH key: $SshKey" }
     $script:SshArgs += @('-i', $SshKey)
