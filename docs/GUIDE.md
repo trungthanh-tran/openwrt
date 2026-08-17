@@ -307,5 +307,6 @@ A: `sh scripts/uninstall.sh` (tự backup trước).
 **Q: UI có điều khiển router trực tiếp không?**
 A: Có 2 chế độ. Mặc định UI sinh `wifi-socks.conf` để bạn `apply.sh`. Muốn UI **bấm-là-áp + health-check SOCKS realtime**: cài agent kiến trúc B (`sh agent/install-agent.sh`) rồi mở UI từ `http://<router>/sbproxy/`. Chi tiết: [../agent/README.md](../agent/README.md).
 
-**Q: Điều khiển từ xa (không cùng mạng router), có tài khoản đăng nhập riêng?**
-A: Dựng **cloud-server** trên VPS — đăng nhập riêng + **phân quyền (RBAC)**, router **poll ra** server (không mở WAN), quản nhiều router từ web. Xem [../cloud-server/README.md](../cloud-server/README.md) và Bước 15 trong [admin-guide.html](admin-guide.html).
+**Q: Có điều khiển router qua Internet không?**
+A: Project chỉ hỗ trợ local. Dùng UI trực tiếp trong LAN quản trị; nếu cần truy cập từ ngoài,
+hãy vào LAN bằng VPN do bạn tự quản lý. Không mở LuCI/uhttpd/agent trực tiếp ra WAN.

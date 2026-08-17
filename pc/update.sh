@@ -43,7 +43,7 @@ TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
 log "Đóng gói repo..."
 tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules \
-  README.md agent cloud-server config docs etc scripts tools ui
+  README.md agent config docs etc scripts tools ui
 
 # 2) Đẩy lên router + giải nén, giữ lại config đang dùng
 log "Đẩy lên $TARGET:$REMOTE_DIR ..."

@@ -15,10 +15,9 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 - Xem **độ trễ (latency) proxy theo thời gian thực** cho từng WiFi.
 - Sao lưu & khôi phục cấu hình chỉ bằng một nút.
 
-**Ba cách dùng:**
+**Hai cách dùng local:**
 - **Offline** — soạn cấu hình rồi tải file về (không đụng router).
 - **Live LAN** — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).
-- **Cloud (từ xa)** — nếu quản trị viên đã dựng server, bạn **đăng nhập bằng tài khoản riêng** trên web để điều khiển router từ bất cứ đâu; thao tác giống hệt, chỉ khác mỗi hành động có thể bị giới hạn theo **quyền** tài khoản của bạn.
 
 ---
 
@@ -28,8 +27,6 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 2. Bấm **🔌 Kết nối router** (góc trên phải).
 3. Để trống ô *Base URL*, dán **token** quản trị viên cấp, bấm **Kết nối**.
 4. Kết nối thành công: hiện huy hiệu **● Live** và cột **Sức khỏe** bắt đầu chạy.
-
-> **Dùng web Cloud (đăng nhập từ xa):** mở địa chỉ web quản trị viên cấp → đăng nhập tài khoản/mật khẩu của bạn. Chọn router muốn quản ở ô trên cùng. Nút nào bị mờ/ẩn nghĩa là tài khoản của bạn **chưa được cấp quyền** cho tính năng đó — liên hệ quản trị viên. Đổi mật khẩu ở nút **Đổi MK** góc trên phải.
 
 > **Nếu không kết nối được (Live LAN):** thường do mở console qua `https` nên trình duyệt chặn gọi router `http`. Hãy mở đúng `http://<router>/sbproxy/`. Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.
 
@@ -104,12 +101,12 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 
 ---
 
-## 08 · An toàn tài khoản (chống lộ)
+## 08 · An toàn token quản trị
 
-- **Không chia sẻ** mật khẩu / token của bạn cho ai. Mỗi người một tài khoản riêng.
-- **Đăng xuất** khi dùng máy chung; khoá máy khi rời đi (token/đăng nhập được lưu trong trình duyệt).
-- Chỉ mở console/web ở **đúng địa chỉ** quản trị viên cấp — cảnh giác trang giả xin token/mật khẩu.
-- Nghi lộ mật khẩu → đổi ngay ở nút **Đổi MK** và báo quản trị viên.
+- **Không chia sẻ token**. Token agent là bí mật dùng chung và có toàn quyền cấu hình router.
+- Khoá máy khi rời đi; token được lưu trong trình duyệt của máy đang dùng.
+- Chỉ mở console tại địa chỉ LAN của router; không dán token vào website bên ngoài.
+- Nghi lộ token → báo quản trị viên xoá `/etc/sbproxy/token` và chạy lại `agent/install-agent.sh`.
 - **Không gửi ảnh chụp màn hình** chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.
 
-> **Nút bị mờ/ẩn?** Nghĩa là tài khoản của bạn chưa được cấp quyền cho tính năng đó — điều này là **chủ ý để an toàn**, liên hệ quản trị viên nếu cần.
+> Project không có tài khoản hoặc phân quyền theo người. Ai có token agent đều có toàn quyền, vì vậy chỉ dùng trên LAN/VPN quản trị tin cậy.

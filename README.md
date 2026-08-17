@@ -47,17 +47,12 @@ pc/                         # CHẠY TỪ MÁY QUẢN TRỊ (Windows/Linux): upd
   update.ps1 / update.sh    #   đẩy code lên router (giữ nguyên config đang dùng)
   backup.ps1 / backup.sh    #   backup router rồi kéo snapshot về máy
   restore.ps1 / restore.sh  #   đẩy snapshot lên router + rollback
-cloud-server/               # ĐIỀU KHIỂN TỪ XA: server Node+SQLite, login riêng + RBAC
-  server.js db.js rbac.js   #   API + DB + phân quyền
-  public/                   #   login.html + app.html (dashboard RBAC-aware)
-  agent/                    #   cloud-agent chạy trên router (poll ra server)
 docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, admin-guide
 ```
 
-## 3 chế độ dùng
+## 2 chế độ dùng local
 - **Offline (mặc định):** UI soạn `wifi-socks.conf` + preview sing-box/nft → bạn tự `apply.sh`. Chạy ở bất kỳ đâu.
 - **Live LAN (agent kiến trúc B):** cài `agent/install-agent.sh`, mở UI từ `http://<router>/sbproxy/` → áp thẳng lên router, xem **latency SOCKS realtime**. Xem [agent/README.md](agent/README.md).
-- **Từ xa (Cloud server):** dựng `cloud-server/` trên VPS — **đăng nhập riêng + phân quyền (RBAC)**, router poll RA (không mở WAN), quản nhiều router từ web. Xem [cloud-server/README.md](cloud-server/README.md).
 
 ## Quickstart
 ```sh
@@ -98,7 +93,7 @@ sh scripts/rollback.sh
 Bản Linux/macOS tương đương: `sh pc/update.sh` / `pc/backup.sh` / `pc/restore.sh`. Chi tiết: [pc/README.md](pc/README.md).
 
 ## Tài liệu
-- **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ theo bước: firmware → cấu hình → agent → cloud → bảo mật. Bắt đầu ở đây.**
+- **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ local theo bước: firmware → cấu hình → agent LAN → bảo mật. Bắt đầu ở đây.**
 - **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: vận hành console hằng ngày, không cần dòng lệnh.**
 - Bản HTML đọc offline: [docs/admin-guide.html](docs/admin-guide.html) · [docs/user-guide.html](docs/user-guide.html)
 

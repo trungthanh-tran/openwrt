@@ -1,8 +1,8 @@
 # sbproxy — Hướng dẫn Quản trị (theo bước)
 
-Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent → kiểm tra → vận hành → điều khiển từ xa → bảo mật.
+Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent LAN → kiểm tra → vận hành → bảo mật.
 
-> Bản HTML đọc offline: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md), [../cloud-server/README.md](../cloud-server/README.md).
+> Bản HTML đọc offline: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).
 
 ## ★ Best practices — đọc trước khi bắt đầu
 - **Luôn cắm LAN dây dự phòng** khi động vào firmware/mạng — hỏng WiFi vẫn SSH vào cứu được.
@@ -128,7 +128,7 @@ Mở `http://<router>/sbproxy/` → **🔌 Kết nối router** → dán token. 
 ### 9.1 Token điều khiển là gì?
 Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu máy-với-máy"), do `install-agent.sh` sinh và lưu tại `/etc/sbproxy/token` (`chmod 600`). UI gắn token vào header `X-SB-Token` mỗi request; agent so khớp mới cho thực thi.
 
-> **Bản chất:** bí mật **dùng chung**, KHÔNG phải hệ đăng nhập. Ai cầm token là có **toàn quyền** router, không phân biệt người, không hết hạn, không ghi "ai làm gì". Cần phân quyền theo người → dùng Cloud (Bước 15).
+> **Bản chất:** bí mật **dùng chung**, KHÔNG phải hệ đăng nhập. Ai cầm token là có **toàn quyền** router, không phân biệt người, không hết hạn, không ghi "ai làm gì". Chỉ cấp token trên LAN/VPN quản trị tin cậy.
 
 ### 9.2 Bảo mật token
 - **Không expose agent/uhttpd ra WAN** — chỉ LAN/VLAN quản trị (quan trọng nhất).
@@ -154,8 +154,8 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ```
 > **Không còn SSH và quên token?** Vào lại bằng LAN dây (SSH), hoặc Failsafe (Bước 12) để mount rootfs rồi `cat /etc/sbproxy/token`. Token luôn nằm trong file trên router — không mất trừ khi wipe cấu hình.
 
-> **Mixed-content:** chế độ Live chỉ chạy khi mở UI qua **http** từ chính router. Điều khiển từ xa an toàn hơn → Cloud (Bước 15).
-> **Muốn điều khiển từ xa / nhiều router / login riêng?** Agent LAN chỉ dùng trong mạng router (hoặc VPN). Xem Bước 15.
+> **Mixed-content:** chế độ Live chỉ chạy khi mở UI qua **http** từ chính router.
+> Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
 
 ## Bước 10 — Kiểm tra / nghiệm thu
 ```sh
@@ -169,7 +169,7 @@ logread -e sing-box | tail -20
 | Trên client (từng WiFi) | Đạt khi |
 |---|---|
 | `https://ipinfo.io/ip` | IP = SOCKS gán cho WiFi đó; 2 WiFi khác sock → 2 IP khác |
-| `dnsleaktest.com` | DNS không phải ISP thật (xem hạn chế v0.1, Bước 16) |
+| `dnsleaktest.com` | DNS không phải ISP thật (xem hạn chế v0.1, Bước 15) |
 | `browserleaks.com/webrtc` | Không lộ IP thật |
 | 2 máy cùng WiFi ping nhau | Không ping được (isolate) |
 
@@ -243,57 +243,7 @@ Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 | POST | `uninstall` | — | {ok,rc,log} |
 | GET | `health_now` | — | probe ngay 1 lần |
 
-## Bước 15 — Điều khiển từ xa qua Cloud (tùy chọn)
-
-| Lớp | Truy cập | Đăng nhập | Hợp khi |
-|---|---|---|---|
-| **Agent LAN** (Bước 9) | Cùng mạng router (hoặc VPN) | Token router | 1 router, quản tại chỗ |
-| **Cloud server** | **Từ xa**, router poll RA (không mở WAN) | **Tài khoản riêng + RBAC** | Từ xa, nhiều router (fleet) |
-
-```
-Bạn ─(đăng nhập)─▶ Web UI + API (VPS, có DB) ◀─ router poll RA (~10s)
-                         │  lưu lịch sử latency + config mong muốn      │ push health
-                         └──────────────────────────────────────────────┘ pull config/commands
-```
-
-**15.1 Deploy server (VPS):**
-```bash
-cd cloud-server
-npm install                            # Node >= 18 (better-sqlite3 sẽ build)
-node seed.js admin 'MatKhauManh123'    # tạo SUPERUSER (chỉ tạo super qua CLI)
-PORT=8088 HTTPS=1 npm start            # mở http://<VPS>:8088
-```
-> **Bảo mật bắt buộc:** đặt sau **reverse proxy HTTPS** (Caddy/Nginx) + `HTTPS=1`. Không chạy HTTP trần ra internet. Sao lưu `cloud-server/data/` (DB + jwt.secret).
-
-**15.2 Phân quyền (RBAC):** **superuser** (tạo qua `seed.js`): toàn quyền + quản user/router. **user thường**: gán tập quyền theo tính năng + giới hạn router. UI tự ẩn/khoá nút; server luôn kiểm tra lại ở API.
-
-| Quyền | Cho phép |
-|---|---|
-| `health.view` | Xem trạng thái & latency |
-| `wifi.view` / `wifi.manage` | Xem / sửa danh sách WiFi |
-| `sock.change` | Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn |
-| `config.apply` | Đẩy & áp cấu hình |
-| `backup.create` / `backup.rollback` | Tạo backup / khôi phục |
-| `device.manage` / `user.manage` | *(super)* Quản router / người dùng |
-| `audit.view` | Xem nhật ký |
-
-**15.3 Thêm router & cài cloud-agent:**
-1. Web → tab **Router** → **＋ Thêm router** → nhận **device key (hiện 1 lần)**.
-2. Trên router (đã xong Bước 8 + agent health):
-   ```sh
-   cat > /etc/sbproxy/cloud.env <<'EOF'
-   CLOUD_URL=https://cloud.example.com
-   DEVICE_KEY=<key vừa cấp>
-   CLOUD_INTERVAL=10
-   EOF
-   chmod 600 /etc/sbproxy/cloud.env
-   sh cloud-server/agent/install-cloud-agent.sh
-   ```
-3. Sau ~10s router chuyển **online** trên web.
-
-> **Cách hoạt động (pull):** config mong muốn lưu ở server; router poll → nếu version mới thì ghi conf + `apply.sh`; nhận command (backup/rollback/set_sock) và `report` health. Chi tiết: [../cloud-server/README.md](../cloud-server/README.md).
-
-## Bước 16 — Bảo mật & chống lộ (checklist)
+## Bước 15 — Bảo mật & chống lộ (checklist)
 Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quyền điều khiển**, **(C) lộ dữ liệu nhạy cảm**.
 
 ### A · Chống lộ danh tính / IP thật
@@ -311,7 +261,6 @@ Kiểm tra lại: `ipinfo.io/ip`, `dnsleaktest.com`, `browserleaks.com/webrtc`, 
 - **Không đưa quản trị ra WAN:** uhttpd/agent/LuCI/SSH chỉ nghe LAN/VLAN quản trị (quan trọng nhất).
 - **Router:** mật khẩu root mạnh; ưu tiên SSH key + tắt password auth (`uci set dropbear.@dropbear[0].PasswordAuth='off'`).
 - **Token agent** (9.1–9.3): bí mật dùng chung = toàn quyền → LAN only, file `600`, xoay khi nghi lộ.
-- **Cloud:** HTTPS reverse proxy (`HTTPS=1`); superuser chỉ qua `seed.js`; **quyền tối thiểu** + giới hạn router; device key lộ → Rekey; cân nhắc **khoá đăng nhập sai nhiều lần + 2FA**.
 - **Cách ly zone:** SSID khách `input=REJECT`/không forward chéo → không chạm LuCI/SSH/agent, không thấy nhau.
 
 ### C · Chống lộ dữ liệu nhạy cảm
@@ -319,13 +268,12 @@ Kiểm tra lại: `ipinfo.io/ip`, `dnsleaktest.com`, `browserleaks.com/webrtc`, 
 |---|---|---|
 | User/pass SOCKS, mật khẩu WiFi | `wifi-socks.conf`, `config.json`, backups | Chỉ root đọc; **KHÔNG commit lên git/nơi công khai**; backup để nơi an toàn (mã hoá ổ đĩa). |
 | Token agent | `/etc/sbproxy/token` | `chmod 600`; không log; không dán web lạ. |
-| DB Cloud + jwt.secret + device keys | `cloud-server/data/` | Quyền hạn chế; backup an toàn; mất `data/` = mất tài khoản/khoá. |
-| Nhật ký | `logread`, audit | Không in token/mật khẩu ra log; giới hạn ai xem (`audit.view`). |
+| Nhật ký | `logread` | Không in token/mật khẩu ra log; chỉ root/admin được xem. |
 
 ### D · Kênh truyền & vận hành
 - SOCKS5 dùng `socks5h` (DNS resolve phía proxy) — đã dùng trong health-check & sing-box.
 - Nếu SOCKS không mã hoá đường tới nó, cân nhắc bọc thêm (chain qua TLS/WireGuard).
 - **Cập nhật** firmware + `sing-box` để vá lỗi (Bước 3 an toàn: backup ra máy trước).
-- **Xoay** token/device key/mật khẩu định kỳ; rà **audit log** (Cloud).
+- **Xoay** token agent và mật khẩu định kỳ; rà `logread` khi có sự cố.
 
-> **Ưu tiên nếu chỉ làm được vài việc:** 1) IPv6 tắt trên SSID khách · 2) DNS ép ẩn danh · 3) Quản trị/agent/Cloud không ra WAN · 4) HTTPS cho Cloud · 5) Không commit file chứa mật khẩu.
+> **Ưu tiên nếu chỉ làm được vài việc:** 1) IPv6 tắt trên SSID khách · 2) DNS ép ẩn danh · 3) Quản trị/agent không ra WAN · 4) Xoay token khi nghi lộ · 5) Không commit file chứa mật khẩu.

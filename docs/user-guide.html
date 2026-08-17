@@ -36,19 +36,18 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 </head>
 <body>
 <div class="doc">
-<nav class="toc"><a href="#sec-1">01 · Console này làm gì?</a><a href="#sec-2">02 · Mở &amp; kết nối router</a><a href="#sec-3">03 · Đọc bảng WiFi</a><a href="#sec-4">04 · Sức khỏe proxy (realtime)</a><a href="#sec-5">05 · Thao tác WiFi</a><a href="#sec-6">06 · Backup &amp; Rollback</a><a href="#sec-7">07 · Khi gặp sự cố</a><a href="#sec-8">08 · An toàn tài khoản (chống lộ)</a></nav><h1>sbproxy Console — Hướng dẫn Người dùng</h1>
+<nav class="toc"><a href="#sec-1">01 · Console này làm gì?</a><a href="#sec-2">02 · Mở &amp; kết nối router</a><a href="#sec-3">03 · Đọc bảng WiFi</a><a href="#sec-4">04 · Sức khỏe proxy (realtime)</a><a href="#sec-5">05 · Thao tác WiFi</a><a href="#sec-6">06 · Backup &amp; Rollback</a><a href="#sec-7">07 · Khi gặp sự cố</a><a href="#sec-8">08 · An toàn token quản trị</a></nav><h1>sbproxy Console — Hướng dẫn Người dùng</h1>
 <p>Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo dõi sức khỏe proxy, và sao lưu/khôi phục — tất cả bằng giao diện. Không cần dòng lệnh.</p>
 <blockquote class="call"><p>Bản HTML đọc offline: <a href="user-guide.html">user-guide.html</a>. Kỹ thuật/quản trị: <a href="admin-guide.md">admin-guide.md</a>.</p></blockquote>
 <hr>
 <h2 id="sec-1">01 · Console này làm gì?</h2>
 <p>Mỗi mạng WiFi bạn tạo sẽ gắn với một <strong>SOCKS5</strong> riêng — thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:</p>
 <ul><li>Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.</li><li>Đổi SOCKS mà không reload WiFi; các phiên mạng đang mở có thể gián đoạn ngắn.</li><li>Xem <strong>độ trễ (latency) proxy theo thời gian thực</strong> cho từng WiFi.</li><li>Sao lưu &amp; khôi phục cấu hình chỉ bằng một nút.</li></ul>
-<p><strong>Ba cách dùng:</strong></p>
-<ul><li><strong>Offline</strong> — soạn cấu hình rồi tải file về (không đụng router).</li><li><strong>Live LAN</strong> — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).</li><li><strong>Cloud (từ xa)</strong> — nếu quản trị viên đã dựng server, bạn <strong>đăng nhập bằng tài khoản riêng</strong> trên web để điều khiển router từ bất cứ đâu; thao tác giống hệt, chỉ khác mỗi hành động có thể bị giới hạn theo <strong>quyền</strong> tài khoản của bạn.</li></ul>
+<p><strong>Hai cách dùng local:</strong></p>
+<ul><li><strong>Offline</strong> — soạn cấu hình rồi tải file về (không đụng router).</li><li><strong>Live LAN</strong> — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).</li></ul>
 <hr>
 <h2 id="sec-2">02 · Mở &amp; kết nối router</h2>
 <ol><li>Mở console: nếu quản trị viên đã cài trên router, vào <code>http://&lt;địa-chỉ-router&gt;/sbproxy/</code> (ví dụ <code>http://192.168.1.1/sbproxy/</code>).</li><li>Bấm <strong>🔌 Kết nối router</strong> (góc trên phải).</li><li>Để trống ô <em>Base URL</em>, dán <strong>token</strong> quản trị viên cấp, bấm <strong>Kết nối</strong>.</li><li>Kết nối thành công: hiện huy hiệu <strong>● Live</strong> và cột <strong>Sức khỏe</strong> bắt đầu chạy.</li></ol>
-<blockquote class="call"><p><strong>Dùng web Cloud (đăng nhập từ xa):</strong> mở địa chỉ web quản trị viên cấp → đăng nhập tài khoản/mật khẩu của bạn. Chọn router muốn quản ở ô trên cùng. Nút nào bị mờ/ẩn nghĩa là tài khoản của bạn <strong>chưa được cấp quyền</strong> cho tính năng đó — liên hệ quản trị viên. Đổi mật khẩu ở nút <strong>Đổi MK</strong> góc trên phải.</p></blockquote>
 <blockquote class="call warn"><p><strong>Nếu không kết nối được (Live LAN):</strong> thường do mở console qua <code>https</code> nên trình duyệt chặn gọi router <code>http</code>. Hãy mở đúng <code>http://&lt;router&gt;/sbproxy/</code>. Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.</p></blockquote>
 <hr>
 <h2 id="sec-3">03 · Đọc bảng WiFi</h2>
@@ -74,9 +73,9 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 <h2 id="sec-7">07 · Khi gặp sự cố</h2>
 <div class="tablewrap"><table><thead><tr><th>Hiện tượng</th><th>Bạn có thể tự làm</th></tr></thead><tbody><tr><td>Một WiFi báo <code>fail</code></td><td>Đổi SOCKS cho WiFi đó (đổi host/cổng → nút ⚡). Nhiều sock cùng fail → báo quản trị viên.</td></tr><tr><td>Sau khi "Áp" bị lỗi/mất mạng</td><td>Vào <strong>🗂 Backup / Rollback</strong> → khôi phục bản "mới nhất" (nhãn <code>pre-apply</code>).</td></tr><tr><td>Router treo / không vào được sau update firmware</td><td>Việc của quản trị viên (recovery). Cung cấp <strong>file backup đã tải về máy</strong> để họ khôi phục nhanh.</td></tr><tr><td>Console báo "Mất kết nối"</td><td>Mở lại đúng <code>http://&lt;router&gt;/sbproxy/</code>; kiểm tra token; hỏi quản trị viên.</td></tr><tr><td>Latency toàn bộ tăng cao</td><td>Có thể do đường mạng/nhà cung cấp SOCKS. Theo dõi biểu đồ; báo admin nếu kéo dài.</td></tr><tr><td>Client vẫn thấy nhau / gọi video hỏng</td><td>Kiểm tra cột <em>Isolate</em>/<em>WebRTC</em> của WiFi đó và chỉnh cho đúng nhu cầu.</td></tr></tbody></table></div>
 <hr>
-<h2 id="sec-8">08 · An toàn tài khoản (chống lộ)</h2>
-<ul><li><strong>Không chia sẻ</strong> mật khẩu / token của bạn cho ai. Mỗi người một tài khoản riêng.</li><li><strong>Đăng xuất</strong> khi dùng máy chung; khoá máy khi rời đi (token/đăng nhập được lưu trong trình duyệt).</li><li>Chỉ mở console/web ở <strong>đúng địa chỉ</strong> quản trị viên cấp — cảnh giác trang giả xin token/mật khẩu.</li><li>Nghi lộ mật khẩu → đổi ngay ở nút <strong>Đổi MK</strong> và báo quản trị viên.</li><li><strong>Không gửi ảnh chụp màn hình</strong> chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.</li></ul>
-<blockquote class="call"><p><strong>Nút bị mờ/ẩn?</strong> Nghĩa là tài khoản của bạn chưa được cấp quyền cho tính năng đó — điều này là <strong>chủ ý để an toàn</strong>, liên hệ quản trị viên nếu cần.</p></blockquote>
+<h2 id="sec-8">08 · An toàn token quản trị</h2>
+<ul><li><strong>Không chia sẻ token</strong>. Token agent là bí mật dùng chung và có toàn quyền cấu hình router.</li><li>Khoá máy khi rời đi; token được lưu trong trình duyệt của máy đang dùng.</li><li>Chỉ mở console tại địa chỉ LAN của router; không dán token vào website bên ngoài.</li><li>Nghi lộ token → báo quản trị viên xoá <code>/etc/sbproxy/token</code> và chạy lại <code>agent/install-agent.sh</code>.</li><li><strong>Không gửi ảnh chụp màn hình</strong> chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.</li></ul>
+<blockquote class="call warn"><p>Project không có tài khoản hoặc phân quyền theo người. Ai có token agent đều có toàn quyền, vì vậy chỉ dùng trên LAN/VPN quản trị tin cậy.</p></blockquote>
 <footer>Sinh tự động từ Markdown bằng tools/build-docs.js — sửa bản .md rồi chạy lại. Không sửa tay file .html này.</footer>
 </div>
 </body>
