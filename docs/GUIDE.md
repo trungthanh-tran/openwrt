@@ -71,8 +71,8 @@ Cẩm nang xuyên suốt: **firmware → cài đặt → cấu hình (UI hoặc 
 4. Upgrade → chờ reboot.
 
 ### 1.5 Sau khi flash
-- IP router đổi về mặc định OpenWrt: **`192.168.1.1`** (khác GL stock `192.168.8.1`). Đổi lại IP máy tính về DHCP hoặc cùng dải `192.168.1.x`.
-- Đặt mật khẩu root: vào LuCI `http://192.168.1.1` → System → Administration, hoặc SSH rồi `passwd`.
+- IP quản trị mặc định của GL-MT6000 với GL.iNet firmware là **`192.168.8.1`**. OpenWrt vanilla mới flash có thể dùng `192.168.1.1`; kiểm tra IP LAN thực tế trước khi tiếp tục.
+- Đặt mật khẩu root: vào trang quản trị `http://192.168.8.1` (hoặc IP LAN thực tế) → System → Administration, hoặc SSH rồi `passwd`.
 - Bật SSH (thường đã bật với dropbear/OpenSSH mặc định).
 
 > **Đồng bộ/cập nhật firmware về sau:** lặp lại 1.3–1.4 với image mới. Trước khi nâng cấp firmware, chạy `sh scripts/backup.sh before-fw-upgrade`. Sau nâng cấp, cấu hình `/etc/config` có thể được giữ (sysupgrade keep settings) — nếu KHÔNG giữ, chạy lại `apply.sh`.
@@ -81,9 +81,9 @@ Cẩm nang xuyên suốt: **firmware → cài đặt → cấu hình (UI hoặc 
 
 ## Bước 2 — Truy cập router (SSH & LuCI)
 ```powershell
-ssh root@192.168.1.1          # đổi IP nếu bạn đã đặt khác
+ssh root@192.168.8.1          # đổi IP nếu bạn đã đặt khác
 ```
-- LuCI (web): `http://192.168.1.1`.
+- LuCI (web): `http://192.168.8.1` (hoặc IP LAN thực tế).
 - Nếu lần đầu báo host key đổi: xóa dòng cũ trong `~/.ssh/known_hosts` rồi thử lại.
 
 ---
@@ -91,7 +91,7 @@ ssh root@192.168.1.1          # đổi IP nếu bạn đã đặt khác
 ## Bước 3 — Đưa project lên router
 Từ máy tính (PowerShell), tại thư mục chứa `openwrt-multiwifi-socks5`:
 ```powershell
-scp -r .\openwrt-multiwifi-socks5 root@192.168.1.1:/root/sbproxy
+scp -r .\openwrt-multiwifi-socks5 root@192.168.8.1:/root/sbproxy
 ```
 SSH vào và chuẩn bị config:
 ```sh
@@ -206,7 +206,7 @@ sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]
 ### A. Giai đoạn firmware / flash
 | Triệu chứng | Nguyên nhân | Cách xử lý |
 |---|---|---|
-| Flash xong không vào được `192.168.1.1` | IP máy tính còn ở dải cũ | Đặt DHCP hoặc IP `192.168.1.x`; cắm đúng cổng LAN |
+| Flash xong không vào được router | IP quản trị phụ thuộc firmware (`192.168.8.1` với GL.iNet; OpenWrt vanilla có thể là `192.168.1.1`) | Đặt máy tính về DHCP, xác định đúng subnet và cắm đúng cổng LAN |
 | Router không lên / brick | Firmware sai/hỏng | **U-Boot recovery** (Bước 1.4 cách A) flash lại image sạch |
 | sha256 không khớp | File tải lỗi | Tải lại từ nguồn chính thức, verify lại |
 | Sau nâng cấp mất hết SSID | firmware không giữ settings | Chạy lại `sh scripts/apply.sh` |
@@ -283,7 +283,7 @@ Hạn chế v0.1 (DNS qua dnsmasq router). Cách khắc phục:
 | Giữa các SSID | Zone `forward=REJECT`, không có `config forwarding` giữa các zone khách |
 
 ### I. Mất kết nối hoàn toàn (không SSH/WiFi)
-1. **LAN dây** → SSH `root@192.168.1.1` → `sh scripts/rollback.sh`.
+1. **LAN dây** → SSH `root@192.168.8.1` (hoặc IP LAN thực tế) → `sh scripts/rollback.sh`.
 2. **Failsafe mode**: reboot, bấm Reset khi đèn nháy; máy tính IP `192.168.1.2`, SSH `root@192.168.1.1` (không mật khẩu) → `mount_root` → rollback, hoặc `firstboot && reboot` (reset về mặc định).
 3. **U-Boot recovery**: flash lại firmware sạch (Bước 1.4 cách A).
 Chi tiết: [ROLLBACK.md](ROLLBACK.md) Mức 4.

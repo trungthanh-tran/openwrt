@@ -6,7 +6,7 @@
 # Use simple KEY=value syntax without spaces around `=` for Bash/PowerShell compatibility.
 
 # Router LAN IP address or hostname.
-ROUTER_HOST=192.168.1.1
+ROUTER_HOST=192.168.8.1
 ROUTER_USER=root
 ROUTER_PORT=22
 

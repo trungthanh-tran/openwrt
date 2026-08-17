@@ -20,7 +20,7 @@ Backup trên nằm **trên router** → mất sạch nếu reflash/brick. Luôn 
 ```sh
 # trên UI: 🗂 Backup / Rollback → ⭳ Về máy
 # hoặc từ máy tính:
-scp -r root@192.168.1.1:/root/sbproxy-backups .\sbproxy-backups
+scp -r root@192.168.8.1:/root/sbproxy-backups .\sbproxy-backups
 ```
 Đăng ký giữ config khi nâng cấp (đã tự làm bởi install-deps/install-agent):
 ```sh
@@ -30,8 +30,8 @@ cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/s
 
 Khôi phục bản đã tải về máy:
 ```sh
-scp .\sbproxy-<tên>.tar.gz root@192.168.1.1:/tmp/
-ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
+scp .\sbproxy-<tên>.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
 ```
 
 ---

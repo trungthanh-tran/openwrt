@@ -56,7 +56,7 @@ Header bắt buộc: `X-SB-Token: <token>`.
 Test nhanh:
 ```sh
 TOKEN=$(cat /etc/sbproxy/token)
-curl -H "X-SB-Token: $TOKEN" http://192.168.1.1/cgi-bin/sbproxy?action=status | jq .
+curl -H "X-SB-Token: $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status | jq .
 ```
 
 ## ⚠️ Mixed-content (quan trọng)

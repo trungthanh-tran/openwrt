@@ -65,7 +65,7 @@ done
 # uhttpd normally enables /cgi-bin already; reload to ensure the CGI is visible.
 /etc/init.d/uhttpd reload 2>/dev/null || true
 
-IP="$(uci -q get network.lan.ipaddr || echo 192.168.1.1)"
+IP="$(uci -q get network.lan.ipaddr || echo 192.168.8.1)"
 cat <<EOF
 
 ============================================================

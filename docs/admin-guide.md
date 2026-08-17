@@ -106,16 +106,16 @@ cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/s
 ## Bước 5 — Truy cập router sau update
 > **Script tương ứng (router, sau khi SSH được):** `sh scripts/inventory.sh > inventory-after.txt`, rồi so với file ở Bước 1. Đặt IP máy tính, mật khẩu root và xử lý SSH host key vẫn làm thủ công.
 
-- IP đổi về mặc định OpenWrt `192.168.1.1`. Đưa máy tính về DHCP / cùng dải.
+- Với GL.iNet firmware, IP quản trị MT6000 mặc định là `192.168.8.1`. OpenWrt vanilla mới flash có thể dùng `192.168.1.1`; luôn kiểm tra IP LAN thực tế trước khi chạy script.
 - Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi `passwd`.
-- SSH: `ssh root@192.168.1.1`. Host key đổi → xoá dòng cũ trong `~/.ssh/known_hosts`.
+- SSH trong cấu hình MT6000 của tài liệu này: `ssh root@192.168.8.1`. Host key đổi → xoá dòng cũ trong `~/.ssh/known_hosts`.
 
 ## Bước 6 — Đưa project lên router & cài gói
 > **Script tương ứng (router):** `sh scripts/preflight.sh` để kiểm tra chỉ đọc; sau khi xử lý cảnh báo, chạy `sh scripts/install-deps.sh` để cài dependency và đăng ký dữ liệu cần giữ khi sysupgrade.
 
 ```sh
 # từ máy tính
-scp -r .\openwrt-multiwifi-socks5 root@192.168.1.1:/root/sbproxy
+scp -r .\openwrt-multiwifi-socks5 root@192.168.8.1:/root/sbproxy
 # trên router
 cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
@@ -189,7 +189,7 @@ Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu m�
 ```sh
 cat /etc/sbproxy/token          # in ra token hiện tại → copy, paste lại vào UI
 TOKEN=$(cat /etc/sbproxy/token)
-curl -H "X-SB-Token: $TOKEN" http://192.168.1.1/cgi-bin/sbproxy?action=status
+curl -H "X-SB-Token: $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status
 ```
 **Nghi lộ / đổi token mới (xoay):**
 ```sh
@@ -254,8 +254,8 @@ sh scripts/rollback.sh --list                               # xem danh sách bac
 
 **Khôi phục backup đã tải về máy:**
 ```sh
-scp .\sbproxy-<tên>.tar.gz root@192.168.1.1:/tmp/
-ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
+scp .\sbproxy-<tên>.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
 # hoặc LuCI: System → Backup/Flash → Restore → upload .tar.gz
 ```
 

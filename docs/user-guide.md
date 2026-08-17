@@ -25,7 +25,7 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 
 ## 02 · Mở & kết nối router
 
-1. Mở console: nếu quản trị viên đã cài trên router, vào `http://<địa-chỉ-router>/sbproxy/` (ví dụ `http://192.168.1.1/sbproxy/`).
+1. Mở console: nếu quản trị viên đã cài trên router, vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
 2. Bấm **🔌 Kết nối router** (góc trên phải).
 3. Để trống ô *Base URL*, dán **token** quản trị viên cấp, bấm **Kết nối**.
 4. Kết nối thành công: hiện huy hiệu **● Live** và cột **Sức khỏe** bắt đầu chạy.

@@ -4,6 +4,7 @@
 
 ## Safety baseline
 
+- This guide uses the GL-MT6000 GL.iNet management default, `192.168.8.1`. OpenWrt vanilla and recovery mode may use `192.168.1.1`; verify the active LAN address before running commands.
 - Keep a wired LAN recovery connection while changing firmware or networking.
 - Download backups off-device before firmware upgrades.
 - Test one or two SSIDs before scaling up.

@@ -7,7 +7,7 @@ The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snap
 ## Open the console
 
 1. Connect through the trusted management LAN.
-2. Open `http://<router>/sbproxy/`.
+2. Open `http://<router>/sbproxy/`; the GL-MT6000 GL.iNet default is `http://192.168.8.1/sbproxy/`.
 3. Select **Connect router**, leave Base URL empty, and paste the administrator-provided token.
 4. A successful connection shows Live status and starts health polling.
 

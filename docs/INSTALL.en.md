@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](INSTALL.md) | English
 
+Connect over SSH to `root@192.168.8.1`, the GL-MT6000 GL.iNet default, or use its configured LAN address.
+
 ## 1. Copy and configure
 
 Copy the repository to `/root/sbproxy`, then create the private configuration:

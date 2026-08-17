@@ -82,11 +82,11 @@ sh scripts/backup.sh before-fw-upgrade</code></pre>
 <blockquote class="call warn"><p><strong>Giữ settings?</strong> Cùng họ firmware có thể "keep settings". Đổi họ (GL→OpenWrt) thì không → khôi phục bằng backup (Bước 12) hoặc cấu hình lại (Bước 7). <strong>Router treo/không lên sau flash?</strong> Xem Bước 12 (Failsafe / U-Boot).</p></blockquote>
 <h2 id="sec-8">Bước 5 — Truy cập router sau update</h2>
 <blockquote class="call"><p><strong>Script tương ứng (router, sau khi SSH được):</strong> <code>sh scripts/inventory.sh &gt; inventory-after.txt</code>, rồi so với file ở Bước 1. Đặt IP máy tính, mật khẩu root và xử lý SSH host key vẫn làm thủ công.</p></blockquote>
-<ul><li>IP đổi về mặc định OpenWrt <code>192.168.1.1</code>. Đưa máy tính về DHCP / cùng dải.</li><li>Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi <code>passwd</code>.</li><li>SSH: <code>ssh root@192.168.1.1</code>. Host key đổi → xoá dòng cũ trong <code>~/.ssh/known_hosts</code>.</li></ul>
+<ul><li>Với GL.iNet firmware, IP quản trị MT6000 mặc định là <code>192.168.8.1</code>. OpenWrt vanilla mới flash có thể dùng <code>192.168.1.1</code>; luôn kiểm tra IP LAN thực tế trước khi chạy script.</li><li>Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi <code>passwd</code>.</li><li>SSH trong cấu hình MT6000 của tài liệu này: <code>ssh root@192.168.8.1</code>. Host key đổi → xoá dòng cũ trong <code>~/.ssh/known_hosts</code>.</li></ul>
 <h2 id="sec-9">Bước 6 — Đưa project lên router &amp; cài gói</h2>
 <blockquote class="call"><p><strong>Script tương ứng (router):</strong> <code>sh scripts/preflight.sh</code> để kiểm tra chỉ đọc; sau khi xử lý cảnh báo, chạy <code>sh scripts/install-deps.sh</code> để cài dependency và đăng ký dữ liệu cần giữ khi sysupgrade.</p></blockquote>
 <pre><code># từ máy tính
-scp -r .\openwrt-multiwifi-socks5 root@192.168.1.1:/root/sbproxy
+scp -r .\openwrt-multiwifi-socks5 root@192.168.8.1:/root/sbproxy
 # trên router
 cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
@@ -124,7 +124,7 @@ sh agent/install-agent.sh
 <p><strong>Còn SSH → chỉ cần đọc lại file, token không mất:</strong></p>
 <pre><code>cat /etc/sbproxy/token          # in ra token hiện tại → copy, paste lại vào UI
 TOKEN=$(cat /etc/sbproxy/token)
-curl -H "X-SB-Token: $TOKEN" http://192.168.1.1/cgi-bin/sbproxy?action=status</code></pre>
+curl -H "X-SB-Token: $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status</code></pre>
 <p><strong>Nghi lộ / đổi token mới (xoay):</strong></p>
 <pre><code>head -c 18 /dev/urandom | hexdump -v -e '/1 "%02x"' &gt; /etc/sbproxy/token
 echo &gt;&gt; /etc/sbproxy/token
@@ -154,8 +154,8 @@ sh scripts/rollback.sh --list                               # xem danh sách bac
 <p><strong>Router treo / brick sau update — cứu bằng U-Boot (GL-MT6000):</strong></p>
 <ol><li><strong>Mềm:</strong> LAN dây → SSH → <code>sh scripts/rollback.sh</code>.</li><li><strong>Failsafe (OpenWrt):</strong> reboot, bấm Reset khi đèn nháy → máy IP <code>192.168.1.2</code> → SSH <code>root@192.168.1.1</code> (không mật khẩu) → <code>mount_root</code> rồi rollback, hoặc <code>firstboot &amp;&amp; reboot</code>.</li><li><strong>U-Boot web (cứu brick):</strong> tắt nguồn → máy IP <code>192.168.1.2</code> → giữ Reset khi cấp nguồn tới khi đèn nháy nhanh → <code>http://192.168.1.1</code> → upload image sạch → flash.</li></ol>
 <p><strong>Khôi phục backup đã tải về máy:</strong></p>
-<pre><code>scp .\sbproxy-&lt;tên&gt;.tar.gz root@192.168.1.1:/tmp/
-ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-&lt;tên&gt;.tar.gz &amp;&amp; reboot"
+<pre><code>scp .\sbproxy-&lt;tên&gt;.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 "sysupgrade -r /tmp/sbproxy-&lt;tên&gt;.tar.gz &amp;&amp; reboot"
 # hoặc LuCI: System → Backup/Flash → Restore → upload .tar.gz</code></pre>
 <h2 id="sec-16">Bước 13 — Xử lý lỗi (theo triệu chứng)</h2>
 <blockquote class="call"><p><strong>Script tương ứng (router, chỉ đọc):</strong> <code>sh scripts/diagnose.sh &gt; /tmp/sbproxy-diagnose.txt 2&gt;&amp;1</code>. Chạy trước khi restart để giữ bằng chứng về WiFi, sing-box, nftables, policy route và log.</p></blockquote>

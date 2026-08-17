@@ -20,7 +20,7 @@ Hai bản Windows/Linux **tương đương nhau** — dùng bản nào cũng đ�
   ```
   ssh-keygen -t ed25519            # nếu chưa có key
   # OpenWrt không có ssh-copy-id phía router, làm tay:
-  type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@192.168.1.1 "cat >> /etc/dropbear/authorized_keys"
+  type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@192.168.8.1 "cat >> /etc/dropbear/authorized_keys"
   ```
 
 ## Cấu hình: file config HOẶC tham số dòng lệnh

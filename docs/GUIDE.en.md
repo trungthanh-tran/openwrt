@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](GUIDE.md) | English
 
+Examples use the GL-MT6000 GL.iNet management default, `192.168.8.1`. OpenWrt vanilla and U-Boot/failsafe may use `192.168.1.1`; confirm the active mode before connecting.
+
 ## Deployment flow
 
 1. Back up the existing router configuration to another computer.
