@@ -36,23 +36,28 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 </head>
 <body>
 <div class="doc">
-<nav class="toc"><a href="#sec-1">Safety baseline</a><a href="#sec-2">Installation and acceptance</a><a href="#sec-3">Local agent</a><a href="#sec-4">Operations and recovery</a><a href="#sec-5">Privacy checklist</a></nav><h1>sbproxy — Administrator guide</h1>
+<nav class="toc"><a href="#sec-1">Safety baseline</a><a href="#sec-2">Script coverage by guide step</a><a href="#sec-3">Installation and acceptance</a><a href="#sec-4">Local agent</a><a href="#sec-5">Operations and recovery</a><a href="#sec-6">Privacy checklist</a></nav><h1>sbproxy — Administrator guide</h1>
 <p><strong>Language:</strong> <a href="admin-guide.md">Tiếng Việt</a> | English</p>
 <h2 id="sec-1">Safety baseline</h2>
 <ul><li>Keep a wired LAN recovery connection while changing firmware or networking.</li><li>Download backups off-device before firmware upgrades.</li><li>Test one or two SSIDs before scaling up.</li><li>Keep LuCI, SSH, uhttpd, and the agent off the WAN.</li><li>Treat <code>wifi-socks.conf</code>, generated sing-box config, backups, and the agent token as secrets.</li></ul>
-<h2 id="sec-2">Installation and acceptance</h2>
+<h2 id="sec-2">Script coverage by guide step</h2>
+<div class="tablewrap"><table><thead><tr><th>Step</th><th>Script</th><th>Scope</th></tr></thead><tbody><tr><td>1, 5</td><td><code>scripts/inventory.sh</code></td><td>Read-only release, board, radio, storage, and address inventory.</td></tr><tr><td>2</td><td><code>pc/verify-firmware.ps1</code> or <code>pc/verify-firmware.sh</code></td><td>Compare the firmware SHA-256 with the vendor-published value. Image selection remains manual.</td></tr><tr><td>3</td><td><code>pc/backup.ps1</code> / <code>pc/backup.sh</code>, <code>scripts/backup.sh</code></td><td>Create and download off-device backups.</td></tr><tr><td>4</td><td>—</td><td>Flashing and U-Boot recovery are physical, high-risk operations and are intentionally not automated.</td></tr><tr><td>6</td><td><code>scripts/preflight.sh</code>, <code>scripts/install-deps.sh</code></td><td>Inspect hardware and install dependencies.</td></tr><tr><td>7, 8</td><td><code>scripts/apply.sh</code>, <code>scripts/uninstall.sh</code></td><td>Validate/apply or remove project-managed configuration.</td></tr><tr><td>9</td><td><code>agent/install-agent.sh</code>, <code>scripts/rotate-token.sh</code></td><td>Install the local agent and rotate its token.</td></tr><tr><td>10</td><td><code>scripts/verify.sh</code></td><td>Router-side acceptance checks; browser leak tests remain client-side.</td></tr><tr><td>11</td><td><code>scripts/set-sock.sh</code>, <code>scripts/backup.sh</code></td><td>Routine SOCKS changes and snapshots.</td></tr><tr><td>12</td><td><code>scripts/rollback.sh</code>, <code>pc/restore.ps1</code> / <code>pc/restore.sh</code></td><td>Roll back or restore snapshots; failsafe/U-Boot remains manual.</td></tr><tr><td>13</td><td><code>scripts/diagnose.sh</code></td><td>Collect diagnostic evidence without restarts or mutations.</td></tr><tr><td>14</td><td><code>agent/cgi/sbproxy</code></td><td>Implements the LAN API used by the UI.</td></tr><tr><td>15</td><td><code>scripts/security-audit.sh</code></td><td>Read-only secret-permission, SSH, and management-exposure audit.</td></tr></tbody></table></div>
+<p>Run router scripts from <code>/root/sbproxy</code>. Inventory and audit helpers intentionally do not apply automatic fixes that could lock an administrator out.</p>
+<h2 id="sec-3">Installation and acceptance</h2>
 <p>Follow <a href="INSTALL.en.md">INSTALL.en.md</a>, then complete <a href="TESTING.en.md">TESTING.en.md</a>. Do not bypass preflight, staged validation, or the first dry-run. Set <code>WIFI_COUNTRY</code> to the router's real operating country and verify radio mapping with <code>iw</code>/UCI rather than assuming <code>radio0</code> is 2.4 GHz.</p>
-<h2 id="sec-3">Local agent</h2>
+<h2 id="sec-4">Local agent</h2>
 <pre><code>cd /root/sbproxy
 sh agent/install-agent.sh</code></pre>
 <p>Open <code>http://&lt;router&gt;/sbproxy/</code>, leave Base URL empty, and supply <code>/etc/sbproxy/token</code>. The token is a shared bearer secret with full control; there are no per-user accounts or roles.</p>
 <p>Rotate a suspected token by deleting it and reinstalling the agent:</p>
 <pre><code>rm /etc/sbproxy/token
 sh agent/install-agent.sh</code></pre>
-<h2 id="sec-4">Operations and recovery</h2>
-<ul><li>Use full apply for SSID topology changes.</li><li>Use <code>set-sock.sh</code> for a single upstream change.</li><li>Keep off-device snapshots with the PC scripts.</li><li>Follow <a href="ROLLBACK.en.md">ROLLBACK.en.md</a> when apply or firmware changes fail.</li></ul>
-<h2 id="sec-5">Privacy checklist</h2>
+<p>Or rotate only the token with <code>sh scripts/rotate-token.sh</code>.</p>
+<h2 id="sec-5">Operations and recovery</h2>
+<ul><li>Use full apply for SSID topology changes.</li><li>Use <code>set-sock.sh</code> for a single upstream change.</li><li>Keep off-device snapshots with the PC scripts.</li><li>Follow <a href="ROLLBACK.en.md">ROLLBACK.en.md</a> when apply or firmware changes fail.</li><li>Run <code>sh scripts/verify.sh</code> for router-side acceptance and <code>sh scripts/diagnose.sh</code> to collect troubleshooting evidence.</li></ul>
+<h2 id="sec-6">Privacy checklist</h2>
 <ul><li>IPv6: disabled on managed SSIDs because v0.2 proxies IPv4 only.</li><li>DNS: still a known leak risk through dnsmasq.</li><li>WebRTC: port-based STUN/TURN blocking is optional and not a universal guarantee.</li><li>Fail-closed: guest zones must never receive a direct guest-to-WAN forwarding rule.</li><li>Logs: never print tokens, Wi-Fi passwords, or SOCKS credentials.</li></ul>
+<p>Run <code>sh scripts/security-audit.sh</code> for a read-only local-management audit. It reports findings but does not alter SSH or firewall policy.</p>
 <p>For access from outside the site, connect to the management LAN through a VPN you control. Do not publish the local agent directly.</p>
 <footer>Generated from Markdown by tools/build-docs.js. Edit the .md source and rebuild; do not edit this HTML file directly.</footer>
 </div>

@@ -26,6 +26,26 @@ UI http://router/sbproxy/ ─▶ CGI /cgi-bin/sbproxy ─▶ apply/set-sock/roll
 sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latency realtime)
 ```
 
+## Script tương ứng theo từng bước
+
+| Bước | Script | Phạm vi |
+|---|---|---|
+| 1, 5 | `scripts/inventory.sh` | Thu thập phiên bản, board, radio, dung lượng và địa chỉ; chỉ đọc. |
+| 2 | `pc/verify-firmware.ps1` hoặc `pc/verify-firmware.sh` | So khớp SHA-256 firmware với giá trị công bố. Việc tải/chọn image vẫn làm thủ công từ nguồn chính thức. |
+| 3 | `pc/backup.ps1` / `pc/backup.sh`, `scripts/backup.sh` | Tạo và tải backup ra máy quản trị. |
+| 4 | — | Flash/U-Boot là thao tác vật lý, có nguy cơ brick nên không tự động hóa. |
+| 6 | `scripts/preflight.sh`, `scripts/install-deps.sh` | Kiểm tra phần cứng rồi cài dependency. |
+| 7, 8 | `scripts/apply.sh`, `scripts/uninstall.sh` | Validate/apply cấu hình hoặc gỡ cấu hình do project tạo. |
+| 9 | `agent/install-agent.sh`, `scripts/rotate-token.sh` | Cài agent local và xoay token. |
+| 10 | `scripts/verify.sh` | Chạy nghiệm thu phía router; kiểm tra leak phía client vẫn cần trình duyệt. |
+| 11 | `scripts/set-sock.sh`, `scripts/backup.sh` | Đổi SOCKS và backup vận hành. |
+| 12 | `scripts/rollback.sh`, `pc/restore.ps1` / `pc/restore.sh` | Rollback hoặc khôi phục snapshot. Failsafe/U-Boot vẫn thủ công. |
+| 13 | `scripts/diagnose.sh` | Gom bằng chứng chẩn đoán, không restart hay sửa trạng thái. |
+| 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
+| 15 | `scripts/security-audit.sh` | Audit quyền file, SSH và dấu hiệu mở quản trị; chỉ đọc. |
+
+Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script có thay đổi trạng thái vẫn yêu cầu quyết định rõ của quản trị viên; các script kiểm kê/audit không tự sửa để tránh khóa mất SSH.
+
 ---
 
 ## Bước 1 — Chuẩn bị
@@ -40,6 +60,7 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 3. Verify (không khớp → KHÔNG flash):
    ```powershell
    Get-FileHash .\openwrt-*-glinet_gl-mt6000-*-sysupgrade.bin -Algorithm SHA256
+   .\pc\verify-firmware.ps1 -File .\firmware.bin -ExpectedSha256 <SHA256-CÔNG-BỐ>
    ```
 4. Ghi lại phiên bản + ngày tải.
 
@@ -162,6 +183,7 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ## Bước 10 — Kiểm tra / nghiệm thu
 ```sh
 # trên router
+sh scripts/verify.sh                                  # kiểm tra tự động, chỉ đọc
 wifi status ; iw dev | grep -E 'Interface|ssid|addr'   # SSID + MAC random
 sing-box check -c /etc/sing-box/config.json            # config hợp lệ
 nft list table inet sbproxy ; ip rule | grep 0x1       # tproxy + policy routing
@@ -208,6 +230,8 @@ ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
 ```
 
 ## Bước 13 — Xử lý lỗi (theo triệu chứng)
+Thu thập trạng thái trước khi restart dịch vụ: `sh scripts/diagnose.sh > /tmp/sbproxy-diagnose.txt 2>&1`.
+
 **D · Có WiFi + IP nhưng không ra internet (hay gặp nhất):**
 ```sh
 pgrep -f sing-box || /etc/init.d/sing-box restart
@@ -246,6 +270,8 @@ Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 | GET | `health_now` | — | probe ngay 1 lần |
 
 ## Bước 15 — Bảo mật & chống lộ (checklist)
+Chạy audit chỉ đọc: `sh scripts/security-audit.sh`. Script cố ý không tự harden SSH/firewall vì thay đổi sai có thể khóa quản trị viên khỏi router.
+
 Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quyền điều khiển**, **(C) lộ dữ liệu nhạy cảm**.
 
 ### A · Chống lộ danh tính / IP thật
