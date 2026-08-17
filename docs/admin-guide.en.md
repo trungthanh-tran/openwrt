@@ -30,6 +30,24 @@
 
 Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentionally do not apply automatic fixes that could lock an administrator out.
 
+## Per-step script examples
+
+1. **Prepare:** on the router, run `sh scripts/inventory.sh > inventory-before.txt`. Cabling and the recovery path remain manual.
+2. **Download and verify firmware:** on Windows run `.\pc\verify-firmware.ps1 -File .\firmware.bin -ExpectedSha256 <PUBLISHED-SHA256>`; on Linux/macOS run `sh pc/verify-firmware.sh ./firmware.bin <PUBLISHED-SHA256>`.
+3. **Back up off-device:** run `.\pc\backup.ps1 -Label before-fw-upgrade` or `sh pc/backup.sh before-fw-upgrade`; the PC helper creates the router snapshot and downloads it to `pc/backups/`.
+4. **Flash firmware:** no script. Image selection, U-Boot/GUI upload, and recovery are intentionally manual because automating them can brick the router.
+5. **Reconnect after upgrade:** after SSH works, run `sh scripts/inventory.sh > inventory-after.txt` and compare it with Step 1.
+6. **Install:** run `sh scripts/preflight.sh`, resolve its findings, then run `sh scripts/install-deps.sh`.
+7. **Configure:** edit `config/wifi-socks.conf` or use the UI, then validate with `DRYRUN=1 sh scripts/apply.sh`.
+8. **Apply:** run `DRYRUN=1 sh scripts/apply.sh` first, then `sh scripts/apply.sh`; use `sh scripts/uninstall.sh` to remove project-managed configuration.
+9. **Install the local agent:** run `sh agent/install-agent.sh`; rotate its bearer token with `sh scripts/rotate-token.sh`.
+10. **Accept:** run `sh scripts/verify.sh`; if it fails, collect evidence with `sh scripts/diagnose.sh`. Client IP, DNS, and WebRTC tests remain browser-side.
+11. **Operate:** use `scripts/set-sock.sh` for one upstream and `scripts/backup.sh` for a router snapshot; use `pc/update.*` and `pc/backup.*` from the administration computer.
+12. **Roll back:** use `scripts/rollback.sh` on the router or `pc/restore.ps1` / `pc/restore.sh` from the PC. Failsafe and U-Boot remain manual.
+13. **Troubleshoot:** run `sh scripts/diagnose.sh > /tmp/sbproxy-diagnose.txt 2>&1` before restarting services.
+14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "X-SB-Token: $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`.
+15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
+
 ## Installation and acceptance
 
 Follow [INSTALL.en.md](INSTALL.en.md), then complete [TESTING.en.md](TESTING.en.md). Do not bypass preflight, staged validation, or the first dry-run. Set `WIFI_COUNTRY` to the router's real operating country and verify radio mapping with `iw`/UCI rather than assuming `radio0` is 2.4 GHz.

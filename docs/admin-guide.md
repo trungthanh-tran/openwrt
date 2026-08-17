@@ -49,12 +49,16 @@ Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script c�
 ---
 
 ## Bước 1 — Chuẩn bị
+> **Script tương ứng (router, chỉ đọc):** `sh scripts/inventory.sh > inventory-before.txt` — lưu phiên bản, board, radio, dung lượng và địa chỉ hiện tại. Các việc cắm LAN, chọn router và chuẩn bị đường cứu hộ vẫn làm thủ công.
+
 - Router **GL-MT6000 (Flint 2)**. Xác định IP quản trị (GL stock: `192.168.8.1`).
 - Cáp **LAN** nối máy tính ↔ router (đường cứu hộ). SSH client + trình duyệt.
 - Không thử nghiệm lần đầu trên router đang phục vụ việc quan trọng.
 - **Firmware nên dùng:** OpenWrt vanilla mới nhất (hoặc ImmortalWrt nếu cần GUI proxy). Tránh firmware lạ chưa xác thực nguồn.
 
 ## Bước 2 — Tải firmware & verify
+> **Script tương ứng (máy tính):** PowerShell: `.\pc\verify-firmware.ps1 -File .\firmware.bin -ExpectedSha256 <SHA256-CÔNG-BỐ>`; Linux/macOS: `sh pc/verify-firmware.sh ./firmware.bin <SHA256-CÔNG-BỐ>`. Script chỉ verify file đã tải, không tự chọn hoặc flash firmware.
+
 1. Vào **firmware-selector.openwrt.org** → `GL.iNet GL-MT6000` (target `mediatek/filogic`, profile `glinet,gl-mt6000`).
 2. Tải bản **sysupgrade** mới nhất + ghi lại **sha256**.
 3. Verify (không khớp → KHÔNG flash):
@@ -65,20 +69,30 @@ Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script c�
 4. Ghi lại phiên bản + ngày tải.
 
 ## Bước 3 — Backup RA MÁY TÍNH (trước khi update)
+> **Script tương ứng (máy tính):** `.\pc\backup.ps1 -Label before-fw-upgrade` hoặc `sh pc/backup.sh before-fw-upgrade`. Script gọi backup trên router rồi tải snapshot về `pc/backups/`; đây là cách khuyến nghị thay cho chuỗi `ssh/scp` thủ công bên dưới.
+
 > **Vì sao bắt buộc:** backup mặc định ở `/root/sbproxy-backups/` trên router — reflash/brick là mất theo.
-```sh
-# Cách 1 — UI: 🗂 Backup / Rollback → ⭳ Về máy
-# Cách 2 — LuCI: System → Backup/Flash Firmware → Generate archive
-# Cách 3 — từ máy tính (PowerShell):
-scp -r root@192.168.1.1:/root/sbproxy-backups .\sbproxy-backups
-sh scripts/backup.sh before-fw-upgrade    # (nếu đã cài project) tạo mốc
+```powershell
+# Run on the Windows administration computer.
+.\pc\backup.ps1 -Label before-fw-upgrade
 ```
+```sh
+# Run on a Linux/macOS administration computer.
+sh pc/backup.sh before-fw-upgrade
+
+# Router-only alternative: creates a snapshot but does not download it.
+sh scripts/backup.sh before-fw-upgrade
+```
+Ngoài script: UI có **🗂 Backup / Rollback → ⭳ Về máy**; LuCI có **System → Backup/Flash Firmware → Generate archive**.
+
 Đảm bảo backup chuẩn OpenWrt giữ được config sbproxy (đã tự đăng ký bởi install-deps/install-agent):
 ```sh
 cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/sbproxy/, config/
 ```
 
 ## Bước 4 — Update / flash firmware
+> **Script tương ứng:** **không có**. Chọn đúng image, vào U-Boot/GUI, upload và chờ flash là thao tác vật lý có nguy cơ brick; project cố ý không tự động hóa bước này.
+
 **Cách A — U-Boot recovery (an toàn nhất, khi đổi họ firmware):**
 1. Tắt nguồn. Máy tính đặt IP tĩnh `192.168.1.2 / 255.255.255.0`.
 2. Giữ **Reset**, cấp nguồn, giữ tới khi đèn nháy nhanh rồi thả.
@@ -90,11 +104,15 @@ cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/s
 > **Router treo/không lên sau flash?** Xem Bước 12 (Failsafe / U-Boot).
 
 ## Bước 5 — Truy cập router sau update
+> **Script tương ứng (router, sau khi SSH được):** `sh scripts/inventory.sh > inventory-after.txt`, rồi so với file ở Bước 1. Đặt IP máy tính, mật khẩu root và xử lý SSH host key vẫn làm thủ công.
+
 - IP đổi về mặc định OpenWrt `192.168.1.1`. Đưa máy tính về DHCP / cùng dải.
 - Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi `passwd`.
 - SSH: `ssh root@192.168.1.1`. Host key đổi → xoá dòng cũ trong `~/.ssh/known_hosts`.
 
 ## Bước 6 — Đưa project lên router & cài gói
+> **Script tương ứng (router):** `sh scripts/preflight.sh` để kiểm tra chỉ đọc; sau khi xử lý cảnh báo, chạy `sh scripts/install-deps.sh` để cài dependency và đăng ký dữ liệu cần giữ khi sysupgrade.
+
 ```sh
 # từ máy tính
 scp -r .\openwrt-multiwifi-socks5 root@192.168.1.1:/root/sbproxy
@@ -107,6 +125,8 @@ sh scripts/install-deps.sh     # cài gói + đăng ký sysupgrade.conf
 **Preflight — 3 điều phải xác nhận:** (1) mapping `radio0/1` ↔ băng tần → sửa `RADIO_2G/5G` trong `settings.sh`; (2) `iw list` "valid interface combinations" = số AP tối đa/radio → chốt số SSID ≤ số này; (3) các gói `[THIẾU]`.
 
 ## Bước 7 — Cấu hình WiFi / SOCKS
+> **Script tương ứng:** cấu hình bằng `config/wifi-socks.conf` hoặc UI; chạy `DRYRUN=1 sh scripts/apply.sh` để validate toàn bộ mà chưa ghi UCI hay `/etc`. Không có script tự sinh credential vì mật khẩu và SOCKS là đầu vào của quản trị viên.
+
 **File nguồn `config/wifi-socks.conf`** — mỗi dòng:
 ```
 name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
@@ -124,6 +144,8 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `STUN_*_PORTS` | Cổng STUN/TURN bị chặn khi WebRTC bật. |
 
 ## Bước 8 — Áp dụng
+> **Script tương ứng (router):** `DRYRUN=1 sh scripts/apply.sh` để xem trước, `sh scripts/apply.sh` để áp thật và tự backup, `sh scripts/uninstall.sh` để gỡ phần cấu hình do project quản lý.
+
 ```sh
 DRYRUN=1 sh scripts/apply.sh | less   # validate trong /tmp; không ghi UCI hay /etc
 sh scripts/apply.sh                    # áp thật (tự backup trước)
@@ -132,6 +154,8 @@ sh scripts/uninstall.sh                # gỡ sạch phần project tạo
 > **Xoá 1 WiFi:** `apply.sh` không tự dọn section cũ. Khi bỏ dòng khỏi conf: chạy `uninstall.sh` rồi `apply.sh` lại, hoặc xoá tay `wireless.wIDX`, `network.wIDX/brwIDX`, `dhcp.wIDX`, `firewall.zIDX`.
 
 ## Bước 9 — Cài agent điều khiển (kiến trúc B)
+> **Script tương ứng (router):** `sh agent/install-agent.sh` để cài agent local; khi cần đổi token, chạy `sh scripts/rotate-token.sh` (hoặc `--yes` trong automation đã được kiểm soát).
+
 Cho UI áp config trực tiếp + health-check latency realtime.
 ```sh
 cd /root/sbproxy
@@ -181,6 +205,8 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
 
 ## Bước 10 — Kiểm tra / nghiệm thu
+> **Script tương ứng (router, chỉ đọc):** `sh scripts/verify.sh`. Exit code `0` nghĩa là các kiểm tra router đạt; khác `0` thì chạy `sh scripts/diagnose.sh`. Các bài kiểm tra IP/DNS/WebRTC vẫn phải chạy trên client nối từng SSID.
+
 ```sh
 # trên router
 sh scripts/verify.sh                                  # kiểm tra tự động, chỉ đọc
@@ -198,6 +224,8 @@ logread -e sing-box | tail -20
 | 2 máy cùng WiFi ping nhau | Không ping được (isolate) |
 
 ## Bước 11 — Vận hành hằng ngày
+> **Script tương ứng (router):** `sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]` để đổi một SOCKS; `sh scripts/backup.sh <nhãn>` để tạo snapshot. Từ máy quản trị dùng `pc/update.*` và `pc/backup.*` để cập nhật hoặc kéo backup về máy.
+
 ```sh
 sh scripts/set-sock.sh <idx> <host> <port> [user] [pass]   # đổi sock 1 WiFi, KHÔNG rớt WiFi
 sh scripts/backup.sh <nhãn>                                # backup thủ công
@@ -208,6 +236,8 @@ sh scripts/rollback.sh --list                               # xem danh sách bac
 - Trên UI: cột **Sức khỏe** latency realtime + **🗂 Backup / Rollback** + nút **⚡** đổi sock nhanh.
 
 ## Bước 12 — Rollback & cứu router treo/brick
+> **Script tương ứng:** trên router dùng `sh scripts/rollback.sh --list` và `sh scripts/rollback.sh <tên>`; từ PC dùng `pc/restore.ps1` hoặc `pc/restore.sh`. Failsafe và U-Boot là thao tác cứu hộ thủ công, không có script.
+
 
 | Mức | Lệnh / thao tác | Khi nào |
 |---|---|---|
@@ -230,7 +260,7 @@ ssh root@192.168.1.1 "sysupgrade -r /tmp/sbproxy-<tên>.tar.gz && reboot"
 ```
 
 ## Bước 13 — Xử lý lỗi (theo triệu chứng)
-Thu thập trạng thái trước khi restart dịch vụ: `sh scripts/diagnose.sh > /tmp/sbproxy-diagnose.txt 2>&1`.
+> **Script tương ứng (router, chỉ đọc):** `sh scripts/diagnose.sh > /tmp/sbproxy-diagnose.txt 2>&1`. Chạy trước khi restart để giữ bằng chứng về WiFi, sing-box, nftables, policy route và log.
 
 **D · Có WiFi + IP nhưng không ra internet (hay gặp nhất):**
 ```sh
@@ -253,6 +283,8 @@ nft list table inet sbproxy ; ip rule | grep 0x1 ; ip route show table 100
 | Agent không kết nối | `curl -H "X-SB-Token: $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status`; kiểm tra `+x` của CGI; mixed-content. |
 
 ## Bước 14 — Tham chiếu API (agent LAN)
+> **Script tương ứng:** `agent/cgi/sbproxy` là CGI hiện thực API; quản trị viên không chạy file này trực tiếp. Ví dụ kiểm tra endpoint: `TOKEN=$(cat /etc/sbproxy/token); curl -H "X-SB-Token: $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`.
+
 Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 
 | Method | action | Body | Trả về |
@@ -270,7 +302,7 @@ Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 | GET | `health_now` | — | probe ngay 1 lần |
 
 ## Bước 15 — Bảo mật & chống lộ (checklist)
-Chạy audit chỉ đọc: `sh scripts/security-audit.sh`. Script cố ý không tự harden SSH/firewall vì thay đổi sai có thể khóa quản trị viên khỏi router.
+> **Script tương ứng (router, chỉ đọc):** `sh scripts/security-audit.sh`. Exit code khác `0` nghĩa là có cảnh báo cần xem; script không tự sửa SSH/firewall để tránh khóa mất quyền quản trị.
 
 Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quyền điều khiển**, **(C) lộ dữ liệu nhạy cảm**.
 
