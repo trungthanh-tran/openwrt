@@ -41,6 +41,14 @@ ADMIN_PORTS="22 80 443"
 # --- Wi-Fi defaults ---------------------------------------------------------
 WIFI_ENCRYPTION="psk2"     # Use `sae` for WPA3 or `sae-mixed` for transition mode.
 
+# --- sing-box compatibility --------------------------------------------------
+# sing-box >=1.12 gates the legacy config syntax we emit behind these env flags
+# and exits fatally without them (>=1.13 gates all of the ones below). They are
+# injected into `sing-box check` and the sing-box init script by apply.sh.
+# Older sing-box ignores unknown flags. If sing-box demands another flag by
+# name, append it here and rerun apply.sh.
+SINGBOX_COMPAT_ENV="ENABLE_DEPRECATED_SPECIAL_OUTBOUNDS=true ENABLE_DEPRECATED_INBOUND_OPTIONS=true ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true ENABLE_DEPRECATED_LEGACY_DNS_FAKEIP_OPTIONS=true ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER=true ENABLE_DEPRECATED_LEGACY_DOMAIN_STRATEGY_OPTIONS=true"
+
 # --- Paths ------------------------------------------------------------------
 SINGBOX_CONF="/etc/sing-box/config.json"
 # Persists the fake-IP map across sing-box restarts.

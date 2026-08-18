@@ -165,6 +165,32 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# sing-box >=1.12 refuses the legacy syntax we emit unless ENABLE_DEPRECATED_*
+# env flags are set. Run every sing-box invocation through these helpers.
+# ---------------------------------------------------------------------------
+singbox_check() {
+  # shellcheck disable=SC2086  # word-splitting of the flag list is intended
+  env ${SINGBOX_COMPAT_ENV:-} sing-box check -c "$1"
+}
+
+# The packaged procd init script has no env hook, so inject a
+# `procd_set_param env` line after its command line. Idempotent; re-run after
+# every apply because package upgrades rewrite the file.
+ensure_singbox_compat_env() {
+  [ -n "${SINGBOX_COMPAT_ENV:-}" ] || return 0
+  initf="/etc/init.d/sing-box"
+  [ -f "$initf" ] || { warn "Không thấy $initf; bỏ qua compat env cho service."; return 0; }
+  if [ "${DRYRUN:-0}" = "1" ]; then
+    printf 'DRYRUN> chèn "procd_set_param env %s" vào %s\n' "$SINGBOX_COMPAT_ENV" "$initf" >&2
+    return 0
+  fi
+  grep -q 'procd_set_param command' "$initf" || { warn "$initf không dùng procd; tự thêm env $SINGBOX_COMPAT_ENV thủ công."; return 0; }
+  sed -i '/procd_set_param env ENABLE_DEPRECATED/d' "$initf"
+  sed -i "/procd_set_param command/a\\	procd_set_param env $SINGBOX_COMPAT_ENV" "$initf"
+  log "Đã chèn compat env vào $initf"
+}
+
+# ---------------------------------------------------------------------------
 # Sinh /etc/sing-box/config.json
 # ---------------------------------------------------------------------------
 build_singbox() {

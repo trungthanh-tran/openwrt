@@ -44,7 +44,7 @@ SINGBOX_CONF="$STAGE/config.json"; NFT_FILE="$STAGE/sbproxy.nft"
 build_singbox
 build_nft
 command -v sing-box >/dev/null 2>&1 || die "Thiếu sing-box."
-sing-box check -c "$SINGBOX_CONF" || die "sing-box config không hợp lệ."
+singbox_check "$SINGBOX_CONF" || die "sing-box config không hợp lệ."
 nft --check --file "$NFT_FILE" || die "nftables config không hợp lệ."
 
 if [ "${DRYRUN:-0}" = "1" ]; then
@@ -76,8 +76,10 @@ TPROXY_MARK=$TPROXY_MARK
 TPROXY_MARK_MASK=$TPROXY_MARK_MASK
 TPROXY_TABLE=$TPROXY_TABLE
 TPROXY_RULE_PRIORITY=$TPROXY_RULE_PRIORITY
+SINGBOX_COMPAT_ENV="$SINGBOX_COMPAT_ENV"
 EOF
 mv /etc/sbproxy.env.new /etc/sbproxy.env
+ensure_singbox_compat_env
 
 # 3) Reload services in dependency order: network, firewall, TPROXY, proxy, Wi-Fi.
 log "Reload dịch vụ..."

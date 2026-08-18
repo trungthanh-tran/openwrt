@@ -2,6 +2,10 @@
 # Run read-only acceptance checks after applying the configuration.
 set -u
 
+# Pick up SINGBOX_COMPAT_ENV so `sing-box check` accepts the legacy syntax.
+# shellcheck source=/dev/null
+[ -f /etc/sbproxy.env ] && . /etc/sbproxy.env
+
 fail=0
 check() {
   label="$1"
@@ -15,7 +19,8 @@ check() {
 }
 
 check 'sing-box process is running' pgrep -f sing-box
-check 'sing-box configuration is valid' sing-box check -c /etc/sing-box/config.json
+check 'sing-box configuration is valid' sh -c "env ${SINGBOX_COMPAT_ENV:-} sing-box check -c /etc/sing-box/config.json"
+check 'sing-box service has compat env' sh -c "grep -q 'procd_set_param env ENABLE_DEPRECATED' /etc/init.d/sing-box || [ -z '${SINGBOX_COMPAT_ENV:-}' ]"
 check 'sbproxy nftables table exists' nft list table inet sbproxy
 check 'fake-IP DNS block present in sing-box config' grep -q '"fakeip"' /etc/sing-box/config.json
 check 'DNS hijack rules loaded' sh -c "nft list chain inet sbproxy prerouting | grep -q 'dport 53'"
