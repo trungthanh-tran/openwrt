@@ -111,7 +111,7 @@ emit_uci_one() {
   name_q="$(uci_dquote "$name")"; key_q="$(uci_dquote "$key")"
   radio="$(radio_of "$band")"
   octet="$(net_octet "$idx")"
-  mac="$(uci -q get "wireless.w$idx.macaddr")"
+  mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
   [ -n "$mac" ] || mac="$(gen_mac)"
 
   # network: bridge device + interface L3
@@ -158,9 +158,11 @@ set firewall.z${idx}adm=rule
 set firewall.z${idx}adm.name=block-admin-w$idx
 set firewall.z${idx}adm.src=z$idx
 set firewall.z${idx}adm.proto=tcp
-set firewall.z${idx}adm.dest_port=$p
 set firewall.z${idx}adm.target=REJECT
 EOF
+    for p in $ADMIN_PORTS; do
+      echo "add_list firewall.z${idx}adm.dest_port=$p"
+    done
   fi
 }
 
@@ -203,13 +205,15 @@ build_singbox() {
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"
     tp="$(tproxy_port "$idx")"
-    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp,\"sniff\":true,\"sniff_override_destination\":true}"
+    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp}"
     host_json="$(jq -Rn --arg v "$host" '$v')"
     if [ -n "$user" ]; then
       user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
       auth=",\"username\":$user_json,\"password\":$pass_json"
     else auth=""; fi
     outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\"$auth}"
+    rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
+    sep=","
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
     sep=","
   }
@@ -223,37 +227,27 @@ build_singbox() {
   "log": { "level": "warn", "timestamp": true },
   "dns": {
     "servers": [
-      { "tag": "dns-fakeip", "address": "fakeip" },
-      { "tag": "dns-local", "address": "local", "detour": "direct" }
+      { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE", "inet6_range": "fc00::/18" },
+      { "type": "udp", "tag": "upstream", "server": "1.1.1.1" }
     ],
     "rules": [
-      { "query_type": ["A"], "server": "dns-fakeip" }
+      { "query_type": ["A", "AAAA"], "action": "route", "server": "fakeip" }
     ],
-    "final": "dns-local",
-    "fakeip": { "enabled": true, "inet4_range": "$FAKEIP_RANGE" },
-    "independent_cache": true,
-    "strategy": "ipv4_only"
+    "final": "upstream",
+    "reverse_mapping": true
   },
   "inbounds": [ $inbounds ],
   "outbounds": [
     $outbounds${outbounds:+,}
-    { "type": "dns", "tag": "dns-out" },
-    { "type": "direct", "tag": "direct" },
-    { "type": "block", "tag": "block" }
+    { "type": "direct", "tag": "direct" }
   ],
   "route": {
-    "rules": [
-      { "protocol": "dns", "outbound": "dns-out" }${rules:+,}
-      $rules
-    ],
+    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }, $rules ],
+    "default_domain_resolver": "upstream",
     "final": "direct"
   },
   "experimental": {
-    "cache_file": {
-      "enabled": true,
-      "path": "$SINGBOX_CACHE",
-      "store_fakeip": true
-    }
+    "cache_file": { "enabled": true, "path": "$SINGBOX_CACHE", "store_fakeip": true }
   }
 }
 EOF

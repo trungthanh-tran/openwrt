@@ -7,7 +7,7 @@ RADIO_2G="radio0"
 RADIO_5G="radio1"
 # Required ISO 3166-1 alpha-2 code for the router's operating country.
 # Leaving it empty makes preflight/apply fail to prevent unlawful radio settings.
-WIFI_COUNTRY=""
+WIFI_COUNTRY="VN"
 
 # --- Hardware limits --------------------------------------------------------
 # Maximum BSSIDs per radio; verify with `iw list` under valid interface combinations.
