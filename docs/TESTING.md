@@ -57,7 +57,7 @@ curl -s https://ipinfo.io/ip      # hoặc mở https://ipinfo.io trên trình d
 ### B2. Không leak DNS
 Mở https://dnsleaktest.com (Extended test).
 **Đạt khi:** DNS server hiện ra **không phải** ISP thật của bạn.
-> ⚠️ v0.1: DNS mặc định đi qua dnsmasq của router → **có thể vẫn leak**. Đây là hạn chế đã biết. Để chống leak: cấu hình dnsmasq forward qua DoH/proxy, hoặc bật DNS trong sing-box (sẽ bổ sung ở bản sau). Ghi nhận kết quả test để quyết định.
+> DNS của SSID proxy được hijack vào sing-box (fake-IP, remote resolve qua SOCKS). Kiểm tra nhanh trên client: `nslookup example.com` phải trả IP trong dải `198.18.0.0/15`. Nếu trả IP thật → rule hijack chưa nạp, chạy lại `sh scripts/apply.sh` và `sh scripts/verify.sh`.
 
 ### B3. Không leak WebRTC (các WiFi bật webrtc=1)
 Mở https://browserleaks.com/webrtc

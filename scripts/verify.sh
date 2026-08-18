@@ -17,6 +17,8 @@ check() {
 check 'sing-box process is running' pgrep -f sing-box
 check 'sing-box configuration is valid' sing-box check -c /etc/sing-box/config.json
 check 'sbproxy nftables table exists' nft list table inet sbproxy
+check 'fake-IP DNS block present in sing-box config' grep -q '"fakeip"' /etc/sing-box/config.json
+check 'DNS hijack rules loaded' sh -c "nft list chain inet sbproxy prerouting | grep -q 'dport 53'"
 check 'TPROXY policy rule exists' sh -c "ip rule | grep -q '0x1'"
 check 'TPROXY route table exists' sh -c "ip route show table 100 | grep -q ."
 check 'managed Wi-Fi interfaces exist' sh -c "iw dev | grep -q 'ssid'"

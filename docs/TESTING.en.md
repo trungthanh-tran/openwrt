@@ -23,7 +23,7 @@ Confirm that all configured SSIDs exist, MAC addresses begin with `02:`, each br
 
 1. Confirm DHCP assigns the expected `192.168.X.0/24` address.
 2. Open `https://ipinfo.io/ip`; it must show the assigned SOCKS egress.
-3. Run a DNS leak test. DNS through dnsmasq may still expose the real ISP in v0.2; record this as a known failure until per-SSID DNS routing is implemented.
+3. Run a DNS leak test. `nslookup example.com` must return a fake-IP in `198.18.0.0/15`; a real IP means the DNS hijack rules are not loaded — rerun `sh scripts/apply.sh` and `sh scripts/verify.sh`.
 4. Run a WebRTC leak test when `webrtc=1`.
 5. Verify that two clients on the same isolated SSID cannot reach each other.
 6. Verify that clients cannot reach router administration ports.

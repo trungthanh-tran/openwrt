@@ -28,6 +28,7 @@ log "Dừng tproxy + xoá nft/sing-box config..."
 nft delete table inet sbproxy 2>/dev/null || true
 rm -f "$NFT_FILE"
 /etc/init.d/sing-box stop 2>/dev/null || true
+rm -f "${SINGBOX_CACHE:-/etc/sing-box/cache.db}"
 
 /etc/init.d/network reload  || true
 /etc/init.d/firewall reload || true

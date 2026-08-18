@@ -168,11 +168,16 @@ EOF
 # Sinh /etc/sing-box/config.json
 # ---------------------------------------------------------------------------
 build_singbox() {
+  # Defaults keep older settings.sh copies (without these vars) working.
+  FAKEIP_RANGE="${FAKEIP_RANGE:-198.18.0.0/15}"
+  # Persist the fakeip<->hostname map across sing-box restarts (e.g. set-sock.sh)
+  # so clients holding cached fake-IPs keep working without a fresh DNS query.
+  SINGBOX_CACHE="${SINGBOX_CACHE:-/etc/sing-box/cache.db}"
   inbounds=""; outbounds=""; rules=""; sep=""
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"
     tp="$(tproxy_port "$idx")"
-    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp,\"sniff\":true}"
+    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp,\"sniff\":true,\"sniff_override_destination\":true}"
     host_json="$(jq -Rn --arg v "$host" '$v')"
     if [ -n "$user" ]; then
       user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
@@ -185,18 +190,44 @@ build_singbox() {
   for_each_ssid _sb_row
 
   mkdir -p "$(dirname "$SINGBOX_CONF")"
+  # DNS fake-IP: trả fake-IP cho client, map ngược về hostname khi kết nối,
+  # nhờ đó outbound SOCKS luôn nhận hostname (remote resolve) thay vì IP thật.
   cat > "$SINGBOX_CONF" <<EOF
 {
   "log": { "level": "warn", "timestamp": true },
+  "dns": {
+    "servers": [
+      { "tag": "dns-fakeip", "address": "fakeip" },
+      { "tag": "dns-local", "address": "local", "detour": "direct" }
+    ],
+    "rules": [
+      { "query_type": ["A"], "server": "dns-fakeip" }
+    ],
+    "final": "dns-local",
+    "fakeip": { "enabled": true, "inet4_range": "$FAKEIP_RANGE" },
+    "independent_cache": true,
+    "strategy": "ipv4_only"
+  },
   "inbounds": [ $inbounds ],
   "outbounds": [
     $outbounds${outbounds:+,}
+    { "type": "dns", "tag": "dns-out" },
     { "type": "direct", "tag": "direct" },
     { "type": "block", "tag": "block" }
   ],
   "route": {
-    "rules": [ $rules ],
+    "rules": [
+      { "protocol": "dns", "outbound": "dns-out" }${rules:+,}
+      $rules
+    ],
     "final": "direct"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "$SINGBOX_CACHE",
+      "store_fakeip": true
+    }
   }
 }
 EOF
@@ -227,6 +258,7 @@ build_nft() {
   sock_bypass=""
   webrtc_rules=""
   tproxy_rules=""
+  dns_rules=""
   _nft_row() {
     idx="$3"; host="$5"; webrtc="${10}"
     tp="$(tproxy_port "$idx")"
@@ -235,6 +267,10 @@ build_nft() {
       *[!0-9.]*) : ;;  # Hostname: skip the IP bypass; sing-box resolves it.
       *) sock_bypass="$sock_bypass    ip daddr $host return\n" ;;
     esac
+    # Hijack DNS into sing-box before the local-net bypass so fake-IP answers
+    # replace dnsmasq for proxied SSIDs (including hardcoded public resolvers).
+    dns_rules="$dns_rules    iifname \"br-w$idx\" udp dport 53 tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
+    dns_rules="$dns_rules    iifname \"br-w$idx\" tcp dport 53 tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     tproxy_rules="$tproxy_rules    iifname \"br-w$idx\" meta l4proto tcp tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     tproxy_rules="$tproxy_rules    iifname \"br-w$idx\" meta l4proto udp tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     if [ "$webrtc" = "1" ]; then
@@ -253,6 +289,8 @@ build_nft() {
     echo "  }"
     echo "  chain prerouting {"
     echo "    type filter hook prerouting priority mangle; policy accept;"
+    echo "    # Hijack DNS from proxied SSIDs into sing-box (fake-IP), ahead of the local-net bypass."
+    printf "%b" "$dns_rules"
     echo "    # Do not proxy local or multicast traffic."
     echo "    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return"
     echo "    # Bypass SOCKS servers through the WAN."

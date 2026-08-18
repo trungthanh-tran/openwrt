@@ -171,12 +171,14 @@ logread -e sing-box | tail -20               # log proxy
 | Kiểm tra | Cách | Đạt khi |
 |---|---|---|
 | Đúng SOCKS | mở `https://ipinfo.io/ip` | IP = IP của sock gán cho WiFi đó; 2 WiFi khác sock → 2 IP khác |
-| Không leak DNS | `https://dnsleaktest.com` | DNS không phải ISP thật *(xem lưu ý v0.1 bên dưới)* |
+| Không leak DNS | `https://dnsleaktest.com` | DNS không phải ISP thật (fake-IP: DNS resolve phía SOCKS) |
 | Không leak WebRTC | `https://browserleaks.com/webrtc` | không lộ IP thật |
 | Cách ly client | 2 máy cùng WiFi, ping nhau | không ping được |
 | Đổi sock không reload WiFi | chạy `set-sock.sh`, reload trang | WiFi/DHCP giữ nguyên; phiên đang mở có thể rớt |
 
-> ⚠️ **DNS leak (v0.1):** DNS mặc định qua dnsmasq router → **có thể còn leak**. Đây là hạn chế đã biết; cách khắc phục ở mục [Xử lý lỗi](#dns-vẫn-lộ-isp-thật).
+> **DNS fake-IP:** DNS (cổng 53) của các SSID proxy được hijack vào sing-box; client nhận fake-IP
+> (mặc định `198.18.0.0/15`), sing-box map ngược fake-IP về hostname và gửi **hostname** cho SOCKS
+> (remote resolve). Nhờ đó không leak DNS qua dnsmasq và SOCKS không nhận IP thô. Nếu vẫn lộ, xem mục [Xử lý lỗi](#dns-vẫn-lộ-isp-thật).
 
 > **IPv6:** v0.2 chỉ proxy IPv4 và tắt RA/DHCPv6 trên các SSID sbproxy. Không bật lại IPv6
 > trước khi có TPROXY + policy routing IPv6 đầy đủ, nếu không client có thể đi thẳng ra WAN.
@@ -258,15 +260,10 @@ ip route show table 100
 | Route sing-box sai inbound→outbound | Xem `config.json` rule `in-w<idx> -> out-w<idx>` |
 
 ### F. DNS vẫn lộ ISP thật
-Hạn chế v0.1 (DNS qua dnsmasq router). Cách khắc phục:
-- **Nhanh:** trỏ dnsmasq upstream sang DNS ẩn danh/DoH:
-  ```sh
-  uci set dhcp.@dnsmasq[0].noresolv='1'
-  uci -q delete dhcp.@dnsmasq[0].server
-  uci add_list dhcp.@dnsmasq[0].server='1.1.1.1'   # hoặc DoH qua https-dns-proxy
-  uci commit dhcp; /etc/init.d/dnsmasq restart
-  ```
-- **Triệt để:** bật khối `dns` trong sing-box và ép DNS đi qua outbound proxy (sẽ bổ sung ở bản sau — xem plan mục DNS chống leak).
+Từ bản này DNS của SSID proxy được hijack vào sing-box với fake-IP (SOCKS nhận hostname). Nếu vẫn lộ:
+- Kiểm tra rule hijack đã nạp: `nft list chain inet sbproxy prerouting | grep 'dport 53'` — thiếu thì chạy lại `sh scripts/apply.sh`.
+- Kiểm tra config sing-box có khối `dns`/`fakeip`: `grep fakeip /etc/sing-box/config.json`; xác nhận `nslookup example.com` từ client trả IP trong dải `198.18.0.0/15`.
+- Client dùng DoH/DoT (cổng 443/853) sẽ né hijack cổng 53 — traffic đó vẫn qua TPROXY nhưng đích là IP thô; sniff SNI (`sniff_override_destination`) là fallback cho TLS. Muốn chặt hơn, chặn cổng 853 và các resolver DoH phổ biến trên các zone khách.
 
 ### G. WebRTC vẫn lộ
 | Nguyên nhân | Cách xử lý |

@@ -26,6 +26,10 @@ TPROXY_MARK_MASK=255
 
 # v0.2 proxies IPv4 only. `disable` turns off RA/DHCPv6 on sbproxy SSIDs to prevent bypass.
 IPV6_MODE="disable"
+# Fake-IP range sing-box hands to proxied clients so SOCKS receives hostnames,
+# not resolved IPs. Must not overlap any real subnet in use (198.18.0.0/15 is
+# the RFC 2544 benchmark range and is safe on typical networks).
+FAKEIP_RANGE="198.18.0.0/15"
 
 # --- Firewall ---------------------------------------------------------------
 # Guest-zone input policy. ACCEPT keeps DHCP/DNS and TPROXY reliable while separate
@@ -39,6 +43,8 @@ WIFI_ENCRYPTION="psk2"     # Use `sae` for WPA3 or `sae-mixed` for transition mo
 
 # --- Paths ------------------------------------------------------------------
 SINGBOX_CONF="/etc/sing-box/config.json"
+# Persists the fake-IP map across sing-box restarts.
+SINGBOX_CACHE="/etc/sing-box/cache.db"
 NFT_FILE="/etc/sbproxy.nft"
 BACKUP_DIR="/root/sbproxy-backups"
 

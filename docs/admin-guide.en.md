@@ -82,7 +82,7 @@ Or rotate only the token with `sh scripts/rotate-token.sh`.
 ## Privacy checklist
 
 - IPv6: disabled on managed SSIDs because v0.2 proxies IPv4 only.
-- DNS: still a known leak risk through dnsmasq.
+- DNS: port-53 traffic on proxied SSIDs is hijacked into sing-box fake-IP, so SOCKS receives hostnames; DoH/DoT clients bypass the hijack and rely on TLS SNI sniffing.
 - WebRTC: port-based STUN/TURN blocking is optional and not a universal guarantee.
 - Fail-closed: guest zones must never receive a direct guest-to-WAN forwarding rule.
 - Logs: never print tokens, Wi-Fi passwords, or SOCKS credentials.

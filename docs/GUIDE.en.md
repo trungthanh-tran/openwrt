@@ -35,7 +35,7 @@ Changing an upstream restarts sing-box, so established sessions can disconnect e
 ## Known limitations
 
 - IPv4 only; managed SSIDs have IPv6 services disabled.
-- DNS through router dnsmasq may leak until per-SSID proxy DNS is implemented.
+- DNS on proxied SSIDs is hijacked into sing-box fake-IP (`198.18.0.0/15` by default), so upstream SOCKS servers receive hostnames (remote resolve). Clients using DoH/DoT bypass the port-53 hijack; TLS SNI sniffing is the fallback for that traffic.
 - UDP requires an upstream SOCKS5 server that supports UDP ASSOCIATE.
 - Real BSSID capacity depends on the driver, firmware, and other radio interfaces.
 - GL.iNet OEM firmware requires separate real-device validation.

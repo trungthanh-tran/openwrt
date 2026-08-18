@@ -277,7 +277,7 @@ nft list table inet sbproxy ; ip rule | grep 0x1 ; ip route show table 100
 | WiFi thiếu SSID | Vượt BSSID → giảm/chia băng. Không SSID nào lên → sai `RADIO_*` hoặc radio `disabled`. |
 | Client không có IP | `/etc/init.d/dnsmasq restart`; đảm bảo `ZONE_INPUT=ACCEPT`. |
 | Ra net nhưng sai IP | `iifname` không khớp `br-w<idx>`; kiểm tra route sing-box `in-w→out-w`. |
-| DNS leak | v0.1 DNS qua dnsmasq → trỏ upstream DoH/ẩn danh, hoặc bật khối `dns` trong sing-box. |
+| DNS leak | DNS SSID proxy được hijack vào sing-box fake-IP. `nslookup` phải trả `198.18.x.x`; nếu không, kiểm tra rule `dport 53` trong `nft list chain inet sbproxy prerouting` rồi chạy lại `apply.sh`. |
 | WebRTC lộ | Bật `webrtc=1` → `apply`; kiểm tra `nft list chain inet sbproxy webrtc`. |
 | Client thấy nhau | `isolate=1`; zone `forward=REJECT`; mỗi SSID một `br-w<idx>`. |
 | Agent không kết nối | `curl -H "X-SB-Token: $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status`; kiểm tra `+x` của CGI; mixed-content. |
@@ -310,7 +310,7 @@ Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quy�
 | Kênh lộ | Trạng thái | Cách bịt |
 |---|---|---|
 | **IPv6 bypass** | ✅ Chặn ở v0.2 | tproxy hiện chỉ bắt IPv4; `apply.sh` tắt DHCPv6/RA/NDP trên từng SSID sbproxy. Chưa hỗ trợ proxy IPv6. |
-| **DNS leak** | ⚠️ v0.1 có thể lộ | `uci add_list dhcp.@dnsmasq[0].server='1.1.1.1'; uci set dhcp.@dnsmasq[0].noresolv='1'` (tốt hơn: DoH qua `https-dns-proxy`, hoặc DNS trong sing-box đi qua proxy). |
+| **DNS leak** | ✅ Chặn (fake-IP) | DNS cổng 53 của SSID proxy hijack vào sing-box; client nhận fake-IP `198.18.0.0/15`, SOCKS nhận **hostname** (remote resolve). Client dùng DoH/DoT né được hijack → fallback sniff SNI; muốn chặt hơn, chặn cổng 853/resolver DoH trên zone khách. |
 | **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh (Bước 7). |
 | **Rò khi proxy chết** | ✅ Fail-closed | Zone khách `forward=REJECT` → sing-box/tproxy chết thì client **mất mạng** chứ không ra thẳng. Đừng thêm rule forward guest→wan. |
 | **MAC thật** | ✅ Random | MAC `02:xx` tự sinh mỗi SSID. |
