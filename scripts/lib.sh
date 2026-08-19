@@ -45,9 +45,11 @@ validate_conf() {
   awk -F'|' -v net_base="${NET_BASE:-10}" -v port_base="${TPROXY_PORT_BASE:-12000}" '
     function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
     /^#/ || /^[[:space:]]*$/ { next }
-    NF != 10 { printf "dòng %d: cần đúng 10 cột, hiện có %d\n", NR, NF; bad=1; next }
+    NF != 10 && NF != 11 { printf "dòng %d: cần 10 hoặc 11 cột, hiện có %d\n", NR, NF; bad=1; next }
     {
       idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10)
+      oui=(NF==11)?trim($11):""
+      if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "dòng %d: mac_oui phải dạng AA:BB:CC hoặc để trống\n", NR; bad=1 }
       if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "dòng %d: idx không hợp lệ\n", NR; bad=1 }
       if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx > 254 || port_base + idx > 65535)) { printf "dòng %d: idx làm subnet/cổng vượt phạm vi\n", NR; bad=1 }
       if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "dòng %d: port không hợp lệ\n", NR; bad=1 }
@@ -68,21 +70,33 @@ net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
 radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "band không hợp lệ: $1";; esac; }
 
-# Valid random MAC: locally administered, unicast, first octet 02.
+# Generate a random MAC.
+#   gen_mac              -> locally administered, unicast, first octet 02.
+#   gen_mac aa:bb:cc     -> given vendor OUI + 3 random octets (impersonates a
+#                           common Wi-Fi vendor; OUI first octet is already
+#                           globally-unique/unicast).
 gen_mac() {
-  printf '02:%02x:%02x:%02x:%02x:%02x\n' \
-    $(head -c5 /dev/urandom | hexdump -v -e '/1 "%u "')
+  oui="$(printf '%s' "${1:-}" | tr -d ' \r' | tr 'A-Z' 'a-z')"
+  if [ -n "$oui" ]; then
+    printf '%s:%02x:%02x:%02x\n' "$oui" \
+      $(head -c3 /dev/urandom | hexdump -v -e '/1 "%u "')
+  else
+    printf '02:%02x:%02x:%02x:%02x:%02x\n' \
+      $(head -c5 /dev/urandom | hexdump -v -e '/1 "%u "')
+  fi
 }
 
 uci_dquote() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
-# Iterate over valid SSID rows and call: cb name band idx key host port user pass isolate webrtc
+# Iterate over valid SSID rows and call:
+#   cb name band idx key host port user pass isolate webrtc mac_oui
+# mac_oui (column 11) is optional; older 10-column configs pass it empty.
 for_each_ssid() {
   _cb="$1"
-  while IFS='|' read -r name band idx key host port user pass isolate webrtc; do
+  while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui; do
     case "$name" in ''|\#*) continue;; esac
     [ -n "$idx" ] || { warn "Bỏ dòng thiếu idx: $name"; continue; }
-    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}"
+    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui"
   done < "$CONF"
 }
 
@@ -108,11 +122,22 @@ check_bssid_limit() {
 # ---------------------------------------------------------------------------
 emit_uci_one() {
   name="$1"; band="$2"; idx="$3"; key="$4"; isolate="$9"
+  mac_oui="$(printf '%s' "${11}" | tr -d ' \r' | tr 'A-Z' 'a-z')"
   name_q="$(uci_dquote "$name")"; key_q="$(uci_dquote "$key")"
   radio="$(radio_of "$band")"
   octet="$(net_octet "$idx")"
   mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
-  [ -n "$mac" ] || mac="$(gen_mac)"
+  # Keep an existing MAC stable, but regenerate when absent or when a vendor
+  # OUI is requested and the current MAC does not already start with it, so
+  # changing the vendor dropdown actually takes effect on the next apply.
+  if [ -z "$mac" ]; then
+    mac="$(gen_mac "$mac_oui")"
+  elif [ -n "$mac_oui" ]; then
+    case "$(printf '%s' "$mac" | tr 'A-Z' 'a-z')" in
+      "$mac_oui":*) : ;;
+      *) mac="$(gen_mac "$mac_oui")" ;;
+    esac
+  fi
 
   # network: bridge device + interface L3
   cat <<EOF
@@ -274,7 +299,7 @@ EOF
 }
 
 desired_idx() {
-  awk -F'|' '!/^#/ && NF==10 { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
+  awk -F'|' '!/^#/ && (NF==10 || NF==11) { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
 }
 
 emit_stale_uci() {

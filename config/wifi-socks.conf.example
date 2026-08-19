@@ -14,8 +14,16 @@
 #   sock_pass: SOCKS5 password; leave empty when authentication is disabled.
 #   isolate  : 1 blocks clients on the same Wi-Fi from reaching one another.
 #   webrtc   : 1 blocks configured STUN/TURN ports to reduce WebRTC leaks.
+#   mac_oui  : OPTIONAL 11th column. 3-byte vendor prefix (AA:BB:CC) used as the
+#              first half of the AP MAC; the last 3 bytes are randomized. Leave
+#              empty (or omit the column) for a random locally-administered 02:
+#              address. Common Wi-Fi vendor OUIs (also in the Console dropdown):
+#                TP-Link 50:C7:BF · Netgear 20:E5:2A · ASUS AC:9E:17
+#                Xiaomi 64:09:80 · Huawei 00:E0:FC · D-Link 1C:BD:B9
+#                Linksys C0:56:27 · Tenda C8:3A:35 · Apple 3C:15:C2
+#                Samsung 5C:0A:5B · Ubiquiti 24:A4:3C · Aruba 00:0B:86
 #
-# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
-Alpha|2g|1|Alpha_pass_123|1.2.3.4|1080|user1|pass1|1|1
-Bravo|2g|2|Bravo_pass_123|5.6.7.8|1080|user2|pass2|1|1
-Charlie|5g|3|Charlie_pass_123|9.9.9.9|1080|||1|0
+# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc|mac_oui
+Alpha|2g|1|Alpha_pass_123|1.2.3.4|1080|user1|pass1|1|1|50:C7:BF
+Bravo|2g|2|Bravo_pass_123|5.6.7.8|1080|user2|pass2|1|1|20:E5:2A
+Charlie|5g|3|Charlie_pass_123|9.9.9.9|1080|||1|0|

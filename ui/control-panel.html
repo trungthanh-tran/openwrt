@@ -296,6 +296,10 @@
         </div>
       </div>
       <div class="field">
+        <label>Hãng WiFi giả lập (MAC) <span class="derived">(3 byte đầu của MAC theo hãng; 3 byte sau random)</span></label>
+        <select id="f_vendor"></select>
+      </div>
+      <div class="field">
         <label>Mật khẩu WiFi <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
         <input type="text" id="f_key" class="mono" placeholder="Alpha_pass_123">
       </div>
@@ -390,6 +394,28 @@
   const NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
+
+  // Common Wi-Fi vendor OUIs (first 3 MAC bytes). Keep in sync with the list in
+  // config/wifi-socks.conf.example. Empty oui = random locally-administered 02:.
+  const VENDORS = [
+    { name: "Ngẫu nhiên / ẩn danh (02:xx)", oui: "" },
+    { name: "TP-Link", oui: "50:C7:BF" },
+    { name: "Netgear", oui: "20:E5:2A" },
+    { name: "ASUS", oui: "AC:9E:17" },
+    { name: "Xiaomi", oui: "64:09:80" },
+    { name: "Huawei", oui: "00:E0:FC" },
+    { name: "D-Link", oui: "1C:BD:B9" },
+    { name: "Linksys", oui: "C0:56:27" },
+    { name: "Tenda", oui: "C8:3A:35" },
+    { name: "Apple", oui: "3C:15:C2" },
+    { name: "Samsung", oui: "5C:0A:5B" },
+    { name: "Ubiquiti", oui: "24:A4:3C" },
+    { name: "Aruba", oui: "00:0B:86" }
+  ];
+  const vendorName = oui => {
+    const v = VENDORS.find(x => x.oui.toUpperCase() === String(oui || "").toUpperCase());
+    return v ? v.name : (oui ? oui : VENDORS[0].name);
+  };
 
   /** @type {Array} */
   let ssids = load();
@@ -634,7 +660,7 @@
       const auth = s.user ? `<span class="chip"><span class="dot"></span>${esc(s.user)}</span>` : `<span class="sub">—</span>`;
       return `<tr>
         <td><span class="idxpill">${s.idx}</span></td>
-        <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)}</div></td>
+        <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)} · MAC ${esc(s.mac_oui ? s.mac_oui + " " + vendorName(s.mac_oui) : "02: ẩn danh")}</div></td>
         <td><span class="band ${s.band === "2g" ? "b2" : "b5"}">${s.band === "2g" ? "2.4G" : "5G"}</span></td>
         <td class="mono sub">${subnet(s.idx)}</td>
         <td class="mono">${esc(s.host)}:${esc(s.port)}</td>
@@ -659,7 +685,7 @@
 # name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 `;
     const lines = [...ssids].sort((a, b) => a.idx - b.idx).map(s =>
-      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, s.webrtc ? 1 : 0].join("|")
+      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, s.webrtc ? 1 : 0, s.mac_oui || ""].join("|")
     );
     return head + lines.join("\n") + (lines.length ? "\n" : "");
   }
@@ -742,6 +768,7 @@
     $("f_pass").value = s ? (s.pass || "") : "";
     $("f_isolate").checked = s ? !!s.isolate : true;
     $("f_webrtc").checked = s ? !!s.webrtc : true;
+    $("f_vendor").value = s ? (s.mac_oui || "") : "";
     $("f_err").textContent = "";
     updateDerived();
     $("backdrop").classList.add("show");
@@ -751,8 +778,10 @@
 
   function updateDerived() {
     const i = parseInt($("f_idx").value, 10);
+    const oui = $("f_vendor").value;
+    const macTxt = oui ? `${oui}:xx:xx:xx (${vendorName(oui)})` : "02:xx (locally-administered)";
     $("f_derived").textContent = isFinite(i)
-      ? `→ subnet ${subnet(i)} · gateway ${gw(i)} · bridge br-w${i} · tproxy :${tport(i)} · MAC 02:xx (tự random trên router)`
+      ? `→ subnet ${subnet(i)} · gateway ${gw(i)} · bridge br-w${i} · tproxy :${tport(i)} · MAC ${macTxt}`
       : "";
   }
 
@@ -775,8 +804,10 @@
     if (!host) return err("Thiếu SOCKS host.");
     if (!isFinite(port) || port < 1 || port > 65535) return err("Cổng SOCKS không hợp lệ.");
     if (user && !pass) return err("Có user thì cần pass (hoặc bỏ trống cả hai).");
+    const mac_oui = $("f_vendor").value;
+    if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err("mac_oui phải dạng AA:BB:CC.");
 
-    const rec = { name, band, idx, key, host, port: String(port), user, pass, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked };
+    const rec = { name, band, idx, key, host, port: String(port), user, pass, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked, mac_oui };
     if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     closeModal(); render(); toast(editId ? "Đã cập nhật" : "Đã thêm WiFi");
@@ -797,7 +828,8 @@
         name: p[0].trim(), band: (p[1] || "2g").trim(), idx,
         key: (p[3] || "").trim(), host: (p[4] || "").trim(), port: (p[5] || "1080").trim(),
         user: (p[6] || "").trim(), pass: (p[7] || "").trim(),
-        isolate: (p[8] || "1").trim() === "1", webrtc: (p[9] || "0").trim() === "1"
+        isolate: (p[8] || "1").trim() === "1", webrtc: (p[9] || "0").trim() === "1",
+        mac_oui: (p[10] || "").trim()
       });
     });
     if (rows.length) ssids = rows;
@@ -846,6 +878,7 @@
   $("cancelBtn").onclick = closeModal;
   $("backdrop").onclick = e => { if (e.target.id === "backdrop") closeModal(); };
   $("f_idx").oninput = updateDerived;
+  $("f_vendor").onchange = updateDerived;
   $("themeBtn").onclick = toggleTheme;
   $("importBtn").onclick = importConf;
   $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
@@ -909,9 +942,9 @@
   if (!ssids.length && !localStorage.getItem("sbproxy.seeded")) {
     localStorage.setItem("sbproxy.seeded", "1");
     ssids = [
-      { id: "s1", name: "Alpha", band: "2g", idx: 1, key: "Alpha_pass_123", host: "1.2.3.4", port: "1080", user: "user1", pass: "pass1", isolate: true, webrtc: true },
-      { id: "s2", name: "Bravo", band: "2g", idx: 2, key: "Bravo_pass_123", host: "5.6.7.8", port: "1080", user: "user2", pass: "pass2", isolate: true, webrtc: true },
-      { id: "s3", name: "Charlie", band: "5g", idx: 3, key: "Charlie_pass_123", host: "9.9.9.9", port: "1080", user: "", pass: "", isolate: true, webrtc: false }
+      { id: "s1", name: "Alpha", band: "2g", idx: 1, key: "Alpha_pass_123", host: "1.2.3.4", port: "1080", user: "user1", pass: "pass1", isolate: true, webrtc: true, mac_oui: "50:C7:BF" },
+      { id: "s2", name: "Bravo", band: "2g", idx: 2, key: "Bravo_pass_123", host: "5.6.7.8", port: "1080", user: "user2", pass: "pass2", isolate: true, webrtc: true, mac_oui: "20:E5:2A" },
+      { id: "s3", name: "Charlie", band: "5g", idx: 3, key: "Charlie_pass_123", host: "9.9.9.9", port: "1080", user: "", pass: "", isolate: true, webrtc: false, mac_oui: "" }
     ];
   }
 
@@ -926,6 +959,11 @@
       }
     }).catch(() => {});
   }
+
+  // Populate the MAC vendor dropdown once.
+  $("f_vendor").innerHTML = VENDORS.map(v =>
+    `<option value="${v.oui}">${esc(v.name)}${v.oui ? " · " + v.oui : ""}</option>`
+  ).join("");
 
   initTheme();
   render();

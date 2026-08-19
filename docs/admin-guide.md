@@ -289,7 +289,7 @@ Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 
 | Method | action | Body | Trả về |
 |---|---|---|---|
-| GET | `status` | — | ssids[], health{probes{idx:{state,latency_ms,code}}}, meta |
+| GET | `status` | — | ssids[] (gồm `mac_oui`), health{probes{idx:{state,latency_ms,code}}}, meta |
 | GET | `get_conf` | — | text conf |
 | POST | `save_conf` | text | {ok,saved} |
 | POST | `apply` | — | {ok,rc,log} |
@@ -313,7 +313,7 @@ Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quy�
 | **DNS leak** | ✅ Chặn (fake-IP) | DNS cổng 53 của SSID proxy hijack vào sing-box; client nhận fake-IP `198.18.0.0/15`, SOCKS nhận **hostname** (remote resolve). Client dùng DoH/DoT né được hijack → fallback sniff SNI; muốn chặt hơn, chặn cổng 853/resolver DoH trên zone khách. |
 | **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh (Bước 7). |
 | **Rò khi proxy chết** | ✅ Fail-closed | Zone khách `forward=REJECT` → sing-box/tproxy chết thì client **mất mạng** chứ không ra thẳng. Đừng thêm rule forward guest→wan. |
-| **MAC thật** | ✅ Random | MAC `02:xx` tự sinh mỗi SSID. |
+| **MAC thật** | ✅ Random / giả hãng | Mặc định MAC `02:xx` (locally-administered) tự sinh mỗi SSID. Có thể chọn giả 3 byte đầu theo hãng WiFi phổ biến (cột 11 `mac_oui` trong `wifi-socks.conf`, hoặc dropdown "Hãng WiFi" trong Console) — 3 byte sau vẫn random. Đổi hãng rồi `apply.sh` sẽ sinh lại MAC. |
 
 Kiểm tra lại: `ipinfo.io/ip`, `dnsleaktest.com`, `browserleaks.com/webrtc`, **`test-ipv6.com`** (không lộ IPv6 thật).
 

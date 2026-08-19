@@ -49,16 +49,19 @@ BODY=""
 [ "$REQUEST_METHOD" = "POST" ] && BODY="$(cat)"
 
 # Build SSID JSON without exposing wifi_key or sock_pass.
+# Reads the optional 11th column (mac_oui); older 10-column rows leave it empty.
 ssids_json() {
   { grep -v '^[[:space:]]*#' "$CONF" 2>/dev/null | grep '|' | \
-    while IFS='|' read -r name band idx key host port user pass iso web; do
+    while IFS='|' read -r name band idx key host port user pass iso web oui; do
       idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue
       iso="$(echo "$iso" | tr -d ' ')"; web="$(echo "$web" | tr -d ' ')"
+      oui="$(echo "$oui" | tr -d ' \r')"
       jq -n --arg name "$name" --arg band "$band" --argjson idx "$idx" \
             --arg host "$host" --arg port "$(echo "$port"|tr -d ' ')" --arg user "$user" \
+            --arg oui "$oui" \
             --argjson iso "$([ "$iso" = 1 ] && echo true || echo false)" \
             --argjson web "$([ "$web" = 1 ] && echo true || echo false)" \
-        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,hasAuth:($user!=""),isolate:$iso,webrtc:$web}'
+        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui}'
     done; } | jq -s 'sort_by(.idx)'
 }
 
