@@ -122,4 +122,5 @@ CI (GitHub Actions + GitLab CI) chạy test + lint + kiểm tra docs khớp ngu�
 - [docs/GUIDE.md](docs/GUIDE.md) — Hướng dẫn toàn tập (một mạch): từ flash firmware → cấu hình → test → xử lý lỗi.
 - [docs/INSTALL.md](docs/INSTALL.md) — cài chi tiết + giải thích từng bước
 - [docs/TESTING.md](docs/TESTING.md) — cách test từng yêu cầu (IP đúng sock, DNS leak, WebRTC, isolation)
+- [docs/DEBUGGING.md](docs/DEBUGGING.md) — runbook bàn giao/debug 4 commit gần nhất trên máy khác (PC + router)
 - [docs/ROLLBACK.md](docs/ROLLBACK.md) — khi lỗi thì khôi phục thế nào (nhiều mức)

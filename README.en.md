@@ -59,6 +59,7 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 - [Complete guide](docs/GUIDE.en.md)
 - [Installation](docs/INSTALL.en.md)
 - [Testing](docs/TESTING.en.md)
+- [Latest-four-commit debugging handoff (Vietnamese)](docs/DEBUGGING.md)
 - [Rollback](docs/ROLLBACK.en.md)
 - [Administrator guide](docs/admin-guide.en.md)
 - [User guide](docs/user-guide.en.md)
