@@ -17,19 +17,25 @@ Open `http://<router>/sbproxy/`, leave Base URL empty, and paste the generated t
 
 ## API
 
-All requests require `X-SB-Token: <token>`.
+All requests require `Authorization: Bearer <token>`. The legacy
+`X-SB-Token` header is also accepted when the HTTP server forwards custom CGI
+headers.
 
 | Method | Action | Purpose |
 |---|---|---|
 | GET | `status` | SSIDs, health, and runtime state |
 | GET | `get_conf` | Current wifi-socks.conf |
 | POST | `save_conf` | Back up and save desired configuration |
-| POST | `apply` | Run validated apply |
+| POST | `dryrun_conf` | Dry-run a temporary candidate without saving it |
+| POST | `apply` | Enforce a final dry-run, then apply only on success |
 | POST | `set_sock` | Change one upstream |
+| POST | `rotate_mac` | Optionally select a provider OUI, randomize BSSID/MAC, persist it, and reload the radio |
 | GET/POST | `backups`, `backup` | List or create snapshots |
 | GET | `download_backup` | Download a snapshot |
 | POST | `rollback` | Restore a snapshot |
 | GET | `health_now` | Run a health probe immediately |
+| GET | `gateway` | Actual Internet route, interface/device, link, DNS, and direct HTTP latency; flags a route that bypasses `wwan` |
+| GET | `clients` | Online clients and offline blocklist entries with band/RSSI/traffic |
 
 ## Security
 

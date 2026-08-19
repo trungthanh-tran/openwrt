@@ -4,11 +4,9 @@
 
 Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua một SOCKS5 riêng**, MAC ngẫu nhiên, cách ly client, chặn WebRTC — điều khiển bằng **một file config duy nhất** + vài script.
 
-> Đi kèm bản plan tổng thể: [`../plan-mt6000-socks5-multi-wifi.md`](../plan-mt6000-socks5-multi-wifi.md)
-
 ## ⚠️ Trạng thái & cảnh báo
-- **v0.2 — pre-production.** Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
-- Hiện chỉ proxy **IPv4**; IPv6 bị tắt trên các SSID sbproxy để tránh đi thẳng. DNS per-SSID qua đúng SOCKS vẫn là hạng mục cần hoàn tất trước production.
+- **v0.3 — pre-production.** Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
+- Hiện chỉ proxy **IPv4**; IPv6 bị tắt trên các SSID sbproxy để tránh đi thẳng. DNS cổng 53 được hijack vào fake-IP và reverse-map hostname để SOCKS thực hiện remote resolve.
 - Luôn có **backup tự động** trước mỗi thay đổi và **rollback 1 lệnh** — xem [docs/ROLLBACK.md](docs/ROLLBACK.md).
 - Chỉ dùng cho mục đích hợp pháp; đảm bảo tuân thủ điều khoản của nhà cung cấp SOCKS.
 
@@ -36,14 +34,15 @@ scripts/
   install-deps.sh           # apk/opkg install + cài init sbproxy
   apply.sh                  # backup + áp toàn bộ config (hỗ trợ DRYRUN=1)
   set-sock.sh               # đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn
+  gateway.sh                # kiểm tra default route/wwan, link, DNS và HTTP trực tiếp
   backup.sh / rollback.sh   # snapshot & khôi phục
   uninstall.sh              # gỡ mọi thứ project tạo
   lib.sh                    # helpers + generator sing-box/nftables
 etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
-console/                    # Console quản lý (UI dùng chung Web + Desktop)
-  web/control-panel.html    #   UI NGUỒN: soạn SSID→SOCKS, sinh config, Live, quản lý thiết bị
-  desktop/                  #   Bản Desktop: đóng gói UI thành .exe Windows (WebView2)
-    main.py / build.ps1     #     host pywebview + script build 1 lệnh -> dist/sbproxy-console.exe
+console/                    # Hai frontend độc lập dùng chung Agent API
+  web/control-panel.html    #   UI Web self-host trên router
+  desktop/                  #   App Windows Tkinter native, không dùng HTML/WebView
+    main.py / build.ps1     #     code native + build 1 lệnh -> dist/sbproxy-console.exe
 agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check latency realtime
   cgi/sbproxy               #   REST API gọi các script trên router
   sbproxy-healthd           #   daemon probe SOCKS, đo latency
@@ -62,9 +61,9 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 - **Offline (mặc định):** UI soạn `wifi-socks.conf` + preview sing-box/nft → bạn tự `apply.sh`. Chạy ở bất kỳ đâu.
 - **Live LAN (agent kiến trúc B):** cài `agent/install-agent.sh`, mở UI → áp thẳng lên router, xem **latency SOCKS realtime**, quản lý thiết bị (kick/cấm). Xem [agent/README.md](agent/README.md).
 
-### Console: bản Web và bản Desktop (cùng 1 UI nguồn)
+### Console: bản Web và bản Desktop native
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
-- **Bản Desktop (.exe)** — chạy trên máy Windows, dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content**. Build 1 lệnh: `cd console/desktop; .\build.ps1`. Chi tiết: [console/desktop/README.md](console/desktop/README.md).
+- **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI, dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: `cd console/desktop; .\build.ps1`. Chi tiết: [console/desktop/README.md](console/desktop/README.md).
 
 ## Quickstart
 ```sh

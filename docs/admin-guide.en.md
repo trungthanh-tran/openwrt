@@ -46,10 +46,11 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 11. **Operate:** use `scripts/set-sock.sh` for one upstream and `scripts/backup.sh` for a router snapshot; use `pc/update.*` and `pc/backup.*` from the administration computer.
 12. **Roll back:** use `scripts/rollback.sh` on the router or `pc/restore.ps1` / `pc/restore.sh` from the PC. Failsafe and U-Boot remain manual.
 13. **Troubleshoot:** run `sh scripts/diagnose.sh > /tmp/sbproxy-diagnose.txt 2>&1` before restarting services.
-14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "X-SB-Token: $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`. Device management: `scripts/clients.sh` lists clients per SSID; `scripts/{kick,ban,unban}.sh <idx> <mac>` deauth/ban/unban a device.
+    `sh scripts/gateway.sh` reports the actual default route, expected `wwan`, link, DNS, and direct HTTP health.
+14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`. Device management: `scripts/clients.sh` lists online clients and offline blocklist entries; `scripts/{kick,ban,unban}.sh <idx> <mac>` deauth/ban/unban a device.
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
 
-**Console builds:** the same UI ships as the router-hosted **web** build and a Windows **desktop** `.exe` (WebView2, no mixed-content limit). Build the desktop app with `cd console/desktop; .\build.ps1` — see [../console/desktop/README.en.md](../console/desktop/README.en.md).
+**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, and includes advanced client filters. Build it with `cd console/desktop; .\build.ps1` — see [../console/desktop/README.en.md](../console/desktop/README.en.md).
 
 ## Installation and acceptance
 
@@ -80,6 +81,9 @@ Or rotate only the token with `sh scripts/rotate-token.sh`.
 - Keep off-device snapshots with the PC scripts.
 - Follow [ROLLBACK.en.md](ROLLBACK.en.md) when apply or firmware changes fail.
 - Run `sh scripts/verify.sh` for router-side acceptance, `sh scripts/doctor.sh` for a full status report, and `sh scripts/diagnose.sh` to collect troubleshooting evidence.
+- Run `sh scripts/gateway.sh` or call Agent action `gateway` to inspect the
+  actual default route, compare it with expected interface `wwan`, and verify
+  link, DNS, and direct HTTP latency.
 
 ## Privacy checklist
 

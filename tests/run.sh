@@ -127,7 +127,9 @@ match   "ipaddr from idx"               "$out" 'set network.w1.ipaddr=192.168.11
 match   "ssid quoted"                   "$out" 'set wireless.w1.ssid="A"'
 match   "isolate value"                 "$out" 'set wireless.w1.isolate=1'
 match   "admin-port block rule"         "$out" 'set firewall.z1adm.name=block-admin-w1'
-match   "admin-port dest_port add_list" "$out" 'add_list firewall.z1adm.dest_port=22'
+match   "admin block limited to router" "$out" 'set firewall.z1adm.dest_ip=192.168.11.1'
+match   "admin ports overwrite old list" "$out" 'set firewall.z1adm.dest_port="22 80 443"'
+nomatch "admin ports do not accumulate" "$out" 'add_list firewall.z1adm.dest_port='
 out="$(emit1 /dev/null '')"
 match   "locally-admin MAC when no vendor & none stored" "$out" 'set wireless.w1.macaddr=02:'
 printf 'wireless.w1.macaddr=50:c7:bf:12:34:56\n' > "$STUB/us"
@@ -141,6 +143,86 @@ printf 'wireless.w1.macaddr=aa:bb:cc:dd:ee:ff\n' > "$STUB/us"
 out="$(emit1 "$STUB/us" '')"
 match   "keep stored MAC when no vendor" "$out" 'set wireless.w1.macaddr=aa:bb:cc:dd:ee:ff'
 
+echo "== validate_admin_rule_scope (CLI + Agent apply guard) =="
+mkc 'NewAgentWifi|2g|7|password12|1.2.3.4|1080|||1|1|'
+admin_batch="$(UCI_STATE=/dev/null emit_uci_one NewAgentWifi 2g 7 password12 1.2.3.4 1080 "" "" 1 1 "")"
+printf '%s\n' "$admin_batch" > "$STUB/admin-good.batch"
+if ( CONF="$STUB/c.conf" validate_admin_rule_scope "$STUB/admin-good.batch" ) >/dev/null 2>&1; then
+  ok "new Agent WiFi admin rule is gateway-scoped"
+else
+  no "new Agent WiFi admin rule is gateway-scoped"
+fi
+grep -v 'firewall.z7adm.dest_ip=' "$STUB/admin-good.batch" > "$STUB/admin-no-ip.batch"
+L="guard rejects unscoped admin rule"; CONF="$STUB/c.conf" dies validate_admin_rule_scope "$STUB/admin-no-ip.batch"
+cp "$STUB/admin-good.batch" "$STUB/admin-add-list.batch"
+printf '%s\n' 'add_list firewall.z7adm.dest_port=443' >> "$STUB/admin-add-list.batch"
+L="guard rejects accumulating admin ports"; CONF="$STUB/c.conf" dies validate_admin_rule_scope "$STUB/admin-add-list.batch"
+agent_cgi="$(cat "$ROOT/agent/cgi/sbproxy")"
+match "Agent apply uses shared guarded apply.sh" "$agent_cgi" 'sh scripts/apply\.sh --no-backup'
+match "Agent exposes candidate config dry-run" "$agent_cgi" 'dryrun_conf\)'
+match "Agent apply enforces quiet dry-run" "$agent_cgi" 'DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply\.sh'
+match "Agent accepts Bearer authorization" "$agent_cgi" 'HTTP_AUTHORIZATION#Bearer'
+match "Agent CORS allows Authorization" "$agent_cgi" 'Access-Control-Allow-Headers: Authorization'
+match "Agent exposes runtime BSSID" "$agent_cgi" 'macaddr:\$mac'
+match "Agent exposes rotate_mac action" "$agent_cgi" 'rotate_mac\)'
+match "Agent exposes gateway status" "$agent_cgi" 'gateway\)'
+desktop_py="$(cat "$ROOT/console/desktop/main.py")"
+match "native app sends Bearer authorization" "$desktop_py" '"Authorization": f"Bearer \{self\.token\}"'
+match "native app filters clients" "$desktop_py" 'def filter_clients\('
+match "native app can rotate BSSID" "$desktop_py" 'def rotate_wifi_mac\('
+match "native app offers router providers" "$desktop_py" 'MAC_VENDORS = \('
+match "native app has Random MAC dialog" "$desktop_py" 'class RandomMacDialog\('
+match "native app has modal loading screen" "$desktop_py" 'class LoadingWindow\('
+match "native app dry-runs candidate config" "$desktop_py" 'client\.dryrun_conf\(content\)'
+match "native app uses bounded apply timeout" "$desktop_py" '"apply", "POST", \{\}, timeout=120'
+match "native app has advanced client filters" "$desktop_py" 'TRAFFIC_FILTERS = \('
+match "native app supports client sorting" "$desktop_py" 'def client_sort_key\('
+match "native app supports bulk client actions" "$desktop_py" 'selectmode="extended"'
+match "native app supports auto refresh" "$desktop_py" 'def schedule_client_refresh\('
+match "native app exports filtered CSV" "$desktop_py" 'def export_clients_csv\('
+match "native app supports manual blocklist entry" "$desktop_py" 'class ManualBanDialog\('
+match "native app keeps selected Wi-Fi actions in edit panel" "$desktop_py" 'CHỈNH SỬA SSID ĐANG CHỌN'
+match "native app keeps selected client actions in edit panel" "$desktop_py" 'ĐIỀU KHIỂN THIẾT BỊ ĐANG CHỌN'
+match "native app disables item actions without selection" "$desktop_py" 'def update_client_editor\('
+match "native app warns before important actions" "$desktop_py" 'def confirm_important\('
+match "important action warning defaults to No" "$desktop_py" 'default=messagebox\.NO'
+match "quick SOCKS change requires warning" "$desktop_py" 'Đổi endpoint SOCKS5 đang dùng cho SSID'
+match "native app checks Internet gateway" "$desktop_py" 'def refresh_gateway\('
+match "native app highlights non-wwan route" "$desktop_py" 'KHÔNG QUA'
+gateway_script="$(cat "$ROOT/scripts/gateway.sh")"
+match "gateway check resolves actual route" "$gateway_script" 'ip -4 route get'
+match "gateway check binds HTTP probe to route device" "$gateway_script" 'curl -4.*--interface'
+match "gateway check verifies DNS" "$gateway_script" 'nslookup "\$DNS_NAME"'
+apply_script="$(cat "$ROOT/scripts/apply.sh")"
+match "quiet dry-run hides generated secrets" "$apply_script" 'DRYRUN_QUIET'
+rotate_mac="$(cat "$ROOT/scripts/rotate-mac.sh")"
+match "rotate MAC validates managed idx" "$rotate_mac" 'band_of_idx "\$IDX"'
+match "rotate MAC preserves configured OUI" "$rotate_mac" 'gen_mac "\$OUI"'
+match "rotate MAC persists in UCI" "$rotate_mac" 'uci set "wireless\.w\$IDX\.macaddr=\$NEW"'
+match "rotate MAC reloads selected radio" "$rotate_mac" 'wifi reload "\$RADIO"'
+match "rotate MAC accepts provider OUI" "$rotate_mac" 'REQUESTED_OUI='
+match "rotate MAC persists provider in config" "$rotate_mac" '\$11=oui'
+
+cat > "$STUB/id" <<'SH'
+#!/bin/sh
+[ "${1:-}" = "-u" ] && echo 0 || echo 0
+SH
+cat > "$STUB/wifi" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat > "$STUB/backup" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$STUB/id" "$STUB/wifi" "$STUB/backup"
+printf '%s\n' 'A|2g|1|password12|1.2.3.4|1080|||1|1|50:C7:BF' > "$STUB/rotate.conf"
+printf '%s\n' 'wireless.w1.ssid=A' 'wireless.w1.macaddr=50:c7:bf:11:22:33' > "$STUB/rotate-uci"
+rotate_out="$(CONF="$STUB/rotate.conf" BACKUP_SCRIPT="$STUB/backup" UCI_STATE="$STUB/rotate-uci" \
+  sh "$ROOT/scripts/rotate-mac.sh" 1 AC:9E:17 2>&1)"
+eq "rotate MAC writes selected provider" "$(awk -F'|' 'NR==1{print $11}' "$STUB/rotate.conf")" "AC:9E:17"
+match "rotate MAC reports selected provider" "$rotate_out" 'OUI=AC:9E:17'
+
 echo "== build_nft =="
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|
 B|5g|2|password12|dns.example.com|1080|||1|0|'
@@ -150,6 +232,8 @@ match   "DNS hijack udp dport 53"     "$nft" 'iifname "br-w1" udp dport 53 tprox
 match   "DNS hijack tcp dport 53"     "$nft" 'iifname "br-w1" tcp dport 53 tproxy ip to :12001'
 match   "tcp tproxy rule"             "$nft" 'iifname "br-w1" meta l4proto tcp tproxy ip to :12001'
 match   "second SSID tproxy port"     "$nft" 'iifname "br-w2" meta l4proto udp tproxy ip to :12002'
+match   "block QUIC on first SSID"    "$nft" 'iifname "br-w1" udp dport 443 drop'
+match   "block QUIC on second SSID"   "$nft" 'iifname "br-w2" udp dport 443 drop'
 match   "bypass literal sock IP"      "$nft" 'ip daddr 1.2.3.4 return'
 nomatch "no hostname bypass"          "$nft" 'ip daddr dns.example.com'
 match   "RFC1918 return"              "$nft" 'ip daddr \{ 127.0.0.0/8'
@@ -169,6 +253,7 @@ B|5g|2|password12|5.6.7.8|1080|||1|0|'
   match   "cache_file store_fakeip"      "$cfg" 'store_fakeip'
   match   "hijack-dns route rule"        "$cfg" 'hijack-dns'
   eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "2"
+  eq      "socks outbound network" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network')" "tcp"
   eq      "auth on user row"      "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.username')" "user1"
   eq      "no auth on empty row"  "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w2")|.username // "none"')" "none"
 else
@@ -180,25 +265,28 @@ if command -v jq >/dev/null 2>&1; then
   printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"phy0-ap0"}]}}\n' > "$STUB/wifi.json"
   mkdir -p "$STUB/iwd"
   printf 'Station aa:bb:cc:dd:ee:ff (on phy0-ap0)\n\trx bytes:\t1048576\n\ttx bytes:\t2097152\n\tsignal:  \t-52 dBm\n\tconnected time:\t3600 seconds\n' > "$STUB/iwd/phy0-ap0.txt"
-  printf '111 aa:bb:cc:dd:ee:ff 192.168.11.100 my-phone *\n' > "$STUB/leases"
-  printf '1|aa:bb:cc:dd:ee:ff\n' > "$STUB/bans2"
-  printf 'wireless.w1.ssid=Alpha\n' > "$STUB/uci_ssid"
+  printf '111 aa:bb:cc:dd:ee:ff 192.168.11.100 my-phone *\n222 11:22:33:44:55:66 192.168.12.101 old-tablet *\n' > "$STUB/leases"
+  printf '1|aa:bb:cc:dd:ee:ff\n2|11:22:33:44:55:66\n' > "$STUB/bans2"
+  printf 'wireless.w1.ssid=Alpha\nwireless.w2.ssid=Bravo\n' > "$STUB/uci_ssid"
   # settings.sh reassigns BANS_FILE, so override it via a custom SETTINGS that
   # sources the real one first (clients.sh re-sources settings in a subprocess).
   printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans2"\n' "$ROOT" "$STUB" > "$STUB/settings.sh"
   out="$(UBUS_WIFI_JSON="$STUB/wifi.json" IW_DUMP_DIR="$STUB/iwd" LEASES="$STUB/leases" \
          SETTINGS="$STUB/settings.sh" UCI_STATE="$STUB/uci_ssid" sh "$ROOT/scripts/clients.sh" 2>/dev/null)"
   eq "ok true"        "$(printf '%s' "$out" | jq -r '.ok')" "true"
-  eq "one client"     "$(printf '%s' "$out" | jq -r '.clients|length')" "1"
-  eq "mac"            "$(printf '%s' "$out" | jq -r '.clients[0].mac')" "aa:bb:cc:dd:ee:ff"
-  eq "ip from lease"  "$(printf '%s' "$out" | jq -r '.clients[0].ip')" "192.168.11.100"
-  eq "host from lease" "$(printf '%s' "$out" | jq -r '.clients[0].host')" "my-phone"
-  eq "connected_s"    "$(printf '%s' "$out" | jq -r '.clients[0].connected_s')" "3600"
-  eq "rx_bytes"       "$(printf '%s' "$out" | jq -r '.clients[0].rx_bytes')" "1048576"
-  eq "tx_bytes"       "$(printf '%s' "$out" | jq -r '.clients[0].tx_bytes')" "2097152"
-  eq "signal_dbm"     "$(printf '%s' "$out" | jq -r '.clients[0].signal_dbm')" "-52"
-  eq "banned true"    "$(printf '%s' "$out" | jq -r '.clients[0].banned')" "true"
-  eq "ssid"           "$(printf '%s' "$out" | jq -r '.clients[0].ssid')" "Alpha"
+  eq "online + blocked offline" "$(printf '%s' "$out" | jq -r '.clients|length')" "2"
+  eq "mac"            "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.mac')" "aa:bb:cc:dd:ee:ff"
+  eq "ip from lease"  "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.ip')" "192.168.11.100"
+  eq "host from lease" "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.host')" "my-phone"
+  eq "connected_s"    "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.connected_s')" "3600"
+  eq "rx_bytes"       "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.rx_bytes')" "1048576"
+  eq "tx_bytes"       "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.tx_bytes')" "2097152"
+  eq "signal_dbm"     "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.signal_dbm')" "-52"
+  eq "banned true"    "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.banned')" "true"
+  eq "ssid"           "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.ssid')" "Alpha"
+  eq "band"           "$(printf '%s' "$out" | jq -r '.clients[]|select(.online)|.band')" "2g"
+  eq "offline blocklist included" "$(printf '%s' "$out" | jq -r '.clients[]|select(.online|not)|.mac')" "11:22:33:44:55:66"
+  eq "offline banned true" "$(printf '%s' "$out" | jq -r '.clients[]|select(.online|not)|.banned')" "true"
 else
   sk "clients.sh integration" "no jq"
 fi

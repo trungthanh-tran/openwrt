@@ -1,8 +1,14 @@
 # ==== Bí mật — KHÔNG commit (tránh lộ) ====
-config/wifi-socks.conf          # bản thật chứa user/pass SOCKS + wifi key
-**/token                        # token agent
-*.secret                        # bí mật cục bộ khác
-sbproxy-backups/                # backup chứa cấu hình nhạy cảm
+# Bản thật chứa user/pass SOCKS + Wi-Fi key.
+config/wifi-socks.conf
+# Token agent ở mọi thư mục.
+**/token
+# Bí mật cục bộ khác.
+*.secret
+# Backup chứa cấu hình nhạy cảm.
+sbproxy-backups/
+# Log/gói chẩn đoán có thể chứa IP/MAC/runtime data.
+sbproxy-debug.log*
 
 # ==== Node ====
 node_modules/

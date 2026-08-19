@@ -473,7 +473,7 @@
   };
   const apiUrl = a => (agent.base || "") + "/cgi-bin/sbproxy?action=" + a;
   function api(action, method, body, isText) {
-    const headers = { "X-SB-Token": agent.token };
+    const headers = { "Authorization": `Bearer ${agent.token}` };
     if (body != null) headers["Content-Type"] = isText ? "text/plain" : "application/json";
     return fetch(apiUrl(action), {
       method: method || "GET", headers,
@@ -557,21 +557,11 @@
     setConnStatus("Đã ngắt kết nối.");
   }
 
-  // Desktop (.exe) build vs router-hosted web build. main.py sets
-  // window.SBPROXY_DESKTOP after load; pywebview also injects window.pywebview.
-  function isDesktop() {
-    return !!window.SBPROXY_DESKTOP || typeof window.pywebview !== "undefined";
-  }
   function updateConnHint() {
     const el = document.getElementById("mixedNote");
     if (!el) return;
-    el.innerHTML = isDesktop()
-      ? "Bản Desktop: nhập <b>http://&lt;IP-router&gt;</b> (ví dụ http://192.168.8.1) rồi dán token. Không bị chặn mixed-content."
-      : "Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).";
-    const b = document.querySelector(".brand p");
-    if (b && isDesktop() && !/Desktop/.test(b.textContent)) b.textContent += " · Desktop";
+    el.innerHTML = "Mixed-content: nếu mở UI qua https, trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b>. Ứng dụng Windows native là chương trình riêng, không dùng trang này.";
   }
-  window.sbproxyApplyDesktop = updateConnHint;   // called by desktop host after load
 
   function showLog(title, d) {
     document.getElementById("logTitle").textContent = title + (d && d.ok ? " ✓" : " ✗");
@@ -644,7 +634,7 @@
   }
   function downloadBackup(name) {
     toast("Đang tải backup về máy…");
-    fetch(apiUrl("download_backup") + "&name=" + encodeURIComponent(name), { headers: { "X-SB-Token": agent.token } })
+    fetch(apiUrl("download_backup") + "&name=" + encodeURIComponent(name), { headers: { "Authorization": `Bearer ${agent.token}` } })
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
       .then(b => {
         const a = document.createElement("a");
@@ -1094,7 +1084,6 @@
   render();
   initAgent();
   updateConnHint();
-  window.addEventListener("pywebviewready", updateConnHint);
 })();
 </script>
 </body>

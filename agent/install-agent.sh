@@ -30,6 +30,9 @@ BACKUP_DIR=/root/sbproxy-backups
 PROBE_URL=https://www.gstatic.com/generate_204
 INTERVAL=15
 SLOW_MS=800
+GATEWAY_EXPECTED_INTERFACE=wwan
+GATEWAY_PROBE_URL=https://www.gstatic.com/generate_204
+GATEWAY_PROBE_TIMEOUT=8
 EOF
 
 log "3) Token xác thực -> /etc/sbproxy/token"
@@ -80,6 +83,6 @@ cat <<EOF
  BẢO MẬT:
   - Chỉ mở trên LAN/VLAN quản trị. KHÔNG expose ra WAN.
   - Giữ token bí mật. Đổi token: xoá /etc/sbproxy/token rồi chạy lại.
-  - Kiểm tra: curl -H "X-SB-Token: \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
+  - Kiểm tra: curl -H "Authorization: Bearer \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
 ============================================================
 EOF

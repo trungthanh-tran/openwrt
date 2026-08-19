@@ -57,9 +57,10 @@ cd console\desktop
   `iw` và `/tmp/dhcp.leases`.
 - Health report chỉ đọc: `scripts/doctor.sh`.
 - Evidence thô chỉ đọc: `scripts/diagnose.sh`.
-- UI nguồn duy nhất: `console/web/control-panel.html`.
-- Desktop wrapper: `console/desktop/main.py`; không sửa đường dẫn cũ `ui/` hay
-  `desktop/` vì chúng không còn tồn tại.
+- UI Web: `console/web/control-panel.html`.
+- Desktop native: `console/desktop/main.py` (Tkinter, không dùng WebView); hai
+  frontend dùng chung Agent API nhưng không dùng chung mã giao diện. Không sửa
+  đường dẫn cũ `ui/` hay `desktop/` vì chúng không còn tồn tại.
 - Bản web được cài lên router tại `/www/sbproxy/index.html`; đổi layout trong
   repo không đổi URL `/sbproxy/` và không đổi đường dẫn sysupgrade.
 

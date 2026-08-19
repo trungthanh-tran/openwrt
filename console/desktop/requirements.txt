@@ -1,6 +1,3 @@
-# Build-time dependencies for the desktop console. End users need only the exe
-# plus the Microsoft Edge WebView2 runtime (preinstalled on Windows 10/11).
-pywebview>=5.0
+# Build-time dependency only. Tkinter, urllib and Windows DPAPI bindings come
+# from Python's standard library; end users need only the generated EXE.
 pyinstaller>=6.0
-# pywebview's EdgeChromium (WebView2) backend on Windows needs pythonnet.
-pythonnet>=3.0 ; sys_platform == "win32"

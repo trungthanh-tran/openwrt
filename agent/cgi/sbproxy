@@ -1,17 +1,21 @@
 #!/bin/sh
 # sbproxy CGI — uhttpd REST agent installed at /www/cgi-bin/sbproxy.
 # Endpoint:  http://<router>/cgi-bin/sbproxy?action=<...>
-# Authentication header: X-SB-Token: <token>, matching /etc/sbproxy/token.
+# Authentication: Authorization: Bearer <token>, matching /etc/sbproxy/token.
+# X-SB-Token remains supported on HTTP servers that forward custom CGI headers.
 #
 # GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}}
 # GET  ?action=get_conf      -> wifi-socks.conf as text/plain
 # GET  ?action=backups       -> {backups:[...]}
 # POST ?action=save_conf     body=text  -> ghi wifi-socks.conf (validate)
-# POST ?action=apply         -> run apply.sh and return its log
+# POST ?action=dryrun_conf   body=text  -> validate candidate config without writing it
+# POST ?action=apply         -> mandatory quiet dry-run, then run apply.sh
 # POST ?action=set_sock      body=json {idx,host,port,user,pass} -> change SOCKS without Wi-Fi reload
+# POST ?action=rotate_mac    body=json {idx,oui?} -> rotate BSSID/MAC, optionally changing provider OUI
 # POST ?action=rollback      body=json {name?} -> rollback
 # POST ?action=uninstall     -> remove project-managed configuration
 # GET  ?action=health_now    -> run an immediate health probe
+# GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status
 # GET  ?action=clients       -> {clients:[...]} devices per SSID (mac/ip/time/in-out/banned)
 # POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
 # POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
@@ -29,7 +33,7 @@ hdr() {
   printf 'Status: %s\r\n' "$1"
   printf 'Content-Type: %s\r\n' "$2"
   printf 'Access-Control-Allow-Origin: *\r\n'
-  printf 'Access-Control-Allow-Headers: X-SB-Token, Content-Type\r\n'
+  printf 'Access-Control-Allow-Headers: Authorization, X-SB-Token, Content-Type\r\n'
   printf 'Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
   printf 'Cache-Control: no-store\r\n\r\n'
 }
@@ -45,7 +49,11 @@ have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu package
 # ---- auth ----
 TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null)"
 [ -n "$TOKEN" ] || json_err "500 Internal Server Error" "chưa có token (chạy install-agent.sh)"
-[ "$HTTP_X_SB_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu header X-SB-Token"
+REQUEST_TOKEN="${HTTP_X_SB_TOKEN:-}"
+case "${HTTP_AUTHORIZATION:-}" in
+  Bearer\ *) [ -n "$REQUEST_TOKEN" ] || REQUEST_TOKEN="${HTTP_AUTHORIZATION#Bearer }" ;;
+esac
+[ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
 
 # ---- parse action ----
 ACTION="$(echo "$QUERY_STRING" | sed -n 's/.*\(^\|&\)action=\([a-z_]*\).*/\2/p')"
@@ -60,12 +68,13 @@ ssids_json() {
       idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue
       iso="$(echo "$iso" | tr -d ' ')"; web="$(echo "$web" | tr -d ' ')"
       oui="$(echo "$oui" | tr -d ' \r')"
+      mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
       jq -n --arg name "$name" --arg band "$band" --argjson idx "$idx" \
             --arg host "$host" --arg port "$(echo "$port"|tr -d ' ')" --arg user "$user" \
-            --arg oui "$oui" \
+            --arg oui "$oui" --arg mac "$mac" \
             --argjson iso "$([ "$iso" = 1 ] && echo true || echo false)" \
             --argjson web "$([ "$web" = 1 ] && echo true || echo false)" \
-        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui}'
+        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui,macaddr:$mac}'
     done; } | jq -s 'sort_by(.idx)'
 }
 
@@ -96,10 +105,27 @@ case "$ACTION" in
     json_ok "$(jq -n '{ok:true, saved:true}')"
     ;;
 
+  dryrun_conf)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    [ -n "$BODY" ] || json_err "400 Bad Request" "body rỗng"
+    TMP_CONF="/tmp/sbproxy-dryrun-conf.$$"
+    printf '%s\n' "$BODY" > "$TMP_CONF" \
+      || json_err "500 Internal Server Error" "không tạo được config dry-run"
+    OUT="$(cd "$SB_ROOT" && CONF="$TMP_CONF" DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply.sh --no-backup 2>&1)"; RC=$?
+    rm -f "$TMP_CONF"
+    json_ok "$(jq -n --arg log "$OUT" --arg phase "dryrun" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, phase:$phase, log:$log}')"
+    ;;
+
   apply)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    # Every caller, including the web UI, must pass the same complete dry-run
+    # immediately before router state can change.
+    CHECK="$(cd "$SB_ROOT" && DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply.sh --no-backup 2>&1)"; CHECK_RC=$?
+    [ "$CHECK_RC" -eq 0 ] || json_ok "$(jq -n --arg log "$CHECK" --arg phase "dryrun" --argjson rc "$CHECK_RC" '{ok:false, rc:$rc, phase:$phase, log:$log}')"
+    # Authoritative shared apply path. Its generated-UCI guard scopes every
+    # block-admin rule to the SSID gateway before changing router state.
     OUT="$(cd "$SB_ROOT" && sh scripts/apply.sh --no-backup 2>&1)"; RC=$?
-    json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
+    json_ok "$(jq -n --arg log "$OUT" --arg phase "apply" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, phase:$phase, log:$log}')"
     ;;
 
   set_sock)
@@ -112,6 +138,23 @@ case "$ACTION" in
     [ -n "$idx" ] && [ -n "$host" ] && [ -n "$port" ] || json_err "400 Bad Request" "thiếu idx/host/port"
     OUT="$(cd "$SB_ROOT" && sh scripts/set-sock.sh "$idx" "$host" "$port" "$user" "$pass" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
+    ;;
+
+  rotate_mac)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    idx="$(echo "$BODY" | jq -r '.idx // empty')"
+    case "$idx" in *[!0-9]*|'') json_err "400 Bad Request" "idx không hợp lệ" ;; esac
+    has_oui="$(echo "$BODY" | jq -r 'has("oui")')"
+    oui="$(echo "$BODY" | jq -r '.oui // ""')"
+    [ -z "$oui" ] || echo "$oui" | grep -Eq '^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){2}$' \
+      || json_err "400 Bad Request" "oui phải dạng AA:BB:CC hoặc để trống"
+    if [ "$has_oui" = "true" ]; then
+      OUT="$(cd "$SB_ROOT" && sh scripts/rotate-mac.sh "$idx" "$oui" 2>&1)"; RC=$?
+    else
+      OUT="$(cd "$SB_ROOT" && sh scripts/rotate-mac.sh "$idx" 2>&1)"; RC=$?
+    fi
+    mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
+    json_ok "$(jq -n --arg log "$OUT" --arg mac "$mac" --arg oui "$oui" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log, mac:$mac, oui:$oui}')"
     ;;
 
   rollback)
@@ -160,6 +203,13 @@ case "$ACTION" in
     [ -x /usr/sbin/sbproxy-healthd ] && /usr/sbin/sbproxy-healthd --once >/dev/null 2>&1
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
     json_ok "$(jq -n --argjson health "$H" '{ok:true, health:$health}')"
+    ;;
+
+  gateway)
+    OUT="$(cd "$SB_ROOT" && sh scripts/gateway.sh 2>&1)"; RC=$?
+    [ "$RC" -eq 0 ] || json_err "500 Internal Server Error" "kiểm tra gateway thất bại"
+    printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 || json_err "500 Internal Server Error" "gateway trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
     ;;
 
   clients)

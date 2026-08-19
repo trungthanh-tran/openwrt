@@ -28,7 +28,8 @@ if [ -n "$rest" ]; then
   uci set "wireless.w$IDX.macfilter=deny"
   for m in $rest; do uci add_list "wireless.w$IDX.maclist=$m"; done
 else
-  uci set "wireless.w$IDX.macfilter=disable"
+  uci -q delete "wireless.w$IDX.macfilter" || true
+  uci -q delete "wireless.w$IDX.maclist" || true
 fi
 uci commit wireless
 

@@ -6,10 +6,10 @@ Create multiple isolated SSIDs on a GL-MT6000 and route each SSID's IPv4 TCP/UDP
 
 ## Status and limitations
 
-- v0.2 is pre-production and requires testing on real hardware.
+- v0.3 is pre-production and requires testing on real hardware.
 - OpenWrt 24.10 (`opkg`) and 25.12 (`apk`) are supported; GL.iNet OEM firmware is experimental.
 - Only IPv4 is proxied. IPv6 services are disabled on managed SSIDs to prevent bypass.
-- Per-SSID DNS through the matching SOCKS endpoint is not complete; DNS leakage is a known limitation.
+- Port-53 DNS on managed SSIDs is hijacked into sing-box fake-IP; reverse mapping sends hostnames to the matching SOCKS upstream for remote resolution.
 - Changing SOCKS keeps Wi-Fi associated, but active sessions may be interrupted when sing-box restarts.
 
 ## Architecture
@@ -46,11 +46,12 @@ sh scripts/rollback.sh
 - Offline mode edits and previews configuration without contacting a router.
 - Live LAN mode uses [the local agent](agent/README.en.md) at `http://<router>/sbproxy/`.
 
-The console ships in two flavors sharing one source (`console/web/control-panel.html`):
-the **web build** (router-hosted, same-origin) and the **desktop build** (a
-Windows `.exe` via WebView2 that reaches `http://<router-ip>` over the LAN with
-no mixed-content limit). Build the desktop app with `cd console/desktop; .\build.ps1`
-— see [console/desktop/README.en.md](console/desktop/README.en.md).
+The console has two independent frontends over the same Agent API: the
+router-hosted **web build** and a native Tkinter **Windows desktop** app. The
+desktop app uses no HTML/WebView/WebView2, protects its token with Windows
+DPAPI, dry-runs before Apply, warns before important mutations, and includes
+advanced client management. Build it with `cd console/desktop; .\build.ps1` —
+see [console/desktop/README.en.md](console/desktop/README.en.md).
 
 There is no cloud control. Use a trusted management LAN or self-managed VPN. Never expose LuCI, uhttpd, SSH, or the agent directly to the WAN.
 

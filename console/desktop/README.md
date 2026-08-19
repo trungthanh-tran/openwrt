@@ -1,53 +1,68 @@
-# sbproxy Console — bản Desktop (.exe cho Windows)
+# sbproxy Console Native cho Windows
 
-**Ngôn ngữ:** Tiếng Việt | [English](README.en.md)
+Ứng dụng desktop Tkinter chạy độc lập và gọi trực tiếp Agent API trên router.
+Ứng dụng **không dùng HTML, WebView hay WebView2**; console web tại
+`console/web/control-panel.html` là một ứng dụng riêng.
 
-Cùng một giao diện với [bản Web](../web/control-panel.html), nhưng đóng gói thành
-ứng dụng Windows (`.exe`) dùng WebView2. Khác biệt chính:
+## Chức năng
 
-| | Bản Web (router-hosted) | Bản Desktop (.exe) |
-|---|---|---|
-| Chạy ở đâu | `http://<router>/sbproxy/` (cài qua `agent/install-agent.sh`) | máy Windows của quản trị viên |
-| Gọi agent router | same-origin (không cần nhập URL) | nhập `http://<IP-router>` trong "Kết nối router" |
-| Mixed-content | Bị chặn nếu mở qua **https** → phải mở qua http từ router | **Không bị chặn** — gọi thẳng router http qua LAN |
-| Cập nhật | copy lại file HTML | build lại exe |
-
-> Cả hai bản dùng **chung một file nguồn** `console/web/control-panel.html`. Sửa UI ở đó,
-> bản Web copy trực tiếp, bản Desktop build lại (`build.ps1` tự copy file này).
-
-## Yêu cầu
-- **Để build:** Python 3.9+ trên PATH (`python --version`).
-- **Để chạy exe:** Windows 10/11 với **Microsoft Edge WebView2 Runtime**
-  (đã cài sẵn trên hầu hết Win10/11; nếu thiếu, tải "Evergreen Standalone
-  Installer" từ trang WebView2 của Microsoft).
+- Quản lý danh sách Wi-Fi/SSID và SOCKS5, lưu cấu hình rồi apply.
+- Thêm/xóa SSID; mọi lần Apply đều dry-run cấu hình tạm trước khi ghi và được
+  Agent dry-run lần cuối trước khi thay đổi router.
+- Hiển thị màn hình loading theo từng bước; timeout: dry-run 60 giây, lưu/backup
+  45 giây và apply 120 giây.
+- Đổi nhanh SOCKS5 cho từng SSID.
+- Xem client, kick, ban và unban.
+- Lọc thiết bị theo SSID, IP/tên/MAC, trạng thái cấm và mức tín hiệu.
+- Bộ lọc nâng cao theo band, online/offline, quyền truy cập, ngưỡng RSSI,
+  lưu lượng và thời gian kết nối; bấm tiêu đề cột để sắp xếp.
+- Dashboard số thiết bị online/yếu/đã chặn/tổng lưu lượng, auto-refresh 5–60s,
+  xem chi tiết, chọn nhiều thiết bị, copy IP/MAC và xuất CSV UTF-8.
+- Khung Internet Gateway hiển thị route thực tế, `wwan`/device, next-hop, IP
+  nguồn, link, DNS và HTTP latency; cảnh báo nếu đường ra không qua `wwan`.
+- Hiển thị cả thiết bị trong blocklist khi đang offline để có thể bỏ cấm.
+- Các thao tác cần chọn mục chỉ nằm trong khung chỉnh sửa sát bảng; toolbar chỉ
+  chứa thao tác toàn cục.
+- Tác vụ quan trọng luôn hiện cảnh báo ảnh hưởng và mặc định chọn **Không**;
+  chỉ thực thi sau khi người dùng xác nhận rõ ràng.
+- Chọn hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, v.v.) rồi bấm
+  **Random MAC** cho từng SSID; provider và BSSID mới được lưu lại.
+- Xem backup, rollback, health và log thao tác.
+- Lưu URL router và token bằng Windows DPAPI cho đúng tài khoản Windows hiện tại.
 
 ## Build
+
+Yêu cầu Python 3.9+ có Tkinter:
+
 ```powershell
-# từ thư mục dự án
-cd desktop
+cd console\desktop
 .\build.ps1
-# -> desktop\dist\sbproxy-console.exe  (một file duy nhất)
+# -> dist\sbproxy-console.exe
 ```
-`build.ps1` sẽ: copy `..\ui\control-panel.html` vào đây, cài
-`pywebview`+`pyinstaller`, rồi đóng gói `--onefile --windowed`.
 
-## Chạy thử khi phát triển (không cần build)
+Máy chạy file EXE không cần cài Python hay WebView2.
+
+## Chạy khi phát triển
+
 ```powershell
-cd desktop
-python -m pip install -r requirements.txt
-python main.py        # nạp thẳng ..\ui\control-panel.html
+cd console\desktop
+.\run.ps1
 ```
 
-## Dùng
-1. Mở `sbproxy-console.exe`.
-2. Bấm **🔌 Kết nối router** → nhập `http://<IP-router>` (ví dụ
-   `http://192.168.8.1`) và **token** (in ra bởi `agent/install-agent.sh`).
-3. Từ đây thao tác giống hệt bản Web: thêm/bớt WiFi, đẩy & áp, xem thiết bị,
-   kick/cấm, backup/rollback…
+## Nạp sẵn kết nối
 
-Token và URL được lưu ở `%USERPROFILE%\.sbproxy-console` nên lần sau tự nhớ.
+Có thể nạp URL và token mà không ghi token rõ vào file:
 
-## Bảo mật
-- Chỉ kết nối tới router trong **LAN/VLAN quản trị**. Không expose agent ra WAN.
-- Giữ token bí mật; đổi token bằng cách xoá `/etc/sbproxy/token` trên router rồi
-  chạy lại `install-agent.sh`.
+```powershell
+$env:SBPROXY_BASE = "http://192.168.8.1"
+$env:SBPROXY_TOKEN = "<token>"
+.\dist\sbproxy-console.exe --provision
+.\dist\sbproxy-console.exe --probe
+```
+
+Thông tin được lưu ở
+`%LOCALAPPDATA%\sbproxy-console-native\connection.json`; token được mã hóa bằng
+DPAPI và chỉ tài khoản Windows hiện tại giải mã được. Agent dùng
+`Authorization: Bearer <token>` vì uhttpd có thể loại bỏ header CGI tùy biến.
+
+Chỉ dùng Agent trong LAN/VLAN quản trị; không mở API ra WAN.

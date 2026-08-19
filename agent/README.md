@@ -6,7 +6,7 @@ Biến UI từ "trình sinh config" thành **bảng điều khiển trực tiế
 
 ```
 Trình duyệt (UI mở TỪ router, http)
-        │  fetch /cgi-bin/sbproxy?action=...   (header X-SB-Token)
+        │  fetch /cgi-bin/sbproxy?action=...   (Authorization: Bearer)
         ▼
 uhttpd ── CGI /www/cgi-bin/sbproxy ──> gọi scripts/*.sh + đọc health JSON
         ▲
@@ -40,23 +40,28 @@ Script sẽ: cài `curl jq`, tạo `/etc/sbproxy/env` + `/etc/sbproxy/token`, đ
    - Nút **⚡** mỗi hàng: đổi SOCKS mà không reload WiFi; phiên đang mở có thể gián đoạn khi sing-box restart.
 
 ## API (tham chiếu)
-Header bắt buộc: `X-SB-Token: <token>`.
+Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
+`X-SB-Token` trên HTTP server có chuyển tiếp custom header vào CGI.
 | Method | action | Body | Trả về |
 |---|---|---|---|
 | GET | `status` | — | `{ssids[], health{ts,probes{idx:{state,latency_ms,code}}}, meta}` |
 | GET | `get_conf` | — | text/plain wifi-socks.conf |
 | POST | `save_conf` | text | `{ok,saved}` |
-| POST | `apply` | — | `{ok,rc,log}` |
+| POST | `dryrun_conf` | text | Dry-run config tạm, không ghi file thật |
+| POST | `apply` | — | Bắt buộc dry-run lần cuối; chỉ đạt mới apply |
 | POST | `set_sock` | `{idx,host,port,user,pass}` | `{ok,rc,log}` |
+| POST | `rotate_mac` | `{idx,oui?}` | Chọn provider OUI, random BSSID/MAC, lưu config rồi reload radio |
 | POST | `rollback` | `{name?}` | `{ok,rc,log}` |
 | POST | `uninstall` | — | `{ok,rc,log}` |
 | GET | `backups` | — | `{ok,backups[]}` |
 | GET | `health_now` | — | probe ngay 1 lần |
+| GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS và HTTP latency; cảnh báo nếu không qua `wwan` |
+| GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |
 
 Test nhanh:
 ```sh
 TOKEN=$(cat /etc/sbproxy/token)
-curl -H "X-SB-Token: $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status | jq .
+curl -H "Authorization: Bearer $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status | jq .
 ```
 
 ## ⚠️ Mixed-content (quan trọng)

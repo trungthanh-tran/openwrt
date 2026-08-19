@@ -3,6 +3,35 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [Unreleased]
+
+### Added
+- Console Windows **Tkinter native** gọi trực tiếp Agent API, không phụ thuộc
+  HTML/WebView/WebView2; token được bảo vệ bằng Windows DPAPI.
+- Pipeline thay đổi cấu hình trong app: dry-run candidate, loading theo bước,
+  timeout hữu hạn, chỉ Apply khi kiểm tra đạt.
+- Quản lý thiết bị nâng cao: lọc theo SSID/band/online/blocklist/RSSI/traffic/
+  thời gian, sắp xếp, chọn nhiều, auto-refresh, chi tiết, copy và xuất CSV.
+- Random BSSID/MAC theo provider OUI, block MAC thủ công và hiển thị cả thiết bị
+  blocklist đang offline.
+- Theo dõi Internet gateway: route/device/next-hop/source, đối chiếu `wwan`,
+  trạng thái link, DNS và HTTP latency trực tiếp.
+- Cảnh báo mặc định **Không** trước Apply, đổi SOCKS, random MAC, xóa SSID,
+  kick/ban/unban và rollback.
+
+### Changed
+- Agent ưu tiên `Authorization: Bearer`; vẫn nhận `X-SB-Token` để tương thích.
+- SOCKS outbound dùng TCP; nftables chặn UDP/443 để trình duyệt fallback từ
+  QUIC/HTTP3 sang TCP/HTTPS qua SOCKS5.
+- Các thao tác phụ thuộc item được chuyển khỏi toolbar vào khung chỉnh sửa của
+  bảng Wi-Fi, thiết bị hoặc backup.
+
+### Fixed
+- Giới hạn rule `block-admin-wN` vào đúng gateway `192.168.(10+N).1`, tránh
+  chặn nhầm toàn bộ HTTP/HTTPS đã đi qua TPROXY.
+- Xóa sạch `macfilter`/`maclist` khi blocklist rỗng và giữ blocklist qua Apply.
+- Bổ sung log DNS/fake-IP và trạng thái client online/offline để chẩn đoán.
+
 ## [0.3.0] — 2026-08-19
 
 ### Added

@@ -42,9 +42,10 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 12 | `scripts/rollback.sh`, `pc/restore.ps1` / `pc/restore.sh` | Rollback hoặc khôi phục snapshot. Failsafe/U-Boot vẫn thủ công. |
 | 13 | `scripts/diagnose.sh` | Gom bằng chứng chẩn đoán, không restart hay sửa trạng thái. |
 | 10, 13 | `scripts/doctor.sh` | Báo cáo trạng thái tổng thể (chỉ đọc): gói, sing-box + fake-IP DNS, tproxy/hijack, Wi-Fi, agent; exit ≠ 0 nếu có FAIL. |
+| 10, 13 | `scripts/gateway.sh` | Kiểm tra read-only default route, đối chiếu `wwan`, link, DNS và HTTP trực tiếp. |
 | 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
 | 14 | `scripts/clients.sh`, `scripts/{kick,ban,unban}.sh` | Liệt kê thiết bị theo SSID và kick/cấm/bỏ cấm theo MAC. |
-| — | `console/desktop/build.ps1` (Windows) | Build Console **bản .exe** từ `console/web/control-panel.html`. Xem [../console/desktop/README.md](../console/desktop/README.md). |
+| — | `console/desktop/build.ps1` (Windows) | Build app Tkinter native `console/desktop/main.py` thành `.exe`; không dùng HTML/WebView. Xem [../console/desktop/README.md](../console/desktop/README.md). |
 | 15 | `scripts/security-audit.sh` | Audit quyền file, SSH và dấu hiệu mở quản trị; chỉ đọc. |
 
 Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script có thay đổi trạng thái vẫn yêu cầu quyết định rõ của quản trị viên; các script kiểm kê/audit không tự sửa để tránh khóa mất SSH.
@@ -174,9 +175,12 @@ Mở `http://<router>/sbproxy/` → **🔌 Kết nối router** → dán token. 
 | `SLOW_MS` | 800 | Ngưỡng coi là "chậm". |
 | `PROBE_URL` | gstatic /generate_204 | URL đo latency. |
 | `PROBE_TIMEOUT` | 8 | Timeout mỗi probe (giây). |
+| `GATEWAY_EXPECTED_INTERFACE` | `wwan` | Interface logic phải là đường Internet mặc định. |
+| `GATEWAY_PROBE_URL` | gstatic `/generate_204` | URL kiểm tra HTTP trực tiếp qua device của default route. |
+| `GATEWAY_PROBE_TIMEOUT` | 8 | Timeout kiểm tra gateway (giây). |
 
 ### 9.1 Token điều khiển là gì?
-Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu máy-với-máy"), do `install-agent.sh` sinh và lưu tại `/etc/sbproxy/token` (`chmod 600`). UI gắn token vào header `X-SB-Token` mỗi request; agent so khớp mới cho thực thi.
+Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu máy-với-máy"), do `install-agent.sh` sinh và lưu tại `/etc/sbproxy/token` (`chmod 600`). App native gửi `Authorization: Bearer <token>`; agent vẫn nhận `X-SB-Token` từ UI Web để tương thích.
 
 > **Bản chất:** bí mật **dùng chung**, KHÔNG phải hệ đăng nhập. Ai cầm token là có **toàn quyền** router, không phân biệt người, không hết hạn, không ghi "ai làm gì". Chỉ cấp token trên LAN/VPN quản trị tin cậy.
 
@@ -184,7 +188,7 @@ Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu m�
 - **Không expose agent/uhttpd ra WAN** — chỉ LAN/VLAN quản trị (quan trọng nhất).
 - Chặn SSID khách chạm tới UI/agent (firewall input zone khách = reject cổng admin).
 - Ưu tiên **HTTPS nội bộ** cho uhttpd nếu LAN nhiều người.
-- Giữ quyền file `/etc/sbproxy/token` = `600`. Trình duyệt lưu token trong `localStorage` → khoá máy, đừng paste trên máy chung/lạ.
+- Giữ quyền file `/etc/sbproxy/token` = `600`. Bản Web lưu token trong `localStorage`; app Windows lưu bản mã hóa DPAPI cho đúng tài khoản Windows. Vẫn phải khóa máy và không dùng token trên máy chung/lạ.
 - Chỉ paste vào UI của chính router (`http://<router>/sbproxy/`), không dán web lạ.
 
 ### 9.3 Quên / lấy lại / xoay token
@@ -192,7 +196,7 @@ Là một **chuỗi bí mật ngẫu nhiên** (bearer token — "mật khẩu m�
 ```sh
 cat /etc/sbproxy/token          # in ra token hiện tại → copy, paste lại vào UI
 TOKEN=$(cat /etc/sbproxy/token)
-curl -H "X-SB-Token: $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status
+curl -H "Authorization: Bearer $TOKEN" http://192.168.8.1/cgi-bin/sbproxy?action=status
 ```
 **Nghi lộ / đổi token mới (xoay):**
 ```sh
@@ -205,9 +209,9 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 > **Không còn SSH và quên token?** Vào lại bằng LAN dây (SSH), hoặc Failsafe (Bước 12) để mount rootfs rồi `cat /etc/sbproxy/token`. Token luôn nằm trong file trên router — không mất trừ khi wipe cấu hình.
 
 ### 9.4 Console: bản Web vs bản Desktop
-Cùng một UI (`console/web/control-panel.html`), hai cách chạy:
+Hai frontend độc lập dùng chung Agent API:
 - **Web (router-hosted):** `install-agent.sh` copy UI vào `/www/sbproxy/index.html`. Mở `http://<router>/sbproxy/` — same-origin. Nếu mở qua **https** thì trình duyệt chặn mixed-content khi gọi router http.
-- **Desktop (.exe):** build trên máy Windows quản trị: `cd console/desktop; .\build.ps1` → `console/desktop/dist/sbproxy-console.exe`. App dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content** — tiện khi quản nhiều router. Chi tiết: [../console/desktop/README.md](../console/desktop/README.md).
+- **Desktop (.exe):** build trên máy Windows quản trị: `cd console/desktop; .\build.ps1` → `console/desktop/dist/sbproxy-console.exe`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.md](../console/desktop/README.md).
 
 > **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
@@ -289,32 +293,35 @@ nft list table inet sbproxy ; ip rule | grep 0x1 ; ip route show table 100
 | DNS leak | DNS SSID proxy được hijack vào sing-box fake-IP. `nslookup` phải trả `198.18.x.x`; nếu không, kiểm tra rule `dport 53` trong `nft list chain inet sbproxy prerouting` rồi chạy lại `apply.sh`. |
 | WebRTC lộ | Bật `webrtc=1` → `apply`; kiểm tra `nft list chain inet sbproxy webrtc`. |
 | Client thấy nhau | `isolate=1`; zone `forward=REJECT`; mỗi SSID một `br-w<idx>`. |
-| Agent không kết nối | `curl -H "X-SB-Token: $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status`; kiểm tra `+x` của CGI; mixed-content. |
+| Agent không kết nối | `curl -H "Authorization: Bearer $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status`; kiểm tra `+x` của CGI; với bản Web kiểm tra thêm mixed-content. |
 
 ## Bước 14 — Tham chiếu API (agent LAN)
-> **Script tương ứng:** `agent/cgi/sbproxy` là CGI hiện thực API; quản trị viên không chạy file này trực tiếp. Ví dụ kiểm tra endpoint: `TOKEN=$(cat /etc/sbproxy/token); curl -H "X-SB-Token: $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`.
+> **Script tương ứng:** `agent/cgi/sbproxy` là CGI hiện thực API; quản trị viên không chạy file này trực tiếp. Ví dụ kiểm tra endpoint: `TOKEN=$(cat /etc/sbproxy/token); curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`.
 
-Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
+Endpoint `/cgi-bin/sbproxy?action=…`, ưu tiên header `Authorization: Bearer <token>`; `X-SB-Token` vẫn được nhận để tương thích.
 
 | Method | action | Body | Trả về |
 |---|---|---|---|
 | GET | `status` | — | ssids[] (gồm `mac_oui`), health{probes{idx:{state,latency_ms,code}}}, meta |
 | GET | `get_conf` | — | text conf |
 | POST | `save_conf` | text | {ok,saved} |
-| POST | `apply` | — | {ok,rc,log} |
+| POST | `dryrun_conf` | text | Dry-run candidate tạm, không ghi cấu hình thật |
+| POST | `apply` | — | Bắt buộc dry-run lần cuối; chỉ đạt mới apply |
 | POST | `set_sock` | {idx,host,port,user,pass} | {ok,rc,log} |
+| POST | `rotate_mac` | {idx,oui?} | Random BSSID/MAC theo provider, lưu config và reload radio |
 | POST | `backup` | {label?} | {ok,rc,log} |
 | GET | `backups` | — | {ok,backups[]} |
 | GET | `download_backup` | ?name= | file .tar.gz |
 | POST | `rollback` | {name?} | {ok,rc,log} |
 | POST | `uninstall` | — | {ok,rc,log} |
 | GET | `health_now` | — | probe ngay 1 lần |
-| GET | `clients` | — | {clients[{idx,ssid,mac,ip,host,connected_s,rx_bytes,tx_bytes,signal_dbm,banned}]} |
+| GET | `gateway` | — | Route/interface/device, link, DNS, HTTP code + latency; đối chiếu `wwan` |
+| GET | `clients` | — | Client online + blocklist offline, gồm band/online/RSSI/traffic |
 | POST | `kick` | {idx,mac} | {ok,rc,log} — deauth tạm |
 | POST | `ban` | {idx,mac} | {ok,rc,log} — chặn MAC lâu dài |
 | POST | `unban` | {idx,mac} | {ok,rc,log} |
 
-**Quản lý thiết bị (Console → 📱 Thiết bị):** xem client đang nối từng WiFi kèm MAC, IP/tên máy, thời gian kết nối, lưu lượng vào/ra (rx/tx), cường độ sóng. **Kick** deauth tạm (thiết bị có thể nối lại). **Cấm** ghi MAC vào `/etc/sbproxy.bans` + đặt `macfilter=deny` cho SSID đó rồi reload băng tần tương ứng; ban được `apply.sh` áp lại mỗi lần chạy nên không mất khi cấu hình lại. Bỏ cấm gỡ MAC và dựng lại maclist. Router-side: `sh scripts/clients.sh`, `sh scripts/{kick,ban,unban}.sh <idx> <mac>`.
+**Quản lý thiết bị:** app native lọc theo SSID, band, online/offline, blocklist, RSSI, traffic và thời gian; hỗ trợ chọn nhiều, sort, auto-refresh, chi tiết và CSV. **Kick** deauth tạm (thiết bị có thể nối lại). **Cấm** ghi MAC vào `/etc/sbproxy.bans` + đặt `macfilter=deny` cho SSID đó rồi reload băng tần tương ứng; ban được `apply.sh` áp lại mỗi lần chạy nên không mất khi cấu hình lại. Blocklist offline vẫn hiện để bỏ cấm. Router-side: `sh scripts/clients.sh`, `sh scripts/{kick,ban,unban}.sh <idx> <mac>`.
 
 ## Bước 15 — Bảo mật & chống lộ (checklist)
 > **Script tương ứng (router, chỉ đọc):** `sh scripts/security-audit.sh`. Exit code khác `0` nghĩa là có cảnh báo cần xem; script không tự sửa SSH/firewall để tránh khóa mất quyền quản trị.

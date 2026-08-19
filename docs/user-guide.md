@@ -22,9 +22,9 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 - **Offline** — soạn cấu hình rồi tải file về (không đụng router).
 - **Live LAN** — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).
 
-**Hai bản Console (cùng giao diện):**
+**Hai bản Console (hai giao diện, cùng Agent API):**
 - **Bản Web** — mở trong trình duyệt tại `http://<router>/sbproxy/`.
-- **Bản Desktop (.exe)** — ứng dụng Windows do quản trị viên build; kết nối tới `http://<IP-router>` qua LAN, không vướng lỗi mixed-content. Dùng khi bạn quản nhiều router hoặc hay bị trình duyệt chặn.
+- **Bản Desktop (.exe)** — ứng dụng Windows Tkinter native, không dùng WebView; kết nối trực tiếp Agent API qua LAN và lưu token mã hóa bằng Windows DPAPI.
 
 ---
 
@@ -33,11 +33,15 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 1. Mở console:
    - **Bản Web:** vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
    - **Bản Desktop:** mở `sbproxy-console.exe`.
-2. Bấm **🔌 Kết nối router** (góc trên phải).
-3. Nhập token quản trị viên cấp, bấm **Kết nối**:
+2. Nhập token quản trị viên cấp rồi bấm **Kết nối**:
    - Bản Web mở từ router: để trống ô *Base URL*.
-   - Bản Desktop: nhập *Base URL* = `http://<IP-router>` (ví dụ `http://192.168.8.1`).
-4. Kết nối thành công: hiện huy hiệu **● Live** và cột **Sức khỏe** bắt đầu chạy.
+   - Bản Desktop: nhập *Router* = `http://<IP-router>` (ví dụ `http://192.168.8.1`).
+3. Kết nối thành công: thanh trạng thái báo sing-box đang chạy; cấu hình, thiết bị và backup được nạp từ router.
+
+Khung **Internet Gateway** phía trên các tab cho biết đường ra thực tế
+(`wwan`/device, next-hop, IP nguồn), trạng thái link, DNS và HTTP latency. Nếu
+hiện **KHÔNG QUA wwan** hoặc màu vàng/đỏ, bấm **Kiểm tra gateway** rồi báo quản
+trị viên trước khi Apply thêm thay đổi.
 
 > **Nếu không kết nối được (bản Web):** thường do mở console qua `https` nên trình duyệt chặn gọi router `http`. Hãy mở đúng `http://<router>/sbproxy/`, hoặc dùng **bản Desktop** (không bị chặn). Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.
 
@@ -75,12 +79,14 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 
 **Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* & *Chặn WebRTC*. Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
 
-**Giả MAC theo hãng WiFi:** trong ô **Hãng WiFi giả lập (MAC)** chọn một hãng thông dụng (TP-Link, Netgear, ASUS, Xiaomi…) — 3 byte đầu của địa chỉ MAC sẽ giống hãng đó, 3 byte sau ngẫu nhiên. Chọn *"Ngẫu nhiên / ẩn danh"* để dùng MAC `02:xx` (mặc định). Đổi hãng chỉ có hiệu lực sau khi **⇪ Đẩy & Áp**.
+**Giả MAC theo hãng WiFi:** chọn SSID trong bảng, dùng **Random MAC** trong khung chỉnh sửa rồi chọn hãng (TP-Link, Netgear, ASUS, Xiaomi…). Ba byte đầu theo OUI của hãng, ba byte sau ngẫu nhiên. Thao tác lưu provider và reload radio ngay sau khi bạn xác nhận cảnh báo.
 
-**Đổi SOCKS nhanh (không reload WiFi):** sửa host/cổng (nút **Sửa**), rồi bấm **⚡** ở hàng đó.
+**Đổi SOCKS nhanh:** chọn SSID trong bảng rồi bấm **Đổi SOCKS** trong khung chỉnh sửa.
 Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.
 
-**Áp toàn bộ thay đổi:** sau khi thêm/sửa/xoá nhiều WiFi, bấm **⇪ Đẩy & Áp lên router** (bước này reload WiFi trong giây lát).
+**Áp toàn bộ thay đổi:** sau khi thêm/sửa/xoá nhiều WiFi, bấm **Đẩy cấu hình & Apply**. App native luôn dry-run candidate trước; chỉ khi đạt mới backup, ghi cấu hình và reload WiFi.
+
+> **Cảnh báo:** Apply, đổi SOCKS, random MAC, xoá SSID, kick/cấm/bỏ cấm và rollback đều hiển thị phạm vi ảnh hưởng trước khi chạy. Mặc định là **Không**; đọc kỹ mục tiêu rồi mới xác nhận.
 
 > **Mẹo:** **⭳ Tải từ router** để nạp cấu hình đang chạy trên router về console (khi mở console trên máy khác).
 
@@ -88,22 +94,23 @@ Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở c�
 
 ## 06 · Thiết bị đang kết nối (kick / cấm)
 
-Ở chế độ Live, bấm **📱 Thiết bị** để xem mọi thiết bị đang nối từng WiFi:
+Mở tab **Thiết bị** để xem client online và cả MAC trong blocklist đang offline:
 
 | Cột | Ý nghĩa |
 |---|---|
-| **WiFi** | WiFi (idx + tên) mà thiết bị đang nối; nhãn *cấm* nếu MAC bị chặn. |
+| **SSID / Band** | WiFi và băng 2.4/5 GHz của thiết bị. |
 | **MAC** | Địa chỉ MAC của thiết bị. |
 | **IP / Tên máy** | Địa chỉ IP được cấp và tên máy (nếu có trong DHCP). |
 | **Kết nối** | Thời gian đã kết nối (vd `3g 20p`). |
 | **Vào / Ra** | Lưu lượng tải xuống (in) / tải lên (out) của phiên. |
 | **Sóng** | Cường độ tín hiệu (dBm); càng gần 0 càng mạnh. |
 
-- **⏏ Kick** — ngắt thiết bị ngay, nhưng nó **có thể nối lại**. Dùng khi cần đá tạm.
-- **⛔ Cấm** — chặn MAC **lâu dài** khỏi WiFi đó (chặn cả lần nối sau). ⚠️ Thao tác này **reload băng tần** của WiFi đó nên các thiết bị cùng băng bị ngắt trong 1–2 giây.
-- **✓ Bỏ cấm** — gỡ lệnh cấm cho MAC đó.
+- Lọc theo SSID, band, online/offline, quyền truy cập, RSSI, traffic, thời gian; tìm bằng IP/tên/MAC và bấm tiêu đề cột để sắp xếp.
+- Chọn một hoặc nhiều dòng; thao tác **Chi tiết / Copy / Kick / Cấm / Bỏ cấm** chỉ nằm trong khung điều khiển sát bảng và tự khóa nếu không phù hợp.
+- **Kick** ngắt thiết bị ngay nhưng nó có thể nối lại. **Cấm** chặn MAC lâu dài và có thể reload radio ngắn. **Bỏ cấm** hoạt động cả với mục blocklist offline.
+- Có thể chặn MAC chưa kết nối, bật auto-refresh 5–60 giây hoặc xuất danh sách đang lọc ra CSV UTF-8.
 
-Danh sách tự làm mới ~8 giây/lần khi cửa sổ đang mở.
+Dashboard phía trên bảng cho biết số online, tín hiệu yếu, đã chặn và tổng lưu lượng.
 
 ---
 
@@ -113,8 +120,8 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 
 1. Bấm **🗂 Backup / Rollback**.
 2. **💾 Tạo backup ngay** để lưu một mốc thủ công (nên làm trước khi thay đổi lớn).
-3. **⭳ Về máy** ở mỗi bản — tải file backup xuống **máy tính của bạn**.
-4. Để quay lui: chọn một bản (mới nhất ở trên) → **↩ Khôi phục** → xác nhận.
+3. Bản Web có thể tải snapshot về máy; với app native dùng thêm `pc/backup.ps1` nếu cần bản sao ngoài router.
+4. Để quay lui: chọn một bản → dùng **Rollback backup đang chọn** trong khung sát danh sách → đọc cảnh báo và xác nhận.
 
 > **Rất quan trọng — tải backup về máy:** backup lưu **trên router**. Nếu router phải cài lại firmware hoặc bị hỏng, các backup đó **mất theo**. Vì vậy: định kỳ, và **bắt buộc trước khi cập nhật firmware**, hãy bấm **⭳ Về máy**.
 
@@ -138,7 +145,7 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 ## 09 · An toàn token quản trị
 
 - **Không chia sẻ token**. Token agent là bí mật dùng chung và có toàn quyền cấu hình router.
-- Khoá máy khi rời đi; token được lưu trong trình duyệt của máy đang dùng.
+- Khoá máy khi rời đi. Bản Web lưu token trong trình duyệt; app native mã hóa token bằng Windows DPAPI cho đúng tài khoản hiện tại.
 - Chỉ mở console tại địa chỉ LAN của router; không dán token vào website bên ngoài.
 - Nghi lộ token → báo quản trị viên xoá `/etc/sbproxy/token` và chạy lại `agent/install-agent.sh`.
 - **Không gửi ảnh chụp màn hình** chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.

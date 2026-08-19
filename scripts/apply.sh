@@ -35,6 +35,9 @@ TMP="/tmp/sbproxy-uci.$$"
 emit_stale_uci >> "$TMP"
 emit_all() { emit_uci_one "$@" >> "$TMP"; }
 for_each_ssid emit_all
+# This same guarded path is used by the Agent/UI `apply` endpoint. Never allow
+# a new SSID to recreate an unscoped 80/443 INPUT reject that breaks TPROXY.
+validate_admin_rule_scope "$TMP"
 
 # Generate and validate staged artifacts without touching active files.
 STAGE="/tmp/sbproxy-stage.$$"
@@ -49,9 +52,11 @@ singbox_check "$SINGBOX_CONF" || die "sing-box config không hợp lệ."
 nft --check --file "$NFT_FILE" || die "nftables config không hợp lệ."
 
 if [ "${DRYRUN:-0}" = "1" ]; then
-  echo "===== UCI sẽ nạp ====="; cat "$TMP"
-  echo "===== sing-box ====="; cat "$SINGBOX_CONF"
-  echo "===== nftables ====="; cat "$NFT_FILE"
+  if [ "${DRYRUN_QUIET:-0}" != "1" ]; then
+    echo "===== UCI sẽ nạp ====="; cat "$TMP"
+    echo "===== sing-box ====="; cat "$SINGBOX_CONF"
+    echo "===== nftables ====="; cat "$NFT_FILE"
+  fi
   log "DRYRUN xong — không có file hệ thống nào bị thay đổi."; exit 0
 fi
 

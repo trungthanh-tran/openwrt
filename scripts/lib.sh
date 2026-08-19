@@ -96,7 +96,8 @@ apply_bans() {
       uci set "wireless.w$idx.macfilter=deny"
       for m in $b; do uci add_list "wireless.w$idx.maclist=$m"; done
     else
-      uci set "wireless.w$idx.macfilter=disable"
+      uci -q delete "wireless.w$idx.macfilter" || true
+      uci -q delete "wireless.w$idx.maclist" || true
     fi
   done
   uci commit wireless
@@ -221,18 +222,39 @@ EOF
 
   # Block router administration ports from a guest zone when input is ACCEPT.
   if [ "$ZONE_INPUT" = "ACCEPT" ]; then
-    p=$(echo "$ADMIN_PORTS" | tr ' ' ' ')
     cat <<EOF
 set firewall.z${idx}adm=rule
 set firewall.z${idx}adm.name=block-admin-w$idx
 set firewall.z${idx}adm.src=z$idx
+set firewall.z${idx}adm.dest_ip=192.168.$octet.1
 set firewall.z${idx}adm.proto=tcp
 set firewall.z${idx}adm.target=REJECT
+set firewall.z${idx}adm.dest_port="$ADMIN_PORTS"
 EOF
-    for p in $ADMIN_PORTS; do
-      echo "add_list firewall.z${idx}adm.dest_port=$p"
-    done
   fi
+}
+
+# Fail closed if a generated admin-port rule is not limited to the gateway of
+# its managed SSID. TPROXY traffic is delivered through the firewall INPUT
+# path, so an unscoped dport 80/443 reject would also block proxied websites.
+# apply.sh calls this for both CLI applies and Agent/UI applies.
+validate_admin_rule_scope() {
+  batch="$1"
+  [ -f "$batch" ] || die "Thiếu UCI batch để kiểm tra admin rule: $batch"
+  [ "$ZONE_INPUT" = "ACCEPT" ] || return 0
+
+  for idx in $(desired_idx); do
+    octet="$(net_octet "$idx")"
+    expected_ip="set firewall.z${idx}adm.dest_ip=192.168.$octet.1"
+    expected_ports="set firewall.z${idx}adm.dest_port=\"$ADMIN_PORTS\""
+    grep -qxF "$expected_ip" "$batch" \
+      || die "admin rule w$idx phải giới hạn dest_ip=192.168.$octet.1"
+    grep -qxF "$expected_ports" "$batch" \
+      || die "admin rule w$idx phải ghi đè dest_port=\"$ADMIN_PORTS\""
+    if grep -q "^add_list firewall\.z${idx}adm\.dest_port=" "$batch"; then
+      die "admin rule w$idx không được add_list dest_port (sẽ tích lũy qua mỗi apply)"
+    fi
+  done
 }
 
 # ---------------------------------------------------------------------------
@@ -281,6 +303,7 @@ ensure_singbox_compat_env() {
 build_singbox() {
   # Defaults keep older settings.sh copies (without these vars) working.
   FAKEIP_RANGE="${FAKEIP_RANGE:-198.18.0.0/15}"
+  SINGBOX_LOG_LEVEL="${SINGBOX_LOG_LEVEL:-warn}"
   # Persist the fakeip<->hostname map across sing-box restarts (e.g. set-sock.sh)
   # so clients holding cached fake-IPs keep working without a fresh DNS query.
   SINGBOX_CACHE="${SINGBOX_CACHE:-/etc/sing-box/cache.db}"
@@ -294,7 +317,9 @@ build_singbox() {
       user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
       auth=",\"username\":$user_json,\"password\":$pass_json"
     else auth=""; fi
-    outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\"$auth}"
+    # Use TCP-only SOCKS upstreams. UDP/QUIC is blocked in nftables so web
+    # clients fall back to TCP HTTP/HTTPS, which all SOCKS5 providers support.
+    outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\",\"network\":\"tcp\"$auth}"
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
     sep=","
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
@@ -311,7 +336,7 @@ build_singbox() {
   #   để client không thử kết nối IPv6 giả không route được.
   cat > "$SINGBOX_CONF" <<EOF
 {
-  "log": { "level": "warn", "timestamp": true },
+  "log": { "level": "$SINGBOX_LOG_LEVEL", "timestamp": true },
   "dns": {
     "servers": [
       { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE" },
@@ -365,6 +390,7 @@ build_nft() {
   # Bypass SOCKS server IPs so the proxy's own connection is not intercepted.
   sock_bypass=""
   webrtc_rules=""
+  udp443_rules=""
   tproxy_rules=""
   dns_rules=""
   _nft_row() {
@@ -379,6 +405,9 @@ build_nft() {
     # replace dnsmasq for proxied SSIDs (including hardcoded public resolvers).
     dns_rules="$dns_rules    iifname \"br-w$idx\" udp dport 53 tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     dns_rules="$dns_rules    iifname \"br-w$idx\" tcp dport 53 tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
+    # Most upstream SOCKS5 endpoints do not implement UDP ASSOCIATE. Drop
+    # QUIC/HTTP3 so browsers fall back to TCP/HTTPS through SOCKS5.
+    udp443_rules="$udp443_rules    iifname \"br-w$idx\" udp dport 443 drop\n"
     tproxy_rules="$tproxy_rules    iifname \"br-w$idx\" meta l4proto tcp tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     tproxy_rules="$tproxy_rules    iifname \"br-w$idx\" meta l4proto udp tproxy ip to :$tp meta mark set $TPROXY_MARK accept\n"
     if [ "$webrtc" = "1" ]; then
@@ -403,6 +432,8 @@ build_nft() {
     echo "    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return"
     echo "    # Bypass SOCKS servers through the WAN."
     printf "%b" "$sock_bypass"
+    echo "    # Drop QUIC/HTTP3; force TCP/HTTPS through SOCKS5."
+    printf "%b" "$udp443_rules"
     echo "    # Send each Wi-Fi to its matching sing-box TPROXY port."
     printf "%b" "$tproxy_rules"
     echo "  }"
