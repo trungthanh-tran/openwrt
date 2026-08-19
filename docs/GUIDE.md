@@ -159,10 +159,11 @@ Tóm tắt nhanh (đầy đủ ở [TESTING.md](TESTING.md)):
 
 **Trên router:**
 ```sh
+sh scripts/doctor.sh                         # báo cáo tổng thể (gói, sing-box, fake-IP DNS, tproxy, wifi, agent)
 wifi status                                  # SSID đã lên?
-iw dev | grep -E 'Interface|ssid|addr'       # MAC mỗi AP khác nhau (random 02:..)
+iw dev | grep -E 'Interface|ssid|addr'       # MAC mỗi AP (random 02: hoặc theo hãng)
 sing-box check -c /etc/sing-box/config.json  # config hợp lệ?
-nft list table inet sbproxy                  # ruleset tproxy có?
+nft list table inet sbproxy                  # ruleset tproxy + hijack DNS có?
 ip rule | grep 0x1 ; ip route show table 100 # policy routing có?
 logread -e sing-box | tail -20               # log proxy
 ```

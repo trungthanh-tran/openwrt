@@ -36,19 +36,22 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color
 </head>
 <body>
 <div class="doc">
-<nav class="toc"><a href="#sec-1">Open the console</a><a href="#sec-2">Common operations</a><a href="#sec-3">Health display</a><a href="#sec-4">Backup and rollback</a><a href="#sec-5">Token safety</a></nav><h1>sbproxy Console — User guide</h1>
+<nav class="toc"><a href="#sec-1">Open the console</a><a href="#sec-2">Common operations</a><a href="#sec-3">Connected devices</a><a href="#sec-4">Health display</a><a href="#sec-5">Backup and rollback</a><a href="#sec-6">Token safety</a></nav><h1>sbproxy Console — User guide</h1>
 <p><strong>Language:</strong> <a href="user-guide.md">Tiếng Việt</a> | English</p>
 <p>The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.</p>
+<p>The console ships in two flavors sharing one interface: the <strong>web build</strong> (<code>http://&lt;router&gt;/sbproxy/</code>) and the <strong>desktop build</strong> (<code>sbproxy-console.exe</code>, a Windows app that reaches <code>http://&lt;router-ip&gt;</code> over the LAN without the mixed-content limit).</p>
 <h2 id="sec-1">Open the console</h2>
-<ol><li>Connect through the trusted management LAN.</li><li>Open <code>http://&lt;router&gt;/sbproxy/</code>; the GL-MT6000 GL.iNet default is <code>http://192.168.8.1/sbproxy/</code>.</li><li>Select <strong>Connect router</strong>, leave Base URL empty, and paste the administrator-provided token.</li><li>A successful connection shows Live status and starts health polling.</li></ol>
+<ol><li>Connect through the trusted management LAN.</li><li>Open the console — web: <code>http://&lt;router&gt;/sbproxy/</code> (GL-MT6000 default <code>http://192.168.8.1/sbproxy/</code>); desktop: launch <code>sbproxy-console.exe</code>.</li><li>Select <strong>Connect router</strong> and paste the administrator-provided token. Web build opened from the router: leave Base URL empty. Desktop build: set Base URL to <code>http://&lt;router-ip&gt;</code>.</li><li>A successful connection shows Live status and starts health polling.</li></ol>
 <h2 id="sec-2">Common operations</h2>
-<ul><li>Add or edit an SSID, band, Wi-Fi password, SOCKS endpoint, isolation, and WebRTC setting.</li><li>Use the lightning action to change one SOCKS endpoint without reloading Wi-Fi. Active network sessions may still be interrupted.</li><li>Use full Apply after adding, deleting, or changing multiple SSIDs. Wi-Fi reloads briefly.</li><li>Load the active router configuration before editing from another computer.</li></ul>
-<h2 id="sec-3">Health display</h2>
+<ul><li>Add or edit an SSID, band, Wi-Fi password, SOCKS endpoint, isolation, WebRTC, and the <strong>spoofed MAC vendor</strong> (dropdown of common Wi-Fi brands; the first 3 MAC bytes match the vendor, the rest are randomized).</li><li>Use the lightning action to change one SOCKS endpoint without reloading Wi-Fi. Active network sessions may still be interrupted.</li><li>Use full Apply after adding, deleting, or changing multiple SSIDs. Wi-Fi reloads briefly.</li><li>Load the active router configuration before editing from another computer.</li></ul>
+<h2 id="sec-3">Connected devices</h2>
+<p>The <strong>Devices</strong> panel lists clients per SSID with MAC, IP/hostname, connection time, in/out traffic, and signal. <strong>Kick</strong> deauthenticates a device (it may reconnect); <strong>Ban</strong> blocks a MAC persistently from that SSID (which briefly reloads that band); <strong>Unban</strong> removes the block.</p>
+<h2 id="sec-4">Health display</h2>
 <ul><li>Green latency: responsive proxy.</li><li>Yellow latency: slow proxy; monitor or replace it.</li><li>Red failure: endpoint or authentication failed.</li></ul>
-<h2 id="sec-4">Backup and rollback</h2>
+<h2 id="sec-5">Backup and rollback</h2>
 <p>Create a snapshot before large changes and download important snapshots to your computer. Router-side snapshots are not sufficient for recovery after erased storage or severe hardware failure.</p>
 <p>Rollback overwrites active configuration and reloads services. Create a new snapshot first when possible.</p>
-<h2 id="sec-5">Token safety</h2>
+<h2 id="sec-6">Token safety</h2>
 <p>The agent has no per-user accounts. Anyone with the token has full router control. Keep it on a trusted LAN/VPN, never paste it into external websites, and ask the administrator to rotate it if exposure is suspected.</p>
 <footer>Generated from Markdown by tools/build-docs.js. Edit the .md source and rebuild; do not edit this HTML file directly.</footer>
 </div>

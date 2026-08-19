@@ -12,25 +12,34 @@ Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo 
 
 Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:
 
-- Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS.
+- Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS, **giả MAC theo hãng WiFi**.
 - Đổi SOCKS mà không reload WiFi; các phiên mạng đang mở có thể gián đoạn ngắn.
 - Xem **độ trễ (latency) proxy theo thời gian thực** cho từng WiFi.
+- **Xem thiết bị đang kết nối** từng WiFi (MAC, IP, thời gian, lưu lượng) và **kick / cấm**.
 - Sao lưu & khôi phục cấu hình chỉ bằng một nút.
 
 **Hai cách dùng local:**
 - **Offline** — soạn cấu hình rồi tải file về (không đụng router).
 - **Live LAN** — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).
 
+**Hai bản Console (cùng giao diện):**
+- **Bản Web** — mở trong trình duyệt tại `http://<router>/sbproxy/`.
+- **Bản Desktop (.exe)** — ứng dụng Windows do quản trị viên build; kết nối tới `http://<IP-router>` qua LAN, không vướng lỗi mixed-content. Dùng khi bạn quản nhiều router hoặc hay bị trình duyệt chặn.
+
 ---
 
 ## 02 · Mở & kết nối router
 
-1. Mở console: nếu quản trị viên đã cài trên router, vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
+1. Mở console:
+   - **Bản Web:** vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
+   - **Bản Desktop:** mở `sbproxy-console.exe`.
 2. Bấm **🔌 Kết nối router** (góc trên phải).
-3. Để trống ô *Base URL*, dán **token** quản trị viên cấp, bấm **Kết nối**.
+3. Nhập token quản trị viên cấp, bấm **Kết nối**:
+   - Bản Web mở từ router: để trống ô *Base URL*.
+   - Bản Desktop: nhập *Base URL* = `http://<IP-router>` (ví dụ `http://192.168.8.1`).
 4. Kết nối thành công: hiện huy hiệu **● Live** và cột **Sức khỏe** bắt đầu chạy.
 
-> **Nếu không kết nối được (Live LAN):** thường do mở console qua `https` nên trình duyệt chặn gọi router `http`. Hãy mở đúng `http://<router>/sbproxy/`. Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.
+> **Nếu không kết nối được (bản Web):** thường do mở console qua `https` nên trình duyệt chặn gọi router `http`. Hãy mở đúng `http://<router>/sbproxy/`, hoặc dùng **bản Desktop** (không bị chặn). Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.
 
 ---
 
@@ -66,6 +75,8 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 
 **Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* & *Chặn WebRTC*. Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
 
+**Giả MAC theo hãng WiFi:** trong ô **Hãng WiFi giả lập (MAC)** chọn một hãng thông dụng (TP-Link, Netgear, ASUS, Xiaomi…) — 3 byte đầu của địa chỉ MAC sẽ giống hãng đó, 3 byte sau ngẫu nhiên. Chọn *"Ngẫu nhiên / ẩn danh"* để dùng MAC `02:xx` (mặc định). Đổi hãng chỉ có hiệu lực sau khi **⇪ Đẩy & Áp**.
+
 **Đổi SOCKS nhanh (không reload WiFi):** sửa host/cổng (nút **Sửa**), rồi bấm **⚡** ở hàng đó.
 Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.
 
@@ -75,7 +86,28 @@ Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở c�
 
 ---
 
-## 06 · Backup & Rollback
+## 06 · Thiết bị đang kết nối (kick / cấm)
+
+Ở chế độ Live, bấm **📱 Thiết bị** để xem mọi thiết bị đang nối từng WiFi:
+
+| Cột | Ý nghĩa |
+|---|---|
+| **WiFi** | WiFi (idx + tên) mà thiết bị đang nối; nhãn *cấm* nếu MAC bị chặn. |
+| **MAC** | Địa chỉ MAC của thiết bị. |
+| **IP / Tên máy** | Địa chỉ IP được cấp và tên máy (nếu có trong DHCP). |
+| **Kết nối** | Thời gian đã kết nối (vd `3g 20p`). |
+| **Vào / Ra** | Lưu lượng tải xuống (in) / tải lên (out) của phiên. |
+| **Sóng** | Cường độ tín hiệu (dBm); càng gần 0 càng mạnh. |
+
+- **⏏ Kick** — ngắt thiết bị ngay, nhưng nó **có thể nối lại**. Dùng khi cần đá tạm.
+- **⛔ Cấm** — chặn MAC **lâu dài** khỏi WiFi đó (chặn cả lần nối sau). ⚠️ Thao tác này **reload băng tần** của WiFi đó nên các thiết bị cùng băng bị ngắt trong 1–2 giây.
+- **✓ Bỏ cấm** — gỡ lệnh cấm cho MAC đó.
+
+Danh sách tự làm mới ~8 giây/lần khi cửa sổ đang mở.
+
+---
+
+## 07 · Backup & Rollback
 
 Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra bạn có thể chủ động:
 
@@ -90,7 +122,7 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 
 ---
 
-## 07 · Khi gặp sự cố
+## 08 · Khi gặp sự cố
 
 | Hiện tượng | Bạn có thể tự làm |
 |---|---|
@@ -103,7 +135,7 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 
 ---
 
-## 08 · An toàn token quản trị
+## 09 · An toàn token quản trị
 
 - **Không chia sẻ token**. Token agent là bí mật dùng chung và có toàn quyền cấu hình router.
 - Khoá máy khi rời đi; token được lưu trong trình duyệt của máy đang dùng.

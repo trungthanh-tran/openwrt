@@ -41,7 +41,10 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 11 | `scripts/set-sock.sh`, `scripts/backup.sh` | Đổi SOCKS và backup vận hành. |
 | 12 | `scripts/rollback.sh`, `pc/restore.ps1` / `pc/restore.sh` | Rollback hoặc khôi phục snapshot. Failsafe/U-Boot vẫn thủ công. |
 | 13 | `scripts/diagnose.sh` | Gom bằng chứng chẩn đoán, không restart hay sửa trạng thái. |
+| 10, 13 | `scripts/doctor.sh` | Báo cáo trạng thái tổng thể (chỉ đọc): gói, sing-box + fake-IP DNS, tproxy/hijack, Wi-Fi, agent; exit ≠ 0 nếu có FAIL. |
 | 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
+| 14 | `scripts/clients.sh`, `scripts/{kick,ban,unban}.sh` | Liệt kê thiết bị theo SSID và kick/cấm/bỏ cấm theo MAC. |
+| — | `desktop/build.ps1` (Windows) | Build Console **bản .exe** từ `ui/control-panel.html`. Xem [../desktop/README.md](../desktop/README.md). |
 | 15 | `scripts/security-audit.sh` | Audit quyền file, SSH và dấu hiệu mở quản trị; chỉ đọc. |
 
 Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script có thay đổi trạng thái vẫn yêu cầu quyết định rõ của quản trị viên; các script kiểm kê/audit không tự sửa để tránh khóa mất SSH.
@@ -201,17 +204,23 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ```
 > **Không còn SSH và quên token?** Vào lại bằng LAN dây (SSH), hoặc Failsafe (Bước 12) để mount rootfs rồi `cat /etc/sbproxy/token`. Token luôn nằm trong file trên router — không mất trừ khi wipe cấu hình.
 
-> **Mixed-content:** chế độ Live chỉ chạy khi mở UI qua **http** từ chính router.
+### 9.4 Console: bản Web vs bản Desktop
+Cùng một UI (`ui/control-panel.html`), hai cách chạy:
+- **Web (router-hosted):** `install-agent.sh` copy UI vào `/www/sbproxy/index.html`. Mở `http://<router>/sbproxy/` — same-origin. Nếu mở qua **https** thì trình duyệt chặn mixed-content khi gọi router http.
+- **Desktop (.exe):** build trên máy Windows quản trị: `cd desktop; .\build.ps1` → `desktop/dist/sbproxy-console.exe`. App dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content** — tiện khi quản nhiều router. Chi tiết: [../desktop/README.md](../desktop/README.md).
+
+> **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
 
 ## Bước 10 — Kiểm tra / nghiệm thu
-> **Script tương ứng (router, chỉ đọc):** `sh scripts/verify.sh`. Exit code `0` nghĩa là các kiểm tra router đạt; khác `0` thì chạy `sh scripts/diagnose.sh`. Các bài kiểm tra IP/DNS/WebRTC vẫn phải chạy trên client nối từng SSID.
+> **Script tương ứng (router, chỉ đọc):** `sh scripts/verify.sh` (nghiệm thu, exit `0`=đạt) và `sh scripts/doctor.sh` (báo cáo trạng thái tổng thể theo từng khu vực). Khác `0` thì chạy `sh scripts/diagnose.sh` để lấy log. Các bài kiểm tra IP/DNS/WebRTC vẫn phải chạy trên client nối từng SSID.
 
 ```sh
 # trên router
-sh scripts/verify.sh                                  # kiểm tra tự động, chỉ đọc
-wifi status ; iw dev | grep -E 'Interface|ssid|addr'   # SSID + MAC random
-sing-box check -c /etc/sing-box/config.json            # config hợp lệ
+sh scripts/verify.sh                                  # nghiệm thu tự động (pass/fail)
+sh scripts/doctor.sh                                  # báo cáo tổng thể: gói, sing-box, fake-IP DNS, tproxy, wifi, agent
+wifi status ; iw dev | grep -E 'Interface|ssid|addr'   # SSID + MAC (random hoặc theo hãng)
+nslookup ipinfo.io 192.168.11.1                        # từ client: phải trả IP 198.18.x.x (fake-IP)
 nft list table inet sbproxy ; ip rule | grep 0x1       # tproxy + policy routing
 logread -e sing-box | tail -20
 ```
