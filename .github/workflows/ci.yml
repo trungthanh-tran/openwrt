@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck + jq
+        run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Unit tests (POSIX sh)
+        run: sh tests/run.sh
+
+      - name: Shellcheck
+        run: shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh
+
+      - name: Docs are up to date
+        run: |
+          node tools/build-docs.js
+          git diff --exit-code -- docs/ || {
+            echo "::error::docs/*.html out of date — run 'node tools/build-docs.js' and commit";
+            exit 1;
+          }

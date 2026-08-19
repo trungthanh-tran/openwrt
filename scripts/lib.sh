@@ -120,9 +120,11 @@ radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "
 gen_mac() {
   oui="$(printf '%s' "${1:-}" | tr -d ' \r' | tr 'A-Z' 'a-z')"
   if [ -n "$oui" ]; then
+    # shellcheck disable=SC2046  # intentional word-split of hexdump octets
     printf '%s:%02x:%02x:%02x\n' "$oui" \
       $(head -c3 /dev/urandom | hexdump -v -e '/1 "%u "')
   else
+    # shellcheck disable=SC2046  # intentional word-split of hexdump octets
     printf '02:%02x:%02x:%02x:%02x:%02x\n' \
       $(head -c5 /dev/urandom | hexdump -v -e '/1 "%u "')
   fi

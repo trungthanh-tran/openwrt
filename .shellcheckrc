@@ -1,0 +1,6 @@
+# Scripts target BusyBox ash — lint them as POSIX sh.
+shell=sh
+# Sourced files (scripts/lib.sh, config/settings.sh) resolve at runtime on the
+# router, not at lint time; do not fail on "not following" source paths.
+disable=SC1091
+external-sources=false

@@ -53,6 +53,9 @@ pc/                         # CHẠY TỪ MÁY QUẢN TRỊ (Windows/Linux): upd
   backup.ps1 / backup.sh    #   backup router rồi kéo snapshot về máy
   restore.ps1 / restore.sh  #   đẩy snapshot lên router + rollback
 docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, admin-guide
+tests/run.sh                # unit test POSIX sh cho lib.sh (không cần router)
+tools/build-docs.js         # sinh docs/*.html từ docs/*.md
+Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 ```
 
 ## 2 chế độ dùng local
@@ -100,6 +103,15 @@ sh scripts/rollback.sh
 .\pc\restore.ps1           # khôi phục router từ snapshot mới nhất trên máy
 ```
 Bản Linux/macOS tương đương: `sh pc/update.sh` / `pc/backup.sh` / `pc/restore.sh`. Chi tiết: [pc/README.md](pc/README.md).
+
+## Phát triển
+```sh
+make test    # unit test (không cần router; phần cần jq tự skip)
+make lint    # shellcheck
+make docs    # sinh lại docs/*.html sau khi sửa docs/*.md
+make check   # lint + test + docs-check (giống CI)
+```
+CI (GitHub Actions + GitLab CI) chạy test + lint + kiểm tra docs khớp nguồn trên mỗi push. Quy ước & ràng buộc: [CONTRIBUTING.md](CONTRIBUTING.md) · lịch sử thay đổi: [CHANGELOG.md](CHANGELOG.md) · bảo mật: [SECURITY.md](SECURITY.md) · phiên bản: [VERSION](VERSION).
 
 ## Tài liệu
 - **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ local theo bước: firmware → cấu hình → agent LAN → bảo mật. Bắt đầu ở đây.**
