@@ -49,7 +49,7 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "X-SB-Token: $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`. Device management: `scripts/clients.sh` lists clients per SSID; `scripts/{kick,ban,unban}.sh <idx> <mac>` deauth/ban/unban a device.
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
 
-**Console builds:** the same UI ships as the router-hosted **web** build and a Windows **desktop** `.exe` (WebView2, no mixed-content limit). Build the desktop app with `cd desktop; .\build.ps1` — see [../desktop/README.en.md](../desktop/README.en.md).
+**Console builds:** the same UI ships as the router-hosted **web** build and a Windows **desktop** `.exe` (WebView2, no mixed-content limit). Build the desktop app with `cd console/desktop; .\build.ps1` — see [../console/desktop/README.en.md](../console/desktop/README.en.md).
 
 ## Installation and acceptance
 

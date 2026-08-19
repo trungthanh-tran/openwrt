@@ -2,7 +2,7 @@
 
 **Language:** [Tiếng Việt](README.md) | English
 
-The same interface as the [web build](../ui/control-panel.html), packaged as a
+The same interface as the [web build](../web/control-panel.html), packaged as a
 Windows app (`.exe`) using WebView2. Key differences:
 
 | | Web build (router-hosted) | Desktop build (.exe) |
@@ -12,7 +12,7 @@ Windows app (`.exe`) using WebView2. Key differences:
 | Mixed content | Blocked when opened over **https** → must open over http from the router | **Not blocked** — calls the router over http on the LAN directly |
 | Updating | recopy the HTML | rebuild the exe |
 
-> Both builds share **one source file**, `ui/control-panel.html`. Edit the UI
+> Both builds share **one source file**, `console/web/control-panel.html`. Edit the UI
 > there; the web build copies it as-is, the desktop build repackages it
 > (`build.ps1` copies it automatically).
 

@@ -1,5 +1,5 @@
 # run.ps1 — dev run of the desktop console without building an exe.
-# Loads the shared UI (..\ui\control-panel.html) in a WebView2 window.
+# Loads the shared UI (..\web\control-panel.html) in a WebView2 window.
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here

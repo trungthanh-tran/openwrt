@@ -47,7 +47,7 @@ chmod +x /www/cgi-bin/sbproxy
 
 log "5) UI self-host -> /www/sbproxy/index.html"
 mkdir -p /www/sbproxy
-cp "$SB_ROOT/ui/control-panel.html" /www/sbproxy/index.html
+cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
 
 log "6) Health daemon -> /usr/sbin/ + procd"
 cp "$AGENT/sbproxy-healthd" /usr/sbin/sbproxy-healthd

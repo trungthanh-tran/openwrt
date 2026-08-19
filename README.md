@@ -40,9 +40,10 @@ scripts/
   uninstall.sh              # gỡ mọi thứ project tạo
   lib.sh                    # helpers + generator sing-box/nftables
 etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
-ui/control-panel.html       # UI NGUỒN (dùng chung Web + Desktop): soạn SSID→SOCKS, sinh config, Live, quản lý thiết bị
-desktop/                    # Bản Desktop: đóng gói ui/control-panel.html thành .exe Windows (WebView2)
-  main.py / build.ps1       #   host pywebview + script build 1 lệnh -> dist/sbproxy-console.exe
+console/                    # Console quản lý (UI dùng chung Web + Desktop)
+  web/control-panel.html    #   UI NGUỒN: soạn SSID→SOCKS, sinh config, Live, quản lý thiết bị
+  desktop/                  #   Bản Desktop: đóng gói UI thành .exe Windows (WebView2)
+    main.py / build.ps1     #     host pywebview + script build 1 lệnh -> dist/sbproxy-console.exe
 agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check latency realtime
   cgi/sbproxy               #   REST API gọi các script trên router
   sbproxy-healthd           #   daemon probe SOCKS, đo latency
@@ -60,7 +61,7 @@ docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, adm
 
 ### Console: bản Web và bản Desktop (cùng 1 UI nguồn)
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
-- **Bản Desktop (.exe)** — chạy trên máy Windows, dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content**. Build 1 lệnh: `cd desktop; .\build.ps1`. Chi tiết: [desktop/README.md](desktop/README.md).
+- **Bản Desktop (.exe)** — chạy trên máy Windows, dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content**. Build 1 lệnh: `cd console/desktop; .\build.ps1`. Chi tiết: [console/desktop/README.md](console/desktop/README.md).
 
 ## Quickstart
 ```sh

@@ -126,7 +126,7 @@ Cài `nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full sing-box`, cài `/e
 Có 2 cách, chọn 1:
 
 ### Cách 1 — Dùng UI "sbproxy Console" (dễ nhất)
-1. Mở UI (artifact web hoặc `ui/control-panel.html`).
+1. Mở UI (bản Web `http://<router>/sbproxy/` hoặc `console/web/control-panel.html`).
 2. **＋ Thêm WiFi**: nhập tên, băng tần, mật khẩu, SOCKS host/port/user/pass, bật/tắt cách ly & chặn WebRTC. idx tự gợi ý.
 3. Theo dõi đồng hồ **BSSID mỗi băng** — đừng để vượt giới hạn (đỏ).
 4. Tab **wifi-socks.conf** → **⧉ Copy** (hoặc **Tải wifi-socks.conf**).

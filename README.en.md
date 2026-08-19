@@ -46,11 +46,11 @@ sh scripts/rollback.sh
 - Offline mode edits and previews configuration without contacting a router.
 - Live LAN mode uses [the local agent](agent/README.en.md) at `http://<router>/sbproxy/`.
 
-The console ships in two flavors sharing one source (`ui/control-panel.html`):
+The console ships in two flavors sharing one source (`console/web/control-panel.html`):
 the **web build** (router-hosted, same-origin) and the **desktop build** (a
 Windows `.exe` via WebView2 that reaches `http://<router-ip>` over the LAN with
-no mixed-content limit). Build the desktop app with `cd desktop; .\build.ps1`
-— see [desktop/README.en.md](desktop/README.en.md).
+no mixed-content limit). Build the desktop app with `cd console/desktop; .\build.ps1`
+— see [console/desktop/README.en.md](console/desktop/README.en.md).
 
 There is no cloud control. Use a trusted management LAN or self-managed VPN. Never expose LuCI, uhttpd, SSH, or the agent directly to the WAN.
 

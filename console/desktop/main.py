@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sbproxy Console — desktop host.
 
-Wraps the shared web UI (ui/control-panel.html) in a native WebView2 window so
+Wraps the shared web UI (console/web/control-panel.html) in a native WebView2 window so
 it can talk to the router agent over http on the LAN without the browser's
 mixed-content restriction (which blocks an https page from calling http). The
 UI is identical to the web build; only the shell differs.
@@ -26,9 +26,9 @@ def ui_path():
     bundled = resource_path("control-panel.html")
     if os.path.exists(bundled):
         return bundled
-    # Dev fallback: the shared source in the sibling ui/ directory.
+    # Dev fallback: the shared source in the sibling web/ directory.
     here = os.path.dirname(os.path.abspath(__file__))
-    dev = os.path.join(here, "..", "ui", "control-panel.html")
+    dev = os.path.join(here, "..", "web", "control-panel.html")
     return os.path.abspath(dev)
 
 

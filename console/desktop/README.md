@@ -2,7 +2,7 @@
 
 **Ngôn ngữ:** Tiếng Việt | [English](README.en.md)
 
-Cùng một giao diện với [bản Web](../ui/control-panel.html), nhưng đóng gói thành
+Cùng một giao diện với [bản Web](../web/control-panel.html), nhưng đóng gói thành
 ứng dụng Windows (`.exe`) dùng WebView2. Khác biệt chính:
 
 | | Bản Web (router-hosted) | Bản Desktop (.exe) |
@@ -12,7 +12,7 @@ Cùng một giao diện với [bản Web](../ui/control-panel.html), nhưng đó
 | Mixed-content | Bị chặn nếu mở qua **https** → phải mở qua http từ router | **Không bị chặn** — gọi thẳng router http qua LAN |
 | Cập nhật | copy lại file HTML | build lại exe |
 
-> Cả hai bản dùng **chung một file nguồn** `ui/control-panel.html`. Sửa UI ở đó,
+> Cả hai bản dùng **chung một file nguồn** `console/web/control-panel.html`. Sửa UI ở đó,
 > bản Web copy trực tiếp, bản Desktop build lại (`build.ps1` tự copy file này).
 
 ## Yêu cầu
