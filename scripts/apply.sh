@@ -44,6 +44,7 @@ SINGBOX_CONF="$STAGE/config.json"; NFT_FILE="$STAGE/sbproxy.nft"
 build_singbox
 build_nft
 command -v sing-box >/dev/null 2>&1 || die "Thiếu sing-box."
+require_singbox_version
 singbox_check "$SINGBOX_CONF" || die "sing-box config không hợp lệ."
 nft --check --file "$NFT_FILE" || die "nftables config không hợp lệ."
 

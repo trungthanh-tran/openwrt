@@ -167,20 +167,34 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# sing-box >=1.12 refuses the legacy syntax we emit unless ENABLE_DEPRECATED_*
-# env flags are set. Run every sing-box invocation through these helpers.
+# The generated config uses modern (1.12+) syntax. SINGBOX_COMPAT_ENV is an
+# escape hatch for future ENABLE_DEPRECATED_* flags; empty means none needed.
 # ---------------------------------------------------------------------------
 singbox_check() {
   # shellcheck disable=SC2086  # word-splitting of the flag list is intended
   env ${SINGBOX_COMPAT_ENV:-} sing-box check -c "$1"
 }
 
+# The modern DNS config (fakeip server type, rule actions) needs sing-box 1.12+.
+require_singbox_version() {
+  v="$(sing-box version 2>/dev/null | head -1 | sed 's/.*version \([0-9][0-9.]*\).*/\1/')"
+  [ -n "$v" ] || { warn "Không đọc được version sing-box; tiếp tục."; return 0; }
+  maj="${v%%.*}"; rest="${v#*.}"; min="${rest%%.*}"
+  if [ "$maj" -lt 1 ] || { [ "$maj" -eq 1 ] && [ "$min" -lt 12 ]; }; then
+    die "Cần sing-box >= 1.12 (đang có $v): config dùng cú pháp DNS mới."
+  fi
+}
+
 # The packaged procd init script has no env hook, so inject a
 # `procd_set_param env` line after its command line. Idempotent; re-run after
-# every apply because package upgrades rewrite the file.
+# every apply because package upgrades rewrite the file. When the flag list is
+# empty, remove any line injected by an older version instead.
 ensure_singbox_compat_env() {
-  [ -n "${SINGBOX_COMPAT_ENV:-}" ] || return 0
   initf="/etc/init.d/sing-box"
+  if [ -z "${SINGBOX_COMPAT_ENV:-}" ]; then
+    [ -f "$initf" ] && [ "${DRYRUN:-0}" != "1" ] && sed -i '/procd_set_param env ENABLE_DEPRECATED/d' "$initf"
+    return 0
+  fi
   [ -f "$initf" ] || { warn "Không thấy $initf; bỏ qua compat env cho service."; return 0; }
   if [ "${DRYRUN:-0}" = "1" ]; then
     printf 'DRYRUN> chèn "procd_set_param env %s" vào %s\n' "$SINGBOX_COMPAT_ENV" "$initf" >&2
@@ -222,15 +236,20 @@ build_singbox() {
   mkdir -p "$(dirname "$SINGBOX_CONF")"
   # DNS fake-IP: trả fake-IP cho client, map ngược về hostname khi kết nối,
   # nhờ đó outbound SOCKS luôn nhận hostname (remote resolve) thay vì IP thật.
+  # - Chặn HTTPS/SVCB (type 65/64): hint IP thật trong đó cho phép trình duyệt
+  #   né fake-IP và kết nối bằng IP thô -> SOCKS từ chối.
+  # - Không cấp inet6_range: mạng SSID là IPv4-only, AAAA trả rỗng (NOERROR)
+  #   để client không thử kết nối IPv6 giả không route được.
   cat > "$SINGBOX_CONF" <<EOF
 {
   "log": { "level": "warn", "timestamp": true },
   "dns": {
     "servers": [
-      { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE", "inet6_range": "fc00::/18" },
+      { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE" },
       { "type": "udp", "tag": "upstream", "server": "1.1.1.1" }
     ],
     "rules": [
+      { "query_type": ["HTTPS", "SVCB"], "action": "predefined", "rcode": "NOTIMP" },
       { "query_type": ["A", "AAAA"], "action": "route", "server": "fakeip" }
     ],
     "final": "upstream",
