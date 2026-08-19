@@ -40,7 +40,9 @@ scripts/
   uninstall.sh              # gỡ mọi thứ project tạo
   lib.sh                    # helpers + generator sing-box/nftables
 etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
-ui/control-panel.html       # UI: soạn SSID→SOCKS, sinh config; + chế độ Live qua agent
+ui/control-panel.html       # UI NGUỒN (dùng chung Web + Desktop): soạn SSID→SOCKS, sinh config, Live, quản lý thiết bị
+desktop/                    # Bản Desktop: đóng gói ui/control-panel.html thành .exe Windows (WebView2)
+  main.py / build.ps1       #   host pywebview + script build 1 lệnh -> dist/sbproxy-console.exe
 agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check latency realtime
   cgi/sbproxy               #   REST API gọi các script trên router
   sbproxy-healthd           #   daemon probe SOCKS, đo latency
@@ -54,7 +56,11 @@ docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, adm
 
 ## 2 chế độ dùng local
 - **Offline (mặc định):** UI soạn `wifi-socks.conf` + preview sing-box/nft → bạn tự `apply.sh`. Chạy ở bất kỳ đâu.
-- **Live LAN (agent kiến trúc B):** cài `agent/install-agent.sh`, mở UI từ `http://<router>/sbproxy/` → áp thẳng lên router, xem **latency SOCKS realtime**. Xem [agent/README.md](agent/README.md).
+- **Live LAN (agent kiến trúc B):** cài `agent/install-agent.sh`, mở UI → áp thẳng lên router, xem **latency SOCKS realtime**, quản lý thiết bị (kick/cấm). Xem [agent/README.md](agent/README.md).
+
+### Console: bản Web và bản Desktop (cùng 1 UI nguồn)
+- **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
+- **Bản Desktop (.exe)** — chạy trên máy Windows, dùng WebView2, gọi thẳng `http://<IP-router>` qua LAN **không bị chặn mixed-content**. Build 1 lệnh: `cd desktop; .\build.ps1`. Chi tiết: [desktop/README.md](desktop/README.md).
 
 ## Quickstart
 ```sh

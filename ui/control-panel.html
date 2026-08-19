@@ -352,7 +352,7 @@
         <label>Token <span class="req">*</span> <span class="derived">(in ra bởi install-agent.sh)</span></label>
         <input type="text" id="c_token" class="mono" placeholder="vd 3f9a1c...">
       </div>
-      <div class="derived">Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b>.</div>
+      <div class="derived" id="mixedNote">Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).</div>
     </div>
     <div class="foot">
       <button class="btn ghost" id="disconnectBtn">Ngắt</button>
@@ -556,6 +556,22 @@
     if (typeof closeDevices === "function") closeDevices();
     setConnStatus("Đã ngắt kết nối.");
   }
+
+  // Desktop (.exe) build vs router-hosted web build. main.py sets
+  // window.SBPROXY_DESKTOP after load; pywebview also injects window.pywebview.
+  function isDesktop() {
+    return !!window.SBPROXY_DESKTOP || typeof window.pywebview !== "undefined";
+  }
+  function updateConnHint() {
+    const el = document.getElementById("mixedNote");
+    if (!el) return;
+    el.innerHTML = isDesktop()
+      ? "Bản Desktop: nhập <b>http://&lt;IP-router&gt;</b> (ví dụ http://192.168.8.1) rồi dán token. Không bị chặn mixed-content."
+      : "Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).";
+    const b = document.querySelector(".brand p");
+    if (b && isDesktop() && !/Desktop/.test(b.textContent)) b.textContent += " · Desktop";
+  }
+  window.sbproxyApplyDesktop = updateConnHint;   // called by desktop host after load
 
   function showLog(title, d) {
     document.getElementById("logTitle").textContent = title + (d && d.ok ? " ✓" : " ✗");
@@ -1077,6 +1093,8 @@
   initTheme();
   render();
   initAgent();
+  updateConnHint();
+  window.addEventListener("pywebviewready", updateConnHint);
 })();
 </script>
 </body>

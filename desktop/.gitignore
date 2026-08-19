@@ -1,0 +1,6 @@
+# Build artifacts and the staged copy of the shared UI.
+build/
+dist/
+__pycache__/
+*.spec
+control-panel.html
