@@ -27,6 +27,7 @@ SB_ROOT="${SB_ROOT:-/root/sbproxy}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 TOKEN_FILE="${TOKEN_FILE:-/etc/sbproxy/token}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+MAX_BODY_BYTES="${MAX_BODY_BYTES:-262144}"
 
 # ---- helpers ----
 hdr() {
@@ -40,6 +41,17 @@ hdr() {
 json_ok()  { hdr "200 OK" "application/json"; printf '%s\n' "$1"; exit 0; }
 json_err() { hdr "$1" "application/json"; jq -n --arg e "$2" '{ok:false,error:$e}'; exit 0; }
 have() { command -v "$1" >/dev/null 2>&1; }
+trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+body_has_nul() {
+  if have od; then
+    od -An -tu1 "$BODY_FILE" 2>/dev/null \
+      | awk '{for (i=1; i<=NF; i++) if ($i == 0) found=1} END {exit found ? 0 : 1}'
+  elif have hexdump; then
+    hexdump -v -e '/1 "%u\n"' "$BODY_FILE" 2>/dev/null | grep -qx '0'
+  else
+    return 2
+  fi
+}
 
 have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu package jq"; exit 0; }
 
@@ -57,20 +69,75 @@ esac
 
 # ---- parse action ----
 ACTION="$(echo "$QUERY_STRING" | sed -n 's/.*\(^\|&\)action=\([a-z_]*\).*/\2/p')"
-BODY=""
-[ "$REQUEST_METHOD" = "POST" ] && BODY="$(cat)"
+BODY_FILE=""
+TMP_CONF=""
+cleanup() {
+  [ -z "$BODY_FILE" ] || rm -f "$BODY_FILE"
+  [ -z "$TMP_CONF" ] || rm -f "$TMP_CONF"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+if [ "$REQUEST_METHOD" = "POST" ]; then
+  case "$MAX_BODY_BYTES" in ''|*[!0-9]*|0) MAX_BODY_BYTES=262144;; esac
+  case "${CONTENT_LENGTH:-}" in
+    '' ) ;;
+    *[!0-9]* ) json_err "400 Bad Request" "Content-Length không hợp lệ";;
+    * ) [ "$CONTENT_LENGTH" -le "$MAX_BODY_BYTES" ] 2>/dev/null \
+          || json_err "413 Payload Too Large" "body vượt quá $MAX_BODY_BYTES byte";;
+  esac
+  umask 077
+  BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/sbproxy-cgi-body.XXXXXX")" \
+    || json_err "500 Internal Server Error" "không tạo được body tạm"
+  cat > "$BODY_FILE" || json_err "400 Bad Request" "không đọc được body"
+  body_size="$(wc -c < "$BODY_FILE" | tr -d ' ')"
+  [ "$body_size" -le "$MAX_BODY_BYTES" ] 2>/dev/null \
+    || json_err "413 Payload Too Large" "body vượt quá $MAX_BODY_BYTES byte"
+  body_has_nul; nul_rc=$?
+  [ "$nul_rc" -ne 0 ] || json_err "400 Bad Request" "body chứa byte NUL không hợp lệ"
+  [ "$nul_rc" -ne 2 ] || json_err "500 Internal Server Error" "thiếu od/hexdump để kiểm tra body"
+fi
+
+require_json_object() {
+  [ -n "$BODY_FILE" ] && jq -e 'type == "object"' "$BODY_FILE" >/dev/null 2>&1 \
+    || json_err "400 Bad Request" "body JSON không hợp lệ"
+}
+
+require_empty_or_json_object() {
+  [ ! -s "$BODY_FILE" ] || require_json_object
+}
+
+require_json_shape() {
+  jq -e "$1" "$BODY_FILE" >/dev/null 2>&1 \
+    || json_err "400 Bad Request" "$2"
+}
+
+require_valid_idx() {
+  value="$1"
+  case "$value" in *[!0-9]*|'') json_err "400 Bad Request" "idx không hợp lệ" ;; esac
+  [ "$value" -ge 1 ] 2>/dev/null && [ "$value" -le 200 ] 2>/dev/null \
+    || json_err "400 Bad Request" "idx ngoài phạm vi 1..200"
+}
+
+valid_snapshot_name() {
+  [ "${#1}" -le 128 ] || return 1
+  case "$1" in ""|*[!A-Za-z0-9._-]*|*..*) return 1 ;; esac
+  return 0
+}
 
 # Build SSID JSON without exposing wifi_key or sock_pass.
 # Reads the optional 11th column (mac_oui); older 10-column rows leave it empty.
 ssids_json() {
-  { grep -v '^[[:space:]]*#' "$CONF" 2>/dev/null | grep '|' | \
-    while IFS='|' read -r name band idx key host port user pass iso web oui; do
-      idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue
-      iso="$(echo "$iso" | tr -d ' ')"; web="$(echo "$web" | tr -d ' ')"
-      oui="$(echo "$oui" | tr -d ' \r')"
+  { awk -F'|' 'NF == 10 || NF == 11 { if ($0 !~ /^[[:space:]]*#/) print }' "$CONF" 2>/dev/null | \
+    while IFS='|' read -r name band idx _wifi_key host port user pass iso web oui; do
+      idx="$(trim_field "$idx")"
+      case "$idx" in ''|*[!0-9]*|0*) continue;; esac
+      [ "$idx" -ge 1 ] 2>/dev/null && [ "$idx" -le 200 ] 2>/dev/null || continue
+      iso="$(trim_field "$iso")"; web="$(trim_field "$web")"
+      oui="$(trim_field "$oui")"
       mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
       jq -n --arg name "$name" --arg band "$band" --argjson idx "$idx" \
-            --arg host "$host" --arg port "$(echo "$port"|tr -d ' ')" --arg user "$user" \
+            --arg host "$host" --arg port "$(trim_field "$port")" --arg user "$user" \
             --arg oui "$oui" --arg mac "$mac" \
             --argjson iso "$([ "$iso" = 1 ] && echo true || echo false)" \
             --argjson web "$([ "$web" = 1 ] && echo true || echo false)" \
@@ -82,6 +149,10 @@ case "$ACTION" in
   status)
     S="$(ssids_json)"; [ -n "$S" ] || S="[]"
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
+    printf '%s' "$H" | jq -e '
+      type == "object" and
+      ((has("probes") | not) or ((.probes | type == "object") and all(.probes[]; type == "object")))
+    ' >/dev/null 2>&1 || H='{}'
     applied="false"; [ -f "$SINGBOX_CONF" ] || [ -f /etc/sing-box/config.json ] && applied="true"
     running="false"; pgrep -f sing-box >/dev/null 2>&1 && running="true"
     json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
@@ -95,29 +166,45 @@ case "$ACTION" in
 
   save_conf)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    [ -n "$BODY" ] || json_err "400 Bad Request" "body rỗng"
-    # Minimal structural validation before saving.
-    bad="$(printf '%s\n' "$BODY" | grep -v '^[[:space:]]*#' | grep '|' | awk -F'|' 'NF<10{print NR}' | head -1)"
-    [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad thiếu cột (cần 10 cột phân tách '|')"
+    [ -s "$BODY_FILE" ] || json_err "400 Bad Request" "body rỗng"
+    # Structural validation gives a concise line error before the shared
+    # validator checks all bounds, duplicate indexes, keys, flags, and OUI.
+    bad="$(awk -F'|' '
+      /^[[:space:]]*($|#)/ {next}
+      NF != 10 && NF != 11 {print NR; exit}
+    ' "$BODY_FILE")"
+    [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad cần đúng 10 hoặc 11 cột phân tách '|'"
+    TMP_CONF="$(mktemp "${CONF}.candidate.XXXXXX")" \
+      || json_err "500 Internal Server Error" "không tạo được config tạm"
+    cp "$BODY_FILE" "$TMP_CONF" \
+      || json_err "500 Internal Server Error" "không tạo được config tạm"
+    VALIDATE_OUT="$(cd "$SB_ROOT" && SB_ROOT="$SB_ROOT" CONF="$TMP_CONF" \
+      sh -c '. "$SB_ROOT/scripts/lib.sh"; validate_conf' 2>&1)"; VALIDATE_RC=$?
+    [ "$VALIDATE_RC" -eq 0 ] \
+      || json_err "400 Bad Request" "config không hợp lệ: $VALIDATE_OUT"
     # Back up before writing desired config; the following apply uses --no-backup.
     OUT="$(cd "$SB_ROOT" && sh scripts/backup.sh pre-apply 2>&1)" || json_err "500 Internal Server Error" "backup trước apply thất bại"
-    printf '%s\n' "$BODY" > "$CONF"
+    mv "$TMP_CONF" "$CONF" || json_err "500 Internal Server Error" "không lưu được config"
+    TMP_CONF=""
     json_ok "$(jq -n '{ok:true, saved:true}')"
     ;;
 
   dryrun_conf)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    [ -n "$BODY" ] || json_err "400 Bad Request" "body rỗng"
-    TMP_CONF="/tmp/sbproxy-dryrun-conf.$$"
-    printf '%s\n' "$BODY" > "$TMP_CONF" \
+    [ -s "$BODY_FILE" ] || json_err "400 Bad Request" "body rỗng"
+    TMP_CONF="$(mktemp "${TMPDIR:-/tmp}/sbproxy-dryrun-conf.XXXXXX")" \
+      || json_err "500 Internal Server Error" "không tạo được config dry-run"
+    cp "$BODY_FILE" "$TMP_CONF" \
       || json_err "500 Internal Server Error" "không tạo được config dry-run"
     OUT="$(cd "$SB_ROOT" && CONF="$TMP_CONF" DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply.sh --no-backup 2>&1)"; RC=$?
     rm -f "$TMP_CONF"
+    TMP_CONF=""
     json_ok "$(jq -n --arg log "$OUT" --arg phase "dryrun" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, phase:$phase, log:$log}')"
     ;;
 
   apply)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_empty_or_json_object
     # Every caller, including the web UI, must pass the same complete dry-run
     # immediately before router state can change.
     CHECK="$(cd "$SB_ROOT" && DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply.sh --no-backup 2>&1)"; CHECK_RC=$?
@@ -130,22 +217,46 @@ case "$ACTION" in
 
   set_sock)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    idx="$(echo "$BODY" | jq -r '.idx // empty')"
-    host="$(echo "$BODY" | jq -r '.host // empty')"
-    port="$(echo "$BODY" | jq -r '.port // empty')"
-    user="$(echo "$BODY" | jq -r '.user // ""')"
-    pass="$(echo "$BODY" | jq -r '.pass // ""')"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      def clean:
+        if type != "string" then false
+        else all(explode[]; . >= 32 and (. < 127 or . > 159)) end;
+      (.idx | integer) and (.host | clean) and (.port | integer) and
+      ((has("user") | not) or (.user | clean)) and
+      ((has("pass") | not) or (.pass | clean))
+    ' "idx/host/port/user/pass sai kiểu hoặc chứa ký tự điều khiển"
+    idx="$(jq -r '.idx' "$BODY_FILE")"
+    host="$(jq -r '.host' "$BODY_FILE")"
+    port="$(jq -r '.port' "$BODY_FILE")"
+    user="$(jq -r '.user // ""' "$BODY_FILE")"
+    pass="$(jq -r '.pass // ""' "$BODY_FILE")"
     [ -n "$idx" ] && [ -n "$host" ] && [ -n "$port" ] || json_err "400 Bad Request" "thiếu idx/host/port"
+    require_valid_idx "$idx"
+    case "$port" in *[!0-9]*|'') json_err "400 Bad Request" "port không hợp lệ" ;; esac
+    [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null \
+      || json_err "400 Bad Request" "port ngoài phạm vi 1..65535"
+    case "$host" in *[!A-Za-z0-9._:-]*) json_err "400 Bad Request" "host chứa ký tự không hợp lệ" ;; esac
+    [ "${#host}" -le 253 ] || json_err "400 Bad Request" "host dài quá 253 ký tự"
+    [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] \
+      || json_err "400 Bad Request" "user/pass dài quá 255 ký tự"
+    case "$user$pass" in *'|'*) json_err "400 Bad Request" "user/pass không được chứa ký tự |" ;; esac
     OUT="$(cd "$SB_ROOT" && sh scripts/set-sock.sh "$idx" "$host" "$port" "$user" "$pass" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
   rotate_mac)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    idx="$(echo "$BODY" | jq -r '.idx // empty')"
-    case "$idx" in *[!0-9]*|'') json_err "400 Bad Request" "idx không hợp lệ" ;; esac
-    has_oui="$(echo "$BODY" | jq -r 'has("oui")')"
-    oui="$(echo "$BODY" | jq -r '.oui // ""')"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      (.idx | integer) and ((has("oui") | not) or (.oui | type == "string"))
+    ' "idx/oui sai kiểu"
+    idx="$(jq -r '.idx' "$BODY_FILE")"
+    require_valid_idx "$idx"
+    has_oui="$(jq -r 'has("oui")' "$BODY_FILE")"
+    oui="$(jq -r '.oui // ""' "$BODY_FILE")"
     [ -z "$oui" ] || echo "$oui" | grep -Eq '^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){2}$' \
       || json_err "400 Bad Request" "oui phải dạng AA:BB:CC hoặc để trống"
     if [ "$has_oui" = "true" ]; then
@@ -159,18 +270,25 @@ case "$ACTION" in
 
   rollback)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    name="$(echo "$BODY" | jq -r '.name // ""')"
+    require_json_object
+    require_json_shape '((has("name") | not) or (.name | type == "string"))' "name sai kiểu"
+    name="$(jq -r '.name // ""' "$BODY_FILE")"
+    [ -z "$name" ] || valid_snapshot_name "$name" \
+      || json_err "400 Bad Request" "tên backup không hợp lệ"
     OUT="$(cd "$SB_ROOT" && SB_YES=1 sh scripts/rollback.sh "$name" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
   uninstall)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_empty_or_json_object
     OUT="$(cd "$SB_ROOT" && sh scripts/uninstall.sh 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
   backups)
+    # BusyBox-compatible mtime ordering; snapshot names are generated safely.
+    # shellcheck disable=SC2010
     B="$(ls -1dt "${BACKUP_DIR:-/root/sbproxy-backups}"/*/ 2>/dev/null | grep -v '/latest/$' | sed 's#.*/\([^/]*\)/$#\1#' | jq -R . | jq -s '.')"
     [ -n "$B" ] || B="[]"
     json_ok "$(jq -n --argjson b "$B" '{ok:true, backups:$b}')"
@@ -178,7 +296,10 @@ case "$ACTION" in
 
   backup)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    label="$(echo "$BODY" | jq -r '.label // "ui"' 2>/dev/null)"
+    require_json_object
+    require_json_shape '((has("label") | not) or (.label | type == "string"))' "label sai kiểu"
+    label="$(jq -r '.label // "ui"' "$BODY_FILE" 2>/dev/null)"
+    valid_snapshot_name "$label" || json_err "400 Bad Request" "nhãn backup không hợp lệ"
     OUT="$(cd "$SB_ROOT" && sh scripts/backup.sh "$label" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
@@ -186,7 +307,7 @@ case "$ACTION" in
   download_backup)
     # Download an off-device backup for recovery after reflash or brick.
     name="$(echo "$QUERY_STRING" | sed -n 's/.*[?&]name=\([A-Za-z0-9._-]*\).*/\1/p')"
-    case "$name" in ""|*..*|*/*) json_err "400 Bad Request" "tên backup không hợp lệ";; esac
+    valid_snapshot_name "$name" || json_err "400 Bad Request" "tên backup không hợp lệ"
     dir="${BACKUP_DIR:-/root/sbproxy-backups}/$name"
     f="$dir/sysupgrade-backup.tar.gz"
     [ -f "$f" ] || f="$dir/etc-config.tar.gz"
@@ -202,28 +323,40 @@ case "$ACTION" in
   health_now)
     [ -x /usr/sbin/sbproxy-healthd ] && /usr/sbin/sbproxy-healthd --once >/dev/null 2>&1
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
+    printf '%s' "$H" | jq -e '
+      type == "object" and
+      ((has("probes") | not) or ((.probes | type == "object") and all(.probes[]; type == "object")))
+    ' >/dev/null 2>&1 || H='{}'
     json_ok "$(jq -n --argjson health "$H" '{ok:true, health:$health}')"
     ;;
 
   gateway)
     OUT="$(cd "$SB_ROOT" && sh scripts/gateway.sh 2>&1)"; RC=$?
     [ "$RC" -eq 0 ] || json_err "500 Internal Server Error" "kiểm tra gateway thất bại"
-    printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 || json_err "500 Internal Server Error" "gateway trả dữ liệu không hợp lệ"
+    printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 || json_err "500 Internal Server Error" "gateway trả dữ liệu không hợp lệ"
     json_ok "$OUT"
     ;;
 
   clients)
-    OUT="$(cd "$SB_ROOT" && sh scripts/clients.sh 2>/dev/null)"
-    printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 || json_err "500 Internal Server Error" "không đọc được danh sách client"
+    OUT="$(cd "$SB_ROOT" && sh scripts/clients.sh 2>/dev/null)"; RC=$?
+    [ "$RC" -eq 0 ] || json_err "500 Internal Server Error" "không đọc được danh sách client"
+    printf '%s' "$OUT" | jq -e '
+      type == "object" and (.clients | type == "array") and all(.clients[]; type == "object")
+    ' >/dev/null 2>&1 || json_err "500 Internal Server Error" "không đọc được danh sách client"
     json_ok "$OUT"
     ;;
 
   kick|ban|unban)
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
-    idx="$(echo "$BODY" | jq -r '.idx // empty')"
-    mac="$(echo "$BODY" | jq -r '.mac // empty')"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      (.idx | integer) and (.mac | type == "string")
+    ' "idx/mac sai kiểu"
+    idx="$(jq -r '.idx' "$BODY_FILE")"
+    mac="$(jq -r '.mac' "$BODY_FILE")"
     [ -n "$idx" ] && [ -n "$mac" ] || json_err "400 Bad Request" "thiếu idx/mac"
-    case "$idx" in *[!0-9]*|'') json_err "400 Bad Request" "idx không hợp lệ" ;; esac
+    require_valid_idx "$idx"
     echo "$mac" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || json_err "400 Bad Request" "mac không hợp lệ"
     OUT="$(cd "$SB_ROOT" && sh "scripts/$ACTION.sh" "$idx" "$mac" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"

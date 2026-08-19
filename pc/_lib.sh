@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2034,SC1090  # Shared variables/config are consumed by callers.
 # _lib.sh — shared helpers for pc/*.sh on Linux, macOS, and Git Bash.
 #
 # Configuration precedence: CLI arguments, config file, then defaults.

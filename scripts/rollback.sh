@@ -12,6 +12,7 @@ require_root
 
 if [ "$1" = "--list" ]; then
   echo "Backup có sẵn trong $BACKUP_DIR:"
+  # shellcheck disable=SC2010  # BusyBox-compatible mtime ordering over generated names.
   ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | sed "s#$BACKUP_DIR/##;s#/\$##" || echo "  (chưa có)"
   echo "'latest' -> $(readlink -f "$BACKUP_DIR/latest" 2>/dev/null || echo none)"
   exit 0

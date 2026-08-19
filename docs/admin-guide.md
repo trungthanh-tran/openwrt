@@ -4,7 +4,7 @@
 
 Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent LAN → kiểm tra → vận hành → bảo mật.
 
-> Bản HTML đọc offline: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).
+> Bản HTML tiếng Việt: [admin-guide.vi.html](admin-guide.vi.html). HTML mặc định tiếng Anh: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).
 
 ## ★ Best practices — đọc trước khi bắt đầu
 - **Luôn cắm LAN dây dự phòng** khi động vào firmware/mạng — hỏng WiFi vẫn SSH vào cứu được.
@@ -45,7 +45,7 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 10, 13 | `scripts/gateway.sh` | Kiểm tra read-only default route, đối chiếu `wwan`, link, DNS và HTTP trực tiếp. |
 | 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
 | 14 | `scripts/clients.sh`, `scripts/{kick,ban,unban}.sh` | Liệt kê thiết bị theo SSID và kick/cấm/bỏ cấm theo MAC. |
-| — | `console/desktop/build.ps1` (Windows) | Build app Tkinter native `console/desktop/main.py` thành `.exe`; không dùng HTML/WebView. Xem [../console/desktop/README.md](../console/desktop/README.md). |
+| — | `console/desktop/build.ps1` (Windows) | Build app Tkinter native `console/desktop/main.py` thành `.exe`; không dùng HTML/WebView. Xem [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |
 | 15 | `scripts/security-audit.sh` | Audit quyền file, SSH và dấu hiệu mở quản trị; chỉ đọc. |
 
 Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script có thay đổi trạng thái vẫn yêu cầu quyết định rõ của quản trị viên; các script kiểm kê/audit không tự sửa để tránh khóa mất SSH.
@@ -211,7 +211,7 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ### 9.4 Console: bản Web vs bản Desktop
 Hai frontend độc lập dùng chung Agent API:
 - **Web (router-hosted):** `install-agent.sh` copy UI vào `/www/sbproxy/index.html`. Mở `http://<router>/sbproxy/` — same-origin. Nếu mở qua **https** thì trình duyệt chặn mixed-content khi gọi router http.
-- **Desktop (.exe):** build trên máy Windows quản trị: `cd console/desktop; .\build.ps1` → `console/desktop/dist/sbproxy-console.exe`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.md](../console/desktop/README.md).
+- **Desktop (.exe):** build trên máy Windows quản trị: `cd console/desktop; .\build.ps1` → `console/desktop/dist/sbproxy-console.exe`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
 
 > **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.

@@ -23,7 +23,7 @@ case "$HOST" in *[!A-Za-z0-9._:-]*) die "host chứa ký tự không hợp lệ"
 case "$USER$PASS" in *'|'*) die "user/pass không được chứa ký tự |" ;; esac
 
 # Ensure the requested index exists.
-grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*$IDX[[:space:]]*\|" "$CONF" || die "Không tìm thấy WiFi idx=$IDX trong $CONF"
+grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*${IDX}[[:space:]]*\|" "$CONF" || die "Không tìm thấy WiFi idx=$IDX trong $CONF"
 
 log "Backup config trước khi đổi SOCKS..."
 "$SB_ROOT/scripts/backup.sh" pre-setsock

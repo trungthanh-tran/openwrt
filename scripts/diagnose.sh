@@ -29,7 +29,7 @@ run 'Listening sockets' sh -c 'ss -lntup 2>/dev/null || netstat -lntup 2>/dev/nu
 run 'DNS hijack rules (must list tcp+udp dport 53 per SSID)' \
   sh -c "nft list chain inet sbproxy prerouting | grep 'dport 53'"
 run 'DNS/fake-IP config summary' \
-  sh -c "grep -n -E '\\"log\\"|fakeip|hijack-dns|out-w|in-w|default_domain_resolver' /etc/sing-box/config.json"
+  grep -n -E '"log"|fakeip|hijack-dns|out-w|in-w|default_domain_resolver' /etc/sing-box/config.json
 run 'DNS-related system logs' \
   sh -c "logread | grep -Ei 'sing-box|dns|tproxy|br-w[0-9]' | tail -n 150"
 run 'fakeip block in sing-box config' grep -c '"fakeip"' /etc/sing-box/config.json

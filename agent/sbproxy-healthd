@@ -19,6 +19,8 @@ SLOW_MS="${SLOW_MS:-800}"
 command -v jq   >/dev/null 2>&1 || { echo "healthd: thiếu jq";   exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "healthd: thiếu curl"; exit 1; }
 
+trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+
 probe_one() {
   # Arguments: host port user pass; output: "state latency_ms code".
   host="$1"; port="$2"; user="$3"; pass="$4"
@@ -28,6 +30,8 @@ probe_one() {
          -w '%{http_code} %{time_total}' "$PROBE_URL" 2>/dev/null)"
   code="$(echo "$res" | awk '{print $1}')"
   t="$(echo "$res" | awk '{print $2}')"
+  case "$code" in ''|*[!0-9]*) echo "fail 0 0"; return;; esac
+  echo "$t" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { echo "fail 0 $code"; return; }
   ms="$(awk -v t="$t" 'BEGIN{printf "%d", (t*1000)+0.5}')"
   case "$code" in
     200|204|301|302) [ "$ms" -gt "$SLOW_MS" ] && echo "slow $ms $code" || echo "ok $ms $code" ;;
@@ -36,12 +40,29 @@ probe_one() {
 }
 
 run_once() {
+  [ -r "$CONF" ] || { echo "healthd: không đọc được config $CONF" >&2; return 1; }
   probes="{}"
   # Read the source configuration.
-  while IFS='|' read -r name band idx key host port user pass iso web; do
+  while IFS='|' read -r name band idx wifi_key host port user pass isolate webrtc _oui extra; do
     case "$name" in ''|\#*) continue;; esac
-    idx="$(echo "$idx" | tr -d ' ')"; [ -n "$idx" ] || continue
-    host="$(echo "$host" | tr -d ' ')"; port="$(echo "$port" | tr -d ' ')"
+    [ -z "$extra" ] || continue
+    band="$(trim_field "$band")"
+    isolate="$(trim_field "$isolate")"; webrtc="$(trim_field "$webrtc")"
+    case "$band" in 2g|5g) :;; *) continue;; esac
+    case "$isolate$webrtc" in 00|01|10|11) :;; *) continue;; esac
+    [ "${#name}" -ge 1 ] && [ "${#name}" -le 32 ] || continue
+    [ "${#wifi_key}" -ge 8 ] && [ "${#wifi_key}" -le 63 ] || continue
+    idx="$(trim_field "$idx")"
+    case "$idx" in ''|*[!0-9]*) continue;; esac
+    [ "$idx" -ge 1 ] 2>/dev/null && [ "$idx" -le 200 ] 2>/dev/null || continue
+    host="$(trim_field "$host")"; port="$(trim_field "$port")"
+    case "$host" in ''|*[!A-Za-z0-9._:-]*) continue;; esac
+    [ "${#host}" -le 253 ] || continue
+    case "$port" in ''|*[!0-9]*) continue;; esac
+    [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || continue
+    [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || continue
+    # probe_one emits exactly three whitespace-free fields.
+    # shellcheck disable=SC2046
     set -- $(probe_one "$host" "$port" "$user" "$pass")
     state="$1"; ms="$2"; code="$3"
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" \
@@ -54,7 +75,7 @@ run_once() {
   jq -n --argjson ts "$ts" --argjson p "$probes" '{ts:$ts, probes:$p}' > "$tmp" && mv "$tmp" "$HEALTH_FILE"
 }
 
-if [ "$1" = "--once" ]; then run_once; exit 0; fi
+if [ "${1:-}" = "--once" ]; then run_once; exit $?; fi
 
 # daemon loop
 while :; do

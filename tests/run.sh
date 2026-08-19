@@ -75,6 +75,7 @@ eq "escape backslash"    "$(uci_dquote 'a\b')" 'a\\b'
 eq "plain passes through" "$(uci_dquote 'plain')" 'plain'
 
 echo "== gen_mac =="
+match "random_octets emits requested byte count" "$(random_octets 4)" '^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]*$'
 match "gen_mac vendor OUI prefix + 6 octets" "$(gen_mac 50:C7:BF)" '^50:c7:bf:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}$'
 match "gen_mac lowercases OUI"               "$(gen_mac AC:9E:17)" '^ac:9e:17:'
 match "gen_mac default is locally-admin 02:" "$(gen_mac)"          '^02:([0-9a-f]{2}:){4}[0-9a-f]{2}$'
@@ -91,6 +92,14 @@ mkc 'A|3g|1|password12|1.2.3.4|1080|||1|1';            vrun "reject band 3g"    
 mkc 'A|2g|1|password12|1.2.3.4|70000|||1|1';           vrun "reject port>65535"    die validate_conf
 mkc 'A|2g|1|password12||1080|||1|1';                   vrun "reject empty sock_host" die validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||2|1';            vrun "reject isolate=2"     die validate_conf
+mkc 'A|2g|1|password12|bad host|1080|||1|1';            vrun "reject dirty sock_host" die validate_conf
+mkc 'A|2g|1|password12|https://host|1080|||1|1';        vrun "reject URL as sock_host" die validate_conf
+tab="$(printf '\t')"
+mkc "A|2g|1|password12|host|1080|bad${tab}user||1|1";  vrun "reject control character" die validate_conf
+long_host="$(awk 'BEGIN { for (i=0; i<254; i++) printf "h" }')"
+mkc "A|2g|1|password12|$long_host|1080|||1|1";         vrun "reject oversized sock_host" die validate_conf
+long_user="$(awk 'BEGIN { for (i=0; i<256; i++) printf "u" }')"
+mkc "A|2g|1|password12|host|1080|$long_user||1|1";     vrun "reject oversized SOCKS user" die validate_conf
 printf 'A|2g|1|password12|1.2.3.4|1080|||1|1\nB|5g|1|password12|5.6.7.8|1080|||1|0\n' > "$STUB/c.conf"
 vrun "reject duplicate idx" die validate_conf
 
@@ -166,6 +175,14 @@ match "Agent CORS allows Authorization" "$agent_cgi" 'Access-Control-Allow-Heade
 match "Agent exposes runtime BSSID" "$agent_cgi" 'macaddr:\$mac'
 match "Agent exposes rotate_mac action" "$agent_cgi" 'rotate_mac\)'
 match "Agent exposes gateway status" "$agent_cgi" 'gateway\)'
+match "Agent checks NUL with BusyBox hexdump fallback" "$agent_cgi" 'elif have hexdump'
+agent_install="$(cat "$ROOT/agent/install-agent.sh")"
+match "Agent install preserves an existing token" "$agent_install" 'if \[ ! -s /etc/sbproxy/token \]'
+match "Agent install protects token permissions" "$agent_install" 'chmod 600 /etc/sbproxy/token'
+match "Agent install deploys native CGI" "$agent_install" 'cp "\$AGENT/cgi/sbproxy" /www/cgi-bin/sbproxy'
+match "Agent install deploys self-hosted web console" "$agent_install" 'control-panel\.html" /www/sbproxy/index\.html'
+match "Agent install enables health daemon" "$agent_install" '/etc/init\.d/sbproxy-healthd enable'
+match "Agent install persists files across sysupgrade" "$agent_install" '/etc/sysupgrade\.conf'
 desktop_py="$(cat "$ROOT/console/desktop/main.py")"
 match "native app sends Bearer authorization" "$desktop_py" '"Authorization": f"Bearer \{self\.token\}"'
 match "native app filters clients" "$desktop_py" 'def filter_clients\('
@@ -189,6 +206,11 @@ match "important action warning defaults to No" "$desktop_py" 'default=messagebo
 match "quick SOCKS change requires warning" "$desktop_py" 'Đổi endpoint SOCKS5 đang dùng cho SSID'
 match "native app checks Internet gateway" "$desktop_py" 'def refresh_gateway\('
 match "native app highlights non-wwan route" "$desktop_py" 'KHÔNG QUA'
+match "native app supports English and Vietnamese" "$desktop_py" 'EN_TRANSLATIONS = \{'
+match "native app supports dark and light themes" "$desktop_py" 'PALETTES = \{"dark": DARK_PALETTE, "light": LIGHT_PALETTE\}'
+match "native app persists UI preferences" "$desktop_py" 'def save_preferences\('
+match "native app switches language live" "$desktop_py" 'def _on_language_changed\('
+match "native app switches theme live" "$desktop_py" 'def _on_theme_changed\('
 gateway_script="$(cat "$ROOT/scripts/gateway.sh")"
 match "gateway check resolves actual route" "$gateway_script" 'ip -4 route get'
 match "gateway check binds HTTP probe to route device" "$gateway_script" 'curl -4.*--interface'

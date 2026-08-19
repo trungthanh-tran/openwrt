@@ -16,6 +16,7 @@ die()  { printf '[sbproxy][ERR] %s\n' "$*" >&2; exit 1; }
 
 # DRYRUN=1 prints mutating commands instead of executing them.
 run() {
+  # shellcheck disable=SC2294  # Commands are intentionally stored as strings for DRYRUN logging.
   if [ "${DRYRUN:-0}" = "1" ]; then printf 'DRYRUN> %s\n' "$*" >&2
   else eval "$@"; fi
 }
@@ -47,7 +48,7 @@ validate_conf() {
     /^#/ || /^[[:space:]]*$/ { next }
     NF != 10 && NF != 11 { printf "dòng %d: cần 10 hoặc 11 cột, hiện có %d\n", NR, NF; bad=1; next }
     {
-      idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10)
+      idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10); host=trim($5)
       oui=(NF==11)?trim($11):""
       if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "dòng %d: mac_oui phải dạng AA:BB:CC hoặc để trống\n", NR; bad=1 }
       if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "dòng %d: idx không hợp lệ\n", NR; bad=1 }
@@ -55,10 +56,12 @@ validate_conf() {
       if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "dòng %d: port không hợp lệ\n", NR; bad=1 }
       if (band != "2g" && band != "5g") { printf "dòng %d: band phải là 2g hoặc 5g\n", NR; bad=1 }
       if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "dòng %d: isolate/webrtc phải là 0 hoặc 1\n", NR; bad=1 }
-      if (length($1) < 1 || length($1) > 32) { printf "dòng %d: SSID phải dài 1..32 byte/ký tự ASCII\n", NR; bad=1 }
-      if (length($4) < 8 || length($4) > 63) { printf "dòng %d: mật khẩu WiFi phải dài 8..63 ký tự\n", NR; bad=1 }
-      if (trim($5) == "") { printf "dòng %d: sock_host bị trống\n", NR; bad=1 }
-      if ($1 ~ /[|\r\n]/ || $4 ~ /[|\r\n]/ || $5 ~ /[|\r\n]/ || $7 ~ /[|\r\n]/ || $8 ~ /[|\r\n]/) { printf "dòng %d: field chứa ký tự cấm\n", NR; bad=1 }
+      if (length($1) < 1 || length($1) > 32) { printf "dòng %d: SSID phải dài 1..32 byte UTF-8\n", NR; bad=1 }
+      if (length($4) < 8 || length($4) > 63) { printf "dòng %d: mật khẩu WiFi phải dài 8..63 byte UTF-8\n", NR; bad=1 }
+      if (host == "") { printf "dòng %d: sock_host bị trống\n", NR; bad=1 }
+      else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "dòng %d: sock_host không hợp lệ\n", NR; bad=1 }
+      if (length($7) > 255 || length($8) > 255) { printf "dòng %d: SOCKS user/pass tối đa 255 byte\n", NR; bad=1 }
+      if ($1 ~ /[[:cntrl:]|]/ || $4 ~ /[[:cntrl:]|]/ || $5 ~ /[[:cntrl:]|]/ || $7 ~ /[[:cntrl:]|]/ || $8 ~ /[[:cntrl:]|]/) { printf "dòng %d: field chứa ký tự cấm hoặc điều khiển\n", NR; bad=1 }
       seen[idx]++; if (seen[idx] > 1) { printf "dòng %d: idx %s bị trùng\n", NR, idx; bad=1 }
     }
     END { exit bad ? 1 : 0 }
@@ -118,16 +121,27 @@ radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "
 #   gen_mac aa:bb:cc     -> given vendor OUI + 3 random octets (impersonates a
 #                           common Wi-Fi vendor; OUI first octet is already
 #                           globally-unique/unicast).
+random_octets() {
+  count="$1"
+  if command -v hexdump >/dev/null 2>&1; then
+    head -c "$count" /dev/urandom | hexdump -v -e '/1 "%u "'
+  elif command -v od >/dev/null 2>&1; then
+    od -An -tu1 -N "$count" /dev/urandom
+  else
+    die "Thiếu hexdump/od để tạo MAC ngẫu nhiên"
+  fi
+}
+
 gen_mac() {
   oui="$(printf '%s' "${1:-}" | tr -d ' \r' | tr 'A-Z' 'a-z')"
   if [ -n "$oui" ]; then
-    # shellcheck disable=SC2046  # intentional word-split of hexdump octets
+    # shellcheck disable=SC2046,SC2183  # intentional word-split supplies three octets
     printf '%s:%02x:%02x:%02x\n' "$oui" \
-      $(head -c3 /dev/urandom | hexdump -v -e '/1 "%u "')
+      $(random_octets 3)
   else
-    # shellcheck disable=SC2046  # intentional word-split of hexdump octets
+    # shellcheck disable=SC2046,SC2183  # intentional word-split supplies five octets
     printf '02:%02x:%02x:%02x:%02x:%02x\n' \
-      $(head -c5 /dev/urandom | hexdump -v -e '/1 "%u "')
+      $(random_octets 5)
   fi
 }
 

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Run every workstation-safe suite. Router behavior is exercised with stubs;
+# this command never connects to or mutates a real router.
+set -e
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+if [ -n "${PYTHON:-}" ]; then
+  PYTHON_CMD="$PYTHON"
+elif command -v python3 >/dev/null 2>&1 && python3 -c 'import sys' >/dev/null 2>&1; then
+  PYTHON_CMD=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=python
+else
+  echo "Python 3 is required for desktop tests" >&2
+  exit 1
+fi
+
+echo "===== POSIX/OpenWrt generator suite ====="
+sh tests/run.sh
+
+echo "===== Native desktop core/workflow suite ====="
+"$PYTHON_CMD" -m unittest -v tests.test_desktop_core tests.test_desktop_workflows tests.test_desktop_gui tests.test_dirty_data
+
+echo "===== Agent CGI integration suite ====="
+sh tests/test_agent.sh
+
+echo "===== Agent health daemon integration suite ====="
+sh tests/test_healthd.sh

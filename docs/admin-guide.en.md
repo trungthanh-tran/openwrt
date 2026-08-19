@@ -1,6 +1,8 @@
 # sbproxy — Administrator guide
 
-**Language:** [Tiếng Việt](admin-guide.md) | English
+**Language:** English (default) | [Tiếng Việt](admin-guide.md)
+
+> Default offline HTML: [admin-guide.html](admin-guide.html). Vietnamese HTML: [admin-guide.vi.html](admin-guide.vi.html).
 
 ## Safety baseline
 
@@ -50,7 +52,7 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`. Device management: `scripts/clients.sh` lists online clients and offline blocklist entries; `scripts/{kick,ban,unban}.sh <idx> <mac>` deauth/ban/unban a device.
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
 
-**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, and includes advanced client filters. Build it with `cd console/desktop; .\build.ps1` — see [../console/desktop/README.en.md](../console/desktop/README.en.md).
+**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, includes advanced client filters, and supports English/Vietnamese with Dark/Light modes. Build it with `cd console/desktop; .\build.ps1` — see [../console/desktop/README.md](../console/desktop/README.md).
 
 ## Installation and acceptance
 

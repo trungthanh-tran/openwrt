@@ -7,9 +7,9 @@ ci:
   stage: check
   image: alpine:3.20
   before_script:
-    - apk add --no-cache shellcheck jq nodejs git
+    - apk add --no-cache shellcheck jq nodejs git python3 py3-tkinter
   script:
-    - sh tests/run.sh
-    - shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh
+    - sh tests/run-all.sh
+    - shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
     - node tools/build-docs.js
     - git diff --exit-code -- docs/ || { echo "docs/*.html out of date — run node tools/build-docs.js and commit"; exit 1; }

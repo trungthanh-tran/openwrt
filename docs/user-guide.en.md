@@ -1,6 +1,8 @@
 # sbproxy Console — User guide
 
-**Language:** [Tiếng Việt](user-guide.md) | English
+**Language:** English (default) | [Tiếng Việt](user-guide.md)
+
+> Default offline HTML: [user-guide.html](user-guide.html). Vietnamese HTML: [user-guide.vi.html](user-guide.vi.html).
 
 The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.
 

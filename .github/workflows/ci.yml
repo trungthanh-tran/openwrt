@@ -10,18 +10,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install shellcheck + jq
-        run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+      - name: Install shellcheck, jq, and Tk bindings
+        run: sudo apt-get update && sudo apt-get install -y shellcheck jq python3-tk
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Unit tests (POSIX sh)
-        run: sh tests/run.sh
+      - name: Full test suite
+        run: sh tests/run-all.sh
 
       - name: Shellcheck
-        run: shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh
+        run: shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
 
       - name: Docs are up to date
         run: |

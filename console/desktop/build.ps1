@@ -13,10 +13,13 @@ if ($LASTEXITCODE -ne 0) {
 python -m PyInstaller --noconfirm --clean --onefile --windowed `
   --name sbproxy-console `
   main.py
+if ($LASTEXITCODE -ne 0) {
+  throw "Build failed: PyInstaller exited with code $LASTEXITCODE"
+}
 
 $exe = Join-Path $here "dist\sbproxy-console.exe"
 if (-not (Test-Path $exe)) {
-  throw "Build thất bại: không thấy $exe"
+  throw "Build failed: output not found at $exe"
 }
-Write-Host "XONG (native): $exe"
-Write-Host "App gọi trực tiếp Agent API; không dùng HTML/WebView."
+Write-Host "BUILD COMPLETE (native): $exe"
+Write-Host "The app calls the Agent API directly and uses no HTML/WebView."

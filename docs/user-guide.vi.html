@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sbproxy · Hướng dẫn Người dùng</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--panel2:#f5f7f9;--border:#d5dce3;--bstrong:#c0cad3;--text:#16202b;--dim:#5c6b78;--faint:#8593a0;--accent:#0d8f80;--accent2:#0a6a5f;--asoft:#d3efe9;--warn:#b5750a;--warns:#f6e9cf;--mono:ui-monospace,"Cascadia Code",Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#141c24;--panel2:#1a232d;--border:#26323f;--bstrong:#35434f;--text:#e6edf3;--dim:#94a3b0;--faint:#6b7a88;--accent:#2dd4bf;--accent2:#7ff0e2;--asoft:#113631;--warn:#e0a53a;--warns:#33280f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.62}
+.doc{max-width:880px;margin:0 auto;padding:30px 22px 90px}
+h1{font-size:28px;letter-spacing:-.5px;margin:.2em 0 .4em;text-wrap:balance}
+h2{font-size:20px;margin:38px 0 6px;padding-top:16px;border-top:1px solid var(--border);scroll-margin-top:16px}
+h3{font-size:15.5px;margin:22px 0 4px}
+p{margin:9px 0}
+a{color:var(--accent2);text-decoration:none;border-bottom:1px solid var(--asoft)}
+ul,ol{margin:9px 0;padding-left:22px}li{margin:5px 0}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+pre{margin:12px 0;background:#11181f;border:1px solid var(--border);border-radius:10px;padding:13px 15px;overflow-x:auto}
+pre code{background:none;border:none;padding:0;color:#d6e2ea;font-size:12.6px;line-height:1.6}
+hr{border:none;border-top:1px solid var(--border);margin:26px 0}
+blockquote.call{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:4px 16px;margin:14px 0;background:var(--panel)}
+blockquote.call.warn{border-left-color:var(--warn)}
+blockquote.call p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:13.6px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);background:var(--panel2)}
+td code{white-space:nowrap}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin:14px 0}
+.tablewrap table{margin:0}.tablewrap th:first-child,.tablewrap td:first-child{padding-left:14px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 8px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px;font-size:13.5px}
+.toc a{color:var(--dim)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--faint);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="doc">
+<nav class="toc"><a href="#sec-1">01 · Console này làm gì?</a><a href="#sec-2">02 · Mở &amp; kết nối router</a><a href="#sec-3">03 · Đọc bảng WiFi</a><a href="#sec-4">04 · Sức khỏe proxy (realtime)</a><a href="#sec-5">05 · Thao tác WiFi</a><a href="#sec-6">06 · Thiết bị đang kết nối (kick / cấm)</a><a href="#sec-7">07 · Backup &amp; Rollback</a><a href="#sec-8">08 · Khi gặp sự cố</a><a href="#sec-9">09 · An toàn token quản trị</a></nav><h1>sbproxy Console — Hướng dẫn Người dùng</h1>
+<p><strong>Ngôn ngữ:</strong> Tiếng Việt | <a href="user-guide.en.md">English</a></p>
+<p>Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo dõi sức khỏe proxy, và sao lưu/khôi phục — tất cả bằng giao diện. Không cần dòng lệnh.</p>
+<blockquote class="call"><p>Bản HTML tiếng Việt đọc offline: <a href="user-guide.vi.html">user-guide.vi.html</a>. Kỹ thuật/quản trị: <a href="admin-guide.md">admin-guide.md</a>.</p></blockquote>
+<hr>
+<h2 id="sec-1">01 · Console này làm gì?</h2>
+<p>Mỗi mạng WiFi bạn tạo sẽ gắn với một <strong>SOCKS5</strong> riêng — thiết bị nối vào WiFi đó ra internet qua đúng proxy đó. Console giúp bạn:</p>
+<ul><li>Thêm/sửa/xoá WiFi, đặt tên, mật khẩu, chọn SOCKS, <strong>giả MAC theo hãng WiFi</strong>.</li><li>Đổi SOCKS mà không reload WiFi; các phiên mạng đang mở có thể gián đoạn ngắn.</li><li>Xem <strong>độ trễ (latency) proxy theo thời gian thực</strong> cho từng WiFi.</li><li><strong>Xem thiết bị đang kết nối</strong> từng WiFi (MAC, IP, thời gian, lưu lượng) và <strong>kick / cấm</strong>.</li><li>Sao lưu &amp; khôi phục cấu hình chỉ bằng một nút.</li></ul>
+<p><strong>Hai cách dùng local:</strong></p>
+<ul><li><strong>Offline</strong> — soạn cấu hình rồi tải file về (không đụng router).</li><li><strong>Live LAN</strong> — nối thẳng tới router trong cùng mạng: bấm nút là áp dụng thật, thấy sức khỏe proxy realtime (cần token quản trị viên cấp).</li></ul>
+<p><strong>Hai bản Console (hai giao diện, cùng Agent API):</strong></p>
+<ul><li><strong>Bản Web</strong> — mở trong trình duyệt tại <code>http://&lt;router&gt;/sbproxy/</code>.</li><li><strong>Bản Desktop (.exe)</strong> — ứng dụng Windows Tkinter native, không dùng WebView; kết nối trực tiếp Agent API qua LAN và lưu token mã hóa bằng Windows DPAPI.</li></ul>
+<hr>
+<h2 id="sec-2">02 · Mở &amp; kết nối router</h2>
+<ol><li>Mở console:</li><li><strong>Bản Web:</strong> vào <code>http://&lt;địa-chỉ-router&gt;/sbproxy/</code> (MT6000 mặc định: <code>http://192.168.8.1/sbproxy/</code>).</li><li><strong>Bản Desktop:</strong> mở <code>sbproxy-console.exe</code>.</li><li>Nhập token quản trị viên cấp rồi bấm <strong>Kết nối</strong>:</li><li>Bản Web mở từ router: để trống ô <em>Base URL</em>.</li><li>Bản Desktop: nhập <em>Router</em> = <code>http://&lt;IP-router&gt;</code> (ví dụ <code>http://192.168.8.1</code>).</li><li>Kết nối thành công: thanh trạng thái báo sing-box đang chạy; cấu hình, thiết bị và backup được nạp từ router.</li></ol>
+<p>Khung <strong>Internet Gateway</strong> phía trên các tab cho biết đường ra thực tế (<code>wwan</code>/device, next-hop, IP nguồn), trạng thái link, DNS và HTTP latency. Nếu hiện <strong>KHÔNG QUA wwan</strong> hoặc màu vàng/đỏ, bấm <strong>Kiểm tra gateway</strong> rồi báo quản trị viên trước khi Apply thêm thay đổi.</p>
+<blockquote class="call warn"><p><strong>Nếu không kết nối được (bản Web):</strong> thường do mở console qua <code>https</code> nên trình duyệt chặn gọi router <code>http</code>. Hãy mở đúng <code>http://&lt;router&gt;/sbproxy/</code>, hoặc dùng <strong>bản Desktop</strong> (không bị chặn). Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.</p></blockquote>
+<hr>
+<h2 id="sec-3">03 · Đọc bảng WiFi</h2>
+<div class="tablewrap"><table><thead><tr><th>Cột</th><th>Ý nghĩa</th></tr></thead><tbody><tr><td><strong>#</strong></td><td>Số thứ tự (idx) — cố định cho mỗi WiFi, quyết định dải mạng riêng.</td></tr><tr><td><strong>WiFi (SSID)</strong></td><td>Tên WiFi + dải mạng &amp; cổng nội bộ (chỉ để tham khảo).</td></tr><tr><td><strong>Băng</strong></td><td>2.4G xa hơn/chậm hơn · 5G nhanh hơn/gần hơn.</td></tr><tr><td><strong>SOCKS5</strong></td><td>Proxy đang gán: <code>host:cổng</code>.</td></tr><tr><td><strong>Isolate</strong></td><td>on = các thiết bị trong WiFi này không thấy nhau (an toàn hơn).</td></tr><tr><td><strong>WebRTC</strong></td><td>on = chặn rò rỉ IP qua WebRTC (đánh đổi: hỏng gọi video P2P).</td></tr><tr><td><strong>Sức khỏe</strong></td><td>Độ trễ proxy realtime + biểu đồ xu hướng — xem mục kế.</td></tr></tbody></table></div>
+<hr>
+<h2 id="sec-4">04 · Sức khỏe proxy (realtime)</h2>
+<p>Ở chế độ Live, router đo độ trễ mỗi proxy ~mỗi 15 giây; console cập nhật ~8 giây/lần và vẽ <strong>biểu đồ đường (sparkline)</strong> theo thời gian bên cạnh con số.</p>
+<div class="tablewrap"><table><thead><tr><th>Hiển thị</th><th>Nghĩa</th><th>Nên làm</th></tr></thead><tbody><tr><td><code>123ms</code> (xanh)</td><td>Proxy tốt, phản hồi nhanh.</td><td>Không cần làm gì.</td></tr><tr><td><code>950ms</code> (vàng)</td><td>Proxy chậm (trên ngưỡng).</td><td>Theo dõi; cân nhắc đổi SOCKS khác.</td></tr><tr><td><code>fail</code> (đỏ)</td><td>Proxy chết/không phản hồi (kèm mã lỗi).</td><td>Đổi SOCKS cho WiFi đó (nút ⚡).</td></tr></tbody></table></div>
+<p>Đường biểu đồ đi lên = độ trễ tăng dần (proxy đang xấu đi); thấp và phẳng = ổn định.</p>
+<hr>
+<h2 id="sec-5">05 · Thao tác WiFi</h2>
+<p><strong>Thêm WiFi:</strong> bấm <strong>＋ Thêm WiFi</strong>, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt <em>Cách ly</em> &amp; <em>Chặn WebRTC</em>. Theo dõi đồng hồ <strong>BSSID</strong> ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).</p>
+<p><strong>Giả MAC theo hãng WiFi:</strong> chọn SSID trong bảng, dùng <strong>Random MAC</strong> trong khung chỉnh sửa rồi chọn hãng (TP-Link, Netgear, ASUS, Xiaomi…). Ba byte đầu theo OUI của hãng, ba byte sau ngẫu nhiên. Thao tác lưu provider và reload radio ngay sau khi bạn xác nhận cảnh báo.</p>
+<p><strong>Đổi SOCKS nhanh:</strong> chọn SSID trong bảng rồi bấm <strong>Đổi SOCKS</strong> trong khung chỉnh sửa. Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.</p>
+<p><strong>Áp toàn bộ thay đổi:</strong> sau khi thêm/sửa/xoá nhiều WiFi, bấm <strong>Đẩy cấu hình &amp; Apply</strong>. App native luôn dry-run candidate trước; chỉ khi đạt mới backup, ghi cấu hình và reload WiFi.</p>
+<blockquote class="call warn"><p><strong>Cảnh báo:</strong> Apply, đổi SOCKS, random MAC, xoá SSID, kick/cấm/bỏ cấm và rollback đều hiển thị phạm vi ảnh hưởng trước khi chạy. Mặc định là <strong>Không</strong>; đọc kỹ mục tiêu rồi mới xác nhận.</p></blockquote>
+<blockquote class="call"><p><strong>Mẹo:</strong> <strong>⭳ Tải từ router</strong> để nạp cấu hình đang chạy trên router về console (khi mở console trên máy khác).</p></blockquote>
+<hr>
+<h2 id="sec-6">06 · Thiết bị đang kết nối (kick / cấm)</h2>
+<p>Mở tab <strong>Thiết bị</strong> để xem client online và cả MAC trong blocklist đang offline:</p>
+<div class="tablewrap"><table><thead><tr><th>Cột</th><th>Ý nghĩa</th></tr></thead><tbody><tr><td><strong>SSID / Band</strong></td><td>WiFi và băng 2.4/5 GHz của thiết bị.</td></tr><tr><td><strong>MAC</strong></td><td>Địa chỉ MAC của thiết bị.</td></tr><tr><td><strong>IP / Tên máy</strong></td><td>Địa chỉ IP được cấp và tên máy (nếu có trong DHCP).</td></tr><tr><td><strong>Kết nối</strong></td><td>Thời gian đã kết nối (vd <code>3g 20p</code>).</td></tr><tr><td><strong>Vào / Ra</strong></td><td>Lưu lượng tải xuống (in) / tải lên (out) của phiên.</td></tr><tr><td><strong>Sóng</strong></td><td>Cường độ tín hiệu (dBm); càng gần 0 càng mạnh.</td></tr></tbody></table></div>
+<ul><li>Lọc theo SSID, band, online/offline, quyền truy cập, RSSI, traffic, thời gian; tìm bằng IP/tên/MAC và bấm tiêu đề cột để sắp xếp.</li><li>Chọn một hoặc nhiều dòng; thao tác <strong>Chi tiết / Copy / Kick / Cấm / Bỏ cấm</strong> chỉ nằm trong khung điều khiển sát bảng và tự khóa nếu không phù hợp.</li><li><strong>Kick</strong> ngắt thiết bị ngay nhưng nó có thể nối lại. <strong>Cấm</strong> chặn MAC lâu dài và có thể reload radio ngắn. <strong>Bỏ cấm</strong> hoạt động cả với mục blocklist offline.</li><li>Có thể chặn MAC chưa kết nối, bật auto-refresh 5–60 giây hoặc xuất danh sách đang lọc ra CSV UTF-8.</li></ul>
+<p>Dashboard phía trên bảng cho biết số online, tín hiệu yếu, đã chặn và tổng lưu lượng.</p>
+<hr>
+<h2 id="sec-7">07 · Backup &amp; Rollback</h2>
+<p>Router <strong>tự sao lưu</strong> trước mỗi lần "Áp" hay "đổi sock". Ngoài ra bạn có thể chủ động:</p>
+<ol><li>Bấm <strong>🗂 Backup / Rollback</strong>.</li><li><strong>💾 Tạo backup ngay</strong> để lưu một mốc thủ công (nên làm trước khi thay đổi lớn).</li><li>Bản Web có thể tải snapshot về máy; với app native dùng thêm <code>pc/backup.ps1</code> nếu cần bản sao ngoài router.</li><li>Để quay lui: chọn một bản → dùng <strong>Rollback backup đang chọn</strong> trong khung sát danh sách → đọc cảnh báo và xác nhận.</li></ol>
+<blockquote class="call warn"><p><strong>Rất quan trọng — tải backup về máy:</strong> backup lưu <strong>trên router</strong>. Nếu router phải cài lại firmware hoặc bị hỏng, các backup đó <strong>mất theo</strong>. Vì vậy: định kỳ, và <strong>bắt buộc trước khi cập nhật firmware</strong>, hãy bấm <strong>⭳ Về máy</strong>.</p></blockquote>
+<blockquote class="call"><p><strong>Lưu ý:</strong> Khôi phục sẽ <strong>ghi đè</strong> cấu hình hiện tại. Nếu chưa chắc, tạo một backup mới trước khi khôi phục.</p></blockquote>
+<hr>
+<h2 id="sec-8">08 · Khi gặp sự cố</h2>
+<div class="tablewrap"><table><thead><tr><th>Hiện tượng</th><th>Bạn có thể tự làm</th></tr></thead><tbody><tr><td>Một WiFi báo <code>fail</code></td><td>Đổi SOCKS cho WiFi đó (đổi host/cổng → nút ⚡). Nhiều sock cùng fail → báo quản trị viên.</td></tr><tr><td>Sau khi "Áp" bị lỗi/mất mạng</td><td>Vào <strong>🗂 Backup / Rollback</strong> → khôi phục bản "mới nhất" (nhãn <code>pre-apply</code>).</td></tr><tr><td>Router treo / không vào được sau update firmware</td><td>Việc của quản trị viên (recovery). Cung cấp <strong>file backup đã tải về máy</strong> để họ khôi phục nhanh.</td></tr><tr><td>Console báo "Mất kết nối"</td><td>Mở lại đúng <code>http://&lt;router&gt;/sbproxy/</code>; kiểm tra token; hỏi quản trị viên.</td></tr><tr><td>Latency toàn bộ tăng cao</td><td>Có thể do đường mạng/nhà cung cấp SOCKS. Theo dõi biểu đồ; báo admin nếu kéo dài.</td></tr><tr><td>Client vẫn thấy nhau / gọi video hỏng</td><td>Kiểm tra cột <em>Isolate</em>/<em>WebRTC</em> của WiFi đó và chỉnh cho đúng nhu cầu.</td></tr></tbody></table></div>
+<hr>
+<h2 id="sec-9">09 · An toàn token quản trị</h2>
+<ul><li><strong>Không chia sẻ token</strong>. Token agent là bí mật dùng chung và có toàn quyền cấu hình router.</li><li>Khoá máy khi rời đi. Bản Web lưu token trong trình duyệt; app native mã hóa token bằng Windows DPAPI cho đúng tài khoản hiện tại.</li><li>Chỉ mở console tại địa chỉ LAN của router; không dán token vào website bên ngoài.</li><li>Nghi lộ token → báo quản trị viên xoá <code>/etc/sbproxy/token</code> và chạy lại <code>agent/install-agent.sh</code>.</li><li><strong>Không gửi ảnh chụp màn hình</strong> chứa token, mật khẩu, hay IP/tài khoản SOCKS ra ngoài.</li></ul>
+<blockquote class="call warn"><p>Project không có tài khoản hoặc phân quyền theo người. Ai có token agent đều có toàn quyền, vì vậy chỉ dùng trên LAN/VPN quản trị tin cậy.</p></blockquote>
+<footer>Sinh tự động từ Markdown bằng tools/build-docs.js — sửa bản .md rồi chạy lại. Không sửa tay file .html này.</footer>
+</div>
+</body>
+</html>

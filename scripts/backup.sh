@@ -32,6 +32,7 @@ fi
 ln -sfn "$DEST" "$BACKUP_DIR/latest"
 
 # Retention: keep the 20 newest snapshots.
+# shellcheck disable=SC2010  # BusyBox-compatible mtime ordering over generated names.
 ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | tail -n +21 | while read -r old; do rm -rf "$old"; done
 
 log "Backup xong: $DEST"

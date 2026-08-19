@@ -1,11 +1,11 @@
 # Developer task runner. These run on a workstation or CI, never on the router.
-LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh
+LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
 
 .PHONY: help lint test docs docs-check check version
 
 help:
 	@echo "make lint        # shellcheck the shell scripts"
-	@echo "make test        # run tests/run.sh (POSIX-sh unit tests)"
+	@echo "make test        # run all POSIX, desktop, Agent, and healthd tests"
 	@echo "make docs        # regenerate docs/*.html from docs/*.md"
 	@echo "make docs-check  # fail if docs/*.html are out of date"
 	@echo "make check       # lint + test + docs-check (what CI runs)"
@@ -16,7 +16,7 @@ lint:
 	shellcheck -S warning $(LINT_FILES)
 
 test:
-	sh tests/run.sh
+	sh tests/run-all.sh
 
 docs:
 	node tools/build-docs.js

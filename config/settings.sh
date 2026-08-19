@@ -1,4 +1,5 @@
 # settings.sh — project-wide tunables sourced by lib.sh.
+# shellcheck disable=SC2034  # Values are consumed by scripts that source this file.
 # Adjust this file for your hardware before running apply.sh.
 
 # --- Radio-to-band mapping --------------------------------------------------
