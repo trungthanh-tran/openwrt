@@ -54,6 +54,9 @@ SINGBOX_CONF="/etc/sing-box/config.json"
 SINGBOX_CACHE="/etc/sing-box/cache.db"
 NFT_FILE="/etc/sbproxy.nft"
 BACKUP_DIR="/root/sbproxy-backups"
+# Persistent per-SSID MAC bans (lines: idx|mac). Source of truth re-applied by
+# apply.sh so bans survive re-applies; ban.sh/unban.sh maintain it.
+BANS_FILE="/etc/sbproxy.bans"
 
 # --- STUN/TURN ports blocked for WebRTC leak mitigation --------------------
 STUN_TCP_PORTS="3478, 3479, 5349, 5350"

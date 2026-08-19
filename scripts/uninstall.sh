@@ -29,6 +29,7 @@ nft delete table inet sbproxy 2>/dev/null || true
 rm -f "$NFT_FILE"
 /etc/init.d/sing-box stop 2>/dev/null || true
 rm -f "${SINGBOX_CACHE:-/etc/sing-box/cache.db}"
+rm -f "${BANS_FILE:-/etc/sbproxy.bans}"
 # Remove the compat env line apply.sh injected into the packaged init script.
 [ -f /etc/init.d/sing-box ] && sed -i '/procd_set_param env ENABLE_DEPRECATED/d' /etc/init.d/sing-box
 

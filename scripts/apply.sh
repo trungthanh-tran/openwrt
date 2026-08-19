@@ -63,6 +63,9 @@ uci commit dhcp
 uci commit firewall
 uci commit wireless
 
+# Re-apply persistent MAC bans so they survive this re-apply (before wifi reload).
+apply_bans
+
 # 2) Install validated artifacts using atomic renames on the target filesystem.
 mkdir -p "$(dirname "$REAL_SINGBOX_CONF")" "$(dirname "$REAL_NFT_FILE")"
 cp "$SINGBOX_CONF" "$REAL_SINGBOX_CONF.new"

@@ -300,6 +300,12 @@ Endpoint `/cgi-bin/sbproxy?action=…`, header `X-SB-Token`.
 | POST | `rollback` | {name?} | {ok,rc,log} |
 | POST | `uninstall` | — | {ok,rc,log} |
 | GET | `health_now` | — | probe ngay 1 lần |
+| GET | `clients` | — | {clients[{idx,ssid,mac,ip,host,connected_s,rx_bytes,tx_bytes,signal_dbm,banned}]} |
+| POST | `kick` | {idx,mac} | {ok,rc,log} — deauth tạm |
+| POST | `ban` | {idx,mac} | {ok,rc,log} — chặn MAC lâu dài |
+| POST | `unban` | {idx,mac} | {ok,rc,log} |
+
+**Quản lý thiết bị (Console → 📱 Thiết bị):** xem client đang nối từng WiFi kèm MAC, IP/tên máy, thời gian kết nối, lưu lượng vào/ra (rx/tx), cường độ sóng. **Kick** deauth tạm (thiết bị có thể nối lại). **Cấm** ghi MAC vào `/etc/sbproxy.bans` + đặt `macfilter=deny` cho SSID đó rồi reload băng tần tương ứng; ban được `apply.sh` áp lại mỗi lần chạy nên không mất khi cấu hình lại. Bỏ cấm gỡ MAC và dựng lại maclist. Router-side: `sh scripts/clients.sh`, `sh scripts/{kick,ban,unban}.sh <idx> <mac>`.
 
 ## Bước 15 — Bảo mật & chống lộ (checklist)
 > **Script tương ứng (router, chỉ đọc):** `sh scripts/security-audit.sh`. Exit code khác `0` nghĩa là có cảnh báo cần xem; script không tự sửa SSH/firewall để tránh khóa mất quyền quản trị.

@@ -12,6 +12,10 @@
 # POST ?action=rollback      body=json {name?} -> rollback
 # POST ?action=uninstall     -> remove project-managed configuration
 # GET  ?action=health_now    -> run an immediate health probe
+# GET  ?action=clients       -> {clients:[...]} devices per SSID (mac/ip/time/in-out/banned)
+# POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
+# POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
+# POST ?action=unban  body json {idx,mac} -> remove a MAC ban
 
 # ---- env / config ----
 [ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
@@ -156,6 +160,23 @@ case "$ACTION" in
     [ -x /usr/sbin/sbproxy-healthd ] && /usr/sbin/sbproxy-healthd --once >/dev/null 2>&1
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
     json_ok "$(jq -n --argjson health "$H" '{ok:true, health:$health}')"
+    ;;
+
+  clients)
+    OUT="$(cd "$SB_ROOT" && sh scripts/clients.sh 2>/dev/null)"
+    printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 || json_err "500 Internal Server Error" "không đọc được danh sách client"
+    json_ok "$OUT"
+    ;;
+
+  kick|ban|unban)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    idx="$(echo "$BODY" | jq -r '.idx // empty')"
+    mac="$(echo "$BODY" | jq -r '.mac // empty')"
+    [ -n "$idx" ] && [ -n "$mac" ] || json_err "400 Bad Request" "thiếu idx/mac"
+    case "$idx" in *[!0-9]*|'') json_err "400 Bad Request" "idx không hợp lệ" ;; esac
+    echo "$mac" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || json_err "400 Bad Request" "mac không hợp lệ"
+    OUT="$(cd "$SB_ROOT" && sh "scripts/$ACTION.sh" "$idx" "$mac" 2>&1)"; RC=$?
+    json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
   *)

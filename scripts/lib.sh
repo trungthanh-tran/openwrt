@@ -65,6 +65,48 @@ validate_conf() {
   ' "$CONF" || die "wifi-socks.conf không hợp lệ."
 }
 
+# --- Client / device management helpers ------------------------------------
+# Print "<section> <ifname>" (e.g. "w1 phy0-ap0") for every running wifi-iface.
+wifi_ifaces() {
+  ubus call network.wireless status 2>/dev/null \
+    | jq -r 'to_entries[].value.interfaces[]? | "\(.section) \(.ifname)"' 2>/dev/null \
+    | awk 'NF==2 && $1 ~ /^w[0-9]+$/'
+}
+
+# Runtime ifname for one managed idx (empty when the SSID is down).
+ifname_of_idx() {
+  wifi_ifaces | awk -v s="w$1" '$1==s { print $2; exit }'
+}
+
+# Space-separated banned MACs for one idx from BANS_FILE (lines: idx|mac).
+bans_for_idx() {
+  f="${BANS_FILE:-/etc/sbproxy.bans}"
+  [ -f "$f" ] || return 0
+  awk -F'|' -v i="$1" '$1==i && $2!="" { print tolower($2) }' "$f" | sort -u
+}
+
+# Re-apply MAC filters from BANS_FILE onto every desired SSID. Runs after the
+# main `uci batch` in apply.sh so bans persist across re-applies.
+apply_bans() {
+  desired_idx | while read -r idx; do
+    [ -n "$idx" ] || continue
+    uci -q delete "wireless.w$idx.maclist" 2>/dev/null || true
+    b="$(bans_for_idx "$idx")"
+    if [ -n "$b" ]; then
+      uci set "wireless.w$idx.macfilter=deny"
+      for m in $b; do uci add_list "wireless.w$idx.maclist=$m"; done
+    else
+      uci set "wireless.w$idx.macfilter=disable"
+    fi
+  done
+  uci commit wireless
+}
+
+# Band (2g/5g) configured for one idx, from CONF.
+band_of_idx() {
+  awk -F'|' -v i="$1" '!/^#/ { g=$3; gsub(/[[:space:]]/,"",g); if (g==i) { b=$2; gsub(/[[:space:]]/,"",b); print b; exit } }' "$CONF"
+}
+
 # --- Values derived from the Wi-Fi index -----------------------------------
 net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }

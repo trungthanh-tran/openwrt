@@ -235,6 +235,7 @@
     <div class="spacer"></div>
     <span id="liveTools">
       <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
+      <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
       <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
       <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
     </span>
@@ -372,6 +373,29 @@
     <div class="foot">
       <button class="btn ghost" id="rbClose">Đóng</button>
       <button class="btn primary" id="rbBackupNow">💾 Tạo backup ngay</button>
+    </div>
+  </div>
+</div>
+
+<!-- Devices modal -->
+<div class="backdrop" id="devBackdrop">
+  <div class="modal" style="max-width: 860px;">
+    <h2>Thiết bị đang kết nối</h2>
+    <div class="form">
+      <div class="conn-status" id="devHint">Danh sách client theo từng WiFi. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
+      <div class="tablescroll">
+        <table style="min-width: 720px;">
+          <thead><tr>
+            <th>WiFi</th><th>MAC</th><th>IP / Tên máy</th><th>Kết nối</th>
+            <th>Vào (in)</th><th>Ra (out)</th><th>Sóng</th><th></th>
+          </tr></thead>
+          <tbody id="devRows"><tr><td colspan="8" class="sub">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="devRefresh">↻ Làm mới</button>
+      <button class="btn primary" id="devClose">Đóng</button>
     </div>
   </div>
 </div>
@@ -529,6 +553,7 @@
   }
   function disconnect() {
     agent.connected = false; stopPoll(); updateLiveUI(); renderRows();
+    if (typeof closeDevices === "function") closeDevices();
     setConnStatus("Đã ngắt kết nối.");
   }
 
@@ -619,6 +644,77 @@
       showLog("rollback.sh " + name, d);
       document.getElementById("rbBackdrop").classList.remove("show");
       poll();
+    }).catch(err => toast("Lỗi: " + err.message));
+  }
+
+  // ---- devices / clients ----
+  let devTimer = null;
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    const u = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n : n.toFixed(1)) + " " + u[i];
+  }
+  function fmtDuration(s) {
+    s = Math.max(0, Math.floor(Number(s) || 0));
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+          m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (d) return `${d}n ${h}g`;
+    if (h) return `${h}g ${m}p`;
+    if (m) return `${m}p ${sec}s`;
+    return `${sec}s`;
+  }
+  function ssidNameByIdx(idx) {
+    const s = ssids.find(x => x.idx === idx);
+    return s ? s.name : "w" + idx;
+  }
+  function openDevices() {
+    if (!agent.connected) return toast("Chưa kết nối router.");
+    $("devBackdrop").classList.add("show");
+    loadDevices();
+    clearInterval(devTimer);
+    devTimer = setInterval(loadDevices, 8000);
+  }
+  function closeDevices() {
+    $("devBackdrop").classList.remove("show");
+    clearInterval(devTimer); devTimer = null;
+  }
+  function loadDevices() {
+    api("clients").then(d => {
+      const box = $("devRows");
+      const list = (d && d.clients) || [];
+      if (!d || !d.ok) throw new Error((d && d.error) || "lỗi");
+      if (!list.length) { box.innerHTML = '<tr><td colspan="8" class="sub">Không có thiết bị nào đang kết nối.</td></tr>'; return; }
+      box.innerHTML = list.map(c => {
+        const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
+        const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
+        const act = c.banned
+          ? `<button class="btn ghost" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ Bỏ cấm</button>`
+          : `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="Ngắt tạm (thiết bị có thể nối lại)">⏏ Kick</button>
+             <button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="Chặn MAC lâu dài">⛔ Cấm</button>`;
+        return `<tr>
+          <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}${c.banned ? ' <span class="chip warnhue on">cấm</span>' : ""}</td>
+          <td class="mono">${esc(c.mac)}</td>
+          <td class="mono sub">${esc(ipHost)}</td>
+          <td class="mono">${fmtDuration(c.connected_s)}</td>
+          <td class="mono">${fmtBytes(c.rx_bytes)}</td>
+          <td class="mono">${fmtBytes(c.tx_bytes)}</td>
+          <td class="mono sub">${esc(sig)}</td>
+          <td><div class="rowbtns">${act}</div></td>
+        </tr>`;
+      }).join("");
+    }).catch(err => {
+      $("devRows").innerHTML = `<tr><td colspan="8"><span class="conn-status bad">Lỗi: ${esc(err.message)}</span></td></tr>`;
+    });
+  }
+  function deviceAction(action, idx, mac) {
+    const verb = action === "kick" ? "Kick (ngắt tạm)" : action === "ban" ? "Cấm (chặn lâu dài)" : "Bỏ cấm";
+    if (action !== "kick" && !confirm(`${verb} thiết bị ${mac} khỏi WiFi "${ssidNameByIdx(idx)}"?` +
+        (action === "ban" ? "\n\n⚠️ Băng tần của WiFi này sẽ reload (các client cùng băng bị ngắt trong giây lát)." : ""))) return;
+    toast("Đang " + verb.toLowerCase() + "…");
+    api(action, "POST", { idx, mac }).then(d => {
+      if (!d || !d.ok) return showLog(verb, d);
+      toast(verb + " ✓"); loadDevices();
     }).catch(err => toast("Lỗi: " + err.message));
   }
 
@@ -897,6 +993,19 @@
   $("connCancel").onclick = () => $("connBackdrop").classList.remove("show");
   $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") $("connBackdrop").classList.remove("show"); };
   $("pushApplyBtn").onclick = pushApply;
+  $("devicesBtn").onclick = openDevices;
+  $("devClose").onclick = closeDevices;
+  $("devRefresh").onclick = loadDevices;
+  $("devBackdrop").onclick = e => { if (e.target.id === "devBackdrop") closeDevices(); };
+  $("devRows").onclick = e => {
+    const k = e.target.getAttribute("data-kick");
+    const b = e.target.getAttribute("data-ban");
+    const u = e.target.getAttribute("data-unban");
+    const idx = parseInt(e.target.getAttribute("data-idx"), 10);
+    if (k) return deviceAction("kick", idx, k);
+    if (b) return deviceAction("ban", idx, b);
+    if (u) return deviceAction("unban", idx, u);
+  };
   $("pullBtn").onclick = pullFromRouter;
   $("rbBtn").onclick = openRollback;
   $("rbClose").onclick = () => $("rbBackdrop").classList.remove("show");
