@@ -496,6 +496,85 @@ out="$(auth_run POST 'action=uninstall' '{}')"
 eq "uninstall succeeds" "$(json_value "$out" '.ok')" 'true'
 contains "uninstall invokes script" "$(cat "$CALLS")" 'uninstall'
 
+echo "== agent self-update =="
+out="$(auth_run GET 'action=status')"
+eq "status reports unknown version without VERSION file" "$(json_value "$out" '.meta.version')" 'unknown'
+
+# Dedicated fake root so an applied update never clobbers the shared stubs.
+SB2="$TMP/router2"
+mkdir -p "$SB2/config" "$SB2/scripts" "$TMP/deploy"
+printf '%s\n' '0.4.0' > "$SB2/VERSION"
+printf '%s\n' 'Alpha|2g|1|alpha-password|proxy1.example|1080|||1|0|50:C7:BF' > "$SB2/config/wifi-socks.conf"
+printf '%s\n' 'ROUTER_SETTING=1' > "$SB2/config/settings.sh"
+cp "$ROOT/scripts/self-update.sh" "$SB2/scripts/self-update.sh"
+cat > "$SB2/scripts/backup.sh" <<'SH'
+#!/bin/sh
+printf 'backup2:%s\n' "${1:-}" >> "$CALLS"
+exit "${BACKUP_RC:-0}"
+SH
+chmod +x "$SB2"/scripts/*.sh
+
+make_pkg() { # version dest-file
+  pkgsrc="$TMP/pkgsrc"
+  rm -rf "$pkgsrc"
+  mkdir -p "$pkgsrc/scripts" "$pkgsrc/agent/cgi" "$pkgsrc/agent/init.d" "$pkgsrc/console/web" "$pkgsrc/config"
+  printf '%s\n' "$1" > "$pkgsrc/VERSION"
+  printf '#!/bin/sh\necho new-apply\n' > "$pkgsrc/scripts/apply.sh"
+  printf '#!/bin/sh\n' > "$pkgsrc/scripts/lib.sh"
+  printf '#!/bin/sh\necho new-cgi\n' > "$pkgsrc/agent/cgi/sbproxy"
+  printf '#!/bin/sh\n' > "$pkgsrc/agent/sbproxy-healthd"
+  printf '#!/bin/sh\n' > "$pkgsrc/agent/init.d/sbproxy-healthd"
+  printf '<html>new-ui</html>\n' > "$pkgsrc/console/web/control-panel.html"
+  printf 'PACKAGED|conf|must|not|survive\n' > "$pkgsrc/config/wifi-socks.conf"
+  tar czf "$2" -C "$pkgsrc" VERSION scripts agent console config
+}
+
+run_agent_pkg() { # query package-file
+  REQUEST_METHOD=POST QUERY_STRING="$1" HTTP_AUTHORIZATION='Bearer agent-test-token' \
+    SB_ROOT="$SB2" CONF="$SB2/config/wifi-socks.conf" \
+    CGI_DEST="$TMP/deploy/sbproxy" UI_DEST="$TMP/deploy/index.html" \
+    HEALTHD_DEST="$TMP/deploy/sbproxy-healthd" HEALTHD_INIT_DEST="$TMP/deploy/init-healthd" \
+    SB_NO_SERVICE=1 sh "$AGENT" < "$2"
+}
+
+out="$(run_agent GET 'action=update' 'Bearer agent-test-token')"
+contains "update requires POST" "$out" 'Status: 405 Method Not Allowed'
+: > "$TMP/empty.bin"
+out="$(run_agent_pkg 'action=update' "$TMP/empty.bin")"
+contains "update rejects empty body" "$out" 'Status: 400 Bad Request'
+printf 'not a package' > "$TMP/garbage.bin"
+out="$(run_agent_pkg 'action=update' "$TMP/garbage.bin")"
+eq "update rejects non-package body" "$(json_value "$out" '.ok')" 'false'
+contains "update names the package problem" "$out" 'không phải .tar.gz hoặc .zip'
+
+reset_calls
+make_pkg 0.5.0 "$TMP/pkg-0.5.0.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.5.0.tar.gz")"
+eq "update applies newer package" "$(json_value "$out" '.ok')" 'true'
+eq "update reports source version" "$(json_value "$out" '.from')" '0.4.0'
+eq "update reports target version" "$(json_value "$out" '.to')" '0.5.0'
+eq "update rewrites VERSION" "$(tr -d ' \r\n' < "$SB2/VERSION")" '0.5.0'
+contains "update backs up before overwrite" "$(cat "$CALLS")" 'backup2:pre-update'
+contains "update replaces code" "$(cat "$SB2/scripts/apply.sh")" 'new-apply'
+contains "update preserves live wifi config" "$(cat "$SB2/config/wifi-socks.conf")" 'Alpha|2g|1|'
+not_contains "update never installs packaged config" "$(cat "$SB2/config/wifi-socks.conf")" 'PACKAGED'
+contains "update preserves live settings" "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=1'
+contains "update deploys refreshed CGI" "$(cat "$TMP/deploy/sbproxy")" 'new-cgi'
+contains "update deploys refreshed web UI" "$(cat "$TMP/deploy/index.html")" 'new-ui'
+
+make_pkg 0.3.0 "$TMP/pkg-0.3.0.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.3.0.tar.gz")"
+eq "update refuses downgrade" "$(json_value "$out" '.ok')" 'false'
+contains "downgrade refusal names versions" "$out" 'cũ hơn'
+eq "refused downgrade leaves VERSION alone" "$(tr -d ' \r\n' < "$SB2/VERSION")" '0.5.0'
+out="$(run_agent_pkg 'action=update&force=1' "$TMP/pkg-0.3.0.tar.gz")"
+eq "forced downgrade succeeds" "$(json_value "$out" '.ok')" 'true'
+eq "forced downgrade rewrites VERSION" "$(json_value "$out" '.to')" '0.3.0'
+
+out="$(REQUEST_METHOD=GET QUERY_STRING='action=status' HTTP_AUTHORIZATION='Bearer agent-test-token' \
+  SB_ROOT="$SB2" CONF="$SB2/config/wifi-socks.conf" sh "$AGENT")"
+eq "status reports installed version" "$(json_value "$out" '.meta.version')" '0.3.0'
+
 echo ""
 printf 'AGENT TOTAL: pass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

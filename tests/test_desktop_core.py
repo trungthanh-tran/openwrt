@@ -191,6 +191,23 @@ class ConfigPersistenceTests(unittest.TestCase):
         with mock.patch.object(app, "_dpapi_unprotect", side_effect=ValueError("bad")):
             self.assertEqual(app.load_connection(), (app.DEFAULT_BASE, ""))
 
+    def test_save_connection_falls_back_to_plain_token_without_dpapi(self):
+        # Linux/macOS builds have no DPAPI; the token drops to token_plain and
+        # the file relies on chmod 600 (POSIX only).
+        with mock.patch.object(app, "_dpapi_protect", side_effect=RuntimeError("no DPAPI")):
+            app.save_connection("http://router/", " tok ")
+        payload = app._read_config_payload()
+        self.assertNotIn("token_dpapi", payload)
+        self.assertEqual(payload["token_plain"], "tok")
+        self.assertEqual(app.load_connection(), ("http://router", "tok"))
+
+    def test_save_connection_replaces_stale_token_keys(self):
+        app._write_config_payload({"token_plain": "old", "token_dpapi": "stale"})
+        app.save_connection("http://router/", "new")
+        payload = app._read_config_payload()
+        self.assertEqual(payload["token_dpapi"], "sealed:new")
+        self.assertNotIn("token_plain", payload)
+
     def test_provision_without_token_does_nothing(self):
         with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(app, "save_connection") as save:
             self.assertFalse(app.provision_from_environment())
@@ -562,6 +579,23 @@ class EntryPointTests(unittest.TestCase):
         for result, expected in ((True, 0), (False, 1)):
             with self.subTest(result=result), mock.patch.object(app, "provision_from_environment", return_value=False), mock.patch.object(app, "probe_saved_connection", return_value=result), mock.patch.object(sys, "argv", ["main.py", "--probe"]):
                 self.assertEqual(app.main(), expected)
+
+
+class VersionTests(unittest.TestCase):
+    def test_app_version_matches_repo_version_file(self):
+        repo_version = (Path(__file__).resolve().parents[1] / "VERSION").read_text(
+            encoding="utf-8").strip()
+        self.assertEqual(app.APP_VERSION, repo_version)
+
+    def test_clean_agent_version_accepts_only_semver_strings(self):
+        self.assertEqual(app.clean_agent_version({"version": "0.4.0"}), "0.4.0")
+        self.assertEqual(app.clean_agent_version({"version": "12.34.56"}), "12.34.56")
+        for dirty in (
+            None, [], "text", 7, {"version": None}, {"version": 7}, {"version": []},
+            {"version": ""}, {"version": "0.4"}, {"version": "0.4.0-rc1"},
+            {"version": "0.4.0\n"}, {"version": "v0.4.0"}, {"version": "0.4.0;rm"},
+        ):
+            self.assertEqual(app.clean_agent_version(dirty), "", repr(dirty))
 
 
 if __name__ == "__main__":

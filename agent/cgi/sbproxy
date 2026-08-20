@@ -20,6 +20,7 @@
 # POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
 # POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
 # POST ?action=unban  body json {idx,mac} -> remove a MAC ban
+# POST ?action=update[&force=1]  body=binary package (.tar.gz/.zip) -> self-update code
 
 # ---- env / config ----
 [ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
@@ -28,6 +29,8 @@ CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 TOKEN_FILE="${TOKEN_FILE:-/etc/sbproxy/token}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
 MAX_BODY_BYTES="${MAX_BODY_BYTES:-262144}"
+# Update packages are binary and larger than text/JSON bodies.
+MAX_UPDATE_BYTES="${MAX_UPDATE_BYTES:-8388608}"
 
 # ---- helpers ----
 hdr() {
@@ -80,22 +83,29 @@ trap 'exit 1' HUP INT TERM
 
 if [ "$REQUEST_METHOD" = "POST" ]; then
   case "$MAX_BODY_BYTES" in ''|*[!0-9]*|0) MAX_BODY_BYTES=262144;; esac
+  case "$MAX_UPDATE_BYTES" in ''|*[!0-9]*|0) MAX_UPDATE_BYTES=8388608;; esac
+  # The update package is binary (gzip/zip), so it gets a larger cap and is
+  # exempt from the NUL check that protects the text/JSON endpoints.
+  BODY_LIMIT="$MAX_BODY_BYTES"
+  [ "$ACTION" = "update" ] && BODY_LIMIT="$MAX_UPDATE_BYTES"
   case "${CONTENT_LENGTH:-}" in
     '' ) ;;
     *[!0-9]* ) json_err "400 Bad Request" "Content-Length không hợp lệ";;
-    * ) [ "$CONTENT_LENGTH" -le "$MAX_BODY_BYTES" ] 2>/dev/null \
-          || json_err "413 Payload Too Large" "body vượt quá $MAX_BODY_BYTES byte";;
+    * ) [ "$CONTENT_LENGTH" -le "$BODY_LIMIT" ] 2>/dev/null \
+          || json_err "413 Payload Too Large" "body vượt quá $BODY_LIMIT byte";;
   esac
   umask 077
   BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/sbproxy-cgi-body.XXXXXX")" \
     || json_err "500 Internal Server Error" "không tạo được body tạm"
   cat > "$BODY_FILE" || json_err "400 Bad Request" "không đọc được body"
   body_size="$(wc -c < "$BODY_FILE" | tr -d ' ')"
-  [ "$body_size" -le "$MAX_BODY_BYTES" ] 2>/dev/null \
-    || json_err "413 Payload Too Large" "body vượt quá $MAX_BODY_BYTES byte"
-  body_has_nul; nul_rc=$?
-  [ "$nul_rc" -ne 0 ] || json_err "400 Bad Request" "body chứa byte NUL không hợp lệ"
-  [ "$nul_rc" -ne 2 ] || json_err "500 Internal Server Error" "thiếu od/hexdump để kiểm tra body"
+  [ "$body_size" -le "$BODY_LIMIT" ] 2>/dev/null \
+    || json_err "413 Payload Too Large" "body vượt quá $BODY_LIMIT byte"
+  if [ "$ACTION" != "update" ]; then
+    body_has_nul; nul_rc=$?
+    [ "$nul_rc" -ne 0 ] || json_err "400 Bad Request" "body chứa byte NUL không hợp lệ"
+    [ "$nul_rc" -ne 2 ] || json_err "500 Internal Server Error" "thiếu od/hexdump để kiểm tra body"
+  fi
 fi
 
 require_json_object() {
@@ -155,9 +165,10 @@ case "$ACTION" in
     ' >/dev/null 2>&1 || H='{}'
     applied="false"; [ -f "$SINGBOX_CONF" ] || [ -f /etc/sing-box/config.json ] && applied="true"
     running="false"; pgrep -f sing-box >/dev/null 2>&1 && running="true"
+    ver="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || true)"; [ -n "$ver" ] || ver="unknown"
     json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
-                     --argjson running "$running" --argjson applied "$applied" \
-      '{ok:true, ssids:$ssids, health:$health, meta:{singbox_running:$running, applied:$applied}}')"
+                     --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
+      '{ok:true, ssids:$ssids, health:$health, meta:{singbox_running:$running, applied:$applied, version:$ver}}')"
     ;;
 
   get_conf)
@@ -284,6 +295,22 @@ case "$ACTION" in
     require_empty_or_json_object
     OUT="$(cd "$SB_ROOT" && sh scripts/uninstall.sh 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
+    ;;
+
+  update)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    [ -s "$BODY_FILE" ] || json_err "400 Bad Request" "body rỗng — cần package .tar.gz/.zip"
+    force_flag=""
+    echo "$QUERY_STRING" | grep -Eq '(^|&)force=1(&|$)' && force_flag="--force"
+    from_ver="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || true)"; [ -n "$from_ver" ] || from_ver="unknown"
+    if [ -n "$force_flag" ]; then
+      OUT="$(cd "$SB_ROOT" && sh scripts/self-update.sh "$BODY_FILE" --force 2>&1)"; RC=$?
+    else
+      OUT="$(cd "$SB_ROOT" && sh scripts/self-update.sh "$BODY_FILE" 2>&1)"; RC=$?
+    fi
+    to_ver="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || true)"; [ -n "$to_ver" ] || to_ver="unknown"
+    json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" --arg from "$from_ver" --arg to "$to_ver" \
+      '{ok:($rc==0), rc:$rc, log:$log, from:$from, to:$to}')"
     ;;
 
   backups)

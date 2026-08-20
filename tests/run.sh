@@ -314,10 +314,38 @@ else
 fi
 
 echo "== pc update package manifest =="
-match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md agent config console docs etc scripts tools'
+match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts tools'
 nomatch "update.sh drops old ui path" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'scripts tools ui'
-match   "update.ps1 packages console" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'README.md agent config console docs etc scripts tools'
+match   "update.ps1 packages console" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'README.md VERSION agent config console docs etc scripts tools'
 nomatch "update.ps1 drops old ui path" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'scripts tools ui'
+match   "make-package.sh ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.sh")" 'README.md VERSION agent config console docs etc scripts tools'
+match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.ps1")" 'README.md VERSION agent config console docs etc scripts tools'
+
+echo "== versioning and self-update =="
+project_version="$(tr -d ' \r\n' < "$ROOT/VERSION")"
+match "VERSION is semver" "$project_version" '^[0-9]+\.[0-9]+\.[0-9]+$'
+ui_version="$(sed -n 's/.*const UI_VERSION = "\([0-9.]*\)".*/\1/p' "$ROOT/console/web/control-panel.html")"
+eq "web console version matches VERSION file" "$ui_version" "$project_version"
+desktop_version="$(sed -n 's/^APP_VERSION = "\([0-9.]*\)"$/\1/p' "$ROOT/console/desktop/main.py")"
+eq "desktop console version matches VERSION file" "$desktop_version" "$project_version"
+desktop_main="$(cat "$ROOT/console/desktop/main.py")"
+match "desktop shows agent version from status meta" "$desktop_main" 'clean_agent_version\(meta\)'
+match "desktop keeps a plain-token fallback for POSIX builds" "$desktop_main" 'token_plain'
+match "desktop locks down POSIX config permissions" "$desktop_main" '0o600'
+match "desktop Linux build script uses PyInstaller" "$(cat "$ROOT/console/desktop/build.sh")" 'PyInstaller --noconfirm --clean --onefile --windowed'
+match "desktop Linux run script starts from source" "$(cat "$ROOT/console/desktop/run.sh")" 'exec "\$PY" main\.py'
+agent_cgi="$(cat "$ROOT/agent/cgi/sbproxy")"
+match "Agent status exposes version" "$agent_cgi" 'version:\$ver'
+match "Agent exposes self-update action" "$agent_cgi" 'sh scripts/self-update\.sh'
+match "Agent exempts only update from NUL check" "$agent_cgi" '\[ "\$ACTION" != "update" \]'
+match "Agent caps update body size" "$agent_cgi" 'MAX_UPDATE_BYTES'
+selfupdate="$(cat "$ROOT/scripts/self-update.sh")"
+match "self-update blocks path traversal" "$selfupdate" 'đường dẫn không an toàn \(tuyệt đối hoặc \.\.\)'
+match "self-update guards downgrades" "$selfupdate" 'dùng --force nếu muốn hạ version'
+match "self-update backs up before overwrite" "$selfupdate" 'backup\.sh pre-update'
+match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf settings\.sh'
+match "self-update validates package contents" "$selfupdate" 'scripts/apply\.sh scripts/lib\.sh agent/cgi/sbproxy'
+match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
 
 echo ""
 printf 'TOTAL: pass=%d  fail=%d  skip=%d\n' "$pass" "$fail" "$skip"

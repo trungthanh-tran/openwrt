@@ -45,7 +45,7 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 10, 13 | `scripts/gateway.sh` | Kiểm tra read-only default route, đối chiếu `wwan`, link, DNS và HTTP trực tiếp. |
 | 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
 | 14 | `scripts/clients.sh`, `scripts/{kick,ban,unban}.sh` | Liệt kê thiết bị theo SSID và kick/cấm/bỏ cấm theo MAC. |
-| — | `console/desktop/build.ps1` (Windows) | Build app Tkinter native `console/desktop/main.py` thành `.exe`; không dùng HTML/WebView. Xem [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |
+| — | `console/desktop/build.ps1` (Windows) / `build.sh` (Linux/macOS) | Build app Tkinter native `console/desktop/main.py` thành `.exe` / binary Linux; không dùng HTML/WebView. Xem [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |
 | 15 | `scripts/security-audit.sh` | Audit quyền file, SSH và dấu hiệu mở quản trị; chỉ đọc. |
 
 Chạy các script router từ thư mục project: `cd /root/sbproxy`. Script có thay đổi trạng thái vẫn yêu cầu quyết định rõ của quản trị viên; các script kiểm kê/audit không tự sửa để tránh khóa mất SSH.
@@ -211,7 +211,7 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ### 9.4 Console: bản Web vs bản Desktop
 Hai frontend độc lập dùng chung Agent API:
 - **Web (router-hosted):** `install-agent.sh` copy UI vào `/www/sbproxy/index.html`. Mở `http://<router>/sbproxy/` — same-origin. Nếu mở qua **https** thì trình duyệt chặn mixed-content khi gọi router http.
-- **Desktop (.exe):** build trên máy Windows quản trị: `cd console/desktop; .\build.ps1` → `console/desktop/dist/sbproxy-console.exe`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
+- **Desktop (.exe / Linux):** build trên máy quản trị: Windows `cd console/desktop; .\build.ps1` → `dist/sbproxy-console.exe`; Linux/macOS `sh console/desktop/build.sh` → `dist/sbproxy-console` (token lưu `chmod 600` thay cho DPAPI). Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
 
 > **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
@@ -320,6 +320,9 @@ Endpoint `/cgi-bin/sbproxy?action=…`, ưu tiên header `Authorization: Bearer 
 | POST | `kick` | {idx,mac} | {ok,rc,log} — deauth tạm |
 | POST | `ban` | {idx,mac} | {ok,rc,log} — chặn MAC lâu dài |
 | POST | `unban` | {idx,mac} | {ok,rc,log} |
+| POST | `update[&force=1]` | binary `.tar.gz`/`.zip` | {ok,rc,log,from,to} — self-update code sbproxy |
+
+**Cập nhật agent qua giao diện (self-update):** tạo package trên máy quản trị bằng `make package` (hoặc `sh pc/make-package.sh` / `pc\make-package.ps1`) → `dist/sbproxy-update-<version>.tar.gz`, rồi trên web console bấm **⬆ Cập nhật** và chọn file. Router chạy `scripts/self-update.sh`: chặn path traversal trong package, từ chối hạ version (tick "force" nếu cố ý), tự backup `pre-update`, **giữ nguyên** `config/wifi-socks.conf` + `config/settings.sh` đang dùng, deploy lại CGI/UI/healthd và reload uhttpd. Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bấm "Đẩy & Áp" sau đó. Version đang chạy hiển thị ở header console (`meta.version` của `?action=status`); giới hạn upload mặc định 8 MB (`MAX_UPDATE_BYTES` trong `/etc/sbproxy/env`).
 
 **Quản lý thiết bị:** app native lọc theo SSID, band, online/offline, blocklist, RSSI, traffic và thời gian; hỗ trợ chọn nhiều, sort, auto-refresh, chi tiết và CSV. **Kick** deauth tạm (thiết bị có thể nối lại). **Cấm** ghi MAC vào `/etc/sbproxy.bans` + đặt `macfilter=deny` cho SSID đó rồi reload băng tần tương ứng; ban được `apply.sh` áp lại mỗi lần chạy nên không mất khi cấu hình lại. Blocklist offline vẫn hiện để bỏ cấm. Router-side: `sh scripts/clients.sh`, `sh scripts/{kick,ban,unban}.sh <idx> <mac>`.
 

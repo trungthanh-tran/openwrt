@@ -1,7 +1,7 @@
 # Developer task runner. These run on a workstation or CI, never on the router.
-LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
+LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
 
-.PHONY: help lint test docs docs-check check version
+.PHONY: help lint test docs docs-check check version package
 
 help:
 	@echo "make lint        # shellcheck the shell scripts"
@@ -10,6 +10,7 @@ help:
 	@echo "make docs-check  # fail if docs/*.html are out of date"
 	@echo "make check       # lint + test + docs-check (what CI runs)"
 	@echo "make version     # print the project version"
+	@echo "make package     # build dist/sbproxy-update-<version>.tar.gz for UI upload"
 
 lint:
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck chưa cài"; exit 1; }
@@ -28,3 +29,6 @@ check: lint test docs-check
 
 version:
 	@cat VERSION
+
+package:
+	sh pc/make-package.sh

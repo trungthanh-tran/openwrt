@@ -36,7 +36,10 @@
 
 ## Build
 
-Yêu cầu Python 3.9+ có Tkinter:
+Yêu cầu Python 3.9+ có Tkinter. PyInstaller không cross-compile — build trên
+đúng nền tảng đích.
+
+Windows:
 
 ```powershell
 cd console\desktop
@@ -44,7 +47,17 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
-Máy chạy file EXE không cần cài Python hay WebView2.
+Linux/macOS (Debian/Ubuntu cần `sudo apt install python3-tk` trước):
+
+```sh
+cd console/desktop
+sh build.sh
+# -> dist/sbproxy-console
+```
+
+Máy chạy file build ra không cần cài Python hay WebView2. Trên Windows token
+được niêm phong bằng DPAPI; trên Linux/macOS token nằm trong
+`~/.config/sbproxy-console-native/connection.json` với quyền `chmod 600`.
 
 ## Chạy khi phát triển
 

@@ -52,7 +52,7 @@ desktop app uses no HTML/WebView/WebView2, protects its token with Windows
 DPAPI, dry-runs before Apply, warns before important mutations, and includes
 advanced client management. Its interface supports English and Vietnamese,
 plus Dark and Light themes; English is the default. Build it with
-`cd console/desktop; .\build.ps1` —
+`cd console/desktop; .\build.ps1` on Windows or `sh build.sh` on Linux/macOS —
 see [console/desktop/README.md](console/desktop/README.md).
 
 There is no cloud control. Use a trusted management LAN or self-managed VPN. Never expose LuCI, uhttpd, SSH, or the agent directly to the WAN.

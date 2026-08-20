@@ -31,8 +31,13 @@ from urllib.request import Request, urlopen
 
 
 APP_NAME = "sbproxy Console Native"
+# Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
+APP_VERSION = "0.4.0"
 DEFAULT_BASE = "http://192.168.8.1"
-CONFIG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "sbproxy-console-native"
+if os.name == "nt":
+    CONFIG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "sbproxy-console-native"
+else:
+    CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "sbproxy-console-native"
 CONFIG_FILE = CONFIG_DIR / "connection.json"
 
 DARK_PALETTE = {
@@ -462,17 +467,25 @@ def _read_config_payload() -> dict:
 
 def _write_config_payload(payload: dict) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(CONFIG_DIR, 0o700)
     temp = CONFIG_FILE.with_suffix(".tmp")
     temp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     temp.replace(CONFIG_FILE)
+    if os.name != "nt":
+        os.chmod(CONFIG_FILE, 0o600)
 
 
 def save_connection(base_url: str, token: str) -> None:
     payload = _read_config_payload()
-    payload.update({
-        "base_url": base_url.strip().rstrip("/"),
-        "token_dpapi": _dpapi_protect(token.strip()),
-    })
+    payload.pop("token_dpapi", None)
+    payload.pop("token_plain", None)
+    # DPAPI on Windows; on Linux/macOS the config file itself is chmod 600.
+    try:
+        secret = {"token_dpapi": _dpapi_protect(token.strip())}
+    except Exception:
+        secret = {"token_plain": token.strip()}
+    payload.update({"base_url": base_url.strip().rstrip("/"), **secret})
     payload.setdefault("language", "en")
     payload.setdefault("theme", "dark")
     _write_config_payload(payload)
@@ -483,10 +496,9 @@ def load_connection() -> tuple[str, str]:
     if not payload:
         return DEFAULT_BASE, ""
     try:
-        return (
-            str(payload.get("base_url") or DEFAULT_BASE).rstrip("/"),
-            _dpapi_unprotect(str(payload.get("token_dpapi") or "")),
-        )
+        sealed = str(payload.get("token_dpapi") or "")
+        token = _dpapi_unprotect(sealed) if sealed else str(payload.get("token_plain") or "")
+        return (str(payload.get("base_url") or DEFAULT_BASE).rstrip("/"), token)
     except Exception:
         return DEFAULT_BASE, ""
 
@@ -504,6 +516,14 @@ def save_preferences(language: str, theme: str) -> None:
     payload["language"] = language if language in ("en", "vi") else "en"
     payload["theme"] = theme if theme in PALETTES else "dark"
     _write_config_payload(payload)
+
+
+def clean_agent_version(meta) -> str:
+    """Return the agent's semver from status meta, or "" for dirty payloads."""
+    value = meta.get("version") if isinstance(meta, dict) else None
+    if isinstance(value, str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value):
+        return value
+    return ""
 
 
 def provision_from_environment() -> bool:
@@ -1138,7 +1158,7 @@ class LoadingWindow(tk.Toplevel):
 class NativeApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title(APP_NAME)
+        self.root.title(f"{APP_NAME} · v{APP_VERSION}")
         self.root.geometry("1380x840")
         self.root.minsize(1100, 700)
         self.client: AgentClient | None = None
@@ -1161,6 +1181,7 @@ class NativeApp:
         self.base_var = tk.StringVar(value=base)
         self.token_var = tk.StringVar(value=token)
         self.status_var = tk.StringVar(value=self.t("Chưa kết nối"))
+        self.agent_version = ""
         self.client_ssid_var = tk.StringVar(value=self.t(ALL_SSIDS))
         self.client_query_var = tk.StringVar()
         self.client_state_var = tk.StringVar(value=self.t(ALL_STATES))
@@ -1267,7 +1288,8 @@ class NativeApp:
         brand = ttk.Frame(header, style="Header.TFrame")
         brand.pack(side="left")
         ttk.Label(brand, text="sbproxy", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(brand, text="OPENWRT · MULTI-SSID SOCKS5 CONTROL CENTER", style="Subtitle.TLabel").pack(anchor="w")
+        ttk.Label(brand, text=f"OPENWRT · MULTI-SSID SOCKS5 CONTROL CENTER · v{APP_VERSION}",
+                  style="Subtitle.TLabel").pack(anchor="w")
         ttk.Label(header, textvariable=self.status_var, style="Status.TLabel").pack(side="right", padx=(20, 0))
         preferences = ttk.Frame(header, style="Header.TFrame")
         preferences.pack(side="right", padx=(18, 0))
@@ -1630,11 +1652,17 @@ class NativeApp:
             self.render_gateway(gateway)
             meta = status.get("meta") if isinstance(status.get("meta"), dict) else {}
             running = bool(meta.get("singbox_running"))
+            self.agent_version = clean_agent_version(meta)
             self.status_var.set(
                 f"Connected to {self.client.base_url} · sing-box {'running' if running else 'NOT running'}"
                 if self.language == "en" else
                 f"Đã kết nối {self.client.base_url} · sing-box {'đang chạy' if running else 'KHÔNG chạy'}"
             )
+            if self.agent_version:
+                suffix = f" · agent v{self.agent_version}"
+                if self.agent_version != APP_VERSION:
+                    suffix += " (≠ app)" if self.language == "en" else " (khác app)"
+                self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
             self.refresh_clients()
             self.refresh_backups()
@@ -1664,11 +1692,17 @@ class NativeApp:
             self.render_gateway(gateway)
             meta = status.get("meta") if isinstance(status.get("meta"), dict) else {}
             running = bool(meta.get("singbox_running"))
+            self.agent_version = clean_agent_version(meta)
             self.status_var.set(
                 f"Refreshed · sing-box {'running' if running else 'NOT running'}"
                 if self.language == "en" else
                 f"Đã làm mới · sing-box {'đang chạy' if running else 'KHÔNG chạy'}"
             )
+            if self.agent_version:
+                suffix = f" · agent v{self.agent_version}"
+                if self.agent_version != APP_VERSION:
+                    suffix += " (≠ app)" if self.language == "en" else " (khác app)"
+                self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
         self.run_task("Đang làm mới…", work, done)
 

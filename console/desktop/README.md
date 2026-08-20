@@ -36,7 +36,10 @@ at `console/web/control-panel.html` remains a separate application.
 
 ## Build
 
-Python 3.9+ with Tkinter is required:
+Python 3.9+ with Tkinter is required. PyInstaller does not cross-compile —
+build on each target platform.
+
+Windows:
 
 ```powershell
 cd console\desktop
@@ -44,7 +47,17 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
-The generated EXE does not require Python or WebView2 on the target PC.
+Linux/macOS (Debian/Ubuntu: `sudo apt install python3-tk` first):
+
+```sh
+cd console/desktop
+sh build.sh
+# -> dist/sbproxy-console
+```
+
+The generated binary does not require Python or WebView2 on the target PC.
+On Windows the token is sealed with DPAPI; on Linux/macOS it is stored in
+`~/.config/sbproxy-console-native/connection.json` with `chmod 600`.
 
 ## Development run
 

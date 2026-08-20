@@ -5,7 +5,36 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-20
+
 ### Added
+- **Versioning xuyên suốt**: agent trả `meta.version` trong `?action=status`;
+  web console hiển thị `v<UI> · agent v<router>` và cảnh báo khi lệch version
+  (test CI ép `UI_VERSION` khớp file `VERSION`).
+- **Cập nhật agent qua giao diện**: endpoint `POST ?action=update[&force=1]`
+  nhận package `.tar.gz`/`.zip`; `scripts/self-update.sh` chặn path traversal,
+  chặn hạ version (trừ `--force`), backup `pre-update`, giữ nguyên
+  `wifi-socks.conf` + `settings.sh`, deploy lại CGI/UI/healthd và reload dịch vụ.
+- Nút **⬆ Cập nhật** + modal upload package trên web console (chọn file, force,
+  log kết quả `from → to`).
+- Tool đóng gói `pc/make-package.sh` / `pc/make-package.ps1` và target
+  `make package` → `dist/sbproxy-update-<version>.tar.gz`.
+- Giao diện web control panel hiện đại hóa: header kính mờ sticky, gradient,
+  focus ring, animation modal/toast, segmented tabs, dark mode giữ nguyên.
+- Desktop hiển thị version: title bar + subtitle `v<APP_VERSION>`, dòng trạng
+  thái thêm `agent v<x.y.z>` (đánh dấu `khác app` khi lệch); `APP_VERSION`
+  được CI ép khớp file `VERSION`.
+- Build desktop cho Linux/macOS: `console/desktop/build.sh` + `run.sh`
+  (PyInstaller, cần `python3-tk`). Không có DPAPI thì token lưu
+  `token_plain` trong `~/.config/sbproxy-console-native/connection.json`
+  với `chmod 600` (thư mục `700`).
+
+### Changed
+- `pc/update.sh` / `pc/update.ps1` đóng gói thêm file `VERSION` lên router.
+- Suite test: +22 assertion agent self-update, +14 assertion POSIX
+  (manifest/versioning/self-update guard).
+
+### Added — console native (gộp vào bản phát hành này)
 - Console Windows **Tkinter native** gọi trực tiếp Agent API, không phụ thuộc
   HTML/WebView/WebView2; token được bảo vệ bằng Windows DPAPI.
 - Pipeline thay đổi cấu hình trong app: dry-run candidate, loading theo bước,

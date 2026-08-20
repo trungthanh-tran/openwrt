@@ -42,7 +42,7 @@ etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
 console/                    # Hai frontend độc lập dùng chung Agent API
   web/control-panel.html    #   UI Web self-host trên router
   desktop/                  #   App Windows Tkinter native, không dùng HTML/WebView
-    main.py / build.ps1     #     code native + build 1 lệnh -> dist/sbproxy-console.exe
+    main.py / build.ps1 / build.sh  # code native + build 1 lệnh -> dist/sbproxy-console(.exe)
 agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check latency realtime
   cgi/sbproxy               #   REST API gọi các script trên router
   sbproxy-healthd           #   daemon probe SOCKS, đo latency
@@ -63,7 +63,7 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 
 ### Console: bản Web và bản Desktop native
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
-- **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI, dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: `cd console/desktop; .\build.ps1`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
+- **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI, dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
 
 ## Quickstart
 ```sh
