@@ -1066,6 +1066,46 @@ def client_sort_key(item, column):
     return str(item.get(column) or "").casefold()
 
 
+def wifi_sort_key(record, column, health=None, runtime=None):
+    """Return a stable, naturally ordered key for every Wi-Fi table column."""
+    health = health if isinstance(health, dict) else {}
+    runtime = runtime if isinstance(runtime, dict) else {}
+    idx = _nonnegative_int(getattr(record, "idx", 0))
+
+    if column in ("idx", "subnet"):
+        return idx
+    if column == "name":
+        return str(getattr(record, "name", "") or "").casefold()
+    if column == "band":
+        band = str(getattr(record, "band", "") or "").casefold()
+        return ({"2g": 0, "5g": 1}.get(band, 2), band)
+    if column == "mac":
+        mac = str(runtime.get("macaddr") or "").casefold()
+        provider = vendor_label(getattr(record, "mac_oui", "")).casefold()
+        return (mac, provider)
+    if column == "socks":
+        host = str(getattr(record, "host", "") or "").casefold()
+        port = _nonnegative_int(getattr(record, "port", 0))
+        return (host, port)
+    if column == "isolate":
+        return int(bool(getattr(record, "isolate", False)))
+    if column == "webrtc":
+        return int(bool(getattr(record, "webrtc", False)))
+    if column == "health":
+        state = str(health.get("state") or "").casefold()
+        if any(word in state for word in ("ok", "up", "healthy")):
+            rank = 0
+        elif any(word in state for word in ("slow", "warn")):
+            rank = 1
+        elif state:
+            rank = 2
+        else:
+            rank = 3
+        latency = _finite_float(health.get("latency_ms"), math.inf)
+        return (rank, latency, state)
+    return ""
+
+
 class WifiDialog(tk.Toplevel):
     def __init__(self, parent, record: WifiRecord | None, next_idx: int, language="en", palette=None):
         super().__init__(parent)
@@ -1371,6 +1411,9 @@ class NativeApp:
         self.client_interval_var = tk.StringVar(value="15s")
         self.client_refresh_job = None
         self.client_refreshing = False
+        self.wifi_sort_column = "idx"
+        self.wifi_sort_reverse = False
+        self.wifi_column_titles = {}
         self.client_sort_column = "ssid"
         self.client_sort_reverse = False
         self.client_column_titles = {}
@@ -1580,6 +1623,7 @@ class NativeApp:
             child.destroy()
         self.wifi_edit_buttons = {}
         self.client_edit_buttons = {}
+        self.wifi_column_titles = {}
         self.client_column_titles = {}
         self._configure_styles()
         self._build_ui()
@@ -1631,7 +1675,10 @@ class NativeApp:
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
         columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "socks": "SOCKS5", "isolate": "Isolate", "webrtc": "WebRTC", "health": "Health"}
+        self.wifi_column_titles = columns.copy()
         self.wifi_tree = self._tree(tab, columns, {"idx": 50, "name": 150, "band": 55, "subnet": 130, "mac": 220, "socks": 195, "isolate": 70, "webrtc": 75, "health": 100})
+        for column, title in columns.items():
+            self.wifi_tree.heading(column, text=title, command=lambda selected=column: self.sort_wifi(selected))
         self.wifi_tree.tag_configure("healthy", foreground=self.palette["good_text"])
         self.wifi_tree.tag_configure("warning", foreground=self.palette["warn_text"])
         self.wifi_tree.tag_configure("error", foreground=self.palette["bad_text"])
@@ -2289,9 +2336,36 @@ class NativeApp:
             timeout_hint=225,
         )
 
+    def sort_wifi(self, column):
+        if column not in self.wifi_column_titles:
+            return
+        if self.wifi_sort_column == column:
+            self.wifi_sort_reverse = not self.wifi_sort_reverse
+        else:
+            self.wifi_sort_column = column
+            self.wifi_sort_reverse = False
+        self.render_wifi()
+
     def render_wifi(self):
+        records = sorted(
+            self.records,
+            key=lambda record: wifi_sort_key(
+                record,
+                self.wifi_sort_column,
+                self.health.get(str(record.idx), self.health.get(record.idx, {})),
+                self.runtime_ssids.get(record.idx),
+            ),
+            reverse=self.wifi_sort_reverse,
+        )
+        for column, title in self.wifi_column_titles.items():
+            marker = " ▼" if self.wifi_sort_reverse else " ▲"
+            self.wifi_tree.heading(
+                column,
+                text=self.t(title) + marker if column == self.wifi_sort_column else self.t(title),
+                command=lambda selected=column: self.sort_wifi(selected),
+            )
         self.wifi_tree.delete(*self.wifi_tree.get_children())
-        for pos, record in enumerate(self.records):
+        for pos, record in enumerate(records):
             probe = self.health.get(str(record.idx), self.health.get(record.idx, {})) or {}
             state = probe.get("state", "—")
             latency = probe.get("latency_ms")

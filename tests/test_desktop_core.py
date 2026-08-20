@@ -565,6 +565,37 @@ class ClientSortTests(unittest.TestCase):
         self.assertEqual(app.client_sort_key({}, "host"), "")
 
 
+class WifiSortTests(unittest.TestCase):
+    def test_numeric_and_natural_columns_do_not_sort_as_display_strings(self):
+        two = valid_record(idx=2, host="proxy", port=9000)
+        ten = valid_record(idx=10, host="proxy", port=1080)
+        self.assertLess(app.wifi_sort_key(two, "idx"), app.wifi_sort_key(ten, "idx"))
+        self.assertLess(app.wifi_sort_key(two, "subnet"), app.wifi_sort_key(ten, "subnet"))
+        self.assertGreater(app.wifi_sort_key(two, "socks"), app.wifi_sort_key(ten, "socks"))
+
+    def test_band_mac_flags_and_health_have_typed_sort_keys(self):
+        two_g = valid_record(band="2g", isolate=False, webrtc=False, mac_oui="50:C7:BF")
+        five_g = valid_record(band="5g", isolate=True, webrtc=True, mac_oui="20:E5:2A")
+        self.assertLess(app.wifi_sort_key(two_g, "band"), app.wifi_sort_key(five_g, "band"))
+        self.assertLess(app.wifi_sort_key(two_g, "isolate"), app.wifi_sort_key(five_g, "isolate"))
+        self.assertLess(app.wifi_sort_key(two_g, "webrtc"), app.wifi_sort_key(five_g, "webrtc"))
+        self.assertLess(
+            app.wifi_sort_key(two_g, "mac", runtime={"macaddr": "02:00:00:00:00:01"}),
+            app.wifi_sort_key(five_g, "mac", runtime={"macaddr": "02:00:00:00:00:02"}),
+        )
+        self.assertLess(
+            app.wifi_sort_key(two_g, "health", {"state": "ok", "latency_ms": 900}),
+            app.wifi_sort_key(five_g, "health", {"state": "slow", "latency_ms": 10}),
+        )
+
+    def test_every_column_tolerates_missing_and_dirty_auxiliary_data(self):
+        record = valid_record()
+        for column in ("idx", "name", "band", "subnet", "mac", "socks", "isolate", "webrtc", "health"):
+            with self.subTest(column=column):
+                app.wifi_sort_key(record, column, health=["bad"], runtime="bad")
+                app.wifi_sort_key(object(), column, health={"state": {}, "latency_ms": []}, runtime={"macaddr": {}})
+
+
 class EntryPointTests(unittest.TestCase):
     def setUp(self):
         # main() bootstraps the private app home; keep tests off the real one.

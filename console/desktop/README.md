@@ -19,7 +19,8 @@ at `console/web/control-panel.html` remains a separate application.
 - List clients and kick, ban, or unban them.
 - Filter clients by SSID, IP/name/MAC, ban state, and signal strength.
 - Advanced filters for band, online/offline state, access state, RSSI range,
-  traffic, and connection duration; click any column heading to sort.
+  traffic, and connection duration. Click any Wi-Fi or Devices column heading
+  to sort; click it again to reverse the order.
 - Dashboard counters, 5–60 second auto-refresh, details, multi-select actions,
   IP/MAC copy, and UTF-8 CSV export.
 - Internet Gateway card with the actual route, `wwan`/device, next hop, source

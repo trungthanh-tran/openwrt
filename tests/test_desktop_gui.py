@@ -137,6 +137,41 @@ class DesktopGuiSmokeTests(unittest.TestCase):
             self.app.runtime_ssids = original_runtime
             self.app.render_wifi()
 
+    def test_every_table_heading_is_sortable_and_shows_direction(self):
+        self.set_mode("en", "dark")
+        for tree in (self.app.wifi_tree, self.app.client_tree):
+            for column in tree["columns"]:
+                with self.subTest(table=str(tree), column=column):
+                    self.assertTrue(tree.heading(column, "command"))
+
+        original_records = self.app.records
+        original_health = self.app.health
+        original_runtime = self.app.runtime_ssids
+        try:
+            self.app.records = [
+                appmod.WifiRecord("Zulu", "2g", 2, "password12", "proxy", 9000),
+                appmod.WifiRecord("alpha", "5g", 10, "password12", "proxy", 1080),
+            ]
+            self.app.health = {}
+            self.app.runtime_ssids = {}
+            self.app.wifi_sort_column = "idx"
+            self.app.wifi_sort_reverse = False
+
+            self.app.sort_wifi("name")
+            self.assertEqual(self.app.wifi_tree.get_children(), ("10", "2"))
+            self.assertTrue(self.app.wifi_tree.heading("name", "text").endswith("▲"))
+
+            self.app.sort_wifi("name")
+            self.assertEqual(self.app.wifi_tree.get_children(), ("2", "10"))
+            self.assertTrue(self.app.wifi_tree.heading("name", "text").endswith("▼"))
+        finally:
+            self.app.records = original_records
+            self.app.health = original_health
+            self.app.runtime_ssids = original_runtime
+            self.app.wifi_sort_column = "idx"
+            self.app.wifi_sort_reverse = False
+            self.app.render_wifi()
+
     def test_primary_dialogs_render_in_both_languages(self):
         record = appmod.WifiRecord("test1", "2g", 1, "password12", "proxy", 1080)
         for language, palette, expected in (

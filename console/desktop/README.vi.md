@@ -19,7 +19,8 @@
 - Xem client, kick, ban và unban.
 - Lọc thiết bị theo SSID, IP/tên/MAC, trạng thái cấm và mức tín hiệu.
 - Bộ lọc nâng cao theo band, online/offline, quyền truy cập, ngưỡng RSSI,
-  lưu lượng và thời gian kết nối; bấm tiêu đề cột để sắp xếp.
+  lưu lượng và thời gian kết nối. Bấm bất kỳ tiêu đề cột nào trong bảng Wi-Fi
+  hoặc Thiết bị để sắp xếp; bấm lại để đảo chiều.
 - Dashboard số thiết bị online/yếu/đã chặn/tổng lưu lượng, auto-refresh 5–60s,
   xem chi tiết, chọn nhiều thiết bị, copy IP/MAC và xuất CSV UTF-8.
 - Khung Internet Gateway hiển thị route thực tế, `wwan`/device, next-hop, IP
