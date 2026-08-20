@@ -56,8 +56,46 @@ sh build.sh
 ```
 
 The generated binary does not require Python or WebView2 on the target PC.
-On Windows the token is sealed with DPAPI; on Linux/macOS it is stored in
-`~/.config/sbproxy-console-native/connection.json` with `chmod 600`.
+
+On Linux the POSIX bootloader does not expand `~` or `$HOME`, so the bundled
+runtime unpacks to the default temp folder unless an absolute path is given:
+
+```sh
+SBPROXY_RUNTIME_TMPDIR=/opt/sbproxy/runtime sh build.sh
+```
+
+## Isolated environment
+
+Everything the app writes lives under one private home, so an install never
+mixes with other Python environments or with another copy of the app:
+
+```
+<home>/config/connection.json   router URL + token (DPAPI on Windows, chmod 600 elsewhere)
+<home>/logs/console.log         rotating debug log (1 MB × 5 files)
+<home>/cache/                   scratch data
+<home>/runtime/                 bundled Python runtime and dependencies (Windows onefile)
+```
+
+`<home>` is resolved in this order:
+
+1. `SBPROXY_HOME` environment variable (any path you choose).
+2. A `data/` folder next to the executable — **portable mode**, ideal for a USB
+   stick or a copy-anywhere install; create the folder and the app uses it.
+3. Per-user default: `%LOCALAPPDATA%\sbproxy-console-native` on Windows,
+   `~/.local/share/sbproxy-console-native` on Linux/macOS.
+
+Run `sbproxy-console --where` to print the resolved paths. A `connection.json`
+from an older release is migrated into `config/` automatically on first start.
+
+## Logs
+
+Every agent call (action, size, duration, HTTP/transport errors), background
+task, UI log line, and uncaught exception — from the main thread and worker
+threads — is written to `<home>/logs/console.log` and rotated at 1 MB, keeping
+5 files. Credentials (token, Bearer header, Wi-Fi key, SOCKS password) are
+redacted before anything is written, so the file is safe to attach to a bug
+report. Use the **Log folder** button in the header to open it, or start with
+`--verbose` for DEBUG-level detail.
 
 ## Development run
 

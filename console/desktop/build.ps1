@@ -10,8 +10,12 @@ if ($LASTEXITCODE -ne 0) {
   python -m pip install -r requirements.txt
 }
 
+# --runtime-tmpdir keeps the bundled Python runtime and dependencies inside the
+# app's own data folder instead of the shared system temp, so one install never
+# mixes with another environment. Config, logs and cache live beside it.
 python -m PyInstaller --noconfirm --clean --onefile --windowed `
   --name sbproxy-console `
+  --runtime-tmpdir "%LOCALAPPDATA%\sbproxy-console-native\runtime" `
   main.py
 if ($LASTEXITCODE -ne 0) {
   throw "Build failed: PyInstaller exited with code $LASTEXITCODE"

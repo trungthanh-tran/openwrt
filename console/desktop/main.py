@@ -15,10 +15,13 @@ from ctypes import wintypes
 from dataclasses import dataclass
 import ipaddress
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -33,12 +36,150 @@ from urllib.request import Request, urlopen
 APP_NAME = "sbproxy Console Native"
 # Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
 APP_VERSION = "0.4.0"
+APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
-if os.name == "nt":
-    CONFIG_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "sbproxy-console-native"
-else:
-    CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "sbproxy-console-native"
+
+LOG_MAX_BYTES = 1024 * 1024
+LOG_BACKUP_COUNT = 5
+
+
+def frozen_dir() -> Path:
+    """Directory holding the running executable (or main.py when run from source)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def resolve_app_home() -> Path:
+    """Every file this app writes lives under one root, isolated per install.
+
+    Precedence: SBPROXY_HOME, a portable `data/` folder beside the executable,
+    then the per-user OS location. The portable form keeps a USB/copy-anywhere
+    install fully self-contained.
+    """
+    override = os.environ.get("SBPROXY_HOME", "").strip()
+    if override:
+        return Path(override).expanduser()
+    portable = frozen_dir() / "data"
+    if portable.is_dir():
+        return portable
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return Path(base) / APP_DIR_NAME
+
+
+APP_HOME = resolve_app_home()
+CONFIG_DIR = APP_HOME / "config"
 CONFIG_FILE = CONFIG_DIR / "connection.json"
+LOG_DIR = APP_HOME / "logs"
+LOG_FILE = LOG_DIR / "console.log"
+CACHE_DIR = APP_HOME / "cache"
+# PyInstaller unpacks the bundled Python runtime and dependencies here (set via
+# --runtime-tmpdir at build time) so nothing lands in the shared system temp.
+RUNTIME_DIR = APP_HOME / "runtime"
+
+# Config used to live directly in the app folder; keep older installs working.
+LEGACY_CONFIG_FILES = (
+    Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) / APP_DIR_NAME / "connection.json",
+    Path(os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")) / APP_DIR_NAME / "connection.json",
+)
+
+log = logging.getLogger("sbproxy")
+
+
+def ensure_app_home() -> Path:
+    """Create the private directory tree; POSIX keeps it owner-only."""
+    for path in (APP_HOME, CONFIG_DIR, LOG_DIR, CACHE_DIR, RUNTIME_DIR):
+        path.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            try:
+                os.chmod(path, 0o700)
+            except OSError:
+                pass
+    return APP_HOME
+
+
+def migrate_legacy_config() -> bool:
+    """Move a pre-0.5 connection.json into the isolated config folder once."""
+    if CONFIG_FILE.exists():
+        return False
+    for legacy in LEGACY_CONFIG_FILES:
+        try:
+            if legacy.resolve() == CONFIG_FILE.resolve() or not legacy.is_file():
+                continue
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            CONFIG_FILE.write_bytes(legacy.read_bytes())
+            if os.name != "nt":
+                os.chmod(CONFIG_FILE, 0o600)
+            log.info("migrated legacy config from %s", legacy)
+            return True
+        except OSError:
+            continue
+    return False
+
+
+SECRET_PATTERN = re.compile(
+    r"(?i)(token|authorization|bearer|password|passwd|pass|wifi_key|key)"
+    r"(\s*[=:]\s*|\s+)"
+    # "Bearer <tok>" must be consumed whole, otherwise only the scheme is masked.
+    r"(Bearer\s+\S+|\"[^\"]*\"|'[^']*'|\S+)"
+)
+
+
+def redact(text) -> str:
+    """Strip credentials before anything reaches the log file."""
+    return SECRET_PATTERN.sub(lambda m: f"{m.group(1)}{m.group(2)}***", str(text))
+
+
+def setup_logging(verbose: bool = False) -> Path:
+    """Rotating file log plus stderr, so field issues can be diagnosed later."""
+    ensure_app_home()
+    log.setLevel(logging.DEBUG if verbose else logging.INFO)
+    for handler in list(log.handlers):
+        log.removeHandler(handler)
+        handler.close()
+    fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(threadName)s %(message)s")
+    try:
+        file_handler = RotatingFileHandler(
+            LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+        )
+        file_handler.setFormatter(fmt)
+        log.addHandler(file_handler)
+        if os.name != "nt":
+            try:
+                os.chmod(LOG_FILE, 0o600)
+            except OSError:
+                pass
+    except OSError:
+        pass  # A read-only home must not stop the app from starting.
+    stream = logging.StreamHandler()
+    stream.setFormatter(fmt)
+    log.addHandler(stream)
+    log.info(
+        "start %s v%s | python %s | frozen=%s | home=%s",
+        APP_NAME, APP_VERSION, sys.version.split()[0], bool(getattr(sys, "frozen", False)), APP_HOME,
+    )
+    return LOG_FILE
+
+
+def install_exception_logging() -> None:
+    """Uncaught failures — main thread and workers — must reach the log file."""
+    previous = sys.excepthook
+
+    def hook(exc_type, exc, tb):
+        log.critical("uncaught exception", exc_info=(exc_type, exc, tb))
+        previous(exc_type, exc, tb)
+
+    sys.excepthook = hook
+    if hasattr(threading, "excepthook"):
+        def thread_hook(args):
+            log.critical(
+                "uncaught exception in %s", args.thread.name if args.thread else "thread",
+                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+            )
+        threading.excepthook = thread_hook
 
 DARK_PALETTE = {
     "bg": "#08111f",
@@ -239,6 +380,7 @@ EN_TRANSLATIONS = {
     "Tất cả file": "All files",
     "Ngôn ngữ": "Language",
     "Giao diện": "Theme",
+    "Thư mục log": "Log folder",
     "Chọn thiết bị trong bảng để điều khiển": "Select devices in the table to control",
     "Chọn một backup để khôi phục": "Select a backup to restore",
     "Đổi SOCKS5": "Change SOCKS5",
@@ -555,6 +697,9 @@ class AgentClient:
                 data = json.dumps(body).encode("utf-8")
                 headers["Content-Type"] = "application/json"
         request = Request(url, data=data, headers=headers, method=method)
+        started = time.monotonic()
+        log.debug("agent %s %s (timeout=%ss, body=%s bytes)",
+                  method, action, request_timeout, len(data) if data else 0)
         try:
             with urlopen(request, timeout=request_timeout) as response:
                 raw = response.read()
@@ -564,9 +709,13 @@ class AgentClient:
                 detail = json.loads(raw.decode("utf-8")).get("error")
             except Exception:
                 detail = raw.decode("utf-8", "replace") or str(exc)
+            log.warning("agent %s %s -> HTTP %s: %s", method, action, exc.code, redact(detail))
             raise AgentError(f"HTTP {exc.code}: {detail}") from exc
         except (URLError, TimeoutError, OSError) as exc:
+            log.warning("agent %s %s -> transport error: %s", method, action, redact(exc))
             raise AgentError(f"Không kết nối được {self.base_url} trong {request_timeout}s: {exc}") from exc
+        log.info("agent %s %s -> %s bytes in %.0f ms",
+                 method, action, len(raw), (time.monotonic() - started) * 1000)
 
         decoded = raw.decode("utf-8", "replace")
         if text:
@@ -1301,6 +1450,7 @@ class NativeApp:
         theme = ttk.Combobox(preferences, textvariable=self.theme_var, values=("Dark", "Light"), state="readonly", width=7)
         theme.pack(side="left")
         theme.bind("<<ComboboxSelected>>", self._on_theme_changed)
+        ttk.Button(preferences, text=self.t("Thư mục log"), command=self.open_log_folder).pack(side="left", padx=(10, 0))
 
         top = ttk.Frame(self.root, style="Card.TFrame", padding=(14, 12))
         top.pack(fill="x", padx=14, pady=(12, 8))
@@ -1541,7 +1691,23 @@ class NativeApp:
     def append_log(self, text):
         entry = str(text).rstrip()
         self.log_history.append(entry)
+        log.info("ui: %s", redact(entry))
         self._write_log_widget(entry)
+
+    def open_log_folder(self):
+        """Hand the operator the log directory for a support bundle."""
+        path = str(LOG_DIR)
+        try:
+            if os.name == "nt":
+                os.startfile(path)  # noqa: S606 - opening our own data folder
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+            log.info("opened log folder %s", path)
+        except Exception as exc:
+            log.warning("cannot open log folder: %s", exc)
+            messagebox.showinfo(APP_NAME, f"{path}\n\n{exc}", parent=self.root)
 
     def _write_log_widget(self, text):
         if not hasattr(self, "log") or not self.log.winfo_exists():
@@ -1573,10 +1739,12 @@ class NativeApp:
         self.status_var.set(label)
         if show_loading:
             self.show_loading(label, timeout_hint)
+        log.info("task start: %s", redact(label))
         def worker():
             try:
                 result = function()
             except Exception as exc:
+                log.exception("task failed: %s", redact(label))
                 self.root.after(0, lambda: self._task_error(exc))
                 return
             self.root.after(0, lambda: self._task_success(result, success))
@@ -2520,6 +2688,12 @@ def probe_saved_connection() -> bool:
 
 
 def main() -> int:
+    setup_logging(verbose="--verbose" in sys.argv)
+    install_exception_logging()
+    migrate_legacy_config()
+    if "--where" in sys.argv:
+        print(f"home={APP_HOME}\nconfig={CONFIG_FILE}\nlogs={LOG_DIR}\nruntime={RUNTIME_DIR}")
+        return 0
     provisioned = provision_from_environment()
     if "--provision" in sys.argv:
         return 0 if provisioned else 2
@@ -2528,6 +2702,7 @@ def main() -> int:
     root = tk.Tk()
     NativeApp(root)
     root.mainloop()
+    log.info("exit normally")
     return 0
 
 

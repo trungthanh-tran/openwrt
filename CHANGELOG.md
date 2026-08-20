@@ -24,6 +24,17 @@ Ngày theo định dạng YYYY-MM-DD.
 - Desktop hiển thị version: title bar + subtitle `v<APP_VERSION>`, dòng trạng
   thái thêm `agent v<x.y.z>` (đánh dấu `khác app` khi lệch); `APP_VERSION`
   được CI ép khớp file `VERSION`.
+- **Desktop chạy trong môi trường tách biệt**: mọi file ghi ra nằm dưới một
+  home riêng (`config/`, `logs/`, `cache/`, `runtime/`); thứ tự xác định là
+  `SBPROXY_HOME` → thư mục `data/` cạnh file exe (portable) → mặc định theo
+  user. Windows onefile giải nén Python runtime + dependency vào
+  `%LOCALAPPDATA%\sbproxy-console-native\runtime` thay vì temp hệ thống
+  (`--runtime-tmpdir`). Có `--where` để in đường dẫn và tự migrate
+  `connection.json` của bản cũ.
+- **Log debug**: `logs/console.log` xoay vòng 1 MB × 5 file, ghi mọi call agent
+  (action/kích thước/thời gian/lỗi), tác vụ nền, log UI và exception không bắt
+  được ở cả worker thread; token/mật khẩu được che trước khi ghi; nút
+  **Thư mục log** trên header và cờ `--verbose`.
 - Build desktop cho Linux/macOS: `console/desktop/build.sh` + `run.sh`
   (PyInstaller, cần `python3-tk`). Không có DPAPI thì token lưu
   `token_plain` trong `~/.config/sbproxy-console-native/connection.json`

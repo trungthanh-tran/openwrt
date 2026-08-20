@@ -562,6 +562,20 @@ class ClientSortTests(unittest.TestCase):
 
 
 class EntryPointTests(unittest.TestCase):
+    def setUp(self):
+        # main() bootstraps the private app home; keep tests off the real one.
+        self.patches = (
+            mock.patch.object(app, "setup_logging", return_value=Path("log")),
+            mock.patch.object(app, "install_exception_logging"),
+            mock.patch.object(app, "migrate_legacy_config", return_value=False),
+        )
+        for patcher in self.patches:
+            patcher.start()
+
+    def tearDown(self):
+        for patcher in reversed(self.patches):
+            patcher.stop()
+
     def test_probe_without_token_and_with_agent_results(self):
         with mock.patch.object(app, "load_connection", return_value=("http://router", "")):
             self.assertFalse(app.probe_saved_connection())
@@ -579,6 +593,118 @@ class EntryPointTests(unittest.TestCase):
         for result, expected in ((True, 0), (False, 1)):
             with self.subTest(result=result), mock.patch.object(app, "provision_from_environment", return_value=False), mock.patch.object(app, "probe_saved_connection", return_value=result), mock.patch.object(sys, "argv", ["main.py", "--probe"]):
                 self.assertEqual(app.main(), expected)
+
+
+class AppHomeIsolationTests(unittest.TestCase):
+    """Everything the EXE writes must stay inside one private folder."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_env_override_wins_over_every_other_location(self):
+        target = self.root / "custom home"
+        with mock.patch.dict(os.environ, {"SBPROXY_HOME": str(target)}, clear=False):
+            self.assertEqual(app.resolve_app_home(), target)
+
+    def test_portable_data_folder_beside_executable_is_used(self):
+        exe_dir = self.root / "portable"
+        (exe_dir / "data").mkdir(parents=True)
+        env = {k: v for k, v in os.environ.items() if k != "SBPROXY_HOME"}
+        with mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch.object(app, "frozen_dir", return_value=exe_dir):
+            self.assertEqual(app.resolve_app_home(), exe_dir / "data")
+
+    def test_per_user_location_is_the_fallback(self):
+        exe_dir = self.root / "installed"
+        exe_dir.mkdir()
+        env = {"LOCALAPPDATA": str(self.root / "local"), "XDG_DATA_HOME": str(self.root / "share")}
+        with mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch.object(app, "frozen_dir", return_value=exe_dir):
+            home = app.resolve_app_home()
+        expected_base = self.root / ("local" if os.name == "nt" else "share")
+        self.assertEqual(home, expected_base / app.APP_DIR_NAME)
+
+    def test_ensure_app_home_creates_the_whole_private_tree(self):
+        home = self.root / "home"
+        paths = {
+            "APP_HOME": home, "CONFIG_DIR": home / "config", "LOG_DIR": home / "logs",
+            "CACHE_DIR": home / "cache", "RUNTIME_DIR": home / "runtime",
+        }
+        with mock.patch.multiple(app, **paths):
+            app.ensure_app_home()
+            for path in paths.values():
+                self.assertTrue(path.is_dir(), path)
+            if os.name != "nt":
+                self.assertEqual(home.stat().st_mode & 0o777, 0o700)
+
+    def test_logging_writes_into_the_private_tree_and_rotates(self):
+        home = self.root / "home"
+        log_dir = home / "logs"
+        with mock.patch.multiple(
+            app, APP_HOME=home, CONFIG_DIR=home / "config", LOG_DIR=log_dir,
+            CACHE_DIR=home / "cache", RUNTIME_DIR=home / "runtime",
+            LOG_FILE=log_dir / "console.log", LOG_MAX_BYTES=2048, LOG_BACKUP_COUNT=2,
+        ):
+            path = app.setup_logging()
+            self.assertEqual(path, log_dir / "console.log")
+            for i in range(400):
+                app.log.info("filler line %s with enough text to force rotation", i)
+            for handler in list(app.log.handlers):
+                handler.close()
+                app.log.removeHandler(handler)
+        written = sorted(p.name for p in log_dir.iterdir())
+        self.assertIn("console.log", written)
+        self.assertTrue(any(name.startswith("console.log.") for name in written), written)
+        self.assertLessEqual(len(written), 3)  # live file + LOG_BACKUP_COUNT
+
+    def test_migration_copies_legacy_config_once_and_never_overwrites(self):
+        home = self.root / "home"
+        legacy = self.root / "legacy" / "connection.json"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text('{"base_url": "http://old"}', encoding="utf-8")
+        config = home / "config" / "connection.json"
+        with mock.patch.multiple(
+            app, APP_HOME=home, CONFIG_DIR=home / "config", CONFIG_FILE=config,
+            LEGACY_CONFIG_FILES=(legacy,),
+        ):
+            self.assertTrue(app.migrate_legacy_config())
+            self.assertEqual(json.loads(config.read_text(encoding="utf-8"))["base_url"], "http://old")
+            config.write_text('{"base_url": "http://new"}', encoding="utf-8")
+            self.assertFalse(app.migrate_legacy_config())
+            self.assertEqual(json.loads(config.read_text(encoding="utf-8"))["base_url"], "http://new")
+
+    def test_migration_tolerates_missing_legacy_locations(self):
+        home = self.root / "home"
+        with mock.patch.multiple(
+            app, APP_HOME=home, CONFIG_DIR=home / "config",
+            CONFIG_FILE=home / "config" / "connection.json",
+            LEGACY_CONFIG_FILES=(self.root / "nope" / "connection.json",),
+        ):
+            self.assertFalse(app.migrate_legacy_config())
+
+
+class RedactionTests(unittest.TestCase):
+    """Logs are shipped to support, so credentials must never reach them."""
+
+    def test_secrets_are_masked_in_every_common_shape(self):
+        for dirty in (
+            "token=abc123", "token: abc123", 'token "abc123"',
+            "Authorization: Bearer abc123", "password=hunter2", "pass 'hunter2'",
+            "wifi_key=super-secret", "PASSWD=hunter2",
+        ):
+            self.assertNotIn("abc123", app.redact(dirty), dirty)
+            self.assertNotIn("hunter2", app.redact(dirty), dirty)
+            self.assertNotIn("super-secret", app.redact(dirty), dirty)
+            self.assertIn("***", app.redact(dirty), dirty)
+
+    def test_non_secret_text_and_non_strings_survive(self):
+        self.assertEqual(app.redact("apply finished rc=0"), "apply finished rc=0")
+        self.assertEqual(app.redact(7), "7")
+        self.assertEqual(app.redact(None), "None")
 
 
 class VersionTests(unittest.TestCase):

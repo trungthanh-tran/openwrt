@@ -55,9 +55,46 @@ sh build.sh
 # -> dist/sbproxy-console
 ```
 
-Máy chạy file build ra không cần cài Python hay WebView2. Trên Windows token
-được niêm phong bằng DPAPI; trên Linux/macOS token nằm trong
-`~/.config/sbproxy-console-native/connection.json` với quyền `chmod 600`.
+Máy chạy file build ra không cần cài Python hay WebView2.
+
+Trên Linux, bootloader POSIX không expand `~` hay `$HOME`, nên runtime giải nén
+vào thư mục temp mặc định trừ khi chỉ định đường dẫn tuyệt đối:
+
+```sh
+SBPROXY_RUNTIME_TMPDIR=/opt/sbproxy/runtime sh build.sh
+```
+
+## Môi trường tách biệt
+
+Mọi thứ app ghi ra đều nằm trong **một thư mục home riêng**, không lẫn với môi
+trường Python bên ngoài hay với bản cài khác:
+
+```
+<home>/config/connection.json   URL router + token (DPAPI trên Windows, chmod 600 nơi khác)
+<home>/logs/console.log         log debug xoay vòng (1 MB × 5 file)
+<home>/cache/                   dữ liệu tạm
+<home>/runtime/                 Python runtime + dependency đóng gói (Windows onefile)
+```
+
+Thứ tự xác định `<home>`:
+
+1. Biến môi trường `SBPROXY_HOME` (tùy ý chỉ định).
+2. Thư mục `data/` nằm cạnh file thực thi — **chế độ portable**, hợp với USB
+   hoặc bản copy-anywhere; cứ tạo thư mục là app tự dùng.
+3. Mặc định theo người dùng: `%LOCALAPPDATA%\sbproxy-console-native` (Windows),
+   `~/.local/share/sbproxy-console-native` (Linux/macOS).
+
+Chạy `sbproxy-console --where` để in ra đường dẫn thực tế. File
+`connection.json` của bản cũ được tự động migrate vào `config/` ở lần chạy đầu.
+
+## Log để debug
+
+Mọi lệnh gọi agent (action, dung lượng, thời gian, lỗi HTTP/kết nối), tác vụ
+nền, dòng log trên UI và **exception không bắt được** — cả main thread lẫn
+worker thread — đều ghi vào `<home>/logs/console.log`, xoay vòng ở 1 MB và giữ
+5 file. Thông tin nhạy cảm (token, header Bearer, mật khẩu WiFi/SOCKS) được
+che (`***`) trước khi ghi nên file an toàn để gửi kèm báo lỗi. Bấm nút
+**Thư mục log** trên header để mở, hoặc chạy `--verbose` để log mức DEBUG.
 
 ## Chạy khi phát triển
 
