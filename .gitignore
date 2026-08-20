@@ -10,10 +10,17 @@ sbproxy-backups/
 # Log/gói chẩn đoán có thể chứa IP/MAC/runtime data.
 sbproxy-debug.log*
 
+# ==== Build output ====
+dist/
+
 # ==== Node ====
 node_modules/
 npm-debug.log*
 package-lock.json
+
+# ==== Python ====
+__pycache__/
+*.pyc
 
 # ==== Hệ điều hành / editor ====
 .DS_Store
