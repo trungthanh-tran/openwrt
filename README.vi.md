@@ -53,7 +53,6 @@ pc/                         # CHẠY TỪ MÁY QUẢN TRỊ (Windows/Linux): upd
   restore.ps1 / restore.sh  #   đẩy snapshot lên router + rollback
 docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, admin-guide
 tests/run.sh                # unit test POSIX sh cho lib.sh (không cần router)
-tools/build-docs.js         # sinh docs/*.html từ docs/*.md
 Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 ```
 
@@ -107,17 +106,15 @@ Bản Linux/macOS tương đương: `sh pc/update.sh` / `pc/backup.sh` / `pc/res
 ```sh
 make test    # unit test (không cần router; phần cần jq tự skip)
 make lint    # shellcheck
-make docs    # sinh lại docs/*.html sau khi sửa docs/*.md
-make check   # lint + test + docs-check (giống CI)
+make check   # lint + test (giống CI)
 ```
-CI (GitHub Actions + GitLab CI) chạy test + lint + kiểm tra docs khớp nguồn trên mỗi push. Quy ước & ràng buộc: [CONTRIBUTING.md](CONTRIBUTING.md) · lịch sử thay đổi: [CHANGELOG.md](CHANGELOG.md) · bảo mật: [SECURITY.md](SECURITY.md) · phiên bản: [VERSION](VERSION).
+CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước & ràng buộc: [CONTRIBUTING.md](CONTRIBUTING.md) · lịch sử thay đổi: [CHANGELOG.md](CHANGELOG.md) · bảo mật: [SECURITY.md](SECURITY.md) · phiên bản: [VERSION](VERSION).
 
 ## Tài liệu
 - **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ local theo bước: firmware → cấu hình → agent LAN → bảo mật. Bắt đầu ở đây.**
 - **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: vận hành console hằng ngày, không cần dòng lệnh.**
-- Bản HTML tiếng Việt đọc offline: [docs/admin-guide.vi.html](docs/admin-guide.vi.html) · [docs/user-guide.vi.html](docs/user-guide.vi.html)
 
-> **Sửa tài liệu:** chỉ sửa file **`.md`** (nguồn duy nhất), rồi chạy `node tools/build-docs.js` để sinh lại `.html`. Đừng sửa tay file `.html` (sẽ bị ghi đè).
+> **Sửa tài liệu:** sửa trực tiếp file **`.md`**. Dự án chỉ dùng Markdown, không sinh bản HTML.
 - [docs/GUIDE.md](docs/GUIDE.md) — Hướng dẫn toàn tập (một mạch): từ flash firmware → cấu hình → test → xử lý lỗi.
 - [docs/INSTALL.md](docs/INSTALL.md) — cài chi tiết + giải thích từng bước
 - [docs/TESTING.md](docs/TESTING.md) — cách test từng yêu cầu (IP đúng sock, DNS leak, WebRTC, isolation)

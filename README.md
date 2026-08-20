@@ -67,7 +67,6 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 - [Administrator guide](docs/admin-guide.en.md)
 - [User guide](docs/user-guide.en.md)
 - [PC management](pc/README.en.md)
-- Offline HTML: [Administrator guide](docs/admin-guide.html) · [User guide](docs/user-guide.html)
 
 ## Testing
 

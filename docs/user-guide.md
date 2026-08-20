@@ -4,7 +4,7 @@
 
 Tạo và quản lý nhiều WiFi, mỗi WiFi đi qua một SOCKS5 riêng, theo dõi sức khỏe proxy, và sao lưu/khôi phục — tất cả bằng giao diện. Không cần dòng lệnh.
 
-> Bản HTML tiếng Việt đọc offline: [user-guide.vi.html](user-guide.vi.html). Kỹ thuật/quản trị: [admin-guide.md](admin-guide.md).
+> Kỹ thuật/quản trị: [admin-guide.md](admin-guide.md).
 
 ---
 

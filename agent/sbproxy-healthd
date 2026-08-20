@@ -16,8 +16,8 @@ PROBE_TIMEOUT="${PROBE_TIMEOUT:-8}"
 INTERVAL="${INTERVAL:-15}"
 SLOW_MS="${SLOW_MS:-800}"
 
-command -v jq   >/dev/null 2>&1 || { echo "healthd: thiếu jq";   exit 1; }
-command -v curl >/dev/null 2>&1 || { echo "healthd: thiếu curl"; exit 1; }
+command -v jq   >/dev/null 2>&1 || { echo "healthd: jq is missing";   exit 1; }
+command -v curl >/dev/null 2>&1 || { echo "healthd: curl is missing"; exit 1; }
 
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 
@@ -40,7 +40,7 @@ probe_one() {
 }
 
 run_once() {
-  [ -r "$CONF" ] || { echo "healthd: không đọc được config $CONF" >&2; return 1; }
+  [ -r "$CONF" ] || { echo "healthd: cannot read config $CONF" >&2; return 1; }
   probes="{}"
   # Read the source configuration.
   while IFS='|' read -r name band idx wifi_key host port user pass isolate webrtc _oui extra; do

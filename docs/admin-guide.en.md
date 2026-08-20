@@ -2,7 +2,7 @@
 
 **Language:** English (default) | [Tiếng Việt](admin-guide.md)
 
-> Default offline HTML: [admin-guide.html](admin-guide.html). Vietnamese HTML: [admin-guide.vi.html](admin-guide.vi.html).
+> Companion documents: [GUIDE.en.md](GUIDE.en.md), [INSTALL.en.md](INSTALL.en.md), [TESTING.en.md](TESTING.en.md), [ROLLBACK.en.md](ROLLBACK.en.md).
 
 ## Safety baseline
 

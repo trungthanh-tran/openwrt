@@ -74,8 +74,8 @@ cd console\desktop
 3. Chạy `shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh`.
 4. Nếu chỉ CI GitLab lỗi, ưu tiên tìm bashism/khác biệt BusyBox ash. Shell của
    router là POSIX/BusyBox; không dùng array hoặc `[[ ... ]]`.
-5. Nếu `docs-check` lỗi, chỉ sửa Markdown nguồn rồi chạy
-   `node tools/build-docs.js`; không sửa tay HTML sinh ra.
+5. Tài liệu chỉ có Markdown trong `docs/*.md`; sửa trực tiếp, không có bước
+   sinh HTML nào cần chạy lại.
 
 ### Lỗi trên router OpenWrt
 

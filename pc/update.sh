@@ -41,7 +41,7 @@ TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
 log "Packaging repository..."
 tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules \
-  README.md VERSION agent config console docs etc scripts tools
+  README.md VERSION agent config console docs etc scripts
 
 # 2) Upload and extract while preserving active configuration.
 log "Uploading to $TARGET:$REMOTE_DIR ..."

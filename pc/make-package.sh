@@ -18,7 +18,7 @@ printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
 mkdir -p "$OUT_DIR"
 PKG="$OUT_DIR/sbproxy-update-$VER.tar.gz"
 tar czf "$PKG" -C "$REPO_DIR" --exclude=node_modules \
-  README.md VERSION agent config console docs etc scripts tools
+  README.md VERSION agent config console docs etc scripts
 
 echo "Created: $PKG"
 echo "Upload through the UI: Connect router -> Update -> select this file."

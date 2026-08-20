@@ -314,12 +314,12 @@ else
 fi
 
 echo "== pc update package manifest =="
-match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts tools'
+match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts'
 nomatch "update.sh drops old ui path" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'scripts tools ui'
-match   "update.ps1 packages console" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'README.md VERSION agent config console docs etc scripts tools'
+match   "update.ps1 packages console" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'README.md VERSION agent config console docs etc scripts'
 nomatch "update.ps1 drops old ui path" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE/p' "$ROOT/pc/update.ps1")" 'scripts tools ui'
-match   "make-package.sh ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.sh")" 'README.md VERSION agent config console docs etc scripts tools'
-match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.ps1")" 'README.md VERSION agent config console docs etc scripts tools'
+match   "make-package.sh ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.sh")" 'README.md VERSION agent config console docs etc scripts'
+match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.ps1")" 'README.md VERSION agent config console docs etc scripts'
 
 echo "== versioning and self-update =="
 project_version="$(tr -d ' \r\n' < "$ROOT/VERSION")"

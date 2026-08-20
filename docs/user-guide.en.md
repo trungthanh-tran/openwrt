@@ -2,7 +2,7 @@
 
 **Language:** English (default) | [Tiếng Việt](user-guide.md)
 
-> Default offline HTML: [user-guide.html](user-guide.html). Vietnamese HTML: [user-guide.vi.html](user-guide.vi.html).
+> Technical and administration detail: [admin-guide.en.md](admin-guide.en.md).
 
 The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.
 

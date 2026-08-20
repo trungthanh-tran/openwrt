@@ -4,7 +4,7 @@
 
 Làm tuần tự từ trên xuống: tải firmware → backup → update → cài đặt → cấu hình → cài agent LAN → kiểm tra → vận hành → bảo mật.
 
-> Bản HTML tiếng Việt: [admin-guide.vi.html](admin-guide.vi.html). HTML mặc định tiếng Anh: [admin-guide.html](admin-guide.html). Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).
+> Bổ trợ: [GUIDE.md](GUIDE.md), [INSTALL.md](INSTALL.md), [TESTING.md](TESTING.md), [ROLLBACK.md](ROLLBACK.md).
 
 ## ★ Best practices — đọc trước khi bắt đầu
 - **Luôn cắm LAN dây dự phòng** khi động vào firmware/mạng — hỏng WiFi vẫn SSH vào cứu được.

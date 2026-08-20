@@ -8,9 +8,8 @@ etc/init.d/ sbproxy                                    # init nạp nft + policy
 agent/      CGI uhttpd + health daemon (agent LAN)
 console/    web/control-panel.html (UI nguồn) + desktop/ (đóng gói .exe)
 pc/         script quản trị router từ máy Windows/Linux qua SSH
-docs/       *.md (nguồn) -> *.html (sinh bằng tools/build-docs.js)
+docs/       *.md — tài liệu (Markdown là định dạng duy nhất)
 tests/      run.sh — unit test POSIX sh cho lib.sh
-tools/      build-docs.js
 ```
 
 ## Ràng buộc code
@@ -26,17 +25,16 @@ tools/      build-docs.js
 ```sh
 make test         # chạy tests/run.sh (không cần router; phần cần jq tự skip)
 make lint         # shellcheck (cần cài shellcheck)
-make docs         # sinh lại docs/*.html sau khi sửa docs/*.md
-make check        # lint + test + docs-check (giống CI)
+make check        # lint + test (giống CI)
 ```
-- **Sửa tài liệu:** chỉ sửa `docs/*.md`, rồi `make docs`. **Đừng** sửa tay
-  `docs/*.html` — CI kiểm tra chúng khớp nguồn và sẽ fail nếu lệch.
+- **Sửa tài liệu:** sửa trực tiếp `docs/*.md`. Dự án chỉ dùng Markdown, không
+  sinh bản HTML.
 - Thêm/sửa hành vi generator (`lib.sh`) thì **thêm test** trong `tests/run.sh`.
 - Bump `VERSION` và ghi `CHANGELOG.md` cho thay đổi có ảnh hưởng người dùng.
 
 ## Commit
 - Một commit = một thay đổi mạch lạc; mô tả *tại sao*, không chỉ *cái gì*.
-- CI (GitHub Actions + GitLab CI) chạy test + lint + docs-check trên mỗi push.
+- CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push.
 
 ## Test trên router thật
 Nhiều thứ (TPROXY, hostapd ubus, wifi) chỉ kiểm được trên GL-MT6000 thật.

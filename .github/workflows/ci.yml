@@ -13,20 +13,8 @@ jobs:
       - name: Install shellcheck, jq, and Tk bindings
         run: sudo apt-get update && sudo apt-get install -y shellcheck jq python3-tk
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - name: Full test suite
         run: sh tests/run-all.sh
 
       - name: Shellcheck
-        run: shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
-
-      - name: Docs are up to date
-        run: |
-          node tools/build-docs.js
-          git diff --exit-code -- docs/ || {
-            echo "::error::docs/*.html out of date — run 'node tools/build-docs.js' and commit";
-            exit 1;
-          }
+        run: shellcheck -S warning scripts/*.sh tests/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd

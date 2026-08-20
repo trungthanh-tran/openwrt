@@ -69,7 +69,7 @@ Initialize-SbPc $PSBoundParameters
 $tmpTar = Join-Path $env:TEMP "sbproxy-update-$PID.tar.gz"
 Log 'Dong goi repo...'
 tar -czf $tmpTar -C $RepoDir --exclude=node_modules `
-  README.md VERSION agent config console docs etc scripts tools
+  README.md VERSION agent config console docs etc scripts
 if ($LASTEXITCODE -ne 0) { Die 'tar that bai (can Windows 10+ co tar.exe)' }
 
 try {
