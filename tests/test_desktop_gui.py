@@ -103,6 +103,40 @@ class DesktopGuiSmokeTests(unittest.TestCase):
                 self.assertEqual(backgrounds.get("active"), appmod.PALETTES[theme]["tab_hover"])
                 self.assertEqual(foregrounds.get("selected"), appmod.PALETTES[theme]["tab_selected_text"])
 
+    def test_tables_have_borders_headers_and_zebra_rows(self):
+        style = appmod.ttk.Style(self.root)
+        for theme in ("dark", "light"):
+            with self.subTest(theme=theme):
+                self.set_mode("en", theme)
+                palette = appmod.PALETTES[theme]
+                self.assertEqual(str(style.lookup("Treeview", "borderwidth")), "1")
+                self.assertEqual(style.lookup("Treeview", "bordercolor"), palette["table_border"])
+                self.assertEqual(str(style.lookup("Treeview.Heading", "borderwidth")), "1")
+                self.assertEqual(style.lookup("Treeview.Heading", "bordercolor"), palette["table_header_border"])
+                for tree in (self.app.wifi_tree, self.app.client_tree):
+                    self.assertEqual(tree.tag_configure("row_even")["background"], palette["table_row_even"])
+                    self.assertEqual(tree.tag_configure("row_odd")["background"], palette["table_row_odd"])
+
+    def test_wifi_table_assigns_alternating_row_tags(self):
+        original_records = self.app.records
+        original_health = self.app.health
+        original_runtime = self.app.runtime_ssids
+        try:
+            self.app.records = [
+                appmod.WifiRecord("one", "2g", 1, "password12", "proxy", 1080),
+                appmod.WifiRecord("two", "5g", 2, "password12", "proxy", 1080),
+            ]
+            self.app.health = {}
+            self.app.runtime_ssids = {}
+            self.app.render_wifi()
+            self.assertIn("row_even", self.app.wifi_tree.item("1", "tags"))
+            self.assertIn("row_odd", self.app.wifi_tree.item("2", "tags"))
+        finally:
+            self.app.records = original_records
+            self.app.health = original_health
+            self.app.runtime_ssids = original_runtime
+            self.app.render_wifi()
+
     def test_primary_dialogs_render_in_both_languages(self):
         record = appmod.WifiRecord("test1", "2g", 1, "password12", "proxy", 1080)
         for language, palette, expected in (

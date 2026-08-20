@@ -204,6 +204,10 @@ DARK_PALETTE = {
     "tab_hover": "#172a42",
     "tab_selected": "#17365d",
     "tab_selected_text": "#9dcbff",
+    "table_border": "#31465f",
+    "table_header_border": "#3a526f",
+    "table_row_even": "#0b1728",
+    "table_row_odd": "#101e31",
     "button": "#263a55",
     "button_active": "#334b6b",
     "button_pressed": "#1d2d45",
@@ -240,6 +244,10 @@ LIGHT_PALETTE = {
     "tab_hover": "#dce6f2",
     "tab_selected": "#dbeafe",
     "tab_selected_text": "#1d4ed8",
+    "table_border": "#aebdce",
+    "table_header_border": "#b8c6d6",
+    "table_row_even": "#ffffff",
+    "table_row_odd": "#f3f7fb",
     "button": "#dbe5f1",
     "button_active": "#c9d7e8",
     "button_pressed": "#b9cbe0",
@@ -1399,6 +1407,15 @@ class NativeApp:
         style.configure("Header.TFrame", background=p["header"])
         style.configure("Card.TFrame", background=p["card"])
         style.configure("Toolbar.TFrame", background=p["header"])
+        style.configure(
+            "Table.TFrame",
+            background=p["table_border"],
+            bordercolor=p["table_border"],
+            lightcolor=p["table_border"],
+            darkcolor=p["table_border"],
+            borderwidth=1,
+            relief="solid",
+        )
         style.configure("TLabel", background=p["card"], foreground=p["text"])
         style.configure("Header.TLabel", background=p["header"], foreground=p["text"])
         style.configure("Title.TLabel", background=p["header"], foreground=p["text"], font=("Segoe UI Semibold", 19))
@@ -1444,8 +1461,31 @@ class NativeApp:
             background=[("selected", p["tab_selected"]), ("active", p["tab_hover"])],
             foreground=[("selected", p["tab_selected_text"]), ("active", p["text"])],
         )
-        style.configure("Treeview", background=p["input"], fieldbackground=p["input"], foreground=p["text"], borderwidth=0, rowheight=32, font=("Segoe UI", 9))
-        style.configure("Treeview.Heading", background=p["heading"], foreground=p["heading_text"], borderwidth=0, padding=(8, 8), font=("Segoe UI Semibold", 9))
+        style.configure(
+            "Treeview",
+            background=p["table_row_even"],
+            fieldbackground=p["table_row_even"],
+            foreground=p["text"],
+            bordercolor=p["table_border"],
+            lightcolor=p["table_border"],
+            darkcolor=p["table_border"],
+            borderwidth=1,
+            relief="solid",
+            rowheight=32,
+            font=("Segoe UI", 9),
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=p["heading"],
+            foreground=p["heading_text"],
+            bordercolor=p["table_header_border"],
+            lightcolor=p["table_header_border"],
+            darkcolor=p["table_header_border"],
+            borderwidth=1,
+            relief="solid",
+            padding=(8, 8),
+            font=("Segoe UI Semibold", 9),
+        )
         style.map("Treeview", background=[("selected", p["primary"])], foreground=[("selected", p["selection_text"])])
         style.map("Treeview.Heading", background=[("active", p["heading_active"])])
         style.configure("Vertical.TScrollbar", background=p["scroll"], troughcolor=p["input"], borderwidth=0)
@@ -1562,9 +1602,11 @@ class NativeApp:
         self.schedule_client_refresh()
 
     def _tree(self, parent, columns, widths, selectmode="browse"):
-        frame = ttk.Frame(parent, style="Card.TFrame")
+        frame = ttk.Frame(parent, style="Table.TFrame", padding=1)
         frame.pack(fill="both", expand=True)
         tree = ttk.Treeview(frame, columns=tuple(columns), show="headings", selectmode=selectmode)
+        tree.tag_configure("row_even", background=self.palette["table_row_even"])
+        tree.tag_configure("row_odd", background=self.palette["table_row_odd"])
         for name, title in columns.items():
             tree.heading(name, text=title)
             tree.column(name, width=widths.get(name, 100), anchor="w")
@@ -2249,7 +2291,7 @@ class NativeApp:
 
     def render_wifi(self):
         self.wifi_tree.delete(*self.wifi_tree.get_children())
-        for record in self.records:
+        for pos, record in enumerate(self.records):
             probe = self.health.get(str(record.idx), self.health.get(record.idx, {})) or {}
             state = probe.get("state", "—")
             latency = probe.get("latency_ms")
@@ -2266,7 +2308,9 @@ class NativeApp:
                 tag = "warning"
             elif state not in ("", "—", None):
                 tag = "error"
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=(tag,) if tag else (), values=(record.idx, record.name, record.band, f"192.168.{10 + record.idx}.0/24", mac_display, f"{record.host}:{record.port}", self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
+            row_tag = "row_even" if pos % 2 == 0 else "row_odd"
+            tags = (row_tag, tag) if tag else (row_tag,)
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, f"192.168.{10 + record.idx}.0/24", mac_display, f"{record.host}:{record.port}", self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
         self.update_client_filter_options()
         self.update_wifi_editor()
 
@@ -2362,8 +2406,10 @@ class NativeApp:
             else:
                 status = "Offline"
             band = {"2g": "2.4G", "5g": "5G"}.get(str(item.get("band") or "").casefold(), item.get("band", ""))
+            row_tag = "row_even" if pos % 2 == 0 else "row_odd"
+            tags = (row_tag, tag) if tag else (row_tag,)
             self.client_tree.insert(
-                "", "end", iid=iid, tags=(tag,) if tag else (),
+                "", "end", iid=iid, tags=tags,
                 values=(
                     item.get("ssid", ""), band, item.get("ip", ""), item.get("host", ""),
                     item.get("mac", ""), human_time(item.get("connected_s")) if online else "—",
