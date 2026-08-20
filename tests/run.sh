@@ -355,6 +355,14 @@ match "self-update backs up before overwrite" "$selfupdate" 'backup\.sh pre-upda
 match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf settings\.sh'
 match "self-update validates package contents" "$selfupdate" 'scripts/apply\.sh scripts/lib\.sh agent/cgi/sbproxy'
 match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
+web_console="$(cat "$ROOT/console/web/control-panel.html")"
+match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'
+match "web console persists language preference" "$web_console" 'localStorage\.setItem\(LANGUAGE_KEY, language\)'
+match "web console switches language live" "$web_console" 'function setLanguage\(next\)'
+match "web console defaults to English" "$web_console" '<html lang="en">'
+match "web console translates icon-prefixed labels" "$web_console" 'function translatePhrase\(vi\)'
+match "web console translates blocks with inline markup" "$web_console" 'const EN_HTML = \{'
+match "web console leaves the mixed-content note to updateConnHint" "$web_console" 'id="mixedNote" data-i18n-skip'
 
 echo ""
 printf 'TOTAL: pass=%d  fail=%d  skip=%d\n' "$pass" "$fail" "$skip"

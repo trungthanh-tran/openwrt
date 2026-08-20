@@ -21,6 +21,11 @@ Ngày theo định dạng YYYY-MM-DD.
   `make package` → `dist/sbproxy-update-<version>.tar.gz`.
 - Giao diện web control panel hiện đại hóa: header kính mờ sticky, gradient,
   focus ring, animation modal/toast, segmented tabs, dark mode giữ nguyên.
+- **Web console song ngữ Anh/Việt**: mặc định tiếng Anh, chọn ngôn ngữ ngay trên
+  header, lưu vào localStorage và đổi trực tiếp không cần tải lại trang. Chuỗi
+  tĩnh dịch qua `EN_TEXT`/`EN_ATTR`/`EN_HTML` (khối có thẻ inline được thay cả
+  block), chuỗi động qua `pick(en, vi)`. Có test tự động chống bỏ sót bản dịch,
+  key trùng và nhãn có tiền tố icon.
 - Desktop hiển thị version: title bar + subtitle `v<APP_VERSION>`, dòng trạng
   thái thêm `agent v<x.y.z>` (đánh dấu `khác app` khi lệch); `APP_VERSION`
   được CI ép khớp file `VERSION`.

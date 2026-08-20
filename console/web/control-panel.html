@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -110,6 +110,10 @@
   }
   .theme-btn:hover { border-color: var(--border-strong); color: var(--text); box-shadow: var(--shadow); }
   .theme-btn:active { transform: translateY(1px); }
+  .language-select {
+    width: auto; min-width: 112px; padding: 7px 30px 7px 10px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
 
   /* Stat bar */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -299,6 +303,10 @@
     </div>
     <div class="hdr-actions">
       <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
+      <select class="language-select" id="languageSelect" aria-label="Language">
+        <option value="en">English</option>
+        <option value="vi">Tiếng Việt</option>
+      </select>
       <button class="theme-btn" id="connBtn" title="Kết nối agent trên router">🔌 Kết nối router</button>
       <button class="theme-btn" id="themeBtn" title="Đổi giao diện sáng/tối">◐ Theme</button>
     </div>
@@ -430,7 +438,7 @@
         <label>Token <span class="req">*</span> <span class="derived">(in ra bởi install-agent.sh)</span></label>
         <input type="text" id="c_token" class="mono" placeholder="vd 3f9a1c...">
       </div>
-      <div class="derived" id="mixedNote">Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).</div>
+      <div class="derived" id="mixedNote" data-i18n-skip>Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).</div>
     </div>
     <div class="foot">
       <button class="btn ghost" id="disconnectBtn">Ngắt</button>
@@ -445,7 +453,7 @@
   <div class="modal">
     <h2>Backup &amp; Rollback</h2>
     <div class="form">
-      <div class="conn-status" id="rbHint">Mỗi lần “Áp”/“đổi sock” router đã tự backup. ⚠️ Trước khi <b>cập nhật firmware</b>, hãy bấm <b>⭳ Về máy</b> để lưu backup ra máy tính — backup nằm trên router sẽ mất nếu reflash/brick.</div>
+      <div class="conn-status" id="rbHint" data-i18n-html="rbHint">Mỗi lần “Áp”/“đổi sock” router đã tự backup. ⚠️ Trước khi <b>cập nhật firmware</b>, hãy bấm <b>⭳ Về máy</b> để lưu backup ra máy tính — backup nằm trên router sẽ mất nếu reflash/brick.</div>
       <div class="rblist" id="rbList"><div class="sub">Đang tải danh sách…</div></div>
     </div>
     <div class="foot">
@@ -460,11 +468,11 @@
   <div class="modal" style="max-width: 860px;">
     <h2>Thiết bị đang kết nối</h2>
     <div class="form">
-      <div class="conn-status" id="devHint">Danh sách client theo từng WiFi. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
+      <div class="conn-status" id="devHint" data-i18n-html="devHint">Danh sách client theo từng WiFi. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
       <div class="tablescroll">
         <table style="min-width: 720px;">
           <thead><tr>
-            <th>WiFi</th><th>MAC</th><th>IP / Tên máy</th><th>Kết nối</th>
+            <th>WiFi</th><th>MAC</th><th>IP / Tên máy</th><th>Thời gian kết nối</th>
             <th>Vào (in)</th><th>Ra (out)</th><th>Sóng</th><th></th>
           </tr></thead>
           <tbody id="devRows"><tr><td colspan="8" class="sub">Đang tải…</td></tr></tbody>
@@ -483,7 +491,7 @@
   <div class="modal">
     <h2>Cập nhật agent trên router</h2>
     <div class="form">
-      <div class="conn-status" id="upStatus">Chọn package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (tạo bằng <code>make package</code> hoặc <code>pc/make-package.sh</code>). Router tự backup trước khi cập nhật và giữ nguyên cấu hình WiFi/SOCKS đang chạy.</div>
+      <div class="conn-status" id="upStatus" data-i18n-html="upStatus">Chọn package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (tạo bằng <code>make package</code> hoặc <code>pc/make-package.sh</code>). Router tự backup trước khi cập nhật và giữ nguyên cấu hình WiFi/SOCKS đang chạy.</div>
       <div class="field">
         <label>Bản đang chạy trên router</label>
         <div class="mono" id="upCurVer">—</div>
@@ -521,6 +529,96 @@
   // Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
   const UI_VERSION = "0.4.0";
   const LS_KEY = "sbproxy.ssids.v1";
+  const LANGUAGE_KEY = "sbproxy.language";
+  let language = localStorage.getItem(LANGUAGE_KEY) === "vi" ? "vi" : "en";
+  const pick = (en, vi) => language === "vi" ? vi : en;
+  const EN_TEXT = {
+    "Kết nối router": "Connect router", "Thêm WiFi": "Add Wi-Fi", "Nhập .conf": "Import .conf",
+    "Đẩy & Áp lên router": "Push & Apply to router", "Thiết bị": "Devices", "Tải từ router": "Pull from router",
+    "Cập nhật": "Update", "Tải wifi-socks.conf": "Download wifi-socks.conf", "Tải JSON": "Download JSON",
+    "Xoá hết": "Clear all", "Băng": "Band", "Sức khỏe": "Health", "Chưa có WiFi nào": "No Wi-Fi configured",
+    "Bấm “＋ Thêm WiFi” để tạo, hoặc “⤓ Nhập .conf” để dán file có sẵn.": "Click “＋ Add Wi-Fi” to create one, or “⤓ Import .conf” to paste an existing file.",
+    "Copy": "Copy", "Tên WiFi (SSID)": "Wi-Fi name (SSID)", "Băng tần": "Band", "idx (số duy nhất)": "idx (unique number)",
+    "Hãng WiFi giả lập (MAC)": "Emulated Wi-Fi vendor (MAC)", "(3 byte đầu của MAC theo hãng; 3 byte sau random)": "(first 3 MAC bytes identify the vendor; last 3 are random)",
+    "Mật khẩu WiFi": "Wi-Fi password", "(≥ 8 ký tự)": "(≥ 8 characters)", "Cổng": "Port",
+    "(trống nếu không auth)": "(empty when authentication is disabled)", "Cách ly client": "Isolate clients", "Chặn WebRTC": "Block WebRTC",
+    "Huỷ": "Cancel", "Lưu": "Save", "Kết nối agent trên router": "Connect to the router agent",
+    "Chưa kết nối. Nhập token rồi bấm “Kết nối”.": "Not connected. Enter the token and click “Connect”.",
+    "(để trống nếu mở UI ngay từ router)": "(leave empty when the UI is served by the router)",
+    "(in ra bởi install-agent.sh)": "(printed by install-agent.sh)", "Ngắt": "Disconnect", "Đóng": "Close", "Kết nối": "Connect",
+    "Tạo backup ngay": "Create backup now", "Thiết bị đang kết nối": "Connected devices", "Làm mới": "Refresh",
+    "Bản đang chạy trên router": "Version running on router", "File package": "Package file",
+    "Cho phép hạ version (force)": "Allow version downgrade (force)", "Kết quả": "Result",
+    "IP / Tên máy": "IP / Hostname", "Thời gian kết nối": "Connected", "Vào (in)": "Received", "Ra (out)": "Sent", "Sóng": "Signal",
+    "Tổng WiFi": "Total Wi-Fi", "SOCKS riêng biệt": "Distinct SOCKS", "Cách ly / WebRTC": "Isolation / WebRTC",
+    "Sửa": "Edit", "Bỏ cấm": "Unblock", "Cấm": "Block", "mới nhất ·": "latest ·",
+    "Về máy": "Download", "Khôi phục": "Restore", "Đang tải danh sách…": "Loading list…",
+    "Chưa có backup nào.": "No backups available.", "Đang tải…": "Loading…",
+    "Không có thiết bị nào đang kết nối.": "No connected devices.", "ẩn danh": "anonymous",
+    "Ngẫu nhiên / ẩn danh (02:xx)": "Random / anonymous (02:xx)",
+    "Cập nhật agent trên router": "Update the router agent",
+    "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Updating does NOT reload Wi-Fi — configuration changes only after you click “Push & Apply”."
+  };
+  // Blocks that contain inline markup are swapped whole rather than per text node.
+  const EN_HTML = {
+    rbHint: 'The router already backs up on every Apply / SOCKS change. ⚠️ Before <b>updating the firmware</b>, click <b>⭳ Download</b> to save a backup to your computer — backups kept only on the router are lost after a reflash or brick.',
+    devHint: 'Clients grouped by Wi-Fi. <b>Disconnect</b> = temporary (the device may reconnect). <b>Block</b> = persistent MAC block (reloads that band).',
+    upStatus: 'Choose the package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (built with <code>make package</code> or <code>pc/make-package.sh</code>). The router backs up before updating and keeps the running Wi-Fi/SOCKS configuration.'
+  };
+  const EN_ATTR = {
+    "Kết nối agent trên router": "Connect to the router agent", "Đổi giao diện sáng/tối": "Toggle light/dark theme",
+    "Ghi config lên router rồi chạy apply.sh": "Write the configuration to the router and run apply.sh",
+    "Thiết bị đang kết nối từng WiFi (kick / cấm)": "Devices connected to each Wi-Fi (disconnect / block)",
+    "Tải wifi-socks.conf từ router": "Download wifi-socks.conf from the router",
+    "Backup & Rollback trên router": "Back up and roll back the router",
+    "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package"
+  };
+
+  // Labels carry a leading icon ("＋ Thêm WiFi"); the map is keyed on the words
+  // only, so split the icon off, translate the rest, then put the icon back.
+  const ICON_PREFIX = /^([^\p{L}\p{N}(]*)(.*)$/su;
+  function translatePhrase(vi) {
+    const [, icon, words] = vi.match(ICON_PREFIX);
+    if (language === "vi") return vi;
+    const body = EN_TEXT[words.trim()];
+    return body === undefined ? vi : icon + body;
+  }
+
+  function localizeStatic(root = document.body) {
+    root.querySelectorAll("[data-i18n-html]").forEach(el => {
+      const key = el.dataset.i18nHtml;
+      if (!el.dataset.i18nHtmlVi) el.dataset.i18nHtmlVi = el.innerHTML;
+      el.innerHTML = language === "vi" ? el.dataset.i18nHtmlVi : (EN_HTML[key] || el.dataset.i18nHtmlVi);
+    });
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.parentElement && ["SCRIPT", "STYLE", "PRE", "CODE", "OPTION"].includes(node.parentElement.tagName)) continue;
+      if (node.parentElement && node.parentElement.closest("[data-i18n-html], [data-i18n-skip]")) continue;
+      const raw = node.nodeValue;
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      if (!node.parentElement.dataset.i18nVi) node.parentElement.dataset.i18nVi = trimmed;
+      const vi = node.parentElement.dataset.i18nVi;
+      node.nodeValue = raw.replace(trimmed, translatePhrase(vi));
+    }
+    root.querySelectorAll("[title]").forEach(el => {
+      if (!el.dataset.i18nTitleVi) el.dataset.i18nTitleVi = el.title;
+      el.title = language === "vi" ? el.dataset.i18nTitleVi : (EN_ATTR[el.dataset.i18nTitleVi] || el.dataset.i18nTitleVi);
+    });
+    document.documentElement.lang = language;
+    document.getElementById("languageSelect").value = language;
+  }
+
+  function setLanguage(next) {
+    language = next === "vi" ? "vi" : "en";
+    localStorage.setItem(LANGUAGE_KEY, language);
+    localizeStatic();
+    renderVendorOptions();
+    render();
+    updateConnHint();
+    renderVersion();
+  }
   const NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
@@ -542,9 +640,10 @@
     { name: "Ubiquiti", oui: "24:A4:3C" },
     { name: "Aruba", oui: "00:0B:86" }
   ];
+  const vendorLabel = v => v.oui ? v.name : pick("Random / anonymous (02:xx)", "Ngẫu nhiên / ẩn danh (02:xx)");
   const vendorName = oui => {
     const v = VENDORS.find(x => x.oui.toUpperCase() === String(oui || "").toUpperCase());
-    return v ? v.name : (oui ? oui : VENDORS[0].name);
+    return v ? vendorLabel(v) : (oui ? oui : vendorLabel(VENDORS[0]));
   };
 
   /** @type {Array} */
@@ -632,55 +731,60 @@
     el.style.color = (agent.connected && agent.version && agent.version !== UI_VERSION)
       ? "var(--warn)" : "";
     el.title = (agent.connected && agent.version && agent.version !== UI_VERSION)
-      ? "Version agent khác version UI — cân nhắc dùng ⬆ Cập nhật" : "";
+      ? pick("The agent version differs from the UI version — consider using ⬆ Update",
+             "Version agent khác version UI — cân nhắc dùng ⬆ Cập nhật") : "";
   }
 
   function startPoll() { stopPoll(); poll(); agent.timer = setInterval(poll, 8000); }
   function stopPoll() { if (agent.timer) clearInterval(agent.timer); agent.timer = null; }
   function poll() {
     api("status").then(d => {
-      if (!d || !d.ok) throw new Error((d && d.error) || "phản hồi lỗi");
+      if (!d || !d.ok) throw new Error((d && d.error) || pick("bad response", "phản hồi lỗi"));
       agent.connected = true;
       agent.health = (d.health && d.health.probes) || {};
       agent.version = (d.meta && d.meta.version) || "";
       recordHistory();
       updateLiveUI(); renderRows();
       const run = d.meta && d.meta.singbox_running;
-      setConnStatus("Đã kết nối · sing-box " + (run ? "đang chạy" : "KHÔNG chạy"), run ? "ok" : "bad");
+      setConnStatus(pick("Connected · sing-box " + (run ? "running" : "NOT running"),
+                         "Đã kết nối · sing-box " + (run ? "đang chạy" : "KHÔNG chạy")), run ? "ok" : "bad");
     }).catch(err => {
       if (agent.connected) { agent.connected = false; updateLiveUI(); renderRows(); }
       stopPoll();
-      setConnStatus("Mất kết nối: " + err.message + " (mixed-content? token sai? agent chưa cài?)", "bad");
+      setConnStatus(pick("Connection lost: " + err.message + " (mixed content? wrong token? agent not installed?)",
+                         "Mất kết nối: " + err.message + " (mixed-content? token sai? agent chưa cài?)"), "bad");
     });
   }
 
   function connect() {
     agent.base = document.getElementById("c_base").value.trim().replace(/\/$/, "");
     agent.token = document.getElementById("c_token").value.trim();
-    if (!agent.token) return setConnStatus("Thiếu token.", "bad");
+    if (!agent.token) return setConnStatus(pick("Token is required.", "Thiếu token."), "bad");
     localStorage.setItem("sbproxy.agent.base", agent.base);
     localStorage.setItem("sbproxy.agent.token", agent.token);
-    setConnStatus("Đang kết nối…");
+    setConnStatus(pick("Connecting…", "Đang kết nối…"));
     api("status").then(d => {
-      if (!d || !d.ok) throw new Error((d && d.error) || "phản hồi lỗi");
+      if (!d || !d.ok) throw new Error((d && d.error) || pick("bad response", "phản hồi lỗi"));
       agent.connected = true; agent.health = (d.health && d.health.probes) || {};
       agent.version = (d.meta && d.meta.version) || "";
       updateLiveUI(); renderRows(); startPoll();
-      setConnStatus("Đã kết nối ✓", "ok");
-      toast("Đã kết nối router");
+      setConnStatus(pick("Connected ✓", "Đã kết nối ✓"), "ok");
+      toast(pick("Connected to the router", "Đã kết nối router"));
       setTimeout(() => document.getElementById("connBackdrop").classList.remove("show"), 700);
-    }).catch(err => setConnStatus("Không kết nối được: " + err.message, "bad"));
+    }).catch(err => setConnStatus(pick("Cannot connect: ", "Không kết nối được: ") + err.message, "bad"));
   }
   function disconnect() {
     agent.connected = false; stopPoll(); updateLiveUI(); renderRows();
     if (typeof closeDevices === "function") closeDevices();
-    setConnStatus("Đã ngắt kết nối.");
+    setConnStatus(pick("Disconnected.", "Đã ngắt kết nối."));
   }
 
   function updateConnHint() {
     const el = document.getElementById("mixedNote");
     if (!el) return;
-    el.innerHTML = "Mixed-content: nếu mở UI qua https, trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b>. Ứng dụng Windows native là chương trình riêng, không dùng trang này.";
+    el.innerHTML = pick(
+      "Mixed content: when this UI is served over https the browser blocks http calls to the router → open <b>http://&lt;router&gt;/sbproxy/</b>. The native Windows app is a separate program and does not use this page.",
+      "Mixed-content: nếu mở UI qua https, trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b>. Ứng dụng Windows native là chương trình riêng, không dùng trang này.");
   }
 
   function showLog(title, d) {
@@ -691,45 +795,48 @@
 
   function pushApply() {
     if (!agent.connected) return;
-    if (!confirm("Ghi wifi-socks.conf hiện tại lên router rồi chạy apply.sh (reload WiFi)?")) return;
-    toast("Đang đẩy & áp…");
+    if (!confirm(pick("Write the current wifi-socks.conf to the router and run apply.sh (reloads Wi-Fi)?",
+                      "Ghi wifi-socks.conf hiện tại lên router rồi chạy apply.sh (reload WiFi)?"))) return;
+    toast(pick("Pushing and applying…", "Đang đẩy & áp…"));
     api("save_conf", "POST", genConf(), true).then(sv => {
-      if (!sv || !sv.ok) throw new Error((sv && sv.error) || "ghi conf lỗi");
+      if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
       return api("apply", "POST", {});
     }).then(d => { showLog("apply.sh", d); poll(); })
-      .catch(err => toast("Lỗi: " + err.message));
+      .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   function pullFromRouter() {
     api("get_conf", "GET", null, "resp").then(txt => {
-      if (!txt) return toast("Router chưa có conf.");
-      parseConfInto(txt); render(); toast("Đã tải config từ router");
-    }).catch(err => toast("Lỗi: " + err.message));
+      if (!txt) return toast(pick("The router has no config yet.", "Router chưa có conf."));
+      parseConfInto(txt); render(); toast(pick("Config downloaded from the router", "Đã tải config từ router"));
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   function zapSock(s) {
     if (!agent.connected) return;
-    if (!confirm(`Đổi SOCKS của "${s.name}" ngay? WiFi không reload nhưng phiên đang mở có thể gián đoạn.\n→ ${s.host}:${s.port}`)) return;
-    toast("Đang đổi sock…");
+    if (!confirm(pick(`Change the SOCKS endpoint of "${s.name}" now? Wi-Fi is not reloaded, but open sessions may drop.\n→ ${s.host}:${s.port}`,
+                      `Đổi SOCKS của "${s.name}" ngay? WiFi không reload nhưng phiên đang mở có thể gián đoạn.\n→ ${s.host}:${s.port}`))) return;
+    toast(pick("Changing the SOCKS endpoint…", "Đang đổi sock…"));
     api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "" })
       .then(d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); })
-      .catch(err => toast("Lỗi: " + err.message));
+      .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
   // ---- self-update ----
   function openUpdate() {
     if (!agent.connected) return;
     document.getElementById("upCurVer").textContent =
-      agent.version ? "v" + agent.version : "không rõ (agent cũ)";
+      agent.version ? "v" + agent.version : pick("unknown (older agent)", "không rõ (agent cũ)");
     document.getElementById("upFile").value = "";
     document.getElementById("upForce").checked = false;
     document.getElementById("upBackdrop").classList.add("show");
   }
   function doUpdate() {
     const f = document.getElementById("upFile").files[0];
-    if (!f) return toast("Chưa chọn file package.");
-    if (!/\.(tar\.gz|tgz|zip)$/i.test(f.name)) return toast("Chỉ nhận .tar.gz / .tgz / .zip");
+    if (!f) return toast(pick("No package file selected.", "Chưa chọn file package."));
+    if (!/\.(tar\.gz|tgz|zip)$/i.test(f.name)) return toast(pick("Only .tar.gz / .tgz / .zip is accepted", "Chỉ nhận .tar.gz / .tgz / .zip"));
     const force = document.getElementById("upForce").checked;
-    if (!confirm(`Cập nhật code sbproxy trên router bằng "${f.name}"${force ? " (FORCE — cho phép hạ version)" : ""}?\nRouter tự backup trước; WiFi không reload.`)) return;
-    toast("Đang upload & cập nhật…");
+    if (!confirm(pick(`Update sbproxy on the router with "${f.name}"${force ? " (FORCE — downgrade allowed)" : ""}?\nThe router backs up first; Wi-Fi is not reloaded.`,
+                      `Cập nhật code sbproxy trên router bằng "${f.name}"${force ? " (FORCE — cho phép hạ version)" : ""}?\nRouter tự backup trước; WiFi không reload.`))) return;
+    toast(pick("Uploading and updating…", "Đang upload & cập nhật…"));
     fetch(apiUrl("update") + (force ? "&force=1" : ""), {
       method: "POST",
       headers: { "Authorization": `Bearer ${agent.token}`, "Content-Type": "application/octet-stream" },
@@ -739,7 +846,7 @@
       showLog("self-update.sh" + (d && d.ok ? ` (${d.from} → ${d.to})` : ""), d);
       // uhttpd may reload; re-poll shortly after to pick up the new version.
       setTimeout(poll, 1500);
-    }).catch(err => toast("Lỗi cập nhật: " + err.message));
+    }).catch(err => toast(pick("Update failed: ", "Lỗi cập nhật: ") + err.message));
   }
 
   function recordHistory() {
@@ -758,47 +865,48 @@
   }
   function loadBackups() {
     const box = document.getElementById("rbList");
-    box.innerHTML = '<div class="sub">Đang tải danh sách…</div>';
+    box.innerHTML = `<div class="sub">${pick("Loading list…", "Đang tải danh sách…")}</div>`;
     api("backups").then(d => {
       const list = (d && d.backups) || [];
-      if (!list.length) { box.innerHTML = '<div class="sub">Chưa có backup nào.</div>'; return; }
+      if (!list.length) { box.innerHTML = `<div class="sub">${pick("No backups available.", "Chưa có backup nào.")}</div>`; return; }
       box.innerHTML = list.map((name, i) => {
         const parts = name.split("-");
         const label = parts.slice(2).join("-") || "manual";
         return `<div class="rbitem">
-          <div class="nm">${esc(name)}<small>${i === 0 ? "mới nhất · " : ""}${esc(label)}</small></div>
+          <div class="nm">${esc(name)}<small>${i === 0 ? pick("latest · ", "mới nhất · ") : ""}${esc(label)}</small></div>
           <div class="rowbtns">
-            <button class="iconbtn" data-dl="${esc(name)}" title="Tải file backup về máy tính (an toàn khi reflash/brick)">⭳ Về máy</button>
-            <button class="btn ghost danger" data-restore="${esc(name)}">↩ Khôi phục</button>
+            <button class="iconbtn" data-dl="${esc(name)}" title="${pick("Download the backup to your computer (safe against reflash/brick)", "Tải file backup về máy tính (an toàn khi reflash/brick)")}">⭳ ${pick("Download", "Về máy")}</button>
+            <button class="btn ghost danger" data-restore="${esc(name)}">↩ ${pick("Restore", "Khôi phục")}</button>
           </div>
         </div>`;
       }).join("");
-    }).catch(err => { box.innerHTML = `<div class="conn-status bad">Lỗi: ${esc(err.message)}</div>`; });
+    }).catch(err => { box.innerHTML = `<div class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</div>`; });
   }
   function backupNow() {
-    toast("Đang tạo backup…");
+    toast(pick("Creating a backup…", "Đang tạo backup…"));
     api("backup", "POST", { label: "ui" }).then(d => { showLog("backup.sh", d); loadBackups(); })
-      .catch(err => toast("Lỗi: " + err.message));
+      .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   function downloadBackup(name) {
-    toast("Đang tải backup về máy…");
+    toast(pick("Downloading the backup…", "Đang tải backup về máy…"));
     fetch(apiUrl("download_backup") + "&name=" + encodeURIComponent(name), { headers: { "Authorization": `Bearer ${agent.token}` } })
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
       .then(b => {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(b); a.download = "sbproxy-" + name + ".tar.gz"; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-        toast("Đã tải backup về máy ✓");
-      }).catch(err => toast("Lỗi tải: " + err.message));
+        toast(pick("Backup downloaded ✓", "Đã tải backup về máy ✓"));
+      }).catch(err => toast(pick("Download failed: ", "Lỗi tải: ") + err.message));
   }
   function restore(name) {
-    if (!confirm(`Khôi phục cấu hình từ backup:\n${name}\n\nSẽ GHI ĐÈ config hiện tại và reload dịch vụ. Tiếp tục?`)) return;
-    toast("Đang rollback…");
+    if (!confirm(pick(`Restore the configuration from backup:\n${name}\n\nThis OVERWRITES the current config and reloads services. Continue?`,
+                      `Khôi phục cấu hình từ backup:\n${name}\n\nSẽ GHI ĐÈ config hiện tại và reload dịch vụ. Tiếp tục?`))) return;
+    toast(pick("Rolling back…", "Đang rollback…"));
     api("rollback", "POST", { name }).then(d => {
       showLog("rollback.sh " + name, d);
       document.getElementById("rbBackdrop").classList.remove("show");
       poll();
-    }).catch(err => toast("Lỗi: " + err.message));
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
   // ---- devices / clients ----
@@ -823,7 +931,7 @@
     return s ? s.name : "w" + idx;
   }
   function openDevices() {
-    if (!agent.connected) return toast("Chưa kết nối router.");
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("devBackdrop").classList.add("show");
     loadDevices();
     clearInterval(devTimer);
@@ -837,17 +945,17 @@
     api("clients").then(d => {
       const box = $("devRows");
       const list = (d && d.clients) || [];
-      if (!d || !d.ok) throw new Error((d && d.error) || "lỗi");
-      if (!list.length) { box.innerHTML = '<tr><td colspan="8" class="sub">Không có thiết bị nào đang kết nối.</td></tr>'; return; }
+      if (!d || !d.ok) throw new Error((d && d.error) || pick("error", "lỗi"));
+      if (!list.length) { box.innerHTML = '<tr><td colspan="8" class="sub">${pick("No connected devices.", "Không có thiết bị nào đang kết nối.")}</td></tr>'; return; }
       box.innerHTML = list.map(c => {
         const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
         const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
         const act = c.banned
-          ? `<button class="btn ghost" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ Bỏ cấm</button>`
-          : `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="Ngắt tạm (thiết bị có thể nối lại)">⏏ Kick</button>
-             <button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="Chặn MAC lâu dài">⛔ Cấm</button>`;
+          ? `<button class="btn ghost" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ ${pick("Unblock", "Bỏ cấm")}</button>`
+          : `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Temporary disconnect (the device may reconnect)", "Ngắt tạm (thiết bị có thể nối lại)")}">⏏ ${pick("Disconnect", "Kick")}</button>
+             <button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Persistently block this MAC", "Chặn MAC lâu dài")}">⛔ ${pick("Block", "Cấm")}</button>`;
         return `<tr>
-          <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}${c.banned ? ' <span class="chip warnhue on">cấm</span>' : ""}</td>
+          <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}${c.banned ? ` <span class="chip warnhue on">${pick("blocked", "cấm")}</span>` : ""}</td>
           <td class="mono">${esc(c.mac)}</td>
           <td class="mono sub">${esc(ipHost)}</td>
           <td class="mono">${fmtDuration(c.connected_s)}</td>
@@ -858,18 +966,25 @@
         </tr>`;
       }).join("");
     }).catch(err => {
-      $("devRows").innerHTML = `<tr><td colspan="8"><span class="conn-status bad">Lỗi: ${esc(err.message)}</span></td></tr>`;
+      $("devRows").innerHTML = `<tr><td colspan="8"><span class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</span></td></tr>`;
     });
   }
   function deviceAction(action, idx, mac) {
-    const verb = action === "kick" ? "Kick (ngắt tạm)" : action === "ban" ? "Cấm (chặn lâu dài)" : "Bỏ cấm";
-    if (action !== "kick" && !confirm(`${verb} thiết bị ${mac} khỏi WiFi "${ssidNameByIdx(idx)}"?` +
-        (action === "ban" ? "\n\n⚠️ Băng tần của WiFi này sẽ reload (các client cùng băng bị ngắt trong giây lát)." : ""))) return;
-    toast("Đang " + verb.toLowerCase() + "…");
+    const verb = action === "kick" ? pick("Disconnect (temporary)", "Kick (ngắt tạm)")
+      : action === "ban" ? pick("Block (persistent)", "Cấm (chặn lâu dài)")
+      : pick("Unblock", "Bỏ cấm");
+    if (action !== "kick" && !confirm(
+        pick(`${verb} device ${mac} from Wi-Fi "${ssidNameByIdx(idx)}"?`,
+             `${verb} thiết bị ${mac} khỏi WiFi "${ssidNameByIdx(idx)}"?`) +
+        (action === "ban"
+          ? pick("\n\n⚠️ The band of this Wi-Fi will reload (clients on the same band drop briefly).",
+                 "\n\n⚠️ Băng tần của WiFi này sẽ reload (các client cùng băng bị ngắt trong giây lát).")
+          : ""))) return;
+    toast(pick(verb + "…", "Đang " + verb.toLowerCase() + "…"));
     api(action, "POST", { idx, mac }).then(d => {
       if (!d || !d.ok) return showLog(verb, d);
       toast(verb + " ✓"); loadDevices();
-    }).catch(err => toast("Lỗi: " + err.message));
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
   // ---- render ----
@@ -878,6 +993,7 @@
     renderRows();
     renderOutput();
     save();
+    localizeStatic();
   }
 
   function renderStats() {
@@ -896,10 +1012,10 @@
       </div>`;
     };
     document.getElementById("stats").innerHTML =
-      `<div class="stat"><div class="label">Tổng WiFi</div><div class="val">${ssids.length}</div></div>` +
+      `<div class="stat"><div class="label">${pick("Total Wi-Fi", "Tổng WiFi")}</div><div class="val">${ssids.length}</div></div>` +
       meter(c2, "2.4 GHz") + meter(c5, "5 GHz") +
-      `<div class="stat"><div class="label">SOCKS riêng biệt</div><div class="val">${proxies}</div></div>` +
-      `<div class="stat"><div class="label">Cách ly / WebRTC</div><div class="val">${iso}<small> / ${web}</small></div></div>`;
+      `<div class="stat"><div class="label">${pick("Distinct SOCKS", "SOCKS riêng biệt")}</div><div class="val">${proxies}</div></div>` +
+      `<div class="stat"><div class="label">${pick("Isolation / WebRTC", "Cách ly / WebRTC")}</div><div class="val">${iso}<small> / ${web}</small></div></div>`;
   }
 
   function renderRows() {
@@ -910,7 +1026,7 @@
       const auth = s.user ? `<span class="chip"><span class="dot"></span>${esc(s.user)}</span>` : `<span class="sub">—</span>`;
       return `<tr>
         <td><span class="idxpill">${s.idx}</span></td>
-        <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)} · MAC ${esc(s.mac_oui ? s.mac_oui + " " + vendorName(s.mac_oui) : "02: ẩn danh")}</div></td>
+        <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)} · MAC ${esc(s.mac_oui ? s.mac_oui + " " + vendorName(s.mac_oui) : pick("02: anonymous", "02: ẩn danh"))}</div></td>
         <td><span class="band ${s.band === "2g" ? "b2" : "b5"}">${s.band === "2g" ? "2.4G" : "5G"}</span></td>
         <td class="mono sub">${subnet(s.idx)}</td>
         <td class="mono">${esc(s.host)}:${esc(s.port)}</td>
@@ -919,8 +1035,8 @@
         <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
         <td>${healthCell(s.idx)}</td>
         <td><div class="rowbtns">
-          ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn">⚡</button>` : ""}
-          <button class="iconbtn" data-edit="${s.id}">Sửa</button>
+          ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="${pick("Change SOCKS without reloading Wi-Fi; open sessions may drop", "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn")}">⚡</button>` : ""}
+          <button class="iconbtn" data-edit="${s.id}">${pick("Edit", "Sửa")}</button>
           <button class="iconbtn" data-dup="${s.id}">⧉</button>
           <button class="iconbtn del" data-del="${s.id}">✕</button>
         </div></td>
@@ -988,18 +1104,18 @@
 
   const TABS = {
     conf: { name: "config/wifi-socks.conf", gen: genConf,
-      hint: `Copy nội dung này vào <code>config/wifi-socks.conf</code> trên router, rồi chạy <code>sh scripts/apply.sh</code>. Đổi 1 sock nhanh: <code>sh scripts/set-sock.sh &lt;idx&gt; host port user pass</code>.` },
+      hint: () => pick(`Copy this content to <code>config/wifi-socks.conf</code> on the router, then run <code>sh scripts/apply.sh</code>. Quickly change one SOCKS endpoint with: <code>sh scripts/set-sock.sh &lt;idx&gt; host port user pass</code>.`, `Copy nội dung này vào <code>config/wifi-socks.conf</code> trên router, rồi chạy <code>sh scripts/apply.sh</code>. Đổi 1 sock nhanh: <code>sh scripts/set-sock.sh &lt;idx&gt; host port user pass</code>.`) },
     singbox: { name: "/etc/sing-box/config.json", gen: genSingbox,
-      hint: `File này do <code>apply.sh</code> tự sinh trên router — đây chỉ là <b>xem trước</b> để đối chiếu. Validate: <code>sing-box check -c /etc/sing-box/config.json</code>.` },
+      hint: () => pick(`This file is generated by <code>apply.sh</code> on the router — this is only a <b>preview</b>. Validate it with: <code>sing-box check -c /etc/sing-box/config.json</code>.`, `File này do <code>apply.sh</code> tự sinh trên router — đây chỉ là <b>xem trước</b> để đối chiếu. Validate: <code>sing-box check -c /etc/sing-box/config.json</code>.`) },
     nft: { name: "/etc/sbproxy.nft", gen: genNft,
-      hint: `Ruleset TPROXY + chặn WebRTC, do <code>apply.sh</code> sinh và nạp qua <code>/etc/init.d/sbproxy</code>. Xem trên router: <code>nft list table inet sbproxy</code>.` }
+      hint: () => pick(`The TPROXY and WebRTC-blocking ruleset is generated by <code>apply.sh</code> and loaded through <code>/etc/init.d/sbproxy</code>. Inspect it with: <code>nft list table inet sbproxy</code>.`, `Ruleset TPROXY + chặn WebRTC, do <code>apply.sh</code> sinh và nạp qua <code>/etc/init.d/sbproxy</code>. Xem trên router: <code>nft list table inet sbproxy</code>.`) }
   };
 
   function renderOutput() {
     const t = TABS[curTab];
     document.getElementById("outName").textContent = t.name;
     document.getElementById("outCode").textContent = t.gen();
-    document.getElementById("applyHint").innerHTML = t.hint;
+    document.getElementById("applyHint").innerHTML = t.hint();
   }
 
   // ---- modal ----
@@ -1007,7 +1123,7 @@
   function openModal(id) {
     editId = id;
     const s = id ? ssids.find(x => x.id === id) : null;
-    $("modalTitle").textContent = s ? "Sửa WiFi" : "Thêm WiFi";
+    $("modalTitle").textContent = s ? pick("Edit Wi-Fi", "Sửa WiFi") : pick("Add Wi-Fi", "Thêm WiFi");
     $("f_name").value = s ? s.name : "";
     $("f_band").value = s ? s.band : "2g";
     $("f_idx").value = s ? s.idx : nextIdx();
@@ -1046,21 +1162,22 @@
     const pass = $("f_pass").value;
     const err = m => { $("f_err").textContent = m; return false; };
 
-    if (!name) return err("Thiếu tên WiFi.");
-    if (/[|]/.test(name)) return err("Tên WiFi không được chứa ký tự '|'.");
-    if (!isFinite(idx) || idx < 1) return err("idx phải là số ≥ 1.");
-    if (ssids.some(s => s.idx === idx && s.id !== editId)) return err(`idx ${idx} đã dùng cho WiFi khác.`);
-    if (key.length < 8) return err("Mật khẩu WiFi phải ≥ 8 ký tự (WPA2).");
-    if (!host) return err("Thiếu SOCKS host.");
-    if (!isFinite(port) || port < 1 || port > 65535) return err("Cổng SOCKS không hợp lệ.");
-    if (user && !pass) return err("Có user thì cần pass (hoặc bỏ trống cả hai).");
+    if (!name) return err(pick("Wi-Fi name is required.", "Thiếu tên WiFi."));
+    if (/[|]/.test(name)) return err(pick("Wi-Fi name must not contain '|'.", "Tên WiFi không được chứa ký tự '|'."));
+    if (!isFinite(idx) || idx < 1) return err(pick("idx must be a number ≥ 1.", "idx phải là số ≥ 1."));
+    if (ssids.some(s => s.idx === idx && s.id !== editId)) return err(pick(`idx ${idx} is already used by another Wi-Fi.`, `idx ${idx} đã dùng cho WiFi khác.`));
+    if (key.length < 8) return err(pick("Wi-Fi password must contain at least 8 characters (WPA2).", "Mật khẩu WiFi phải ≥ 8 ký tự (WPA2)."));
+    if (!host) return err(pick("SOCKS host is required.", "Thiếu SOCKS host."));
+    if (!isFinite(port) || port < 1 || port > 65535) return err(pick("Invalid SOCKS port.", "Cổng SOCKS không hợp lệ."));
+    if (user && !pass) return err(pick("A password is required when a username is set (or leave both empty).", "Có user thì cần pass (hoặc bỏ trống cả hai)."));
     const mac_oui = $("f_vendor").value;
-    if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err("mac_oui phải dạng AA:BB:CC.");
+    if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err(pick("mac_oui must look like AA:BB:CC.", "mac_oui phải dạng AA:BB:CC."));
 
     const rec = { name, band, idx, key, host, port: String(port), user, pass, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked, mac_oui };
     if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
-    closeModal(); render(); toast(editId ? "Đã cập nhật" : "Đã thêm WiFi");
+    const wasEditing = !!editId;
+    closeModal(); render(); toast(wasEditing ? pick("Updated", "Đã cập nhật") : pick("Wi-Fi added", "Đã thêm WiFi"));
   }
 
   // ---- import ----
@@ -1086,11 +1203,11 @@
     return rows.length;
   }
   function importConf() {
-    const txt = prompt("Dán nội dung wifi-socks.conf:");
+    const txt = prompt(pick("Paste the contents of wifi-socks.conf:", "Dán nội dung wifi-socks.conf:"));
     if (!txt) return;
     const n = parseConfInto(txt);
-    if (!n) return toast("Không đọc được dòng WiFi nào.");
-    render(); toast(`Đã nhập ${n} WiFi`);
+    if (!n) return toast(pick("No valid Wi-Fi rows were found.", "Không đọc được dòng WiFi nào."));
+    render(); toast(pick(`Imported ${n} Wi-Fi row(s)`, `Đã nhập ${n} WiFi`));
   }
 
   // ---- download / copy ----
@@ -1101,7 +1218,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
   function copy(text) {
-    navigator.clipboard.writeText(text).then(() => toast("Đã copy"), () => toast("Không copy được"));
+    navigator.clipboard.writeText(text).then(() => toast(pick("Copied", "Đã copy")), () => toast(pick("Copy failed", "Không copy được")));
   }
   let toastT;
   function toast(m) {
@@ -1129,17 +1246,18 @@
   $("backdrop").onclick = e => { if (e.target.id === "backdrop") closeModal(); };
   $("f_idx").oninput = updateDerived;
   $("f_vendor").onchange = updateDerived;
+  $("languageSelect").onchange = e => setLanguage(e.target.value);
   $("themeBtn").onclick = toggleTheme;
   $("importBtn").onclick = importConf;
   $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
   $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
   $("copyBtn").onclick = () => copy(TABS[curTab].gen());
-  $("clearBtn").onclick = () => { if (confirm("Xoá toàn bộ WiFi khỏi console? (không đụng tới router)")) { ssids = []; render(); } };
+  $("clearBtn").onclick = () => { if (confirm(pick("Remove all Wi-Fi entries from the console? (This does not change the router.)", "Xoá toàn bộ WiFi khỏi console? (không đụng tới router)"))) { ssids = []; render(); } };
 
   // live mode events
   $("connBtn").onclick = () => {
     $("c_base").value = agent.base; $("c_token").value = agent.token;
-    if (!agent.connected) setConnStatus("Chưa kết nối. Nhập token rồi bấm “Kết nối”.");
+    if (!agent.connected) setConnStatus(pick("Not connected. Enter the token and click “Connect”.", "Chưa kết nối. Nhập token rồi bấm “Kết nối”."));
     $("connBackdrop").classList.add("show");
   };
   $("connectBtn").onclick = connect;
@@ -1188,9 +1306,9 @@
     if (du) {
       const s = ssids.find(x => x.id === du);
       const clone = { ...s, id: "s" + Date.now(), idx: nextIdx(), name: s.name + "-copy" };
-      ssids.push(clone); render(); toast("Đã nhân bản");
+      ssids.push(clone); render(); toast(pick("Duplicated", "Đã nhân bản"));
     }
-    if (de) { const s = ssids.find(x => x.id === de); if (confirm(`Xoá WiFi "${s.name}"?`)) { ssids = ssids.filter(x => x.id !== de); render(); } }
+    if (de) { const s = ssids.find(x => x.id === de); if (confirm(pick(`Delete Wi-Fi "${s.name}"?`, `Xoá WiFi "${s.name}"?`))) { ssids = ssids.filter(x => x.id !== de); render(); } }
   };
 
   document.getElementById("outTabs").onclick = e => {
@@ -1229,11 +1347,17 @@
   }
 
   // Populate the MAC vendor dropdown once.
-  $("f_vendor").innerHTML = VENDORS.map(v =>
-    `<option value="${v.oui}">${esc(v.name)}${v.oui ? " · " + v.oui : ""}</option>`
-  ).join("");
+  function renderVendorOptions() {
+    const keep = $("f_vendor").value;
+    $("f_vendor").innerHTML = VENDORS.map(v =>
+      `<option value="${v.oui}">${esc(vendorLabel(v))}${v.oui ? " · " + v.oui : ""}</option>`
+    ).join("");
+    $("f_vendor").value = keep;
+  }
+  renderVendorOptions();
 
   initTheme();
+  localizeStatic();
   render();
   initAgent();
   updateConnHint();
