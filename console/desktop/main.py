@@ -284,14 +284,15 @@ EN_TRANSLATIONS = {
     "Chưa kết nối": "Not connected",
     "Kết nối": "Connect",
     "Làm mới": "Refresh",
-    "Kiểm tra gateway": "Check gateway",
-    "● Gateway chưa kiểm tra": "● Gateway not checked",
-    "● Gateway chưa xác định": "● Gateway unknown",
-    "● Gateway mất kết nối": "● Gateway down",
-    "● Gateway suy giảm": "● Gateway degraded",
-    "● Gateway OK": "● Gateway OK",
+    "Kiểm tra cổng ra": "Check gateway",
+    "CỔNG RA INTERNET": "INTERNET GATEWAY",
+    "● Internet chưa kiểm tra": "● Gateway not checked",
+    "● Internet chưa xác định": "● Gateway unknown",
+    "● Mất kết nối Internet": "● Gateway down",
+    "● Internet suy giảm": "● Gateway degraded",
+    "● Internet hoạt động": "● Gateway OK",
     "Đường ra: —": "Egress: —",
-    "Link/DNS: —": "Link/DNS: —",
+    "Kết nối/DNS: —": "Link/DNS: —",
     "Internet HTTP: —": "Internet HTTP: —",
     "Wi‑Fi / SOCKS5": "Wi-Fi / SOCKS5",
     "Thiết bị": "Devices",
@@ -435,7 +436,7 @@ EN_TRANSLATIONS = {
     "Không xác định được OUI của hãng đã chọn": "Could not determine the selected vendor OUI",
     "Đang kết nối Agent…": "Connecting to Agent…",
     "Đang làm mới…": "Refreshing…",
-    "Đang kiểm tra Internet gateway…": "Checking Internet gateway…",
+    "Đang kiểm tra cổng ra Internet…": "Checking Internet gateway…",
     "Đang đổi SOCKS…": "Changing SOCKS…",
     "Đang dry-run trước khi apply…": "Running dry-run before apply…",
     "Đang đọc backup…": "Loading backups…",
@@ -1417,9 +1418,9 @@ class NativeApp:
         self.client_weak_count_var = tk.StringVar(value="0 weak signal" if self.language == "en" else "0 tín hiệu yếu")
         self.client_blocked_count_var = tk.StringVar(value="0 blocked" if self.language == "en" else "0 đã chặn")
         self.client_traffic_total_var = tk.StringVar(value="0 B total traffic" if self.language == "en" else "0 B tổng lưu lượng")
-        self.gateway_state_var = tk.StringVar(value=self.t("● Gateway chưa kiểm tra"))
+        self.gateway_state_var = tk.StringVar(value=self.t("● Internet chưa kiểm tra"))
         self.gateway_route_var = tk.StringVar(value=self.t("Đường ra: —"))
-        self.gateway_link_var = tk.StringVar(value=self.t("Link/DNS: —"))
+        self.gateway_link_var = tk.StringVar(value=self.t("Kết nối/DNS: —"))
         self.gateway_http_var = tk.StringVar(value=self.t("Internet HTTP: —"))
         self.wifi_selection_var = tk.StringVar(value=self.t("Chọn một SSID trong bảng để chỉnh sửa"))
         self.client_selection_var = tk.StringVar(value=self.t("Chọn thiết bị trong bảng để điều khiển"))
@@ -1626,10 +1627,10 @@ class NativeApp:
         gateway.pack(fill="x", padx=14, pady=(0, 8))
         gateway_head = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_head.pack(fill="x")
-        ttk.Label(gateway_head, text="INTERNET GATEWAY", style="MetricBlue.TLabel").pack(side="left", padx=(0, 18))
+        ttk.Label(gateway_head, text="CỔNG RA INTERNET", style="MetricBlue.TLabel").pack(side="left", padx=(0, 18))
         self.gateway_state_label = ttk.Label(gateway_head, textvariable=self.gateway_state_var, style="MetricBlue.TLabel")
         self.gateway_state_label.pack(side="left")
-        ttk.Button(gateway_head, text="Kiểm tra gateway", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
+        ttk.Button(gateway_head, text="Kiểm tra cổng ra", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
         gateway_detail = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_detail.pack(fill="x", pady=(7, 0))
         ttk.Label(gateway_detail, textvariable=self.gateway_route_var, style="MetricBlue.TLabel").pack(side="left", padx=(0, 28))
@@ -1688,6 +1689,11 @@ class NativeApp:
         self.update_client_summary()
         if self.gateway_payload:
             self.render_gateway(self.gateway_payload)
+        else:
+            self.gateway_state_var.set(self.t("● Internet chưa kiểm tra"))
+            self.gateway_route_var.set(self.t("Đường ra: —"))
+            self.gateway_link_var.set(self.t("Kết nối/DNS: —"))
+            self.gateway_http_var.set(self.t("Internet HTTP: —"))
         for name in self.backup_names:
             self.backup_list.insert("end", name)
         for entry in self.log_history:
@@ -2065,10 +2071,10 @@ class NativeApp:
         self.gateway_payload = payload
         state = str(payload.get("state") or "unknown")
         labels = {
-            "ok": ("● Gateway OK", "MetricGreen.TLabel"),
-            "degraded": ("● Gateway suy giảm", "MetricYellow.TLabel"),
-            "down": ("● Gateway mất kết nối", "MetricRed.TLabel"),
-            "unknown": ("● Gateway chưa xác định", "MetricBlue.TLabel"),
+            "ok": ("● Internet hoạt động", "MetricGreen.TLabel"),
+            "degraded": ("● Internet suy giảm", "MetricYellow.TLabel"),
+            "down": ("● Mất kết nối Internet", "MetricRed.TLabel"),
+            "unknown": ("● Internet chưa xác định", "MetricBlue.TLabel"),
         }
         text, style = labels.get(state, labels["unknown"])
         self.gateway_state_var.set(self.t(text))
@@ -2077,12 +2083,12 @@ class NativeApp:
         expected = str(payload.get("expected_interface") or "wwan")
         logical = str(payload.get("interface") or "—")
         device = str(payload.get("device") or "—")
-        via = str(payload.get("gateway") or "direct")
+        via = str(payload.get("gateway") or ("direct" if self.language == "en" else "trực tiếp"))
         source = str(payload.get("source_ip") or "—")
         route = (
             f"Egress: {logical}/{device} · via {via} · src {source}"
             if self.language == "en" else
-            f"Đường ra: {logical}/{device} · via {via} · src {source}"
+            f"Đường ra: {logical}/{device} · qua {via} · IP nguồn {source}"
         )
         if payload.get("expected_active") is False:
             route += f" · NOT VIA {expected}" if self.language == "en" else f" · KHÔNG QUA {expected}"
@@ -2090,10 +2096,14 @@ class NativeApp:
 
         link = "OK" if payload.get("link_ok") else ("ERROR" if self.language == "en" else "LỖI")
         if not payload.get("dns_checked", True):
-            dns = "not checked" if self.language == "en" else "không kiểm tra"
+            dns = "not checked" if self.language == "en" else "chưa kiểm tra"
         else:
             dns = "OK" if payload.get("dns_ok") else ("ERROR" if self.language == "en" else "LỖI")
-        self.gateway_link_var.set(f"Link: {link} · DNS: {dns}")
+        self.gateway_link_var.set(
+            f"Link: {link} · DNS: {dns}"
+            if self.language == "en" else
+            f"Kết nối: {'Tốt' if link == 'OK' else link} · DNS: {'Tốt' if dns == 'OK' else dns}"
+        )
 
         if payload.get("http_ok"):
             self.gateway_http_var.set(
@@ -2112,12 +2122,18 @@ class NativeApp:
         def done(payload):
             self.render_gateway(payload)
             state = payload.get("state") or "unknown"
+            state_vi = {
+                "ok": "hoạt động",
+                "degraded": "suy giảm",
+                "down": "mất kết nối",
+                "unknown": "chưa xác định",
+            }.get(state, str(state))
             self.append_log(
                 f"Gateway check: {state} · {payload.get('route') or 'no route'}"
                 if self.language == "en" else
-                f"Kiểm tra gateway: {state} · {payload.get('route') or 'không có route'}"
+                f"Kiểm tra cổng ra: {state_vi} · {payload.get('route') or 'không có route'}"
             )
-        self.run_task("Đang kiểm tra Internet gateway…", client.gateway, done)
+        self.run_task("Đang kiểm tra cổng ra Internet…", client.gateway, done)
 
     def capture_runtime_ssids(self, status):
         self.runtime_ssids = {}

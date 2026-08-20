@@ -79,6 +79,8 @@ class TranslationTests(unittest.TestCase):
     def test_known_translation_and_vietnamese_identity(self):
         self.assertEqual(app.translate("Thiết bị", "en"), "Devices")
         self.assertEqual(app.translate("Thiết bị", "vi"), "Thiết bị")
+        self.assertEqual(app.translate("CỔNG RA INTERNET", "en"), "INTERNET GATEWAY")
+        self.assertEqual(app.translate("CỔNG RA INTERNET", "vi"), "CỔNG RA INTERNET")
 
     def test_unknown_translation_is_preserved(self):
         self.assertEqual(app.translate("custom text", "en"), "custom text")

@@ -311,11 +311,34 @@ class GatewayWorkflowTests(unittest.TestCase):
         self.assertEqual(instance.gateway_http_var.get(), "HTTP: 204 · 31 ms")
         self.assertEqual(instance.gateway_state_label.options["style"], "MetricGreen.TLabel")
 
+    def test_render_gateway_ok_is_fully_localized_in_vietnamese(self):
+        instance = self.make_instance("vi")
+        payload = {
+            "state": "ok", "expected_interface": "wwan", "interface": "wwan",
+            "device": "phy0-sta0", "gateway": "192.168.8.1", "source_ip": "192.168.8.2",
+            "expected_active": True, "link_ok": True, "dns_checked": True,
+            "dns_ok": True, "http_ok": True, "http_code": 204, "latency_ms": 31,
+        }
+        instance.render_gateway(payload)
+        self.assertEqual(instance.gateway_state_var.get(), "● Internet hoạt động")
+        self.assertEqual(
+            instance.gateway_route_var.get(),
+            "Đường ra: wwan/phy0-sta0 · qua 192.168.8.1 · IP nguồn 192.168.8.2",
+        )
+        self.assertEqual(instance.gateway_link_var.get(), "Kết nối: Tốt · DNS: Tốt")
+        self.assertEqual(instance.gateway_http_var.get(), "HTTP: 204 · 31 ms")
+        combined = " ".join((
+            instance.gateway_state_var.get(), instance.gateway_route_var.get(),
+            instance.gateway_link_var.get(), instance.gateway_http_var.get(),
+        ))
+        for untranslated in ("Gateway", "Link:", " via ", " src "):
+            self.assertNotIn(untranslated, combined)
+
     def test_render_gateway_unknown_defaults_and_non_expected_warning(self):
         instance = self.make_instance("vi")
         instance.render_gateway({"expected_active": False, "dns_checked": False})
         self.assertIn("KHÔNG QUA wwan", instance.gateway_route_var.get())
-        self.assertIn("không kiểm tra", instance.gateway_link_var.get())
+        self.assertIn("chưa kiểm tra", instance.gateway_link_var.get())
         self.assertIn("LỖI", instance.gateway_http_var.get())
         self.assertEqual(instance.gateway_state_label.options["style"], "MetricBlue.TLabel")
 

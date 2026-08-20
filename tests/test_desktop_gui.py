@@ -66,6 +66,16 @@ class DesktopGuiSmokeTests(unittest.TestCase):
                     texts = widget_texts(self.root)
                     expected = ("Devices", "Language", "Theme") if language == "en" else ("Thiết bị", "Ngôn ngữ", "Giao diện")
                     self.assertTrue(all(label in texts for label in expected))
+                    gateway_title = "INTERNET GATEWAY" if language == "en" else "CỔNG RA INTERNET"
+                    self.assertIn(gateway_title, texts)
+                    self.assertEqual(
+                        self.app.gateway_state_var.get(),
+                        "● Gateway not checked" if language == "en" else "● Internet chưa kiểm tra",
+                    )
+                    self.assertEqual(
+                        self.app.gateway_link_var.get(),
+                        "Link/DNS: —" if language == "en" else "Kết nối/DNS: —",
+                    )
                     self.assertEqual(self.root.cget("background").lower(), appmod.PALETTES[theme]["bg"].lower())
 
     def test_language_and_theme_handlers_persist(self):
