@@ -83,6 +83,8 @@ match "gen_mac default is locally-admin 02:" "$(gen_mac)"          '^02:([0-9a-f
 echo "== validate_conf =="
 mkc 'A|2g|1|password12|1.2.3.4|1080|u|p|1|1|50:C7:BF'; vrun "accept 11-col"        ok  validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0';            vrun "accept 10-col"        ok  validate_conf
+mkc 'A|2g|3|password12|1.2.3.4|8080|||1|0';            vrun "accept idx=3 port=8080" ok validate_conf
+mkc 'A|5g|200|password12|1.2.3.4|65535|||1|0';         vrun "accept upper idx/port" ok validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|ZZ:GG:HH';   vrun "reject bad mac_oui"   die validate_conf
 mkc 'A|2g|1|short|1.2.3.4|1080|||1|1';                 vrun "reject short wifi_key" die validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1';              vrun "reject NF=9"          die validate_conf
