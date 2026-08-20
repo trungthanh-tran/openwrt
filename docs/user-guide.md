@@ -79,9 +79,9 @@ trị viên trước khi Apply thêm thay đổi.
 
 **Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* & *Chặn WebRTC*. Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
 
-**Giả MAC theo hãng WiFi:** chọn SSID trong bảng, dùng **Random MAC** trong khung chỉnh sửa rồi chọn hãng (TP-Link, Netgear, ASUS, Xiaomi…). Ba byte đầu theo OUI của hãng, ba byte sau ngẫu nhiên. Thao tác lưu provider và reload radio ngay sau khi bạn xác nhận cảnh báo.
+**Giả MAC theo hãng WiFi:** nhấp chuột phải lên SSID trong bảng, chọn **Random MAC** rồi chọn hãng (TP-Link, Netgear, ASUS, Xiaomi…). Ba byte đầu theo OUI của hãng, ba byte sau ngẫu nhiên. Thao tác lưu provider và reload radio ngay sau khi bạn xác nhận cảnh báo.
 
-**Đổi SOCKS nhanh:** chọn SSID trong bảng rồi bấm **Đổi SOCKS** trong khung chỉnh sửa.
+**Đổi SOCKS nhanh:** nhấp chuột phải lên SSID trong bảng rồi chọn **Đổi SOCKS**. Menu chuột phải tự chọn đúng dòng dưới con trỏ; khung cố định chỉ giữ nút Sửa và Xoá.
 Thiết bị vẫn nối WiFi và giữ DHCP, nhưng phiên mạng đang mở có thể gián đoạn khi sing-box restart.
 
 **Áp toàn bộ thay đổi:** sau khi thêm/sửa/xoá nhiều WiFi, bấm **Đẩy cấu hình & Apply**. App native luôn dry-run candidate trước; chỉ khi đạt mới backup, ghi cấu hình và reload WiFi.

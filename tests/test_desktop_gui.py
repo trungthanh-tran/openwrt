@@ -79,6 +79,14 @@ class DesktopGuiSmokeTests(unittest.TestCase):
             self.app._on_theme_changed()
             save.assert_called_with("vi", "light")
 
+    def test_wifi_item_actions_use_context_menu(self):
+        self.set_mode("en", "dark")
+        self.assertEqual(set(self.app.wifi_edit_buttons), {"edit", "delete"})
+        self.assertEqual(
+            [self.app.wifi_context_menu.entrycget(index, "label") for index in (0, 1, 2, 4)],
+            ["Edit configuration", "Change SOCKS", "Random MAC", "Delete SSID"],
+        )
+
     def test_primary_dialogs_render_in_both_languages(self):
         record = appmod.WifiRecord("test1", "2g", 1, "password12", "proxy", 1080)
         for language, palette, expected in (

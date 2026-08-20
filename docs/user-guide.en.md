@@ -31,8 +31,9 @@ it reports degraded/down or says the route does not use `wwan`.
 - Add or edit an SSID, band, Wi-Fi password, SOCKS endpoint, isolation, WebRTC,
   and the **spoofed MAC vendor** (dropdown of common Wi-Fi brands; the first 3
   MAC bytes match the vendor, the rest are randomized).
-- Select an SSID and use its edit panel for configuration, SOCKS changes,
-  provider-based MAC randomization, or deletion.
+- Right-click an SSID row for Edit, Change SOCKS, Random MAC, or Delete. A
+  right-click first selects that row, so the action always targets the item
+  under the pointer. The fixed edit panel keeps only Edit and Delete.
 - Full Apply always dry-runs the candidate first, then backs up, saves, and
   reloads Wi-Fi only when validation passes.
 - Load the active router configuration before editing from another computer.

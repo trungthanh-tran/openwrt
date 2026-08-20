@@ -25,12 +25,12 @@
 - Khung Internet Gateway hiển thị route thực tế, `wwan`/device, next-hop, IP
   nguồn, link, DNS và HTTP latency; cảnh báo nếu đường ra không qua `wwan`.
 - Hiển thị cả thiết bị trong blocklist khi đang offline để có thể bỏ cấm.
-- Các thao tác cần chọn mục chỉ nằm trong khung chỉnh sửa sát bảng; toolbar chỉ
-  chứa thao tác toàn cục.
+- Nhấp chuột phải lên một dòng SSID để sửa, đổi SOCKS, random MAC hoặc xoá.
+  Khung chỉnh sửa cố định chỉ giữ Sửa và Xoá; toolbar chỉ chứa thao tác toàn cục.
 - Tác vụ quan trọng luôn hiện cảnh báo ảnh hưởng và mặc định chọn **Không**;
   chỉ thực thi sau khi người dùng xác nhận rõ ràng.
-- Chọn hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, v.v.) rồi bấm
-  **Random MAC** cho từng SSID; provider và BSSID mới được lưu lại.
+- Nhấp chuột phải lên SSID, chọn **Random MAC**, rồi chọn hãng router/OUI
+  (TP-Link, Netgear, ASUS, Xiaomi, Huawei, v.v.); provider và BSSID mới được lưu lại.
 - Xem backup, rollback, health và log thao tác.
 - Lưu URL router và token bằng Windows DPAPI cho đúng tài khoản Windows hiện tại.
 

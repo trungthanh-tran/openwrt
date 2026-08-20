@@ -25,12 +25,14 @@ at `console/web/control-panel.html` remains a separate application.
 - Internet Gateway card with the actual route, `wwan`/device, next hop, source
   IP, link, DNS, and HTTP latency; warns when egress bypasses `wwan`.
 - Keep offline blocklist entries visible so they can be unblocked.
-- Selection-dependent actions live in the edit panel beside their table;
-  toolbars contain only global actions.
+- Right-click an SSID row for its item actions: edit, change SOCKS, randomize
+  MAC, or delete. The fixed edit panel keeps only Edit and Delete; toolbars
+  contain only global actions.
 - Important actions show their impact first and default to **No**; they run
   only after explicit confirmation.
-- Select a router provider/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, etc.)
-  and click **Random MAC**; the provider and new BSSID are persisted.
+- Right-click an SSID, choose **Random MAC**, then select a router provider/OUI
+  (TP-Link, Netgear, ASUS, Xiaomi, Huawei, etc.); the provider and new BSSID are
+  persisted.
 - Inspect backups, roll back, run health checks, and view operation logs.
 - Protect the router URL and token with Windows DPAPI for the current user.
 

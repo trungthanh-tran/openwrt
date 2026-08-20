@@ -1574,7 +1574,30 @@ class NativeApp:
         self.wifi_tree.tag_configure("warning", foreground=self.palette["warn_text"])
         self.wifi_tree.tag_configure("error", foreground=self.palette["bad_text"])
         self.wifi_tree.bind("<Double-1>", lambda _event: self.edit_wifi())
+        self.wifi_tree.bind("<Button-3>", self.show_wifi_context_menu)
         self.wifi_tree.bind("<<TreeviewSelect>>", self.update_wifi_editor)
+
+        self.wifi_context_menu = tk.Menu(
+            self.root,
+            tearoff=False,
+            background=self.palette["card"],
+            foreground=self.palette["text"],
+            activebackground=self.palette["primary"],
+            activeforeground=self.palette["selection_text"],
+            relief="flat",
+            borderwidth=1,
+        )
+        self.wifi_context_entries = {}
+        for key, text, command in (
+            ("edit", "Sửa cấu hình", self.edit_wifi),
+            ("sock", "Đổi SOCKS", self.quick_sock),
+            ("mac", "Random MAC", self.rotate_wifi_mac),
+        ):
+            self.wifi_context_menu.add_command(label=self.t(text), command=command)
+            self.wifi_context_entries[key] = self.wifi_context_menu.index("end")
+        self.wifi_context_menu.add_separator()
+        self.wifi_context_menu.add_command(label=self.t("Xoá SSID"), command=self.delete_wifi)
+        self.wifi_context_entries["delete"] = self.wifi_context_menu.index("end")
 
         editor = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         editor.pack(fill="x", pady=(8, 0))
@@ -1582,8 +1605,6 @@ class NativeApp:
         ttk.Label(editor, textvariable=self.wifi_selection_var, style="Toolbar.TLabel").pack(side="left", fill="x", expand=True)
         for key, text, command, button_style in (
             ("edit", "Sửa cấu hình", self.edit_wifi, "TButton"),
-            ("sock", "Đổi SOCKS", self.quick_sock, "Primary.TButton"),
-            ("mac", "Random MAC", self.rotate_wifi_mac, "Warning.TButton"),
             ("delete", "Xoá SSID", self.delete_wifi, "Danger.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
@@ -1948,14 +1969,33 @@ class NativeApp:
         selected = self.wifi_tree.selection()
         if not selected:
             return None
-        idx = int(selected[0])
+        try:
+            idx = int(selected[0])
+        except (TypeError, ValueError):
+            return None
         return next((item for item in self.records if item.idx == idx), None)
+
+    def show_wifi_context_menu(self, event):
+        """Select the row under the pointer and open its item action menu."""
+        row = self.wifi_tree.identify_row(event.y)
+        if not row:
+            return None
+        self.wifi_tree.selection_set(row)
+        self.wifi_tree.focus(row)
+        self.update_wifi_editor()
+        try:
+            self.wifi_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.wifi_context_menu.grab_release()
+        return "break"
 
     def update_wifi_editor(self, _event=None):
         record = self.selected_wifi()
         state = "normal" if record else "disabled"
         for button in self.wifi_edit_buttons.values():
             button.configure(state=state)
+        for entry in getattr(self, "wifi_context_entries", {}).values():
+            self.wifi_context_menu.entryconfigure(entry, state=state)
         if record:
             self.wifi_selection_var.set(f"{record.name} · IDX {record.idx} · {record.band}")
         else:

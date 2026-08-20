@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
@@ -67,9 +68,11 @@ class FakeRoot:
 
 
 class FakeTree:
-    def __init__(self, selection=(), children=()):
+    def __init__(self, selection=(), children=(), row_at_y=""):
         self.selected = tuple(selection)
         self.children = tuple(children)
+        self.row_at_y = row_at_y
+        self.focused = None
 
     def selection(self):
         return self.selected
@@ -79,6 +82,28 @@ class FakeTree:
 
     def get_children(self):
         return self.children
+
+    def identify_row(self, _y):
+        return self.row_at_y
+
+    def focus(self, value):
+        self.focused = value
+
+
+class FakeMenu:
+    def __init__(self):
+        self.entries = {}
+        self.popup = None
+        self.released = False
+
+    def entryconfigure(self, entry, **options):
+        self.entries[entry] = options
+
+    def tk_popup(self, x, y):
+        self.popup = (x, y)
+
+    def grab_release(self):
+        self.released = True
 
 
 class FakeListbox:
@@ -207,6 +232,57 @@ class ConnectionWorkflowTests(unittest.TestCase):
         self.assertIsNone(instance.selected_wifi())
         instance.wifi_tree = FakeTree(("1",))
         self.assertIs(instance.selected_wifi(), instance.records[0])
+
+    def test_selected_wifi_tolerates_dirty_tree_id(self):
+        instance = bare_app()
+        instance.records = [record(1)]
+        instance.wifi_tree = FakeTree(("not-an-idx",))
+        self.assertIsNone(instance.selected_wifi())
+
+    def test_wifi_context_menu_selects_clicked_row_before_popup(self):
+        instance = bare_app()
+        instance.records = [record(1), record(2)]
+        instance.wifi_tree = FakeTree(("1",), row_at_y="2")
+        instance.wifi_context_menu = FakeMenu()
+        instance.update_wifi_editor = mock.Mock()
+        event = SimpleNamespace(y=20, x_root=140, y_root=260)
+
+        self.assertEqual(instance.show_wifi_context_menu(event), "break")
+        self.assertEqual(instance.wifi_tree.selection(), ("2",))
+        self.assertEqual(instance.wifi_tree.focused, "2")
+        self.assertEqual(instance.wifi_context_menu.popup, (140, 260))
+        self.assertTrue(instance.wifi_context_menu.released)
+        instance.update_wifi_editor.assert_called_once_with()
+
+    def test_wifi_context_menu_ignores_blank_table_area(self):
+        instance = bare_app()
+        instance.wifi_tree = FakeTree(("1",), row_at_y="")
+        instance.wifi_context_menu = FakeMenu()
+        instance.update_wifi_editor = mock.Mock()
+
+        self.assertIsNone(instance.show_wifi_context_menu(SimpleNamespace(y=50, x_root=1, y_root=2)))
+        self.assertEqual(instance.wifi_tree.selection(), ("1",))
+        self.assertIsNone(instance.wifi_context_menu.popup)
+        instance.update_wifi_editor.assert_not_called()
+
+    def test_wifi_editor_updates_buttons_and_context_entries(self):
+        instance = bare_app()
+        instance.records = [record(1)]
+        instance.wifi_edit_buttons = {"edit": FakeButton(), "delete": FakeButton()}
+        instance.wifi_context_menu = FakeMenu()
+        instance.wifi_context_entries = {"edit": 0, "sock": 1, "mac": 2, "delete": 4}
+        instance.wifi_selection_var = FakeVar()
+        instance.wifi_tree = FakeTree()
+
+        instance.update_wifi_editor()
+        self.assertTrue(all(button.options["state"] == "disabled" for button in instance.wifi_edit_buttons.values()))
+        self.assertTrue(all(options["state"] == "disabled" for options in instance.wifi_context_menu.entries.values()))
+
+        instance.wifi_tree.selection_set("1")
+        instance.update_wifi_editor()
+        self.assertTrue(all(button.options["state"] == "normal" for button in instance.wifi_edit_buttons.values()))
+        self.assertTrue(all(options["state"] == "normal" for options in instance.wifi_context_menu.entries.values()))
+        self.assertIn("test1", instance.wifi_selection_var.get())
 
 
 class GatewayWorkflowTests(unittest.TestCase):
