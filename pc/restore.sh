@@ -28,20 +28,20 @@ while [ $# -gt 0 ]; do
     --list)    LIST=1; shift ;;
     --yes)     YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    -*) die "Tham số lạ: $1 — xem: pc/restore.sh --help" ;;
-    *)  [ -z "$BACKUP" ] || die "Chỉ nhận 1 bản backup (đã có: $BACKUP, thừa: $1)"
+    -*) die "Unknown argument: $1 — see: pc/restore.sh --help" ;;
+    *)  [ -z "$BACKUP" ] || die "Only one backup is accepted (existing: $BACKUP, extra: $1)"
         BACKUP="$1"; shift ;;
   esac
 done
 sbpc_init
 
 if [ "$LIST" = "1" ]; then
-  echo "Backup local trong $LOCAL_BACKUP_DIR:"
+  echo "Local backups in $LOCAL_BACKUP_DIR:"
   FILES="$(ls -1t "$LOCAL_BACKUP_DIR"/*.tar.gz 2>/dev/null || true)"
   if [ -n "$FILES" ]; then
     echo "$FILES" | while read -r f; do printf '  %s\n' "$(basename "$f" .tar.gz)"; done
   else
-    echo "  (chưa có — chạy pc/backup.sh trước)"
+    echo "  (none — run pc/backup.sh first)"
   fi
   exit 0
 fi
@@ -49,29 +49,29 @@ fi
 # Resolve the requested snapshot.
 if [ -z "$BACKUP" ]; then
   FILE="$(ls -1t "$LOCAL_BACKUP_DIR"/*.tar.gz 2>/dev/null | head -n 1)"
-  [ -n "$FILE" ] || die "Chưa có backup nào trong $LOCAL_BACKUP_DIR. Chạy pc/backup.sh trước."
+  [ -n "$FILE" ] || die "No backups found in $LOCAL_BACKUP_DIR. Run pc/backup.sh first."
 elif [ -f "$BACKUP" ]; then
   FILE="$BACKUP"
 elif [ -f "$LOCAL_BACKUP_DIR/$BACKUP.tar.gz" ]; then
   FILE="$LOCAL_BACKUP_DIR/$BACKUP.tar.gz"
 else
-  die "Không tìm thấy: $BACKUP. Xem danh sách: pc/restore.sh --list"
+  die "Not found: $BACKUP. List backups with: pc/restore.sh --list"
 fi
 NAME="$(basename "$FILE" .tar.gz)"
 
-warn "Sẽ GHI ĐÈ cấu hình trên router $ROUTER_HOST bằng bản: $NAME"
+warn "This will OVERWRITE the configuration on router $ROUTER_HOST with: $NAME"
 if [ "$YES" != "1" ]; then
-  printf "Tiếp tục? [y/N] "
-  read -r ans; case "$ans" in y|Y) : ;; *) die "Đã huỷ." ;; esac
+  printf "Continue? [y/N] "
+  read -r ans; case "$ans" in y|Y) : ;; *) die "Cancelled." ;; esac
 fi
 
 # 1) Upload and extract into the router backup directory.
-log "Đẩy $NAME lên router..."
+log "Uploading $NAME to the router..."
 rssh "cat > /tmp/sb-restore.tar.gz" < "$FILE"
 rssh "mkdir -p '$REMOTE_BACKUP_DIR' && tar xzf /tmp/sb-restore.tar.gz -C '$REMOTE_BACKUP_DIR' && rm -f /tmp/sb-restore.tar.gz"
 
 # 2) Run project rollback and reload affected services.
-log "Chạy rollback trên router..."
+log "Running rollback on the router..."
 rssht "SB_YES=1 sh '$REMOTE_DIR/scripts/rollback.sh' '$NAME'"
 
-log "KHÔI PHỤC XONG. Kiểm tra lại mạng/WiFi. Nếu mất kết nối SSH, xem docs/ROLLBACK.md."
+log "RESTORE COMPLETE. Check network/Wi-Fi connectivity. If SSH connectivity is lost, see docs/ROLLBACK.md."

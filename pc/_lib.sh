@@ -28,8 +28,8 @@ PC_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$PC_DIR/.." && pwd)"
 
 log() { printf '\033[1;32m[pc]\033[0m %s\n' "$*"; }
-warn(){ printf '\033[1;33m[pc][CẢNH BÁO]\033[0m %s\n' "$*" >&2; }
-die() { printf '\033[1;31m[pc][LỖI]\033[0m %s\n' "$*" >&2; exit 1; }
+warn(){ printf '\033[1;33m[pc][WARNING]\033[0m %s\n' "$*" >&2; }
+die() { printf '\033[1;31m[pc][ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
 # Recognize one shared option and set SBPC_CONSUMED to 2 or 0.
 sbpc_try_common() {
@@ -45,7 +45,7 @@ sbpc_try_common() {
     --local-dir)  CLI_LOCAL_BACKUP_DIR="$2" ;;
     *) SBPC_CONSUMED=0; return 0 ;;
   esac
-  [ -n "$2" ] || die "Thiếu giá trị cho $1"
+  [ -n "$2" ] || die "Missing value for $1"
 }
 
 # Load optional config, apply CLI overrides and defaults, then build SSH options.
@@ -55,7 +55,7 @@ sbpc_init() {
   if [ -f "$CONF_FILE" ]; then
     . "$CONF_FILE"
   elif [ -n "$CLI_CONF" ]; then
-    die "Không thấy file config: $CLI_CONF"
+    die "Config file not found: $CLI_CONF"
   fi
 
   # CLI values override file values.
@@ -68,7 +68,7 @@ sbpc_init() {
   if [ -n "${CLI_LOCAL_BACKUP_DIR:-}" ];  then LOCAL_BACKUP_DIR="$CLI_LOCAL_BACKUP_DIR"; fi
 
   # Required values and defaults.
-  [ -n "${ROUTER_HOST:-}" ] || die "Chưa biết địa chỉ router. Truyền --host <IP> hoặc tạo $PC_DIR/sbproxy-pc.conf (copy từ sbproxy-pc.conf.example)."
+  [ -n "${ROUTER_HOST:-}" ] || die "Router address is unknown. Pass --host <IP> or create $PC_DIR/sbproxy-pc.conf (copy from sbproxy-pc.conf.example)."
   ROUTER_USER="${ROUTER_USER:-root}"
   ROUTER_PORT="${ROUTER_PORT:-22}"
   REMOTE_DIR="${REMOTE_DIR:-/root/sbproxy}"
@@ -79,7 +79,7 @@ sbpc_init() {
   TARGET="$ROUTER_USER@$ROUTER_HOST"
   SSH_OPTS="-p $ROUTER_PORT -o ConnectTimeout=10"
   if [ -n "$SSH_KEY" ]; then
-    [ -f "$SSH_KEY" ] || die "Không thấy SSH key: $SSH_KEY"
+    [ -f "$SSH_KEY" ] || die "SSH key not found: $SSH_KEY"
     SSH_OPTS="$SSH_OPTS -i $SSH_KEY"
   fi
 }

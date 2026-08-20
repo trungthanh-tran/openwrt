@@ -11,33 +11,33 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 require_root
 
 if [ "$1" = "--list" ]; then
-  echo "Backup có sẵn trong $BACKUP_DIR:"
+  echo "Available backups in $BACKUP_DIR:"
   # shellcheck disable=SC2010  # BusyBox-compatible mtime ordering over generated names.
-  ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | sed "s#$BACKUP_DIR/##;s#/\$##" || echo "  (chưa có)"
+  ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | sed "s#$BACKUP_DIR/##;s#/\$##" || echo "  (none)"
   echo "'latest' -> $(readlink -f "$BACKUP_DIR/latest" 2>/dev/null || echo none)"
   exit 0
 fi
 
 if [ -n "$1" ]; then
-  case "$1" in *[!A-Za-z0-9._-]*|*..*) die "Tên backup không hợp lệ: $1" ;; esac
+  case "$1" in *[!A-Za-z0-9._-]*|*..*) die "Invalid backup name: $1" ;; esac
   SRC="$BACKUP_DIR/$1"
 else SRC="$(readlink -f "$BACKUP_DIR/latest" 2>/dev/null)"; fi
-[ -n "$SRC" ] && [ -d "$SRC" ] || die "Không tìm thấy backup: ${1:-latest}. Xem: rollback.sh --list"
+[ -n "$SRC" ] && [ -d "$SRC" ] || die "Backup not found: ${1:-latest}. See: rollback.sh --list"
 
-log "Rollback từ: $SRC"
+log "Rolling back from: $SRC"
 # SB_YES=1 skips confirmation for non-interactive agent/CGI calls.
 if [ "$SB_YES" != "1" ]; then
-  printf "Việc này GHI ĐÈ /etc/config, /etc/sing-box, %s. Tiếp tục? [y/N] " "$NFT_FILE"
-  read -r ans; case "$ans" in y|Y) : ;; *) die "Đã huỷ."; esac
+  printf "This will OVERWRITE /etc/config, /etc/sing-box, and %s. Continue? [y/N] " "$NFT_FILE"
+  read -r ans; case "$ans" in y|Y) : ;; *) die "Cancelled."; esac
 fi
 
 # 1) Restore configuration files.
-[ -f "$SRC/etc-config.tar.gz" ] && tar xzf "$SRC/etc-config.tar.gz" -C / && log "Đã phục hồi /etc/config + /etc/sing-box"
-[ -f "$SRC/sbproxy.nft" ] && cp "$SRC/sbproxy.nft" "$NFT_FILE" && log "Đã phục hồi $NFT_FILE"
-[ -f "$SRC/wifi-socks.conf" ] && cp "$SRC/wifi-socks.conf" "$CONF" && log "Đã phục hồi wifi-socks.conf"
+[ -f "$SRC/etc-config.tar.gz" ] && tar xzf "$SRC/etc-config.tar.gz" -C / && log "Restored /etc/config and /etc/sing-box"
+[ -f "$SRC/sbproxy.nft" ] && cp "$SRC/sbproxy.nft" "$NFT_FILE" && log "Restored $NFT_FILE"
+[ -f "$SRC/wifi-socks.conf" ] && cp "$SRC/wifi-socks.conf" "$CONF" && log "Restored wifi-socks.conf"
 
 # 2) Reload all affected services.
-log "Reload dịch vụ..."
+log "Reloading services..."
 uci commit 2>/dev/null || true
 /etc/init.d/network reload  || true
 /etc/init.d/dnsmasq restart || true
@@ -46,6 +46,6 @@ uci commit 2>/dev/null || true
 /etc/init.d/sing-box restart 2>/dev/null || true
 wifi reload || true
 
-log "ROLLBACK XONG. Kiểm tra lại mạng."
-log "Nếu vẫn hỏng nặng: dùng bản sysupgrade ($SRC/sysupgrade-backup.tar.gz) qua LuCI"
-log "  System > Backup/Flash > Restore, hoặc: sysupgrade -r $SRC/sysupgrade-backup.tar.gz && reboot"
+log "ROLLBACK COMPLETE. Check network connectivity."
+log "If serious problems remain, restore the sysupgrade backup ($SRC/sysupgrade-backup.tar.gz) through LuCI"
+log "  System > Backup/Flash > Restore, or: sysupgrade -r $SRC/sysupgrade-backup.tar.gz && reboot"

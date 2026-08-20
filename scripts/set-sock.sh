@@ -4,7 +4,7 @@
 #
 # Usage:
 #   scripts/set-sock.sh <idx> <sock_host> <sock_port> [user] [pass]
-# VD:
+# Example:
 #   scripts/set-sock.sh 2 5.6.7.8 1080 myuser mypass
 #   scripts/set-sock.sh 3 9.9.9.9 1080            # no authentication
 set -e
@@ -14,18 +14,18 @@ require_root
 require_conf
 
 IDX="$1"; HOST="$2"; PORT="$3"; USER="${4:-}"; PASS="${5:-}"
-[ -n "$IDX" ] && [ -n "$HOST" ] && [ -n "$PORT" ] || die "Cú pháp: set-sock.sh <idx> <host> <port> [user] [pass]"
-case "$IDX" in *[!0-9]*|'') die "idx phải là số nguyên dương" ;; esac
-case "$PORT" in *[!0-9]*|'') die "port phải là số từ 1 đến 65535" ;; esac
-[ "$IDX" -ge 1 ] && [ "$IDX" -le 200 ] || die "idx ngoài phạm vi 1..200"
-[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "port ngoài phạm vi 1..65535"
-case "$HOST" in *[!A-Za-z0-9._:-]*) die "host chứa ký tự không hợp lệ" ;; esac
-case "$USER$PASS" in *'|'*) die "user/pass không được chứa ký tự |" ;; esac
+[ -n "$IDX" ] && [ -n "$HOST" ] && [ -n "$PORT" ] || die "Usage: set-sock.sh <idx> <host> <port> [user] [pass]"
+case "$IDX" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
+case "$PORT" in *[!0-9]*|'') die "port must be an integer from 1 to 65535" ;; esac
+[ "$IDX" -ge 1 ] && [ "$IDX" -le 200 ] || die "idx is outside the 1..200 range"
+[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "port is outside the 1..65535 range"
+case "$HOST" in *[!A-Za-z0-9._:-]*) die "host contains invalid characters" ;; esac
+case "$USER$PASS" in *'|'*) die "user/pass must not contain the | character" ;; esac
 
 # Ensure the requested index exists.
-grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*${IDX}[[:space:]]*\|" "$CONF" || die "Không tìm thấy WiFi idx=$IDX trong $CONF"
+grep -qE "^[^#][^|]*\|[^|]*\|[[:space:]]*${IDX}[[:space:]]*\|" "$CONF" || die "Wi-Fi idx=$IDX was not found in $CONF"
 
-log "Backup config trước khi đổi SOCKS..."
+log "Backing up the configuration before changing SOCKS..."
 "$SB_ROOT/scripts/backup.sh" pre-setsock
 
 # Rewrite the matching row while preserving Wi-Fi and isolation fields.
@@ -39,12 +39,12 @@ awk -F'|' -v OFS='|' -v idx="$IDX" -v h="$HOST" -v p="$PORT" -v u="$USER" -v pw=
 mv "$TMP" "$CONF"
 validate_conf
 
-log "Sinh lại sing-box + nftables (cập nhật bypass sock IP)..."
+log "Regenerating sing-box and nftables configuration (updating SOCKS IP bypass)..."
 build_singbox
 build_nft
 
-log "Reload sing-box + tproxy (WiFi KHÔNG bị ngắt)..."
+log "Reloading sing-box and tproxy (Wi-Fi will NOT be interrupted)..."
 run "/etc/init.d/sbproxy restart"
 run "/etc/init.d/sing-box restart"
 
-log "Đã đổi SOCKS cho WiFi idx=$IDX -> $HOST:$PORT"
+log "Changed SOCKS for Wi-Fi idx=$IDX -> $HOST:$PORT"

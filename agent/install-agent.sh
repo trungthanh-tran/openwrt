@@ -6,9 +6,9 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 AGENT="$SB_ROOT/agent"
 
 log() { printf '[agent] %s\n' "$*"; }
-[ "$(id -u)" = "0" ] || { echo "Cần root."; exit 1; }
+[ "$(id -u)" = "0" ] || { echo "Root privileges are required."; exit 1; }
 
-log "1) Cài gói: curl jq (uhttpd thường đã có)"
+log "1) Installing packages: curl jq (uhttpd is usually preinstalled)"
 if command -v apk >/dev/null 2>&1; then
   pkg_update() { apk update >/dev/null 2>&1 || true; }; pkg_has() { apk list -I "$1" 2>/dev/null | grep -q "^$1-"; }; pkg_add() { apk add "$1"; }
 else
@@ -16,9 +16,9 @@ else
 fi
 pkg_update
 for p in curl jq; do
-  pkg_has "$p" || pkg_add "$p" || echo "  cảnh báo: chưa cài được $p"
+  pkg_has "$p" || pkg_add "$p" || echo "  warning: could not install $p"
 done
-[ -f /etc/init.d/uhttpd ] || echo "  cảnh báo: chưa thấy uhttpd — cài package uhttpd"
+[ -f /etc/init.d/uhttpd ] || echo "  warning: uhttpd was not found — install the uhttpd package"
 
 log "2) env agent -> /etc/sbproxy/env"
 mkdir -p /etc/sbproxy
@@ -35,7 +35,7 @@ GATEWAY_PROBE_URL=https://www.gstatic.com/generate_204
 GATEWAY_PROBE_TIMEOUT=8
 EOF
 
-log "3) Token xác thực -> /etc/sbproxy/token"
+log "3) Authentication token -> /etc/sbproxy/token"
 if [ ! -s /etc/sbproxy/token ]; then
   head -c 18 /dev/urandom | hexdump -v -e '/1 "%02x"' > /etc/sbproxy/token
   echo >> /etc/sbproxy/token
@@ -72,17 +72,17 @@ IP="$(uci -q get network.lan.ipaddr || echo 192.168.8.1)"
 cat <<EOF
 
 ============================================================
- AGENT ĐÃ CÀI XONG.
- UI (mở TỪ ROUTER, http để tránh mixed-content):
+ AGENT INSTALLATION COMPLETE.
+ UI (open FROM THE ROUTER using http to avoid mixed content):
      http://$IP/sbproxy/
  API:
      http://$IP/cgi-bin/sbproxy?action=status
- TOKEN (dán vào ô "Kết nối router" trên UI):
+ TOKEN (paste into the "Connect router" field in the UI):
      $TOKEN
 ------------------------------------------------------------
- BẢO MẬT:
-  - Chỉ mở trên LAN/VLAN quản trị. KHÔNG expose ra WAN.
-  - Giữ token bí mật. Đổi token: xoá /etc/sbproxy/token rồi chạy lại.
-  - Kiểm tra: curl -H "Authorization: Bearer \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
+ SECURITY:
+  - Only expose this on the management LAN/VLAN. DO NOT expose it to the WAN.
+  - Keep the token secret. To rotate it, delete /etc/sbproxy/token and run this script again.
+  - Test: curl -H "Authorization: Bearer \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
 ============================================================
 EOF

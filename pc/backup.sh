@@ -12,7 +12,7 @@
 #
 # Examples:
 #   pc/backup.sh                          # label `pc`, read pc/sbproxy-pc.conf
-#   pc/backup.sh truoc-nang-cap
+#   pc/backup.sh pre-upgrade
 #   pc/backup.sh --host 192.168.8.1 --local-dir ~/router-backups
 set -e
 . "$(dirname "$0")/_lib.sh"
@@ -25,30 +25,30 @@ while [ $# -gt 0 ]; do
   if [ "$SBPC_CONSUMED" -gt 0 ]; then shift "$SBPC_CONSUMED"; continue; fi
   case "$1" in
     -h|--help) usage; exit 0 ;;
-    -*) die "Tham số lạ: $1 — xem: pc/backup.sh --help" ;;
-    *)  [ -z "$LABEL" ] || die "Chỉ nhận 1 nhãn (đã có: $LABEL, thừa: $1)"
+    -*) die "Unknown argument: $1 — see: pc/backup.sh --help" ;;
+    *)  [ -z "$LABEL" ] || die "Only one label is accepted (existing: $LABEL, extra: $1)"
         LABEL="$1"; shift ;;
   esac
 done
 sbpc_init
 
 LABEL="${LABEL:-pc}"
-case "$LABEL" in *[!a-zA-Z0-9._-]*) die "Nhãn chỉ gồm chữ/số/._- (không khoảng trắng): $LABEL" ;; esac
+case "$LABEL" in *[!a-zA-Z0-9._-]*) die "Label may only contain letters, numbers, dots, underscores, and hyphens (no spaces): $LABEL" ;; esac
 
 # 1) Create a router snapshot with scripts/backup.sh.
-log "Tạo backup trên router (nhãn: $LABEL)..."
+log "Creating router backup (label: $LABEL)..."
 rssh "sh '$REMOTE_DIR/scripts/backup.sh' '$LABEL'"
 
 # 2) Resolve the newly created snapshot through `latest`.
 NAME="$(rssh "basename \$(readlink -f '$REMOTE_BACKUP_DIR/latest')")"
-[ -n "$NAME" ] && [ "$NAME" != "latest" ] || die "Không xác định được bản backup vừa tạo trên router."
+[ -n "$NAME" ] && [ "$NAME" != "latest" ] || die "Could not identify the backup just created on the router."
 
 # 3) Download via tar over SSH for Dropbear compatibility.
 mkdir -p "$LOCAL_BACKUP_DIR"
 OUT="$LOCAL_BACKUP_DIR/$NAME.tar.gz"
-log "Kéo về: $OUT ..."
+log "Downloading to: $OUT ..."
 rssh "tar czf - -C '$REMOTE_BACKUP_DIR' '$NAME'" > "$OUT"
-[ -s "$OUT" ] || { rm -f "$OUT"; die "File kéo về rỗng — kiểm tra kết nối/đường dẫn."; }
+[ -s "$OUT" ] || { rm -f "$OUT"; die "Downloaded file is empty — check the connection and path."; }
 
-log "Backup xong: $OUT"
-log "Danh sách bản local: pc/restore.sh --list"
+log "Backup complete: $OUT"
+log "List local backups: pc/restore.sh --list"

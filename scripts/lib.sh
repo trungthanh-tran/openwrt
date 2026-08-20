@@ -21,51 +21,51 @@ run() {
   else eval "$@"; fi
 }
 
-require_root() { [ "$(id -u)" = "0" ] || die "Cần chạy bằng root."; }
-require_conf() { [ -f "$CONF" ] || die "Thiếu config: $CONF (copy từ config/wifi-socks.conf.example)"; }
+require_root() { [ "$(id -u)" = "0" ] || die "This command must be run as root."; }
+require_conf() { [ -f "$CONF" ] || die "Missing configuration: $CONF (copy from config/wifi-socks.conf.example)"; }
 
 validate_platform() {
   board="$(ubus call system board 2>/dev/null | jsonfilter -e '@.board_name' 2>/dev/null || true)"
   model="$(cat /proc/device-tree/model 2>/dev/null | tr -d '\000' || true)"
   case "$board:$model" in
     glinet,gl-mt6000:*|*:*GL-MT6000*) : ;;
-    *) die "Thiết bị chưa được hỗ trợ: board=${board:-?}, model=${model:-?} (cần GL-MT6000)." ;;
+    *) die "Unsupported device: board=${board:-?}, model=${model:-?} (GL-MT6000 required)." ;;
   esac
-  [ -z "$(cat /etc/glversion 2>/dev/null)" ] || warn "Đang chạy firmware GL.iNet OEM; hỗ trợ experimental, cần test riêng."
+  [ -z "$(cat /etc/glversion 2>/dev/null)" ] || warn "GL.iNet OEM firmware detected; support is experimental and requires separate testing."
 }
 
 validate_settings() {
   case "${WIFI_COUNTRY:-}" in
     [A-Z][A-Z]) : ;;
-    *) die "WIFI_COUNTRY phải là mã quốc gia 2 chữ in hoa trong config/settings.sh (ví dụ VN)." ;;
+    *) die "WIFI_COUNTRY must be a two-letter uppercase country code in config/settings.sh (for example, VN)." ;;
   esac
-  [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 chỉ hỗ trợ IPV6_MODE=disable."
+  [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 only supports IPV6_MODE=disable."
 }
 
 validate_conf() {
   awk -F'|' -v net_base="${NET_BASE:-10}" -v port_base="${TPROXY_PORT_BASE:-12000}" '
     function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
     /^#/ || /^[[:space:]]*$/ { next }
-    NF != 10 && NF != 11 { printf "dòng %d: cần 10 hoặc 11 cột, hiện có %d\n", NR, NF; bad=1; next }
+    NF != 10 && NF != 11 { printf "line %d: expected 10 or 11 columns, found %d\n", NR, NF; bad=1; next }
     {
       idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10); host=trim($5)
       oui=(NF==11)?trim($11):""
-      if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "dòng %d: mac_oui phải dạng AA:BB:CC hoặc để trống\n", NR; bad=1 }
-      if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "dòng %d: idx không hợp lệ\n", NR; bad=1 }
-      if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx > 254 || port_base + idx > 65535)) { printf "dòng %d: idx làm subnet/cổng vượt phạm vi\n", NR; bad=1 }
-      if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "dòng %d: port không hợp lệ\n", NR; bad=1 }
-      if (band != "2g" && band != "5g") { printf "dòng %d: band phải là 2g hoặc 5g\n", NR; bad=1 }
-      if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "dòng %d: isolate/webrtc phải là 0 hoặc 1\n", NR; bad=1 }
-      if (length($1) < 1 || length($1) > 32) { printf "dòng %d: SSID phải dài 1..32 byte UTF-8\n", NR; bad=1 }
-      if (length($4) < 8 || length($4) > 63) { printf "dòng %d: mật khẩu WiFi phải dài 8..63 byte UTF-8\n", NR; bad=1 }
-      if (host == "") { printf "dòng %d: sock_host bị trống\n", NR; bad=1 }
-      else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "dòng %d: sock_host không hợp lệ\n", NR; bad=1 }
-      if (length($7) > 255 || length($8) > 255) { printf "dòng %d: SOCKS user/pass tối đa 255 byte\n", NR; bad=1 }
-      if ($1 ~ /[[:cntrl:]|]/ || $4 ~ /[[:cntrl:]|]/ || $5 ~ /[[:cntrl:]|]/ || $7 ~ /[[:cntrl:]|]/ || $8 ~ /[[:cntrl:]|]/) { printf "dòng %d: field chứa ký tự cấm hoặc điều khiển\n", NR; bad=1 }
-      seen[idx]++; if (seen[idx] > 1) { printf "dòng %d: idx %s bị trùng\n", NR, idx; bad=1 }
+      if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "line %d: mac_oui must use the AA:BB:CC format or be empty\n", NR; bad=1 }
+      if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
+      if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx > 254 || port_base + idx > 65535)) { printf "line %d: idx makes the subnet/port exceed its valid range\n", NR; bad=1 }
+      if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "line %d: invalid port\n", NR; bad=1 }
+      if (band != "2g" && band != "5g") { printf "line %d: band must be 2g or 5g\n", NR; bad=1 }
+      if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "line %d: isolate/webrtc must be 0 or 1\n", NR; bad=1 }
+      if (length($1) < 1 || length($1) > 32) { printf "line %d: SSID must be 1..32 UTF-8 bytes long\n", NR; bad=1 }
+      if (length($4) < 8 || length($4) > 63) { printf "line %d: Wi-Fi password must be 8..63 UTF-8 bytes long\n", NR; bad=1 }
+      if (host == "") { printf "line %d: sock_host is empty\n", NR; bad=1 }
+      else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "line %d: invalid sock_host\n", NR; bad=1 }
+      if (length($7) > 255 || length($8) > 255) { printf "line %d: SOCKS user/pass may be at most 255 bytes\n", NR; bad=1 }
+      if ($1 ~ /[[:cntrl:]|]/ || $4 ~ /[[:cntrl:]|]/ || $5 ~ /[[:cntrl:]|]/ || $7 ~ /[[:cntrl:]|]/ || $8 ~ /[[:cntrl:]|]/) { printf "line %d: field contains a forbidden or control character\n", NR; bad=1 }
+      seen[idx]++; if (seen[idx] > 1) { printf "line %d: duplicate idx %s\n", NR, idx; bad=1 }
     }
     END { exit bad ? 1 : 0 }
-  ' "$CONF" || die "wifi-socks.conf không hợp lệ."
+  ' "$CONF" || die "wifi-socks.conf is invalid."
 }
 
 # --- Client / device management helpers ------------------------------------
@@ -114,7 +114,7 @@ band_of_idx() {
 # --- Values derived from the Wi-Fi index -----------------------------------
 net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
-radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "band không hợp lệ: $1";; esac; }
+radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "invalid band: $1";; esac; }
 
 # Generate a random MAC.
 #   gen_mac              -> locally administered, unicast, first octet 02.
@@ -128,7 +128,7 @@ random_octets() {
   elif command -v od >/dev/null 2>&1; then
     od -An -tu1 -N "$count" /dev/urandom
   else
-    die "Thiếu hexdump/od để tạo MAC ngẫu nhiên"
+    die "hexdump/od is required to generate a random MAC address"
   fi
 }
 
@@ -154,7 +154,7 @@ for_each_ssid() {
   _cb="$1"
   while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui; do
     case "$name" in ''|\#*) continue;; esac
-    [ -n "$idx" ] || { warn "Bỏ dòng thiếu idx: $name"; continue; }
+    [ -n "$idx" ] || { warn "Skipping row with missing idx: $name"; continue; }
     "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui"
   done < "$CONF"
 }
@@ -163,16 +163,16 @@ for_each_ssid() {
 check_unique_idx() {
   dup=$(awk -F'|' '!/^#/ && NF>=3 {gsub(/ /,"",$3); if($3!="") print $3}' "$CONF" \
         | sort | uniq -d)
-  [ -z "$dup" ] || die "idx bị trùng trong config: $dup"
+  [ -z "$dup" ] || die "duplicate idx in configuration: $dup"
 }
 
 # --- BSSID limit warning ----------------------------------------------------
 check_bssid_limit() {
   c2=$(awk -F'|' '!/^#/ && $2 ~ /2g/ {n++} END{print n+0}' "$CONF")
   c5=$(awk -F'|' '!/^#/ && $2 ~ /5g/ {n++} END{print n+0}' "$CONF")
-  log "Số SSID: 2.4G=$c2 , 5G=$c5 (giới hạn/băng = $BSSID_LIMIT)"
-  [ "$c2" -le "$BSSID_LIMIT" ] || warn "2.4G ($c2) VƯỢT giới hạn BSSID ($BSSID_LIMIT) -> có thể lỗi/không phát đủ."
-  [ "$c5" -le "$BSSID_LIMIT" ] || warn "5G ($c5) VƯỢT giới hạn BSSID ($BSSID_LIMIT) -> có thể lỗi/không phát đủ."
+  log "SSID count: 2.4G=$c2, 5G=$c5 (limit per band = $BSSID_LIMIT)"
+  [ "$c2" -le "$BSSID_LIMIT" ] || warn "2.4G ($c2) EXCEEDS the BSSID limit ($BSSID_LIMIT) -> some APs may fail or remain unavailable."
+  [ "$c5" -le "$BSSID_LIMIT" ] || warn "5G ($c5) EXCEEDS the BSSID limit ($BSSID_LIMIT) -> some APs may fail or remain unavailable."
 }
 
 # ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ EOF
 # apply.sh calls this for both CLI applies and Agent/UI applies.
 validate_admin_rule_scope() {
   batch="$1"
-  [ -f "$batch" ] || die "Thiếu UCI batch để kiểm tra admin rule: $batch"
+  [ -f "$batch" ] || die "Missing UCI batch for admin-rule validation: $batch"
   [ "$ZONE_INPUT" = "ACCEPT" ] || return 0
 
   for idx in $(desired_idx); do
@@ -262,11 +262,11 @@ validate_admin_rule_scope() {
     expected_ip="set firewall.z${idx}adm.dest_ip=192.168.$octet.1"
     expected_ports="set firewall.z${idx}adm.dest_port=\"$ADMIN_PORTS\""
     grep -qxF "$expected_ip" "$batch" \
-      || die "admin rule w$idx phải giới hạn dest_ip=192.168.$octet.1"
+      || die "admin rule w$idx must restrict dest_ip=192.168.$octet.1"
     grep -qxF "$expected_ports" "$batch" \
-      || die "admin rule w$idx phải ghi đè dest_port=\"$ADMIN_PORTS\""
+      || die "admin rule w$idx must overwrite dest_port=\"$ADMIN_PORTS\""
     if grep -q "^add_list firewall\.z${idx}adm\.dest_port=" "$batch"; then
-      die "admin rule w$idx không được add_list dest_port (sẽ tích lũy qua mỗi apply)"
+      die "admin rule w$idx must not use add_list for dest_port (it accumulates on every apply)"
     fi
   done
 }
@@ -283,10 +283,10 @@ singbox_check() {
 # The modern DNS config (fakeip server type, rule actions) needs sing-box 1.12+.
 require_singbox_version() {
   v="$(sing-box version 2>/dev/null | head -1 | sed 's/.*version \([0-9][0-9.]*\).*/\1/')"
-  [ -n "$v" ] || { warn "Không đọc được version sing-box; tiếp tục."; return 0; }
+  [ -n "$v" ] || { warn "Could not read the sing-box version; continuing."; return 0; }
   maj="${v%%.*}"; rest="${v#*.}"; min="${rest%%.*}"
   if [ "$maj" -lt 1 ] || { [ "$maj" -eq 1 ] && [ "$min" -lt 12 ]; }; then
-    die "Cần sing-box >= 1.12 (đang có $v): config dùng cú pháp DNS mới."
+    die "sing-box >= 1.12 is required (found $v): the configuration uses the new DNS syntax."
   fi
 }
 
@@ -300,19 +300,19 @@ ensure_singbox_compat_env() {
     [ -f "$initf" ] && [ "${DRYRUN:-0}" != "1" ] && sed -i '/procd_set_param env ENABLE_DEPRECATED/d' "$initf"
     return 0
   fi
-  [ -f "$initf" ] || { warn "Không thấy $initf; bỏ qua compat env cho service."; return 0; }
+  [ -f "$initf" ] || { warn "$initf was not found; skipping the service compatibility environment."; return 0; }
   if [ "${DRYRUN:-0}" = "1" ]; then
-    printf 'DRYRUN> chèn "procd_set_param env %s" vào %s\n' "$SINGBOX_COMPAT_ENV" "$initf" >&2
+    printf 'DRYRUN> insert "procd_set_param env %s" into %s\n' "$SINGBOX_COMPAT_ENV" "$initf" >&2
     return 0
   fi
-  grep -q 'procd_set_param command' "$initf" || { warn "$initf không dùng procd; tự thêm env $SINGBOX_COMPAT_ENV thủ công."; return 0; }
+  grep -q 'procd_set_param command' "$initf" || { warn "$initf does not use procd; add env $SINGBOX_COMPAT_ENV manually."; return 0; }
   sed -i '/procd_set_param env ENABLE_DEPRECATED/d' "$initf"
   sed -i "/procd_set_param command/a\\	procd_set_param env $SINGBOX_COMPAT_ENV" "$initf"
-  log "Đã chèn compat env vào $initf"
+  log "Inserted the compatibility environment into $initf"
 }
 
 # ---------------------------------------------------------------------------
-# Sinh /etc/sing-box/config.json
+# Generate /etc/sing-box/config.json
 # ---------------------------------------------------------------------------
 build_singbox() {
   # Defaults keep older settings.sh copies (without these vars) working.
@@ -342,12 +342,12 @@ build_singbox() {
   for_each_ssid _sb_row
 
   mkdir -p "$(dirname "$SINGBOX_CONF")"
-  # DNS fake-IP: trả fake-IP cho client, map ngược về hostname khi kết nối,
-  # nhờ đó outbound SOCKS luôn nhận hostname (remote resolve) thay vì IP thật.
-  # - Chặn HTTPS/SVCB (type 65/64): hint IP thật trong đó cho phép trình duyệt
-  #   né fake-IP và kết nối bằng IP thô -> SOCKS từ chối.
-  # - Không cấp inet6_range: mạng SSID là IPv4-only, AAAA trả rỗng (NOERROR)
-  #   để client không thử kết nối IPv6 giả không route được.
+  # Fake-IP DNS: return fake IPs to clients and map them back to hostnames on connect,
+  # ensuring that SOCKS outbounds always receive hostnames (remote resolution), not real IPs.
+  # - Block HTTPS/SVCB (types 65/64): their real-IP hints could let browsers bypass
+  #   fake IPs and connect using raw IP addresses, which SOCKS would reject.
+  # - Do not provide inet6_range: SSID networks are IPv4-only, so AAAA returns an empty
+  #   NOERROR response and clients do not attempt to use unroutable fake IPv6 addresses.
   cat > "$SINGBOX_CONF" <<EOF
 {
   "log": { "level": "$SINGBOX_LOG_LEVEL", "timestamp": true },
@@ -378,7 +378,7 @@ build_singbox() {
   }
 }
 EOF
-  log "Đã ghi $SINGBOX_CONF"
+  log "Wrote $SINGBOX_CONF"
 }
 
 desired_idx() {
@@ -453,5 +453,5 @@ build_nft() {
     echo "  }"
     echo "}"
   } > "$NFT_FILE"
-  log "Đã ghi $NFT_FILE"
+  log "Wrote $NFT_FILE"
 }

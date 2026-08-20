@@ -6,7 +6,7 @@ set -u
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
 
-command -v jq >/dev/null 2>&1 || { echo '{"ok":false,"error":"thiếu jq"}'; exit 0; }
+command -v jq >/dev/null 2>&1 || { echo '{"ok":false,"error":"jq is missing"}'; exit 0; }
 LEASES="${LEASES:-/tmp/dhcp.leases}"
 TMP_JSON="/tmp/sbproxy-clients.$$.jsonl"
 LIVE_KEYS="/tmp/sbproxy-clients.$$.live"

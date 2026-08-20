@@ -9,17 +9,17 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 require_root
 
 IDX="$1"; MAC="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
-case "$IDX" in *[!0-9]*|'') die "idx phải là số nguyên dương" ;; esac
+case "$IDX" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
 case "$MAC" in
   [0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]) : ;;
-  *) die "mac không hợp lệ (cần AA:BB:CC:DD:EE:FF)" ;;
+  *) die "invalid MAC address (expected AA:BB:CC:DD:EE:FF)" ;;
 esac
-uci -q get "wireless.w$IDX" >/dev/null 2>&1 || die "không thấy SSID idx=$IDX"
+uci -q get "wireless.w$IDX" >/dev/null 2>&1 || die "SSID idx=$IDX not found"
 
 BANS_FILE="${BANS_FILE:-/etc/sbproxy.bans}"
 touch "$BANS_FILE"
 if grep -qi "^$IDX|$MAC\$" "$BANS_FILE"; then
-  log "$MAC đã bị cấm trên idx=$IDX (không đổi gì)"
+  log "$MAC is already blocked on idx=$IDX (no changes)"
 else
   echo "$IDX|$MAC" >> "$BANS_FILE"
 fi
@@ -43,4 +43,4 @@ if [ -n "$radio" ]; then
 else
   run "wifi reload"
 fi
-log "Đã cấm $MAC trên idx=$IDX (SSID reload băng ${band:-?})"
+log "Blocked $MAC on idx=$IDX (reloaded the ${band:-?} band SSID)"

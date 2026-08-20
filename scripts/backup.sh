@@ -19,13 +19,13 @@ log "Backup -> $DEST"
 
 # Layer 1: archive project-related configuration files.
 tar czf "$DEST/etc-config.tar.gz" \
-  -C / etc/config etc/sing-box 2>/dev/null || warn "Một số path chưa tồn tại (bình thường ở lần đầu)."
+  -C / etc/config etc/sing-box 2>/dev/null || warn "Some paths do not exist yet (normal on the first run)."
 [ -f "$NFT_FILE" ] && cp "$NFT_FILE" "$DEST/sbproxy.nft" 2>/dev/null || true
 [ -f "$CONF" ] && cp "$CONF" "$DEST/wifi-socks.conf" 2>/dev/null || true
 
 # Layer 2: standard sysupgrade backup.
 if command -v sysupgrade >/dev/null 2>&1; then
-  sysupgrade -b "$DEST/sysupgrade-backup.tar.gz" 2>/dev/null || warn "sysupgrade -b lỗi (bỏ qua)."
+  sysupgrade -b "$DEST/sysupgrade-backup.tar.gz" 2>/dev/null || warn "sysupgrade -b failed (ignored)."
 fi
 
 # Update the `latest` pointer.
@@ -35,5 +35,5 @@ ln -sfn "$DEST" "$BACKUP_DIR/latest"
 # shellcheck disable=SC2010  # BusyBox-compatible mtime ordering over generated names.
 ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | grep -v "^$BACKUP_DIR/latest/$" | tail -n +21 | while read -r old; do rm -rf "$old"; done
 
-log "Backup xong: $DEST"
-log "Danh sách: scripts/rollback.sh --list"
+log "Backup complete: $DEST"
+log "List backups: scripts/rollback.sh --list"

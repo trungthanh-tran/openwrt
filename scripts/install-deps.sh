@@ -16,7 +16,7 @@ elif command -v opkg >/dev/null 2>&1; then
   pkg_installed() { opkg list-installed "$1" 2>/dev/null | grep -q "^$1 "; }
   pkg_install() { run "opkg install '$1'"; }
 else
-  die "Không tìm thấy apk hoặc opkg."
+  die "Neither apk nor opkg was found."
 fi
 log "$PKG_MANAGER update..."
 pkg_update
@@ -24,10 +24,10 @@ pkg_update
 PKGS="nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full jq sing-box"
 for p in $PKGS; do
   if pkg_installed "$p"; then
-    log "[đã có] $p"
+    log "[installed] $p"
   else
-    log "Cài $p..."
-    pkg_install "$p" || warn "Không cài được $p — kiểm tra feed của firmware."
+    log "Installing $p..."
+    pkg_install "$p" || warn "Could not install $p — check the firmware package feed."
   fi
 done
 
@@ -36,16 +36,16 @@ if [ -f "$SB_ROOT/etc/init.d/sbproxy" ]; then
   run "cp '$SB_ROOT/etc/init.d/sbproxy' /etc/init.d/sbproxy"
   run "chmod +x /etc/init.d/sbproxy"
   run "/etc/init.d/sbproxy enable"
-  log "Đã cài /etc/init.d/sbproxy"
+  log "Installed /etc/init.d/sbproxy"
 fi
 
 # Enable sing-box at boot.
-[ -f /etc/init.d/sing-box ] && run "/etc/init.d/sing-box enable" || warn "Chưa thấy /etc/init.d/sing-box"
+[ -f /etc/init.d/sing-box ] && run "/etc/init.d/sing-box enable" || warn "/etc/init.d/sing-box was not found"
 
 # Register project files that standard OpenWrt sysupgrade backups must preserve.
-log "Đăng ký /etc/sysupgrade.conf (để backup/nâng cấp giữ được config sbproxy)..."
+log "Registering files in /etc/sysupgrade.conf (to preserve sbproxy configuration during backup/upgrades)..."
 for p in /etc/sing-box/ /etc/sbproxy.nft /etc/sbproxy.env /etc/sbproxy.managed /etc/init.d/sbproxy $SB_ROOT/config/; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 
-log "Xong install-deps. Tiếp theo: scripts/apply.sh"
+log "install-deps complete. Next: scripts/apply.sh"

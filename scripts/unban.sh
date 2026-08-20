@@ -8,10 +8,10 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 require_root
 
 IDX="$1"; MAC="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
-case "$IDX" in *[!0-9]*|'') die "idx phải là số nguyên dương" ;; esac
+case "$IDX" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
 case "$MAC" in
   [0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]) : ;;
-  *) die "mac không hợp lệ (cần AA:BB:CC:DD:EE:FF)" ;;
+  *) die "invalid MAC address (expected AA:BB:CC:DD:EE:FF)" ;;
 esac
 
 BANS_FILE="${BANS_FILE:-/etc/sbproxy.bans}"
@@ -40,4 +40,4 @@ if [ -n "$radio" ]; then
 else
   run "wifi reload"
 fi
-log "Đã bỏ cấm $MAC trên idx=$IDX"
+log "Unblocked $MAC on idx=$IDX"

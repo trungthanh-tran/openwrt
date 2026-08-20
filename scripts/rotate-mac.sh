@@ -11,7 +11,7 @@ require_root
 require_conf
 
 IDX="${1:-}"
-case "$IDX" in *[!0-9]*|'') die "idx phải là số nguyên dương" ;; esac
+case "$IDX" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
 
 SET_OUI=0
 REQUESTED_OUI=""
@@ -21,14 +21,14 @@ if [ "$#" -ge 2 ]; then
   case "$REQUESTED_OUI" in
     '') : ;;
     [0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]) : ;;
-    *) die "mac_oui phải dạng AA:BB:CC hoặc để trống" ;;
+    *) die "mac_oui must use the AA:BB:CC format or be empty" ;;
   esac
 fi
 
 BAND="$(band_of_idx "$IDX")"
-[ -n "$BAND" ] || die "idx=$IDX không thuộc wifi-socks.conf"
+[ -n "$BAND" ] || die "idx=$IDX is not present in wifi-socks.conf"
 uci -q get "wireless.w$IDX.ssid" >/dev/null 2>&1 \
-  || die "Wi-Fi w$IDX chưa được apply trên router"
+  || die "Wi-Fi w$IDX has not been applied on the router"
 
 OUI="$(awk -F'|' -v i="$IDX" '
   !/^[[:space:]]*#/ {
@@ -47,7 +47,7 @@ while [ "$NEW" = "$OLD" ] && [ "$tries" -lt 5 ]; do
   NEW="$(gen_mac "$OUI")"
   tries=$((tries + 1))
 done
-[ "$NEW" != "$OLD" ] || die "không tạo được MAC mới"
+[ "$NEW" != "$OLD" ] || die "failed to generate a new MAC address"
 
 "${BACKUP_SCRIPT:-$SB_ROOT/scripts/backup.sh}" pre-rotate-mac
 if [ "$SET_OUI" = "1" ]; then
@@ -69,4 +69,4 @@ uci commit wireless
 
 RADIO="$(radio_of "$BAND")"
 wifi reload "$RADIO" >/dev/null 2>&1 || wifi reload
-log "Đã xoay BSSID w$IDX: ${OLD:-chưa đặt} -> $NEW (OUI=${OUI:-02 local}, radio=$RADIO)"
+log "Rotated BSSID w$IDX: ${OLD:-not set} -> $NEW (OUI=${OUI:-02 local}, radio=$RADIO)"

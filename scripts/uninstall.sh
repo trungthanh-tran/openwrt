@@ -9,7 +9,7 @@ SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 require_root
 require_conf
 
-log "Backup trước khi gỡ..."
+log "Backing up before uninstalling..."
 "$SB_ROOT/scripts/backup.sh" pre-uninstall
 
 del_one() {
@@ -18,12 +18,12 @@ del_one() {
            "firewall.z$idx" "firewall.z${idx}adm"; do
     uci -q delete "$s" 2>/dev/null || true
   done
-  log "Đã xoá section idx=$idx"
+  log "Removed section idx=$idx"
 }
 for_each_ssid del_one
 
 uci commit
-log "Dừng tproxy + xoá nft/sing-box config..."
+log "Stopping tproxy and removing nft/sing-box configuration..."
 /etc/init.d/sbproxy stop 2>/dev/null || true
 nft delete table inet sbproxy 2>/dev/null || true
 rm -f "$NFT_FILE"
@@ -37,4 +37,4 @@ rm -f "${BANS_FILE:-/etc/sbproxy.bans}"
 /etc/init.d/firewall reload || true
 wifi reload || true
 
-log "GỠ XONG. (Gói opkg vẫn còn — muốn xoá: opkg remove sing-box ...)"
+log "UNINSTALL COMPLETE. (opkg packages remain installed — remove them with: opkg remove sing-box ...)"

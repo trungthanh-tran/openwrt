@@ -95,7 +95,7 @@ if PATH="$NO_DEPS" /bin/sh "$HEALTHD" --once >"$TMP/no-jq.out" 2>&1; then
 else
   ok "missing jq fails"
 fi
-contains "missing jq error is actionable" "$(cat "$TMP/no-jq.out")" 'thiếu jq'
+contains "missing jq error is actionable" "$(cat "$TMP/no-jq.out")" 'jq is missing'
 
 echo "== health daemon dirty config and probe output =="
 cat > "$CONF" <<'EOF'

@@ -545,7 +545,7 @@ contains "update rejects empty body" "$out" 'Status: 400 Bad Request'
 printf 'not a package' > "$TMP/garbage.bin"
 out="$(run_agent_pkg 'action=update' "$TMP/garbage.bin")"
 eq "update rejects non-package body" "$(json_value "$out" '.ok')" 'false'
-contains "update names the package problem" "$out" 'không phải .tar.gz hoặc .zip'
+contains "update names the package problem" "$out" 'is not a .tar.gz or .zip file'
 
 reset_calls
 make_pkg 0.5.0 "$TMP/pkg-0.5.0.tar.gz"
@@ -565,7 +565,7 @@ contains "update deploys refreshed web UI" "$(cat "$TMP/deploy/index.html")" 'ne
 make_pkg 0.3.0 "$TMP/pkg-0.3.0.tar.gz"
 out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.3.0.tar.gz")"
 eq "update refuses downgrade" "$(json_value "$out" '.ok')" 'false'
-contains "downgrade refusal names versions" "$out" 'cũ hơn'
+contains "downgrade refusal names versions" "$out" 'is older than'
 eq "refused downgrade leaves VERSION alone" "$(tr -d ' \r\n' < "$SB2/VERSION")" '0.5.0'
 out="$(run_agent_pkg 'action=update&force=1' "$TMP/pkg-0.3.0.tar.gz")"
 eq "forced downgrade succeeds" "$(json_value "$out" '.ok')" 'true'

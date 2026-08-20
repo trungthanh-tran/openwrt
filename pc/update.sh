@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     --with-settings) WITH_SETTINGS=1; shift ;;
     --apply)         APPLY=1; shift ;;
     -h|--help)       usage; exit 0 ;;
-    *) die "Tham số lạ: $1 — xem: pc/update.sh --help" ;;
+    *) die "Unknown argument: $1 — see: pc/update.sh --help" ;;
   esac
 done
 sbpc_init
@@ -39,12 +39,12 @@ sbpc_init
 # 1) Package router-side files; pc/ may contain local secrets and is excluded.
 TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
-log "Đóng gói repo..."
+log "Packaging repository..."
 tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules \
   README.md VERSION agent config console docs etc scripts tools
 
 # 2) Upload and extract while preserving active configuration.
-log "Đẩy lên $TARGET:$REMOTE_DIR ..."
+log "Uploading to $TARGET:$REMOTE_DIR ..."
 rssh "cat > /tmp/sbproxy-update.tar.gz" < "$TMP_TAR"
 rssh "REMOTE_DIR='$REMOTE_DIR' WITH_SETTINGS=$WITH_SETTINGS sh -s" <<'EOF'
 set -e
@@ -57,14 +57,14 @@ if [ -f "$KEEP/wifi-socks.conf" ]; then cp "$KEEP/wifi-socks.conf" "$REMOTE_DIR/
 if [ -f "$KEEP/settings.sh" ];      then cp "$KEEP/settings.sh"      "$REMOTE_DIR/config/settings.sh"; fi
 chmod +x "$REMOTE_DIR"/scripts/*.sh 2>/dev/null || true
 rm -rf "$KEEP" /tmp/sbproxy-update.tar.gz
-echo "[router] Code đã cập nhật -> $REMOTE_DIR"
+echo "[router] Code updated -> $REMOTE_DIR"
 EOF
 
 # 3) Apply when requested.
 if [ "$APPLY" = "1" ]; then
-  log "Chạy apply.sh trên router (tự backup trước khi áp)..."
+  log "Running apply.sh on the router (automatically backs up first)..."
   rssht "cd '$REMOTE_DIR' && sh scripts/apply.sh"
 else
-  log "Xong. Chưa áp cấu hình — khi sẵn sàng:"
-  log "  pc/update.sh --apply   (hoặc SSH vào router: sh $REMOTE_DIR/scripts/apply.sh)"
+  log "Done. Configuration has not been applied — when ready:"
+  log "  pc/update.sh --apply   (or SSH into the router: sh $REMOTE_DIR/scripts/apply.sh)"
 fi

@@ -8,12 +8,12 @@ set -eu
 cd "$(dirname "$0")"
 
 PY="${PYTHON:-python3}"
-command -v "$PY" >/dev/null 2>&1 || { echo "Cần python3 (hoặc đặt PYTHON=...)"; exit 1; }
+command -v "$PY" >/dev/null 2>&1 || { echo "python3 is required (or set PYTHON=...)"; exit 1; }
 
 "$PY" -c 'import tkinter; print("Tkinter OK", tkinter.TkVersion)' \
-  || { echo "Thiếu Tkinter — Debian/Ubuntu: sudo apt install python3-tk"; exit 1; }
+  || { echo "Tkinter is missing — Debian/Ubuntu: sudo apt install python3-tk"; exit 1; }
 "$PY" -c 'import PyInstaller; print("PyInstaller OK", PyInstaller.__version__)' 2>/dev/null \
-  || { echo "Cài dependency build lần đầu..."; "$PY" -m pip install -r requirements.txt; }
+  || { echo "Installing build dependencies for the first time..."; "$PY" -m pip install -r requirements.txt; }
 
 # The POSIX bootloader does NOT expand "~" or "$HOME" in --runtime-tmpdir, so a
 # per-user runtime path cannot be baked in here; the default (/tmp) is used
@@ -24,10 +24,10 @@ set -- --noconfirm --clean --onefile --windowed --name sbproxy-console
 if [ -n "${SBPROXY_RUNTIME_TMPDIR:-}" ]; then
   case "$SBPROXY_RUNTIME_TMPDIR" in
     /*) ;;
-    *) echo "SBPROXY_RUNTIME_TMPDIR phải là đường dẫn tuyệt đối"; exit 1 ;;
+    *) echo "SBPROXY_RUNTIME_TMPDIR must be an absolute path"; exit 1 ;;
   esac
   set -- "$@" --runtime-tmpdir "$SBPROXY_RUNTIME_TMPDIR"
-  echo "Runtime sẽ giải nén tại: $SBPROXY_RUNTIME_TMPDIR"
+  echo "The runtime will be extracted to: $SBPROXY_RUNTIME_TMPDIR"
 fi
 "$PY" -m PyInstaller "$@" main.py
 

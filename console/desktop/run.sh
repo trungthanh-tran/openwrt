@@ -4,5 +4,5 @@ set -eu
 cd "$(dirname "$0")"
 PY="${PYTHON:-python3}"
 "$PY" -c 'import tkinter; print("Tkinter OK", tkinter.TkVersion)' \
-  || { echo "Thiếu Tkinter — Debian/Ubuntu: sudo apt install python3-tk"; exit 1; }
+  || { echo "Tkinter is missing — Debian/Ubuntu: sudo apt install python3-tk"; exit 1; }
 exec "$PY" main.py

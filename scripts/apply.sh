@@ -21,7 +21,7 @@ NO_BACKUP=0
 [ "$1" = "--no-backup" ] && NO_BACKUP=1
 
 if [ "$NO_BACKUP" = "0" ] && [ "${DRYRUN:-0}" != "1" ]; then
-  log "Backup trước khi apply..."
+  log "Backing up before apply..."
   "$SB_ROOT/scripts/backup.sh" pre-apply
 fi
 
@@ -46,21 +46,21 @@ REAL_SINGBOX_CONF="$SINGBOX_CONF"; REAL_NFT_FILE="$NFT_FILE"
 SINGBOX_CONF="$STAGE/config.json"; NFT_FILE="$STAGE/sbproxy.nft"
 build_singbox
 build_nft
-command -v sing-box >/dev/null 2>&1 || die "Thiếu sing-box."
+command -v sing-box >/dev/null 2>&1 || die "sing-box is missing."
 require_singbox_version
-singbox_check "$SINGBOX_CONF" || die "sing-box config không hợp lệ."
-nft --check --file "$NFT_FILE" || die "nftables config không hợp lệ."
+singbox_check "$SINGBOX_CONF" || die "The sing-box configuration is invalid."
+nft --check --file "$NFT_FILE" || die "The nftables configuration is invalid."
 
 if [ "${DRYRUN:-0}" = "1" ]; then
   if [ "${DRYRUN_QUIET:-0}" != "1" ]; then
-    echo "===== UCI sẽ nạp ====="; cat "$TMP"
+    echo "===== UCI configuration to be loaded ====="; cat "$TMP"
     echo "===== sing-box ====="; cat "$SINGBOX_CONF"
     echo "===== nftables ====="; cat "$NFT_FILE"
   fi
-  log "DRYRUN xong — không có file hệ thống nào bị thay đổi."; exit 0
+  log "DRY RUN complete — no system files were changed."; exit 0
 fi
 
-log "Nạp UCI..."
+log "Loading UCI configuration..."
 uci batch < "$TMP"
 rm -f "$TMP"
 uci commit network
@@ -91,7 +91,7 @@ mv /etc/sbproxy.env.new /etc/sbproxy.env
 ensure_singbox_compat_env
 
 # 3) Reload services in dependency order: network, firewall, TPROXY, proxy, Wi-Fi.
-log "Reload dịch vụ..."
+log "Reloading services..."
 run "/etc/init.d/network reload"
 run "/etc/init.d/dnsmasq restart"
 run "/etc/init.d/firewall reload"
@@ -99,5 +99,5 @@ run "/etc/init.d/sbproxy restart"
 run "/etc/init.d/sing-box restart"
 run "wifi reload"
 
-log "APPLY XONG. Chạy scripts kiểm thử trong docs/TESTING.md."
-log "Nếu mất mạng/lỗi: scripts/rollback.sh  (xem docs/ROLLBACK.md)"
+log "APPLY COMPLETE. Run the test scripts described in docs/TESTING.md."
+log "If networking is lost or an error occurs: scripts/rollback.sh (see docs/ROLLBACK.md)"
