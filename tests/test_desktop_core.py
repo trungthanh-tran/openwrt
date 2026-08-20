@@ -101,7 +101,7 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(set(app.DARK_PALETTE), set(app.LIGHT_PALETTE))
         for key in (
             "bg", "card", "text", "primary", "danger", "input",
-            "tab_idle", "tab_hover", "tab_selected", "tab_selected_text",
+            "tab_strip", "tab_idle", "tab_hover", "tab_selected", "tab_selected_text",
             "table_border", "table_header_border", "table_row_even", "table_row_odd",
         ):
             self.assertIn(key, app.DARK_PALETTE)

@@ -10,6 +10,8 @@
 
 - Chuyển trực tiếp giữa giao diện English/Tiếng Việt và theme Dark/Light; lựa
   chọn được lưu cho lần chạy sau. Mặc định là English + Dark.
+- Điều hướng bằng tab bo góc kiểu Chrome; tab đang mở liền màu với vùng nội dung,
+  tab chưa chọn và trạng thái hover được phân biệt rõ trong cả hai theme.
 - Quản lý danh sách Wi-Fi/SSID và SOCKS5, lưu cấu hình rồi apply.
 - Thêm/xóa SSID; mọi lần Apply đều dry-run cấu hình tạm trước khi ghi và được
   Agent dry-run lần cuối trước khi thay đổi router.

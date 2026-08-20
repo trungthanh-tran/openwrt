@@ -87,21 +87,28 @@ class DesktopGuiSmokeTests(unittest.TestCase):
             ["Edit configuration", "Change SOCKS", "Random MAC", "Delete SSID"],
         )
 
-    def test_tabs_use_compact_regular_weight_focus_styles(self):
+    def test_tabs_use_chrome_style_rounded_surfaces(self):
         style = appmod.ttk.Style(self.root)
         for theme in ("dark", "light"):
             with self.subTest(theme=theme):
                 self.set_mode("en", theme)
-                font = str(style.lookup("TNotebook.Tab", "font"))
-                padding = str(style.lookup("TNotebook.Tab", "padding"))
-                backgrounds = dict(style.map("TNotebook.Tab", "background"))
-                foregrounds = dict(style.map("TNotebook.Tab", "foreground"))
+                font = str(style.lookup("Chrome.TNotebook.Tab", "font"))
+                padding = str(style.lookup("Chrome.TNotebook.Tab", "padding"))
+                backgrounds = dict(style.map("Chrome.TNotebook.Tab", "background"))
+                foregrounds = dict(style.map("Chrome.TNotebook.Tab", "foreground"))
                 self.assertNotIn("Semibold", font)
                 self.assertIn("9", font)
-                self.assertIn("14", padding)
+                self.assertIn("18", padding)
+                self.assertEqual(self.app.tabs.cget("style"), "Chrome.TNotebook")
+                self.assertEqual(style.lookup("Chrome.TNotebook", "background"), appmod.PALETTES[theme]["tab_strip"])
                 self.assertEqual(backgrounds.get("selected"), appmod.PALETTES[theme]["tab_selected"])
                 self.assertEqual(backgrounds.get("active"), appmod.PALETTES[theme]["tab_hover"])
                 self.assertEqual(foregrounds.get("selected"), appmod.PALETTES[theme]["tab_selected_text"])
+                layout = style.layout("Chrome.TNotebook.Tab")
+                self.assertEqual(layout[0][0], f"Chrome.{theme}.tab")
+                image = self.app._style_images[theme]["selected"]
+                self.assertTrue(image.transparency_get(0, 0))
+                self.assertFalse(image.transparency_get(image.width() // 2, 0))
 
     def test_tables_have_borders_headers_and_zebra_rows(self):
         style = appmod.ttk.Style(self.root)

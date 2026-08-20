@@ -200,10 +200,11 @@ DARK_PALETTE = {
     "metric": "#0d1b2e",
     "heading": "#1a2b43",
     "heading_active": "#223956",
-    "tab_idle": "#0a1626",
+    "tab_strip": "#08111f",
+    "tab_idle": "#0b1728",
     "tab_hover": "#172a42",
-    "tab_selected": "#17365d",
-    "tab_selected_text": "#9dcbff",
+    "tab_selected": "#111f33",
+    "tab_selected_text": "#edf4ff",
     "table_border": "#31465f",
     "table_header_border": "#3a526f",
     "table_row_even": "#0b1728",
@@ -240,10 +241,11 @@ LIGHT_PALETTE = {
     "metric": "#e2eaf5",
     "heading": "#dce6f2",
     "heading_active": "#cbd9e9",
-    "tab_idle": "#edf2f7",
-    "tab_hover": "#dce6f2",
-    "tab_selected": "#dbeafe",
-    "tab_selected_text": "#1d4ed8",
+    "tab_strip": "#dce4ee",
+    "tab_idle": "#e5ebf3",
+    "tab_hover": "#eef3f8",
+    "tab_selected": "#f8fafc",
+    "tab_selected_text": "#172033",
     "table_border": "#aebdce",
     "table_header_border": "#b8c6d6",
     "table_row_even": "#ffffff",
@@ -263,6 +265,20 @@ LIGHT_PALETTE = {
 
 PALETTES = {"dark": DARK_PALETTE, "light": LIGHT_PALETTE}
 PALETTE = DARK_PALETTE
+
+
+def rounded_tab_image(master, color: str, width=32, height=30, radius=9):
+    """Create a stretchable tab surface with Chrome-like rounded top corners."""
+    image = tk.PhotoImage(master=master, width=width, height=height)
+    radius = max(1, min(int(radius), width // 2, height))
+    for y in range(height):
+        if y >= radius:
+            inset = 0
+        else:
+            dy = radius - y - 0.5
+            inset = max(0, math.ceil(radius - math.sqrt(max(0.0, radius * radius - dy * dy))))
+        image.put(color, to=(inset, y, width - inset, y + 1))
+    return image
 
 EN_TRANSLATIONS = {
     "Chưa kết nối": "Not connected",
@@ -1377,6 +1393,7 @@ class NativeApp:
         self.backup_names = []
         self.log_history = []
         self.loading_window: LoadingWindow | None = None
+        self._style_images = {}
         self.language, self.theme = load_preferences()
         self.palette = PALETTES[self.theme]
         self.language_var = tk.StringVar(value="English" if self.language == "en" else "Tiếng Việt")
@@ -1489,18 +1506,57 @@ class NativeApp:
         style.map("TCheckbutton", background=[("active", p["card"])], indicatorcolor=[("selected", p["primary"])])
         style.configure("Toolbar.TCheckbutton", background=p["header"], foreground=p["text"], indicatorcolor=p["input"], padding=3)
         style.map("Toolbar.TCheckbutton", background=[("active", p["header"])], indicatorcolor=[("selected", p["primary"])])
-        style.configure("TNotebook", background=p["bg"], borderwidth=0, tabmargins=(0, 4, 0, 8))
+        tab_images = self._style_images.get(self.theme)
+        if tab_images is None:
+            tab_images = {
+                "idle": rounded_tab_image(self.root, p["tab_idle"]),
+                "hover": rounded_tab_image(self.root, p["tab_hover"]),
+                "selected": rounded_tab_image(self.root, p["tab_selected"]),
+            }
+            self._style_images[self.theme] = tab_images
+        tab_element = f"Chrome.{self.theme}.tab"
+        if tab_element not in style.element_names():
+            style.element_create(
+                tab_element,
+                "image",
+                tab_images["idle"],
+                ("selected", tab_images["selected"]),
+                ("active", tab_images["hover"]),
+                border=(12, 10, 12, 2),
+                sticky="nsew",
+            )
         style.configure(
-            "TNotebook.Tab",
+            "Chrome.TNotebook",
+            background=p["tab_strip"],
+            borderwidth=0,
+            tabmargins=(8, 6, 8, 0),
+        )
+        style.layout(
+            "Chrome.TNotebook.Tab",
+            [(tab_element, {
+                "sticky": "nsew",
+                "children": [("Notebook.padding", {
+                    "side": "top",
+                    "sticky": "nsew",
+                    "children": [("Notebook.focus", {
+                        "side": "top",
+                        "sticky": "nsew",
+                        "children": [("Notebook.label", {"side": "top", "sticky": ""})],
+                    })],
+                })],
+            })],
+        )
+        style.configure(
+            "Chrome.TNotebook.Tab",
             background=p["tab_idle"],
             foreground=p["muted"],
             borderwidth=0,
             relief="flat",
-            padding=(14, 8),
+            padding=(18, 9),
             font=("Segoe UI", 9),
         )
         style.map(
-            "TNotebook.Tab",
+            "Chrome.TNotebook.Tab",
             background=[("selected", p["tab_selected"]), ("active", p["tab_hover"])],
             foreground=[("selected", p["tab_selected_text"]), ("active", p["text"])],
         )
@@ -1580,7 +1636,7 @@ class NativeApp:
         ttk.Label(gateway_detail, textvariable=self.gateway_link_var, style="MetricBlue.TLabel").pack(side="left", padx=(0, 28))
         ttk.Label(gateway_detail, textvariable=self.gateway_http_var, style="MetricBlue.TLabel").pack(side="left")
 
-        self.tabs = ttk.Notebook(self.root)
+        self.tabs = ttk.Notebook(self.root, style="Chrome.TNotebook")
         self.tabs.pack(fill="both", expand=True, padx=14, pady=(6, 14))
         self._build_wifi_tab()
         self._build_clients_tab()

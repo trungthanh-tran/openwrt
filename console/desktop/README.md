@@ -10,6 +10,8 @@ at `console/web/control-panel.html` remains a separate application.
 
 - Switch live between English/Vietnamese and Dark/Light themes. Preferences
   persist across launches; the defaults are English and Dark.
+- Navigate with Chrome-like rounded tabs whose active surface connects visually
+  to the current panel, with distinct idle and hover states in both themes.
 - Manage Wi-Fi/SSID and SOCKS5 records, save configuration, and apply it.
 - Add/remove SSIDs; every Apply dry-runs the temporary candidate before saving,
   then the Agent enforces a final dry-run before changing router state.
