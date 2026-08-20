@@ -124,6 +124,15 @@ class DesktopGuiSmokeTests(unittest.TestCase):
                     self.assertEqual(tree.tag_configure("row_even")["background"], palette["table_row_even"])
                     self.assertEqual(tree.tag_configure("row_odd")["background"], palette["table_row_odd"])
 
+    def test_all_table_headers_and_cells_are_centered(self):
+        for language in ("en", "vi"):
+            with self.subTest(language=language):
+                self.set_mode(language, "dark")
+                for tree in (self.app.wifi_tree, self.app.client_tree):
+                    for column in tree["columns"]:
+                        self.assertEqual(str(tree.heading(column, "anchor")), "center")
+                        self.assertEqual(str(tree.column(column, "anchor")), "center")
+
     def test_wifi_table_assigns_alternating_row_tags(self):
         original_records = self.app.records
         original_health = self.app.health

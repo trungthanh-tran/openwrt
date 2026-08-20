@@ -1708,8 +1708,8 @@ class NativeApp:
         tree.tag_configure("row_even", background=self.palette["table_row_even"])
         tree.tag_configure("row_odd", background=self.palette["table_row_odd"])
         for name, title in columns.items():
-            tree.heading(name, text=title)
-            tree.column(name, width=widths.get(name, 100), anchor="w")
+            tree.heading(name, text=title, anchor="center")
+            tree.column(name, width=widths.get(name, 100), anchor="center")
         vscroll = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
         hscroll = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
         tree.configure(yscrollcommand=vscroll.set, xscrollcommand=hscroll.set)
