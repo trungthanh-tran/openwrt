@@ -200,6 +200,10 @@ DARK_PALETTE = {
     "metric": "#0d1b2e",
     "heading": "#1a2b43",
     "heading_active": "#223956",
+    "tab_idle": "#0a1626",
+    "tab_hover": "#172a42",
+    "tab_selected": "#17365d",
+    "tab_selected_text": "#9dcbff",
     "button": "#263a55",
     "button_active": "#334b6b",
     "button_pressed": "#1d2d45",
@@ -232,6 +236,10 @@ LIGHT_PALETTE = {
     "metric": "#e2eaf5",
     "heading": "#dce6f2",
     "heading_active": "#cbd9e9",
+    "tab_idle": "#edf2f7",
+    "tab_hover": "#dce6f2",
+    "tab_selected": "#dbeafe",
+    "tab_selected_text": "#1d4ed8",
     "button": "#dbe5f1",
     "button_active": "#c9d7e8",
     "button_pressed": "#b9cbe0",
@@ -1421,9 +1429,21 @@ class NativeApp:
         style.map("TCheckbutton", background=[("active", p["card"])], indicatorcolor=[("selected", p["primary"])])
         style.configure("Toolbar.TCheckbutton", background=p["header"], foreground=p["text"], indicatorcolor=p["input"], padding=3)
         style.map("Toolbar.TCheckbutton", background=[("active", p["header"])], indicatorcolor=[("selected", p["primary"])])
-        style.configure("TNotebook", background=p["bg"], borderwidth=0, tabmargins=(0, 0, 0, 8))
-        style.configure("TNotebook.Tab", background=p["header"], foreground=p["muted"], borderwidth=0, padding=(18, 10), font=("Segoe UI Semibold", 10))
-        style.map("TNotebook.Tab", background=[("selected", p["primary"]), ("active", p["heading_active"])], foreground=[("selected", p["selection_text"]), ("active", p["text"])])
+        style.configure("TNotebook", background=p["bg"], borderwidth=0, tabmargins=(0, 4, 0, 8))
+        style.configure(
+            "TNotebook.Tab",
+            background=p["tab_idle"],
+            foreground=p["muted"],
+            borderwidth=0,
+            relief="flat",
+            padding=(14, 8),
+            font=("Segoe UI", 9),
+        )
+        style.map(
+            "TNotebook.Tab",
+            background=[("selected", p["tab_selected"]), ("active", p["tab_hover"])],
+            foreground=[("selected", p["tab_selected_text"]), ("active", p["text"])],
+        )
         style.configure("Treeview", background=p["input"], fieldbackground=p["input"], foreground=p["text"], borderwidth=0, rowheight=32, font=("Segoe UI", 9))
         style.configure("Treeview.Heading", background=p["heading"], foreground=p["heading_text"], borderwidth=0, padding=(8, 8), font=("Segoe UI Semibold", 9))
         style.map("Treeview", background=[("selected", p["primary"])], foreground=[("selected", p["selection_text"])])

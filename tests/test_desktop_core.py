@@ -99,7 +99,10 @@ class TranslationTests(unittest.TestCase):
 
     def test_palettes_have_identical_complete_keys(self):
         self.assertEqual(set(app.DARK_PALETTE), set(app.LIGHT_PALETTE))
-        for key in ("bg", "card", "text", "primary", "danger", "input"):
+        for key in (
+            "bg", "card", "text", "primary", "danger", "input",
+            "tab_idle", "tab_hover", "tab_selected", "tab_selected_text",
+        ):
             self.assertIn(key, app.DARK_PALETTE)
         self.assertEqual(set(app.PALETTES), {"dark", "light"})
 

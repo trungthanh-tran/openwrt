@@ -87,6 +87,22 @@ class DesktopGuiSmokeTests(unittest.TestCase):
             ["Edit configuration", "Change SOCKS", "Random MAC", "Delete SSID"],
         )
 
+    def test_tabs_use_compact_regular_weight_focus_styles(self):
+        style = appmod.ttk.Style(self.root)
+        for theme in ("dark", "light"):
+            with self.subTest(theme=theme):
+                self.set_mode("en", theme)
+                font = str(style.lookup("TNotebook.Tab", "font"))
+                padding = str(style.lookup("TNotebook.Tab", "padding"))
+                backgrounds = dict(style.map("TNotebook.Tab", "background"))
+                foregrounds = dict(style.map("TNotebook.Tab", "foreground"))
+                self.assertNotIn("Semibold", font)
+                self.assertIn("9", font)
+                self.assertIn("14", padding)
+                self.assertEqual(backgrounds.get("selected"), appmod.PALETTES[theme]["tab_selected"])
+                self.assertEqual(backgrounds.get("active"), appmod.PALETTES[theme]["tab_hover"])
+                self.assertEqual(foregrounds.get("selected"), appmod.PALETTES[theme]["tab_selected_text"])
+
     def test_primary_dialogs_render_in_both_languages(self):
         record = appmod.WifiRecord("test1", "2g", 1, "password12", "proxy", 1080)
         for language, palette, expected in (
