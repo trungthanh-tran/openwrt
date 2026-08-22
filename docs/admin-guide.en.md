@@ -44,7 +44,7 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 4. **Flash firmware:** no script. Image selection, U-Boot/GUI upload, and recovery are intentionally manual because automating them can brick the router.
 5. **Reconnect after upgrade:** after SSH works, run `sh scripts/inventory.sh > inventory-after.txt` and compare it with Step 1.
 
-    > **Steps 6–10 in one pass:** the desktop console's **Post-flash setup…** runs the same sequence over SSH — inspect what the router already has, push the code and `wifi-socks.conf`, install dependencies, run `preflight.sh` and the dry-run, run `apply.sh`, install the agent, read `/etc/sbproxy/token`, and verify `?action=status`. Anything already installed is reused, the run stops at the first failure with the router's own error, and the token is stored on success.
+    > **Steps 6–10 in one pass** (the whole four-step path is in [QUICKSTART.en.md](QUICKSTART.en.md)): the desktop console's **Post-flash setup…** runs the same sequence over SSH — inspect what the router already has, push the code and `wifi-socks.conf`, install dependencies, run `preflight.sh` and the dry-run, run `apply.sh`, install the agent, read `/etc/sbproxy/token`, and verify `?action=status`. Anything already installed is reused, the run stops at the first failure with the router's own error, and the token is stored on success.
     >
     > On a machine with no repository checkout, carry only `sbproxy-console.exe` — it embeds the matching router package — plus a `sbproxy-update-<version>.tar.gz` when a different version must be installed. See the *Field runbook* section of [../console/desktop/README.md](../console/desktop/README.md).
     >

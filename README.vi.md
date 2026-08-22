@@ -66,7 +66,16 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 - **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI (Linux/macOS dùng `chmod 600`), dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`.
 - **Cài router vừa flash ngay trong bản Desktop** — chức năng **Cài đặt sau khi flash** chạy qua SSH: kiểm tra router đang có sẵn gì, đẩy mã nguồn và cấu hình, cài phụ thuộc và agent, chạy script khởi tạo rồi đọc token về và mở màn hình điều khiển; phần nào đã cài thì dùng lại và từng bước hiện ngay trên giao diện. File build đã nhúng sẵn gói router nên máy chạy không cần mã nguồn. Bản build tách theo nền tảng vì PyInstaller không cross-compile: Windows dùng `console/desktop/dist/sbproxy-console.exe` (build bằng `.\build.ps1`), Linux/macOS dùng `console/desktop/dist/sbproxy-console` (build bằng `sh console/desktop/build.sh`); mỗi file tự chứa đủ mọi thứ, chạy bằng `.\sbproxy-console.exe` hoặc `./sbproxy-console`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
 
-## Quickstart
+## Cài nhanh bằng file exe
+
+Backup → flash firmware → đặt mật khẩu root → chạy file exe. Console desktop lo
+phần còn lại qua SSH: đẩy mã nguồn và cấu hình, cài gói phụ thuộc và agent, chạy
+script khởi tạo, lấy token rồi mở màn hình điều khiển. Máy tính không cần cài
+thêm gì.
+
+**[Xem 4 bước →](docs/QUICKSTART.md)**
+
+## Quickstart (làm tay trên router)
 ```sh
 # 0. Copy repo lên router (vd /root/sbproxy), rồi:
 cd /root/sbproxy
@@ -113,16 +122,23 @@ make check   # lint + test (giống CI)
 CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước & ràng buộc: [CONTRIBUTING.md](CONTRIBUTING.md) · lịch sử thay đổi: [CHANGELOG.md](CHANGELOG.md) · bảo mật: [SECURITY.md](SECURITY.md) · phiên bản: [VERSION](VERSION).
 
 ## Tài liệu
-- **[docs/admin-guide.md](docs/admin-guide.md) — Hướng dẫn QUẢN TRỊ local theo bước: firmware → cấu hình → agent LAN → bảo mật. Bắt đầu ở đây.**
-- **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: vận hành console hằng ngày, không cần dòng lệnh.**
 
-> **Sửa tài liệu:** sửa trực tiếp file **`.md`**. Dự án chỉ dùng Markdown, không sinh bản HTML.
-- [docs/GUIDE.md](docs/GUIDE.md) — Hướng dẫn toàn tập (một mạch): từ flash firmware → cấu hình → test → xử lý lỗi.
-- [docs/INSTALL.md](docs/INSTALL.md) — cài chi tiết + giải thích từng bước
-- [docs/TESTING.md](docs/TESTING.md) — cách test từng yêu cầu (IP đúng sock, DNS leak, WebRTC, isolation)
-- [docs/DEBUGGING.md](docs/DEBUGGING.md) — hướng dẫn debug: môi trường dev, bản đồ code, khoanh vùng lỗi trên PC và router
-- [docs/ROLLBACK.md](docs/ROLLBACK.md) — khi lỗi thì khôi phục thế nào (nhiều mức)
-- [console/desktop/README.vi.md](console/desktop/README.vi.md) — console desktop: cài router sau khi flash, chạy bằng file exe + gói `.tar.gz`
+**Cài đặt**
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md) — Cài nhanh bằng file exe: backup → flash → mật khẩu root → chạy app. Bắt đầu ở đây.**
+- [docs/INSTALL.md](docs/INSTALL.md) — cài tay từng lệnh, giải thích từng bước
+- [docs/GUIDE.md](docs/GUIDE.md) — hướng dẫn toàn tập một mạch: firmware → cấu hình → test → xử lý lỗi
+
+**Vận hành**
+- **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: dùng console hằng ngày, không cần dòng lệnh.**
+- [docs/admin-guide.md](docs/admin-guide.md) — hướng dẫn QUẢN TRỊ theo bước, kèm script tương ứng
+- [docs/TESTING.md](docs/TESTING.md) — kiểm tra IP đúng sock, DNS leak, WebRTC, cách ly client
+- [docs/ROLLBACK.md](docs/ROLLBACK.md) — khôi phục khi lỗi (nhiều mức)
+- [docs/DEBUGGING.md](docs/DEBUGGING.md) — debug: môi trường dev, bản đồ code, khoanh vùng lỗi PC/router
+
+**Thành phần**
+- [console/desktop/README.vi.md](console/desktop/README.vi.md) — console desktop: cài router sau khi flash, chạy bằng file exe
 - [agent/README.md](agent/README.md) — agent LAN trên router (CGI + healthd)
 - [pc/README.md](pc/README.md) — script quản trị từ máy tính qua SSH
 - [docs/TEST-MATRIX.md](docs/TEST-MATRIX.md) — ma trận test tự động
+
+> **Sửa tài liệu:** sửa trực tiếp file **`.md`**. Dự án chỉ dùng Markdown, không sinh bản HTML.

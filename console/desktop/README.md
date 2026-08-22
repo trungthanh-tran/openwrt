@@ -58,6 +58,10 @@ with no Python and no repository checkout on the operator's machine.
 
 ## Post-flash setup
 
+New router, start to finish? Follow the four-step
+[quick start](../../docs/QUICKSTART.en.md) instead; this section explains what
+the wizard does.
+
 A freshly flashed router carries no sbproxy code, no agent, and no token. Open
 **Post-flash setup…** — from the yellow bar shown while no token is stored, or
 from the button in the connection row, which is always available — and the

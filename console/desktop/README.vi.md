@@ -57,6 +57,9 @@ không cần mã nguồn.
 
 ## Cài đặt sau khi flash
 
+Router mới, làm từ đầu tới cuối? Theo
+[hướng dẫn 4 bước](../../docs/QUICKSTART.md); phần này giải thích wizard làm gì.
+
 Router vừa flash lại chưa có mã nguồn sbproxy, chưa có agent và chưa có token.
 Bấm **Cài đặt sau khi flash…** — trên thanh vàng hiện khi chưa lưu token, hoặc
 nút luôn có sẵn ở hàng kết nối — để console chạy toàn bộ quy trình qua SSH và

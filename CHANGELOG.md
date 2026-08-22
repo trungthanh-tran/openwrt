@@ -6,6 +6,10 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Hướng dẫn cài nhanh bằng file exe** (`docs/QUICKSTART.md` + bản EN): 4 bước
+  backup → flash → đặt mật khẩu root → chạy app, kèm phần chuẩn bị, kiểm tra sau
+  khi cài và bảng xử lý sự cố. README gốc và các guide gom mục lục theo nhóm
+  Cài đặt / Vận hành / Thành phần và trỏ thẳng vào hướng dẫn này.
 - **Cài đặt sau khi flash ngay trong console desktop**: nút **Cài đặt sau khi
   flash…** chạy toàn bộ chuỗi qua SSH — kiểm tra SSH, đẩy mã nguồn vào
   `/root/sbproxy`, `install-deps.sh`, đẩy `wifi-socks.conf` (và `settings.sh`

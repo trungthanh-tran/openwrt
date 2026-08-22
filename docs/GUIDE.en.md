@@ -8,11 +8,9 @@ Examples use the GL-MT6000 GL.iNet management default, `192.168.8.1`. OpenWrt va
 
 ## Deployment flow
 
-Steps 3–8 can be run in one pass by the desktop console — **Post-flash setup**
-inspects the router, pushes code and configuration, installs dependencies and
-the agent, and reads the token back
-([console/desktop/README.md](../console/desktop/README.md)). The manual
-sequence below stays authoritative and is what the console automates.
+Steps 3–8 can be run in one pass by the desktop console — see the four-step
+[quick start](QUICKSTART.en.md). The manual sequence below stays authoritative
+and is what the console automates.
 
 1. Back up the existing router configuration to another computer.
 2. Confirm the router is a GL-MT6000 and identify whether it runs official OpenWrt or GL.iNet OEM firmware.

@@ -22,7 +22,16 @@ SSID w2 -> br-w2 -> nftables TPROXY :12002 -> sing-box out-w2 -> SOCKS B
 
 Each SSID has its own bridge, subnet, DHCP scope, firewall zone, stable random MAC, and sing-box inbound/outbound pair.
 
-## Quick start
+## Quick start — the executable
+
+Back up, flash, set the root password, run the app. The desktop console does the
+rest over SSH: it pushes the code and configuration, installs the dependencies
+and the agent, runs the initial scripts, fetches the token, and opens the
+control screens. Nothing else has to be installed on your computer.
+
+**[Follow the four steps →](docs/QUICKSTART.en.md)**
+
+## Quick start — by hand on the router
 
 ```sh
 cd /root/sbproxy
@@ -73,16 +82,21 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 
 ## Documentation
 
-- [Complete guide](docs/GUIDE.en.md)
-- [Installation](docs/INSTALL.en.md)
-- [Testing](docs/TESTING.en.md)
-- [Debugging guide](docs/DEBUGGING.en.md)
-- [Rollback](docs/ROLLBACK.en.md)
-- [Administrator guide](docs/admin-guide.en.md)
-- [User guide](docs/user-guide.en.md)
-- [Desktop console](console/desktop/README.md)
-- [Local agent](agent/README.en.md)
-- [PC management](pc/README.en.md)
+**Install**
+
+- [Quick start with the executable](docs/QUICKSTART.en.md) — four steps, no checkout
+- [Installation by hand](docs/INSTALL.en.md) — the same work, command by command
+- [Complete guide](docs/GUIDE.en.md) — firmware to acceptance in one read
+
+**Operate**
+
+- [User guide](docs/user-guide.en.md) — daily console use
+- [Administrator guide](docs/admin-guide.en.md) — every step with its script
+- [Testing](docs/TESTING.en.md) · [Rollback](docs/ROLLBACK.en.md) · [Debugging](docs/DEBUGGING.en.md)
+
+**Components**
+
+- [Desktop console](console/desktop/README.md) · [Local agent](agent/README.en.md) · [PC management](pc/README.en.md)
 - [Automated test matrix](docs/TEST-MATRIX.md)
 
 ## Testing

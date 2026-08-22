@@ -115,7 +115,7 @@ cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/s
 - Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi `passwd`.
 - SSH trong cấu hình MT6000 của tài liệu này: `ssh root@192.168.8.1`. Host key đổi → xoá dòng cũ trong `~/.ssh/known_hosts`.
 
-> **Làm nhanh Bước 6–10 bằng console desktop:** mở app, bấm **Cài đặt sau khi flash…**, nhập địa chỉ router + thông tin SSH rồi bấm chạy. Chuỗi chạy qua SSH:
+> **Làm nhanh Bước 6–10 bằng console desktop** (toàn bộ đường đi 4 bước: [QUICKSTART.md](QUICKSTART.md)): mở app, bấm **Cài đặt sau khi flash…**, nhập địa chỉ router + thông tin SSH rồi bấm chạy. Chuỗi chạy qua SSH:
 >
 > 1. kiểm tra hiện trạng router (mã nguồn, cấu hình, phụ thuộc, agent, token) — phần nào đã có thì dùng lại;
 > 2. đẩy mã nguồn + `wifi-socks.conf`, cài phụ thuộc;
