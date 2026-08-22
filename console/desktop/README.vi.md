@@ -135,37 +135,48 @@ là cài được router**. Chỉ cần thêm gói `sbproxy-update-<version>.tar
 cài version khác gói nhúng; tạo từ mã nguồn bằng `make package`,
 `sh pc/make-package.sh` hoặc `.\pc\make-package.ps1` (file ra ở `dist/`).
 
-Máy nào cũng cần: OpenSSH client (`ssh`, `scp`) và `tar` trong `PATH`, cùng một
-đường LAN có dây tới router. Không cần Python, không cần mã nguồn.
+Máy nào cũng cần: OpenSSH client (`ssh` và `scp`) trong `PATH` và một đường LAN
+có dây tới router. Không cần Python, không cần mã nguồn, cũng **không cần `tar`**:
+gói nhúng được đẩy nguyên trạng và router tự giải nén. Chỉ khi payload là thư mục
+mã nguồn (phải đóng gói trước) thì máy mới cần `tar`.
 
-### 1. Kiểm tra công cụ và gói cài
+### 1. Kiểm tra file chạy và gói nó mang theo
+
+Không có file gói nào phải giữ kèm: file thực thi đã chứa sẵn
+`sbproxy-update-<version>.tar.gz` và bung ra cạnh runtime của nó khi chạy.
+`--where` in ra đúng bản gói sẽ được đẩy lên router, nên dòng `payload=` vừa là
+bằng chứng gói có sẵn, vừa cho biết sẽ cài version nào.
 
 Windows (PowerShell):
 
 ```powershell
-ssh -V; tar --version            # cả hai phải có trong PATH
-.\sbproxy-console.exe --where    # home/config/logs/runtime + gói đang dùng
-
-# Tuỳ chọn, kiểm tra file gói:
-tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # gói chứa gì
-tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # gói là version nào
+ssh -V                           # OpenSSH client phải có trong PATH
+.\sbproxy-console.exe --where    # home/config/logs/runtime + payload=…-<version>.tar.gz
 ```
 
 Linux/macOS (shell):
 
 ```sh
-ssh -V; tar --version            # cả hai phải có trong PATH
+ssh -V                           # OpenSSH client phải có trong PATH
 chmod +x ./sbproxy-console       # chỉ cần lần đầu
-./sbproxy-console --where        # home/config/logs/runtime + gói đang dùng
-
-# Tuỳ chọn, kiểm tra file gói:
-tar -tzf ./sbproxy-update-0.4.0.tar.gz | head
-tar -xzOf ./sbproxy-update-0.4.0.tar.gz VERSION
+./sbproxy-console --where        # home/config/logs/runtime + payload=…-<version>.tar.gz
 ```
 
-Dòng `payload=` do `--where` in ra chính là gói mà **Cài đặt sau khi flash** sẽ
-đẩy lên router: đường dẫn trong bundle đã bung nếu chạy bản build, hoặc thư mục
-mã nguồn nếu chạy từ source.
+Nếu chạy từ mã nguồn thay vì bản build, `payload=` trỏ vào thư mục repo và app
+tự đóng gói khi cài — đó là trường hợp duy nhất máy cần `tar`.
+
+**Chỉ khi mang thêm một gói rời** (để cài version khác gói nhúng) mới có file để
+kiểm tra:
+
+```powershell
+tar -tzf .\sbproxy-update-0.5.0.tar.gz | Select-Object -First 10   # gói chứa gì
+tar -xzOf .\sbproxy-update-0.5.0.tar.gz VERSION                    # gói là version nào
+```
+
+```sh
+tar -tzf ./sbproxy-update-0.5.0.tar.gz | head
+tar -xzOf ./sbproxy-update-0.5.0.tar.gz VERSION
+```
 
 ### 2. Kiểm tra router trước khi đụng vào
 

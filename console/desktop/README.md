@@ -142,38 +142,50 @@ to install a version other than the embedded one; build one from a checkout with
 `make package`, `sh pc/make-package.sh`, or `.\pc\make-package.ps1` (output in
 `dist/`).
 
-What the machine needs either way: the OpenSSH client (`ssh`, `scp`) and `tar`
-on `PATH`, plus a wired LAN connection to the router. Nothing else — no Python,
-no repository checkout.
+What the machine needs either way: the OpenSSH client (`ssh` and `scp`) on
+`PATH` and a wired LAN connection to the router. Nothing else — no Python, no
+repository checkout, and no `tar`: the embedded package is uploaded as it is and
+unpacked by the router. `tar` is only needed on the machine when the payload is
+a source checkout that has to be packaged first.
 
-### 1. Check the tools and the package
+### 1. Check the tool and the package it carries
+
+There is no package file to look after: the executable already contains
+`sbproxy-update-<version>.tar.gz` and unpacks it beside its own runtime at
+launch. `--where` prints the copy it will push, so the `payload=` line is both
+the proof it is there and the version that will be installed.
 
 Windows (PowerShell):
 
 ```powershell
-ssh -V; tar --version            # both must exist on PATH
-.\sbproxy-console.exe --where    # home/config/logs/runtime + the payload in use
-
-# Optional checks on a package file:
-tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # what it contains
-tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # which version it is
+ssh -V                           # OpenSSH client must exist on PATH
+.\sbproxy-console.exe --where    # home/config/logs/runtime + payload=…-<version>.tar.gz
 ```
 
 Linux/macOS (shell):
 
 ```sh
-ssh -V; tar --version            # both must exist on PATH
+ssh -V                           # OpenSSH client must exist on PATH
 chmod +x ./sbproxy-console       # first run only
-./sbproxy-console --where        # home/config/logs/runtime + the payload in use
-
-# Optional checks on a package file:
-tar -tzf ./sbproxy-update-0.4.0.tar.gz | head
-tar -xzOf ./sbproxy-update-0.4.0.tar.gz VERSION
+./sbproxy-console --where        # home/config/logs/runtime + payload=…-<version>.tar.gz
 ```
 
-The `payload=` line from `--where` is exactly the package **Post-flash setup**
-will push: a path inside the unpacked bundle for a shipped executable, or the
-checkout when the app runs from source.
+Running from a source checkout instead of a build, `payload=` points at the
+checkout, which the app packages on the fly — that is the case that needs `tar`
+on the machine.
+
+**Only if you also carry a separate package** (to install a version other than
+the embedded one) is there a file to inspect:
+
+```powershell
+tar -tzf .\sbproxy-update-0.5.0.tar.gz | Select-Object -First 10   # what it contains
+tar -xzOf .\sbproxy-update-0.5.0.tar.gz VERSION                    # which version it is
+```
+
+```sh
+tar -tzf ./sbproxy-update-0.5.0.tar.gz | head
+tar -xzOf ./sbproxy-update-0.5.0.tar.gz VERSION
+```
 
 ### 2. Check the router before changing anything
 
