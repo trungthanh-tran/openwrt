@@ -60,9 +60,14 @@ the code and configuration, installs dependencies and the agent, runs the
 initial scripts, then reads the token back and opens the control screens —
 reusing anything already installed and reporting every step live. A built
 executable embeds the matching router package, so no repository checkout is
-needed on the operator's machine. Build it with
-`cd console/desktop; .\build.ps1` on Windows or `sh build.sh` on Linux/macOS —
-see [console/desktop/README.md](console/desktop/README.md).
+needed on the operator's machine.
+
+It ships as two separate artifacts because PyInstaller does not cross-compile:
+`console/desktop/dist/sbproxy-console.exe` for Windows (`cd console/desktop;
+.\build.ps1`) and `console/desktop/dist/sbproxy-console` for Linux/macOS
+(`sh console/desktop/build.sh`). Each one is self-contained — start it with
+`.\sbproxy-console.exe` or `./sbproxy-console`. See
+[console/desktop/README.md](console/desktop/README.md).
 
 There is no cloud control. Use a trusted management LAN or self-managed VPN. Never expose LuCI, uhttpd, SSH, or the agent directly to the WAN.
 

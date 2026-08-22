@@ -9,9 +9,11 @@
 The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.
 
 The console has two independent frontends over the same Agent API: the **web
-build** (`http://<router>/sbproxy/`) and a native Tkinter **desktop build**
-(`sbproxy-console.exe`). The desktop app uses no HTML/WebView/WebView2 and
-protects the saved token with Windows DPAPI.
+build** (`http://<router>/sbproxy/`) and a native Tkinter **desktop build**.
+The desktop build is one self-contained file per platform —
+`sbproxy-console.exe` on Windows, `sbproxy-console` on Linux/macOS — and uses no
+HTML/WebView/WebView2. It protects the saved token with Windows DPAPI, or with
+`chmod 600` on Linux/macOS.
 
 ## Open the console
 

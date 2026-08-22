@@ -117,19 +117,30 @@ trả về version khác với gói vừa cài.
 
 ## Chạy tại hiện trường: file exe + gói `sbproxy-update-*.tar.gz`
 
-Cần mang theo:
+Cùng một quy trình nhưng có **hai bản chạy** — chọn đúng bản cho máy mang theo.
+**PyInstaller không cross-compile: file `.exe` của Windows không chạy trên Linux
+và ngược lại**, nên phải build (hoặc lấy) đúng bản của nền tảng đó.
 
-- `sbproxy-console.exe` (Windows) hoặc `sbproxy-console` (Linux/macOS). File này
-  đã nhúng gói router đúng version của nó nên **một mình nó cài được router**.
-- Gói `sbproxy-update-<version>.tar.gz` (tuỳ chọn), chỉ cần khi muốn cài version
-  khác với gói nhúng. Tạo từ mã nguồn bằng `make package`,
-  `sh pc/make-package.sh` hoặc `.\pc\make-package.ps1`; file ra nằm ở `dist/`.
+| | Windows | Linux / macOS |
+|---|---|---|
+| File mang theo | `sbproxy-console.exe` | `sbproxy-console` (binary ELF/Mach-O) |
+| Build bằng | `.\build.ps1` | `sh build.sh` |
+| Chạy | `.\sbproxy-console.exe` | `./sbproxy-console` (lần đầu `chmod +x`) |
+| Lưu token | DPAPI theo tài khoản Windows | `chmod 600` trong thư mục home của app |
+| Thư mục home | `%LOCALAPPDATA%\sbproxy-console-native` | `~/.local/share/sbproxy-console-native` |
+| Yêu cầu thêm | — | máy build phải có Tk (`python3-tk`) |
 
-Máy tính cần: Windows 10+ (hoặc Linux/macOS) có OpenSSH client (`ssh`, `scp`) và
-`tar` trong `PATH`, cùng một đường LAN có dây tới router. Không cần Python,
-không cần mã nguồn.
+Cả hai bản đều nhúng sẵn gói router đúng version của chính nó, nên **chỉ một file
+là cài được router**. Chỉ cần thêm gói `sbproxy-update-<version>.tar.gz` khi muốn
+cài version khác gói nhúng; tạo từ mã nguồn bằng `make package`,
+`sh pc/make-package.sh` hoặc `.\pc\make-package.ps1` (file ra ở `dist/`).
+
+Máy nào cũng cần: OpenSSH client (`ssh`, `scp`) và `tar` trong `PATH`, cùng một
+đường LAN có dây tới router. Không cần Python, không cần mã nguồn.
 
 ### 1. Kiểm tra công cụ và gói cài
+
+Windows (PowerShell):
 
 ```powershell
 ssh -V; tar --version            # cả hai phải có trong PATH
@@ -138,6 +149,18 @@ ssh -V; tar --version            # cả hai phải có trong PATH
 # Tuỳ chọn, kiểm tra file gói:
 tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # gói chứa gì
 tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # gói là version nào
+```
+
+Linux/macOS (shell):
+
+```sh
+ssh -V; tar --version            # cả hai phải có trong PATH
+chmod +x ./sbproxy-console       # chỉ cần lần đầu
+./sbproxy-console --where        # home/config/logs/runtime + gói đang dùng
+
+# Tuỳ chọn, kiểm tra file gói:
+tar -tzf ./sbproxy-update-0.4.0.tar.gz | head
+tar -xzOf ./sbproxy-update-0.4.0.tar.gz VERSION
 ```
 
 Dòng `payload=` do `--where` in ra chính là gói mà **Cài đặt sau khi flash** sẽ
@@ -176,6 +199,10 @@ $env:SBPROXY_PAYLOAD = "D:\packages\sbproxy-update-0.5.0.tar.gz"
 .\sbproxy-console.exe
 ```
 
+```sh
+SBPROXY_PAYLOAD=/srv/packages/sbproxy-update-0.5.0.tar.gz ./sbproxy-console
+```
+
 Khi router đã chạy agent thì các lần cập nhật sau không cần SSH nữa: upload đúng
 file `.tar.gz` đó trong dialog **Cập nhật** của console web
 (`scripts/self-update.sh` giữ nguyên `wifi-socks.conf` + `settings.sh` và chặn hạ
@@ -201,6 +228,11 @@ $env:SBPROXY_BASE = "http://192.168.8.1"
 $env:SBPROXY_TOKEN = "<token>"
 .\dist\sbproxy-console.exe --provision
 .\dist\sbproxy-console.exe --probe
+```
+
+```sh
+SBPROXY_BASE=http://192.168.8.1 SBPROXY_TOKEN=<token> ./dist/sbproxy-console --provision
+./dist/sbproxy-console --probe
 ```
 
 Agent dùng `Authorization: Bearer <token>` vì uhttpd có thể loại bỏ header CGI

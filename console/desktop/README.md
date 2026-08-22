@@ -122,21 +122,33 @@ different version than the package that was installed.
 
 ## Field runbook: the executable plus a `sbproxy-update-*.tar.gz`
 
-What to carry to the site:
+The same workflow ships in two forms — pick the one for the machine you are
+carrying. **PyInstaller does not cross-compile: a Windows `.exe` cannot run on
+Linux and a Linux binary cannot run on Windows**, so build (or fetch) the one
+that matches.
 
-- `sbproxy-console.exe` (Windows) or `sbproxy-console` (Linux/macOS). It embeds
-  the router package matching its own version, so this file alone installs a
-  router.
-- Optionally a `sbproxy-update-<version>.tar.gz`, needed only to install a
-  version other than the embedded one. Build one from a checkout with
-  `make package`, `sh pc/make-package.sh`, or `.\pc\make-package.ps1`; the
-  output lands in `dist/`.
+| | Windows | Linux / macOS |
+|---|---|---|
+| File to carry | `sbproxy-console.exe` | `sbproxy-console` (ELF/Mach-O binary) |
+| Built by | `.\build.ps1` | `sh build.sh` |
+| Start it | `.\sbproxy-console.exe` | `./sbproxy-console` (`chmod +x` once) |
+| Token storage | DPAPI, current Windows account | `chmod 600` inside the app home |
+| Private home | `%LOCALAPPDATA%\sbproxy-console-native` | `~/.local/share/sbproxy-console-native` |
+| Extra requirement | — | a working Tk on the build machine (`python3-tk`) |
 
-What the PC needs: Windows 10+ (or Linux/macOS) with the OpenSSH client
-(`ssh`, `scp`) and `tar` on `PATH`, plus a wired LAN connection to the router.
-Nothing else — no Python, no repository checkout.
+Both forms embed the router package matching their own version, so **the single
+file installs a router by itself**. Add a `sbproxy-update-<version>.tar.gz` only
+to install a version other than the embedded one; build one from a checkout with
+`make package`, `sh pc/make-package.sh`, or `.\pc\make-package.ps1` (output in
+`dist/`).
+
+What the machine needs either way: the OpenSSH client (`ssh`, `scp`) and `tar`
+on `PATH`, plus a wired LAN connection to the router. Nothing else — no Python,
+no repository checkout.
 
 ### 1. Check the tools and the package
+
+Windows (PowerShell):
 
 ```powershell
 ssh -V; tar --version            # both must exist on PATH
@@ -145,6 +157,18 @@ ssh -V; tar --version            # both must exist on PATH
 # Optional checks on a package file:
 tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # what it contains
 tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # which version it is
+```
+
+Linux/macOS (shell):
+
+```sh
+ssh -V; tar --version            # both must exist on PATH
+chmod +x ./sbproxy-console       # first run only
+./sbproxy-console --where        # home/config/logs/runtime + the payload in use
+
+# Optional checks on a package file:
+tar -tzf ./sbproxy-update-0.4.0.tar.gz | head
+tar -xzOf ./sbproxy-update-0.4.0.tar.gz VERSION
 ```
 
 The `payload=` line from `--where` is exactly the package **Post-flash setup**
@@ -183,6 +207,10 @@ $env:SBPROXY_PAYLOAD = "D:\packages\sbproxy-update-0.5.0.tar.gz"
 .\sbproxy-console.exe
 ```
 
+```sh
+SBPROXY_PAYLOAD=/srv/packages/sbproxy-update-0.5.0.tar.gz ./sbproxy-console
+```
+
 Once a router runs the agent, routine updates no longer need SSH: upload the
 same `.tar.gz` from the web console's **Update** dialog (`scripts/self-update.sh`
 keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades).
@@ -207,6 +235,11 @@ $env:SBPROXY_BASE = "http://192.168.8.1"
 $env:SBPROXY_TOKEN = "<token>"
 .\dist\sbproxy-console.exe --provision
 .\dist\sbproxy-console.exe --probe
+```
+
+```sh
+SBPROXY_BASE=http://192.168.8.1 SBPROXY_TOKEN=<token> ./dist/sbproxy-console --provision
+./dist/sbproxy-console --probe
 ```
 
 Requests use `Authorization: Bearer <token>` because uhttpd may discard custom

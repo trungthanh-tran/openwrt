@@ -53,6 +53,10 @@ Ngày theo định dạng YYYY-MM-DD.
   chối đẩy gói cũ hơn; cài lại agent khi CGI/healthd/UI đã deploy khác với code
   vừa đẩy (trước đây chỉ cần “đã có agent” là bỏ qua, khiến CGI cũ vẫn chạy sau
   khi nâng version); bước cuối báo lỗi nếu agent trả về version khác gói vừa cài.
+- Tài liệu tách rõ hai bản chạy: `.exe` cho Windows và binary `sbproxy-console`
+  cho Linux/macOS (PyInstaller không cross-compile) — bảng đối chiếu file/lệnh
+  build/cách chạy/nơi lưu token, kèm ví dụ PowerShell và shell song song trong
+  phần chạy tại hiện trường; README gốc, admin-guide và user-guide ghi chú tương ứng.
 - Suite mới `tests/test_desktop_provision.py` và các test GUI cho wizard.
 
 ### Fixed
