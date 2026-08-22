@@ -7,6 +7,11 @@
 - Truy cập **SSH** vào router (`ssh root@192.168.8.1` hoặc IP LAN của bạn).
 - **QUAN TRỌNG:** làm lần đầu khi **có đường mạng dự phòng** (cắm LAN trực tiếp) để nếu WiFi/định tuyến hỏng vẫn vào lại được router.
 
+> **Đi nhanh:** console desktop chạy toàn bộ các bước dưới đây qua SSH trong
+> một màn hình — **Cài đặt sau khi flash**, xem
+> [console/desktop/README.vi.md](../console/desktop/README.vi.md). Làm tay
+> theo các bước dưới khi cần xem hoặc sửa từng lệnh.
+
 ## 1. Đưa project lên router
 Từ máy tính (PowerShell):
 ```powershell

@@ -30,6 +30,8 @@ sh agent/install-agent.sh
 ```
 Script sẽ: cài `curl jq`, tạo `/etc/sbproxy/env` + `/etc/sbproxy/token`, đặt CGI, self-host UI vào `/www/sbproxy/`, cài + chạy health daemon. Cuối cùng in ra **URL + token**.
 
+Console desktop chạy đúng script này qua SSH rồi đọc token về hộ bạn — xem **Cài đặt sau khi flash** trong [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
+
 ## Dùng
 1. Mở **`http://<router>/sbproxy/`** (phải là **http từ chính router** — xem mixed-content bên dưới).
 2. Bấm **🔌 Kết nối router**, để trống Base URL (same-origin), dán **token** → **Kết nối**.

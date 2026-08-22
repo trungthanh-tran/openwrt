@@ -54,6 +54,23 @@ Suite: `tests/test_desktop_workflows.py`
 | Backups | Empty/invalid/safe labels, selection state, confirmation, rollback reconnect delay |
 | SSID deletion/addition | Confirmation and 200-SSID limit without opening an invalid dialog |
 
+## Post-flash provisioning
+
+Suite: `tests/test_desktop_provision.py`
+
+| Area | Cases locked by tests |
+|---|---|
+| SSH/SCP commands | Batch mode without a password, askpass options with one, legacy SCP protocol, custom port, password never on the command line |
+| Settings validation | Missing host/user, invalid port, relative router directory, missing key/payload, password excluded from the stored payload |
+| Step sequence | All ten steps in order, install-deps before agent install before token read, both config files uploaded, skipped steps reported |
+| Reuse what exists | An installed router skips dependencies, configuration, and agent install but still reads the token; the overwrite/reinstall flags force each; a missing agent is installed despite a stale token |
+| Router inventory | Read-only probe command, unreported keys default to absent, present/missing description, English labels |
+| Failure handling | Failing step stops the chain, missing local tool, timeout, unhealthy agent, cancellation, invalid source folder |
+| Token handling | Valid token shape accepted and stored, noise/short/error output rejected |
+| Router probe | `ok`, 401/403, 404, 5xx, and socket failure classification |
+| Configuration | Settings round-trip, payload discovery via override, embedded bundle, and source checkout; a bundled payload path is never persisted |
+| Translation | Every step, state, and router-state label has English; composed `step: detail` errors translate on both sides |
+
 ## Dirty and adversarial data
 
 Suite: `tests/test_dirty_data.py`, plus dirty-input sections in
@@ -78,6 +95,9 @@ Suite: `tests/test_desktop_gui.py`
 - Verifies live language/theme handlers persist their selections.
 - Opens Wi-Fi edit, Random MAC, blocklist, and loading dialogs in both
   languages.
+- Shows the setup bar only without a token, connects immediately with one,
+  renders every wizard step in both languages, and adopts a provisioned
+  token into the main window.
 - Automatically skips only when no graphical display is available.
 
 ## Agent CGI

@@ -2,6 +2,8 @@
 
 **Language:** English (default) | [Tiếng Việt](user-guide.md)
 
+> The Vietnamese edition ([user-guide.md](user-guide.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 > Technical and administration detail: [admin-guide.en.md](admin-guide.en.md).
 
 The console manages SSIDs, their SOCKS5 upstreams, proxy health, and router snapshots without requiring a command line.
@@ -21,6 +23,11 @@ protects the saved token with Windows DPAPI.
    URL to `http://<router-ip>`.
 4. A successful desktop connection loads configuration, clients, backups, and
    sing-box status from the router.
+
+If the desktop app shows a yellow **Router not configured** bar, that router has
+no agent or token yet. **Check status** says which of the two is missing without
+changing anything; the actual setup is an administrator task
+([admin-guide.en.md](admin-guide.en.md)).
 
 The **Internet Gateway** card shows the actual egress interface/device, next
 hop, source IP, link, DNS, and direct HTTP latency. Use **Check gateway** when

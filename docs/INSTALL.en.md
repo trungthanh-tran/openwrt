@@ -2,7 +2,14 @@
 
 **Language:** [Tiếng Việt](INSTALL.md) | English
 
+> The Vietnamese edition ([INSTALL.md](INSTALL.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 Connect over SSH to `root@192.168.8.1`, the GL-MT6000 GL.iNet default, or use its configured LAN address.
+
+> **Shortcut:** the desktop console performs every step below over SSH from
+> one screen — **Post-flash setup** in
+> [console/desktop/README.md](../console/desktop/README.md). Use the manual
+> steps when you want to see or adapt each command.
 
 ## 1. Copy and configure
 

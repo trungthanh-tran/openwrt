@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](ROLLBACK.md) | English
 
+> The Vietnamese edition ([ROLLBACK.md](ROLLBACK.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 Normal GL-MT6000 management uses `192.168.8.1`. This documentation uses `192.168.1.1` only for OpenWrt failsafe/U-Boot recovery where applicable.
 
 Every full apply, SOCKS change, and uninstall creates a snapshot under `/root/sbproxy-backups` unless explicitly disabled.

@@ -1,45 +1,195 @@
-# sbproxy Console Native for Windows
+# sbproxy Console Native
 
 **Language:** English (default) | [Tiếng Việt](README.vi.md)
 
-This standalone Tkinter desktop application calls the router Agent API
-directly. It uses **no HTML, WebView, or WebView2**; the router-hosted console
-at `console/web/control-panel.html` remains a separate application.
+A standalone Tkinter desktop application that talks to the router Agent API
+directly. It uses **no HTML, WebView, or WebView2** — the router-hosted console
+at `console/web/control-panel.html` is a separate application over the same API.
+Windows is the primary target; the same source builds on Linux and macOS.
+
+Two things it does that the web console cannot: it installs a freshly flashed
+router over SSH (**Post-flash setup**), and it runs from a single executable
+with no Python and no repository checkout on the operator's machine.
 
 ## Features
 
-- Switch live between English/Vietnamese and Dark/Light themes. Preferences
-  persist across launches; the defaults are English and Dark.
-- Manage Wi-Fi/SSID and SOCKS5 records, save configuration, and apply it.
-- Add/remove SSIDs; every Apply dry-runs the temporary candidate before saving,
-  then the Agent enforces a final dry-run before changing router state.
-- Show a staged modal loading screen; timeouts are 60 seconds for dry-run, 45
-  seconds for save/backup, and 120 seconds for apply.
-- Change an SSID's SOCKS5 endpoint without a full edit.
-- List clients and kick, ban, or unban them.
-- Filter clients by SSID, IP/name/MAC, ban state, and signal strength.
-- Advanced filters for band, online/offline state, access state, RSSI range,
-  traffic, and connection duration; click any column heading to sort.
-- Dashboard counters, 5–60 second auto-refresh, details, multi-select actions,
-  IP/MAC copy, and UTF-8 CSV export.
-- Internet Gateway card with the actual route, `wwan`/device, next hop, source
-  IP, link, DNS, and HTTP latency; warns when egress bypasses `wwan`.
-- Keep offline blocklist entries visible so they can be unblocked.
-- Selection-dependent actions live in the edit panel beside their table;
-  toolbars contain only global actions.
-- Important actions show their impact first and default to **No**; they run
-  only after explicit confirmation.
-- Select a router provider/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, etc.)
-  and click **Random MAC**; the provider and new BSSID are persisted.
-- Inspect backups, roll back, run health checks, and view operation logs.
-- Protect the router URL and token with Windows DPAPI for the current user.
+**Configuration**
+
+- Manage Wi-Fi/SSID and SOCKS5 records, save the configuration, and apply it.
+- Add or remove SSIDs; every Apply dry-runs the candidate before saving, and
+  the Agent enforces a final dry-run before the router changes state.
+- Change one SSID's SOCKS5 endpoint without a full edit.
+- Pick a router vendor/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, …) and
+  click **Random MAC**; the vendor and the new BSSID are persisted.
+
+**Devices**
+
+- List clients and kick, ban, or unban them; offline blocklist entries stay
+  visible so they can be unblocked.
+- Filter by SSID, IP/name/MAC, band, online state, access state, RSSI, traffic,
+  and connection duration; click any column heading to sort.
+- Dashboard counters, 5–60 second auto-refresh, per-device details,
+  multi-select actions, IP/MAC copy, and UTF-8 CSV export.
+
+**Operations**
+
+- Internet Gateway card: actual route, `wwan`/device, next hop, source IP,
+  link, DNS, and HTTP latency; warns when egress bypasses `wwan`.
+- Inspect backups, roll back, run health checks, and read the operation log.
+- Install or repair a router over SSH from the app — see
+  [Post-flash setup](#post-flash-setup).
+
+**Interface and safety**
+
+- Switch live between English/Vietnamese and Dark/Light; preferences persist
+  (defaults: English, Dark).
+- A staged modal loading screen with finite timeouts: 60 s dry-run, 45 s
+  save/backup, 120 s apply.
+- Important actions state their impact first and default to **No**.
+- Selection-dependent actions sit in the edit panel beside their table;
+  toolbars hold only global actions.
+- The router URL and token are stored with Windows DPAPI for the current user
+  (`chmod 600` on Linux/macOS).
+
+## Post-flash setup
+
+A freshly flashed router carries no sbproxy code, no agent, and no token. Open
+**Post-flash setup…** — from the yellow bar shown while no token is stored, or
+from the button in the connection row, which is always available — and the
+console runs the whole bring-up over SSH, ticking each step in the checklist as
+it goes:
+
+1. Check the SSH connection (and report the OpenWrt release).
+2. Check what the router already has: code, `wifi-socks.conf`, sing-box, the
+   agent CGI, its token, and whether sing-box runs.
+3. Push the code to `/root/sbproxy`.
+4. Install dependencies (`scripts/install-deps.sh`).
+5. Push `config/wifi-socks.conf` — and `config/settings.sh` when selected.
+6. Run `scripts/preflight.sh` and `DRYRUN=1 scripts/apply.sh`.
+7. Run the initial `scripts/apply.sh` (optional checkbox).
+8. Install or update the agent (`agent/install-agent.sh`).
+9. Read `/etc/sbproxy/token` and store it like a manually typed token.
+10. Call `?action=status` to confirm the agent answers.
+
+**Nothing already working is redone.** Step 2 decides the rest of the run:
+dependencies present are not reinstalled, an existing configuration is kept,
+and an installed agent with a valid token is left alone — its token is still
+read, so the tool opens on it. Tick **Overwrite the configuration already on
+the router** or **Reinstall the agent even if it is present** to force either.
+
+The run stops at the first failing step and shows the router's own error, so
+the step can be fixed and the run repeated; every finished step is idempotent.
+When the last step passes, the wizard closes and the control screens open
+against the new token.
+
+**Authentication** uses the local OpenSSH client: an SSH key, a key already
+loaded in the agent, or the router password. The password reaches `ssh` through
+an askpass helper — never on the command line — and is never written to
+`connection.json`. Router address, user, port, and paths are remembered for the
+next run.
+
+**Checking before installing.** With a stored token the app connects on launch
+and opens the control screens. Without one it quietly probes the stored router
+address and puts the answer in the yellow bar: agent healthy, agent up but the
+token is wrong, router up without an agent, or unreachable. **Check status**
+repeats that on demand and adds the SSH inventory from step 2. Both are
+read-only, so a setup run is only started when it is actually needed.
+
+## Field runbook: the executable plus a `sbproxy-update-*.tar.gz`
+
+What to carry to the site:
+
+- `sbproxy-console.exe` (Windows) or `sbproxy-console` (Linux/macOS). It embeds
+  the router package matching its own version, so this file alone installs a
+  router.
+- Optionally a `sbproxy-update-<version>.tar.gz`, needed only to install a
+  version other than the embedded one. Build one from a checkout with
+  `make package`, `sh pc/make-package.sh`, or `.\pc\make-package.ps1`; the
+  output lands in `dist/`.
+
+What the PC needs: Windows 10+ (or Linux/macOS) with the OpenSSH client
+(`ssh`, `scp`) and `tar` on `PATH`, plus a wired LAN connection to the router.
+Nothing else — no Python, no repository checkout.
+
+### 1. Check the tools and the package
+
+```powershell
+ssh -V; tar --version            # both must exist on PATH
+.\sbproxy-console.exe --where    # home/config/logs/runtime + the payload in use
+
+# Optional checks on a package file:
+tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # what it contains
+tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # which version it is
+```
+
+The `payload=` line from `--where` is exactly the package **Post-flash setup**
+will push: a path inside the unpacked bundle for a shipped executable, or the
+checkout when the app runs from source.
+
+### 2. Check the router before changing anything
+
+Start the app and read the yellow bar, or press **Check status** — both are
+read-only, as described above. From a script, `--probe` exits 0 when the stored
+token still works.
+
+### 3. Install or repair the router
+
+Open **Post-flash setup…**, then:
+
+| Field | What to enter |
+|---|---|
+| Router (IP) | `192.168.8.1` on GL.iNet firmware, `192.168.1.1` on vanilla/recovery |
+| SSH account / port | `root`, `22` |
+| SSH password / key | the router password, or an SSH key (a key needs no password) |
+| Router directory | `/root/sbproxy` unless the install lives elsewhere |
+| Source folder or `.tar.gz` | leave as-is for the embedded package; browse to a `sbproxy-update-<version>.tar.gz` to install that one instead |
+| `wifi-socks.conf` | the configuration to push; leave empty to keep the router's own |
+| Overwrite / Reinstall | tick only to replace an existing configuration or agent |
+
+Press **Start setup** and watch the checklist: steps whose work is already done
+are marked *Skipped*, a failure stops the run with the router's own error, and a
+finished run stores the token and opens the control screens.
+
+To install a different package later, reopen the wizard and pick the new
+`.tar.gz`, or point the app at one before launching:
+
+```powershell
+$env:SBPROXY_PAYLOAD = "D:\packages\sbproxy-update-0.5.0.tar.gz"
+.\sbproxy-console.exe
+```
+
+Once a router runs the agent, routine updates no longer need SSH: upload the
+same `.tar.gz` from the web console's **Update** dialog (`scripts/self-update.sh`
+keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades).
+
+## Command line and environment
+
+| Flag / variable | Effect |
+|---|---|
+| `--where` | Print the resolved home, config, logs, runtime, and payload paths |
+| `--probe` | Exit 0 when the stored token still reaches the agent, 1 otherwise |
+| `--provision` | Store `SBPROXY_BASE`/`SBPROXY_TOKEN` and exit (0 on success, 2 without a token) |
+| `--verbose` | DEBUG-level logging for this run |
+| `SBPROXY_HOME` | Override the private home directory |
+| `SBPROXY_PAYLOAD` | Router package or checkout **Post-flash setup** should push |
+| `SBPROXY_BASE`, `SBPROXY_TOKEN` | Connection values consumed by `--provision` |
+
+Provision a connection without ever writing the token in plaintext:
+
+```powershell
+$env:SBPROXY_BASE = "http://192.168.8.1"
+$env:SBPROXY_TOKEN = "<token>"
+.\dist\sbproxy-console.exe --provision
+.\dist\sbproxy-console.exe --probe
+```
+
+Requests use `Authorization: Bearer <token>` because uhttpd may discard custom
+CGI headers. Only expose the Agent on a management LAN/VLAN, never on the WAN.
 
 ## Build
 
 Python 3.9+ with Tkinter is required. PyInstaller does not cross-compile —
 build on each target platform.
-
-Windows:
 
 ```powershell
 cd console\desktop
@@ -47,15 +197,18 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
-Linux/macOS (Debian/Ubuntu: `sudo apt install python3-tk` first):
-
 ```sh
 cd console/desktop
 sh build.sh
-# -> dist/sbproxy-console
+# -> dist/sbproxy-console        (Debian/Ubuntu: sudo apt install python3-tk first)
 ```
 
-The generated binary does not require Python or WebView2 on the target PC.
+Both scripts embed the router-side package (`sbproxy-update-<version>.tar.gz`,
+the same file list as `pc/make-package.sh`) so **Post-flash setup** works from
+the executable alone. The package is built in a temp folder outside the
+repository and unpacks with the rest of the bundle at launch; `SBPROXY_PAYLOAD`
+and the wizard's file picker still take precedence. The generated binary needs
+neither Python nor WebView2 on the target PC.
 
 On Linux the POSIX bootloader does not expand `~` or `$HOME`, so the bundled
 runtime unpacks to the default temp folder unless an absolute path is given:
@@ -78,55 +231,33 @@ mixes with other Python environments or with another copy of the app:
 
 `<home>` is resolved in this order:
 
-1. `SBPROXY_HOME` environment variable (any path you choose).
+1. `SBPROXY_HOME` (any path you choose).
 2. A `data/` folder next to the executable — **portable mode**, ideal for a USB
    stick or a copy-anywhere install; create the folder and the app uses it.
 3. Per-user default: `%LOCALAPPDATA%\sbproxy-console-native` on Windows,
    `~/.local/share/sbproxy-console-native` on Linux/macOS.
 
-Run `sbproxy-console --where` to print the resolved paths. A `connection.json`
-from an older release is migrated into `config/` automatically on first start.
+`--where` prints the resolved paths. A `connection.json` from an older release
+is migrated into `config/` automatically on first start.
 
 ## Logs
 
 Every agent call (action, size, duration, HTTP/transport errors), background
-task, UI log line, and uncaught exception — from the main thread and worker
-threads — is written to `<home>/logs/console.log` and rotated at 1 MB, keeping
-5 files. Credentials (token, Bearer header, Wi-Fi key, SOCKS password) are
-redacted before anything is written, so the file is safe to attach to a bug
-report. Use the **Log folder** button in the header to open it, or start with
-`--verbose` for DEBUG-level detail.
+task, UI log line, and uncaught exception — main thread and workers alike — is
+written to `<home>/logs/console.log`, rotated at 1 MB, keeping 5 files.
+Credentials (token, Bearer header, Wi-Fi key, SOCKS password) are redacted
+before anything is written, so the file is safe to attach to a bug report. The
+**Log folder** button in the header opens it; `--verbose` adds DEBUG detail.
 
-## Development run
+## Development and tests
 
 ```powershell
 cd console\desktop
-.\run.ps1
+.\run.ps1          # sh run.sh on Linux/macOS
 ```
 
-## Tests
-
-From the repository root, run `sh tests/run-all.sh` (or `make test`). The
-headless suites cover core parsing/filtering/API behavior and critical UI
-workflows; `tests/test_desktop_gui.py` additionally exercises every
-English/Vietnamese and Dark/Light combination when a display is available.
-See [the full test matrix](../../docs/TEST-MATRIX.md).
-
-## Provision a connection
-
-Provision the URL and token without storing the token as plaintext:
-
-```powershell
-$env:SBPROXY_BASE = "http://192.168.8.1"
-$env:SBPROXY_TOKEN = "<token>"
-.\dist\sbproxy-console.exe --provision
-.\dist\sbproxy-console.exe --probe
-```
-
-Connection data is stored in
-`%LOCALAPPDATA%\sbproxy-console-native\connection.json`. The token is encrypted
-with DPAPI and can only be decrypted by the current Windows account. Requests
-use `Authorization: Bearer <token>` because uhttpd may discard custom CGI
-headers.
-
-Only expose the Agent on a management LAN/VLAN, never on the WAN.
+From the repository root, `sh tests/run-all.sh` (or `make test`) runs every
+workstation-safe suite: core parsing/filtering/API behavior, UI workflows, the
+post-flash provisioning sequence against injected fakes, and — when a display
+is available — Tk smoke tests across both languages and themes. See
+[the full test matrix](../../docs/TEST-MATRIX.md).

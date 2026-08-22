@@ -17,7 +17,7 @@ printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
 
 mkdir -p "$OUT_DIR"
 PKG="$OUT_DIR/sbproxy-update-$VER.tar.gz"
-tar czf "$PKG" -C "$REPO_DIR" --exclude=node_modules \
+tar czf "$PKG" -C "$REPO_DIR" --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ \
   README.md VERSION agent config console docs etc scripts
 
 echo "Created: $PKG"

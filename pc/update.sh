@@ -40,7 +40,7 @@ sbpc_init
 TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
 log "Packaging repository..."
-tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules \
+tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ \
   README.md VERSION agent config console docs etc scripts
 
 # 2) Upload and extract while preserving active configuration.

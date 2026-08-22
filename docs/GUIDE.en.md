@@ -2,9 +2,17 @@
 
 **Language:** [Tiếng Việt](GUIDE.md) | English
 
+> The Vietnamese edition ([GUIDE.md](GUIDE.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 Examples use the GL-MT6000 GL.iNet management default, `192.168.8.1`. OpenWrt vanilla and U-Boot/failsafe may use `192.168.1.1`; confirm the active mode before connecting.
 
 ## Deployment flow
+
+Steps 3–8 can be run in one pass by the desktop console — **Post-flash setup**
+inspects the router, pushes code and configuration, installs dependencies and
+the agent, and reads the token back
+([console/desktop/README.md](../console/desktop/README.md)). The manual
+sequence below stays authoritative and is what the console automates.
 
 1. Back up the existing router configuration to another computer.
 2. Confirm the router is a GL-MT6000 and identify whether it runs official OpenWrt or GL.iNet OEM firmware.
@@ -34,7 +42,8 @@ Changing an upstream restarts sing-box, so established sessions can disconnect e
 
 ## Known limitations
 
-- IPv4 only; managed SSIDs have IPv6 services disabled.
+- IPv4 only; managed SSIDs have IPv6 services disabled so traffic cannot
+  bypass the proxy over IPv6.
 - DNS on proxied SSIDs is hijacked into sing-box fake-IP (`198.18.0.0/15` by default), so upstream SOCKS servers receive hostnames (remote resolve). Clients using DoH/DoT bypass the port-53 hijack; TLS SNI sniffing is the fallback for that traffic.
 - UDP requires an upstream SOCKS5 server that supports UDP ASSOCIATE.
 - Real BSSID capacity depends on the driver, firmware, and other radio interfaces.

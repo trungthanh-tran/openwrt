@@ -21,8 +21,10 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import tkinter as tk
@@ -415,6 +417,92 @@ EN_TRANSLATIONS = {
     "isolate và webrtc phải là boolean": "isolate and webrtc must be boolean values",
     "Các trường văn bản phải là chuỗi": "Text fields must be strings",
     "Đã đạt giới hạn 200 SSID": "The 200-SSID limit has been reached",
+    "Bỏ qua": "Skipped",
+    'Kiểm tra hiện trạng router': 'Check what the router already has',
+    'Đã có': 'Present',
+    'Chưa có': 'Missing',
+    'Mã nguồn trên router': 'Code on the router',
+    'Cấu hình wifi-socks.conf': 'wifi-socks.conf configuration',
+    'Gói phụ thuộc (sing-box)': 'Dependencies (sing-box)',
+    'Agent CGI': 'Agent CGI',
+    'Token agent': 'Agent token',
+    'sing-box đang chạy': 'sing-box running',
+    'Ghi đè cấu hình đã có trên router': 'Overwrite the configuration already on the router',
+    'Cài lại agent dù đã có': 'Reinstall the agent even if it is present',
+    'Đang kiểm tra router…': 'Checking the router…',
+    'Chưa kiểm tra được router': 'The router has not been checked yet',
+    # Post-flash provisioning
+    'Thiếu địa chỉ router': 'Router address is required',
+    'Thiếu tài khoản SSH': 'SSH account is required',
+    'Port SSH không hợp lệ': 'Invalid SSH port',
+    'Thư mục trên router phải là đường dẫn tuyệt đối': 'The router directory must be an absolute path',
+    'Không thấy SSH key': 'SSH key not found',
+    'Chưa chọn mã nguồn hoặc gói cập nhật': 'Select the source folder or the update package',
+    'Không thấy mã nguồn hoặc gói cập nhật': 'Source folder or update package not found',
+    'Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)': 'Invalid source folder (scripts/ or agent/ is missing)',
+    'Không thấy file wifi-socks.conf đã chọn': 'The selected wifi-socks.conf file was not found',
+    'Không thấy file settings.sh đã chọn': 'The selected settings.sh file was not found',
+    'Không đọc được token agent trên router': 'Could not read the agent token on the router',
+    'Agent chưa trả lời đúng': 'The agent did not answer correctly',
+    'Đã dừng theo yêu cầu': 'Stopped on request',
+    'quá thời gian chờ': 'timed out',
+    'Kiểm tra kết nối SSH': 'Check the SSH connection',
+    'Đẩy mã nguồn lên router': 'Push the code to the router',
+    'Cài gói phụ thuộc': 'Install dependencies',
+    'Đẩy cấu hình wifi-socks.conf': 'Push the wifi-socks.conf configuration',
+    'Chạy preflight và dry-run': 'Run preflight and dry-run',
+    'Chạy apply.sh khởi tạo': 'Run the initial apply.sh',
+    'Cài / cập nhật agent': 'Install / update the agent',
+    'Lấy token agent': 'Fetch the agent token',
+    'Kiểm tra agent API': 'Check the agent API',
+    'Đóng gói mã nguồn': 'Package the code',
+    'Đẩy mã nguồn': 'Upload the code',
+    'Giải nén mã nguồn': 'Extract the code',
+    'Đẩy wifi-socks.conf': 'Upload wifi-socks.conf',
+    'Đẩy settings.sh': 'Upload settings.sh',
+    'Đặt quyền cấu hình': 'Set configuration permissions',
+    'Chạy preflight': 'Run preflight',
+    'Dry-run apply': 'Dry-run apply',
+    'Chạy apply.sh': 'Run apply.sh',
+    'Cài agent': 'Install the agent',
+    'Đọc token agent': 'Read the agent token',
+    'Cài đặt router sau khi flash': 'Router setup after flashing',
+    'CÀI ĐẶT SAU KHI FLASH LẠI ROUTER': 'POST-FLASH ROUTER SETUP',
+    'Đẩy mã nguồn, cài phụ thuộc, đẩy cấu hình, chạy script khởi tạo, cài agent rồi lấy token.': 'Push the code, install dependencies, push the configuration, run the initial scripts, install the agent, then fetch the token.',
+    'Chưa chạy bước nào': 'No step has run yet',
+    'Tài khoản SSH': 'SSH account',
+    'Port SSH': 'SSH port',
+    'Mật khẩu SSH': 'SSH password',
+    'SSH key (tuỳ chọn)': 'SSH key (optional)',
+    'Thư mục trên router': 'Router directory',
+    'Mã nguồn hoặc gói .tar.gz': 'Source folder or .tar.gz package',
+    'settings.sh (tuỳ chọn)': 'settings.sh (optional)',
+    'Chạy apply.sh sau khi đẩy cấu hình': 'Run apply.sh after pushing the configuration',
+    'Bắt đầu cài đặt': 'Start setup',
+    'Kiểm tra tình trạng': 'Check status',
+    'Dừng': 'Stop',
+    'Đóng': 'Close',
+    'Bước': 'Step',
+    'Chọn gói cập nhật': 'Select the update package',
+    'Chọn thư mục mã nguồn': 'Select the source folder',
+    'Chọn file': 'Select a file',
+    'Chờ': 'Pending',
+    'Đang chạy': 'Running',
+    'Xong': 'Done',
+    'Cài đặt chưa hoàn tất': 'Setup did not complete',
+    'Cài đặt chưa hoàn tất — hãy xử lý bước lỗi rồi chạy lại.': 'Setup did not complete — fix the failed step and run it again.',
+    'Cài đặt hoàn tất': 'Setup complete',
+    'Cài đặt hoàn tất — đã lấy token và mở màn hình điều khiển.': 'Setup complete — the token was fetched and the control screens are open.',
+    'Đang cài đặt — vẫn đóng cửa sổ?': 'Setup is running — close the window anyway?',
+    'Agent trả lời OK với token hiện tại': 'The agent answers OK with the current token',
+    'Agent đang chạy nhưng token sai hoặc thiếu': 'The agent is running but the token is wrong or missing',
+    'Router trả lời nhưng chưa cài agent': 'The router answers but the agent is not installed',
+    'Không liên lạc được với router': 'The router cannot be reached',
+    'Chưa cấu hình router — hãy chạy cài đặt sau khi flash': 'Router not configured — run the post-flash setup',
+    'CHƯA CẤU HÌNH ROUTER': 'ROUTER NOT CONFIGURED',
+    'Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
+    'Cài đặt sau khi flash…': 'Post-flash setup…',
+    'Đang kiểm tra tình trạng router…': 'Checking the router status…',
 }
 
 
@@ -424,11 +512,18 @@ def translate(text: str, language: str = "en", **values) -> str:
         dynamic_prefixes = (
             ("Dòng cấu hình cần 10 hoặc 11 cột: ", "Configuration row must have 10 or 11 columns: "),
             ("Không kết nối được ", "Could not connect to "),
+            ("Thiếu công cụ ", "Missing local tool "),
         )
         for source, target in dynamic_prefixes:
             if text.startswith(source):
                 translated = target + text[len(source):]
                 break
+        if translated == text and ": " in text:
+            # Provisioning errors read "<step>: <detail>"; translate both parts.
+            head, _separator, tail = text.partition(": ")
+            head_en = EN_TRANSLATIONS.get(head)
+            if head_en:
+                translated = f"{head_en}: {translate(tail, language)}"
     return translated.format(**values) if values else translated
 
 
@@ -676,6 +771,561 @@ def provision_from_environment() -> bool:
     save_connection(base_url, token)
     os.environ.pop("SBPROXY_TOKEN", None)
     return True
+
+
+# --------------------------------------------------------------------------
+# Post-flash provisioning over SSH
+#
+# After the router is re-flashed nothing of sbproxy survives: no code, no
+# agent, no token. These helpers drive the whole bring-up sequence (push code,
+# install dependencies, push configuration, run the initial scripts, install
+# the agent, read the token back) from the desktop console so the operator
+# never has to open an SSH session by hand. Every step reports progress to the
+# UI, and the fetched token is stored exactly like a manually typed one.
+# --------------------------------------------------------------------------
+
+SSH_CONNECT_TIMEOUT = 12
+REMOTE_DIR_DEFAULT = "/root/sbproxy"
+REMOTE_TOKEN_FILE = "/etc/sbproxy/token"
+# Same router-side file list as pc/update.sh; pc/ may hold local secrets.
+PAYLOAD_ENTRIES = ("README.md", "VERSION", "agent", "config", "console", "docs", "etc", "scripts")
+KNOWN_HOSTS_FILE = CONFIG_DIR / "known_hosts"
+
+STEP_PENDING = "pending"
+STEP_RUNNING = "running"
+STEP_OK = "ok"
+STEP_SKIPPED = "skipped"
+STEP_FAILED = "failed"
+
+
+class ProvisionError(RuntimeError):
+    """A provisioning step failed; the message is already operator-readable."""
+
+
+def askpass_helper() -> str:
+    """Path to a program ssh can call for the router password.
+
+    The frozen executable answers this itself (see main()); running from source
+    needs a tiny generated script instead because SSH_ASKPASS takes no
+    arguments.
+    """
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    ensure_app_home()
+    if os.name == "nt":
+        helper = RUNTIME_DIR / "askpass.cmd"
+        helper.write_text("@echo off\r\necho %SBPROXY_SSH_PASSWORD%\r\n", encoding="utf-8")
+    else:
+        helper = RUNTIME_DIR / "askpass.sh"
+        helper.write_text("#!/bin/sh\nprintf '%s\\n' \"$SBPROXY_SSH_PASSWORD\"\n", encoding="utf-8")
+        os.chmod(helper, 0o700)
+    return str(helper)
+
+
+def write_stdout(text: str) -> bool:
+    """Write to whatever stdout this build has.
+
+    A windowed PyInstaller build has no `sys.stdout`, so the inherited pipe is
+    written through the file descriptor (and the Win32 handle) instead — that
+    pipe is how `ssh` reads an askpass answer.
+    """
+    data = text.encode("utf-8")
+    try:
+        os.write(1, data)
+        return True
+    except (OSError, ValueError, AttributeError):
+        pass
+    if os.name == "nt":
+        try:
+            handle = ctypes.windll.kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+            written = wintypes.DWORD(0)
+            if handle and handle != -1 and ctypes.windll.kernel32.WriteFile(
+                handle, data, len(data), ctypes.byref(written), None
+            ):
+                return True
+        except Exception:  # no console, no pipe: fall through to sys.stdout
+            pass
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+        return True
+    except Exception:
+        return False
+
+
+def write_askpass_answer(password: str) -> int:
+    """Hand the password to ssh; a nonzero result makes ssh fail loudly."""
+    if write_stdout(f"{password}\n"):
+        return 0
+    log.error("askpass could not write the password to stdout")
+    return 1
+
+
+@dataclass
+class ProvisionSettings:
+    """Everything needed to reach a freshly flashed router over SSH."""
+
+    host: str = "192.168.8.1"
+    user: str = "root"
+    port: int = 22
+    key_path: str = ""
+    password: str = ""  # session-only; never written to connection.json
+    remote_dir: str = REMOTE_DIR_DEFAULT
+    payload: str = ""  # repository directory or sbproxy-update-<ver>.tar.gz
+    config_path: str = ""
+    settings_path: str = ""
+    run_apply: bool = True
+    overwrite_config: bool = False
+    reinstall_agent: bool = False
+
+    def validate(self) -> None:
+        if not str(self.host).strip():
+            raise ValueError("Thiếu địa chỉ router")
+        if not str(self.user).strip():
+            raise ValueError("Thiếu tài khoản SSH")
+        try:
+            port = int(self.port)
+        except (TypeError, ValueError):
+            raise ValueError("Port SSH không hợp lệ") from None
+        if not 1 <= port <= 65535:
+            raise ValueError("Port SSH không hợp lệ")
+        if not str(self.remote_dir).startswith("/"):
+            raise ValueError("Thư mục trên router phải là đường dẫn tuyệt đối")
+        if self.key_path and not Path(self.key_path).is_file():
+            raise ValueError("Không thấy SSH key")
+        if not self.payload:
+            raise ValueError("Chưa chọn mã nguồn hoặc gói cập nhật")
+        if not Path(self.payload).exists():
+            raise ValueError("Không thấy mã nguồn hoặc gói cập nhật")
+
+    @property
+    def target(self) -> str:
+        return f"{str(self.user).strip()}@{str(self.host).strip()}"
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{str(self.host).strip()}"
+
+    def _common_options(self) -> list[str]:
+        options = [
+            "-o", f"ConnectTimeout={SSH_CONNECT_TIMEOUT}",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", f"UserKnownHostsFile={KNOWN_HOSTS_FILE}",
+        ]
+        if self.key_path:
+            options += ["-i", self.key_path]
+        if self.password:
+            # An askpass helper answers the prompt; one attempt, then fail.
+            options += ["-o", "NumberOfPasswordPrompts=1",
+                        "-o", "PreferredAuthentications=publickey,password,keyboard-interactive"]
+        else:
+            # No password on hand: never hang the UI on an interactive prompt.
+            options += ["-o", "BatchMode=yes"]
+        return options
+
+    def ssh_command(self, remote_command: str) -> list[str]:
+        return ["ssh", "-p", str(int(self.port))] + self._common_options() + [self.target, remote_command]
+
+    def scp_command(self, local: str, remote: str) -> list[str]:
+        # OpenWrt images usually ship without sftp-server, so force legacy SCP.
+        return (["scp", "-O", "-P", str(int(self.port))] + self._common_options()
+                + [local, f"{self.target}:{remote}"])
+
+    def to_payload(self) -> dict:
+        """Persistable form — the password is deliberately left out."""
+        return {
+            "host": str(self.host).strip(),
+            "user": str(self.user).strip(),
+            "port": int(self.port),
+            "key_path": self.key_path,
+            "remote_dir": self.remote_dir,
+            # The bundle is unpacked to a new temp path on every launch, so a
+            # bundled payload is re-resolved instead of being remembered.
+            "payload": "" if is_bundled_payload(self.payload) else self.payload,
+            "config_path": self.config_path,
+            "settings_path": self.settings_path,
+            "run_apply": bool(self.run_apply),
+            "overwrite_config": bool(self.overwrite_config),
+            "reinstall_agent": bool(self.reinstall_agent),
+        }
+
+
+def repo_root_candidate() -> str:
+    """Repository directory when the console runs from a source checkout."""
+    root = Path(__file__).resolve().parents[2]
+    if (root / "scripts" / "apply.sh").is_file() and (root / "VERSION").is_file():
+        return str(root)
+    return ""
+
+
+def bundled_payload() -> str:
+    """Router package shipped inside the executable, if this is a frozen build.
+
+    build.ps1/build.sh embed `sbproxy-update-<version>.tar.gz` under `payload/`
+    so a single .exe can provision a freshly flashed router with no checkout.
+    """
+    root = getattr(sys, "_MEIPASS", "")
+    if not root:
+        return ""
+    try:
+        packages = sorted((Path(root) / "payload").glob("sbproxy-update-*.tar.gz"))
+    except OSError:
+        return ""
+    return str(packages[-1]) if packages else ""
+
+
+def is_bundled_payload(path) -> bool:
+    """True for a path inside the unpacked bundle, which changes every launch."""
+    root = getattr(sys, "_MEIPASS", "")
+    if not root or not path:
+        return False
+    try:
+        return Path(path).resolve().is_relative_to(Path(root).resolve())
+    except (OSError, ValueError):
+        return False
+
+
+def find_payload() -> str:
+    """Locate router-side code: env override, bundle, checkout, or a package."""
+    override = os.environ.get("SBPROXY_PAYLOAD", "").strip()
+    if override and Path(override).exists():
+        return override
+    bundled = bundled_payload()
+    if bundled:
+        return bundled
+    repo = repo_root_candidate()
+    if repo:
+        return repo
+    packages = []
+    for folder in (frozen_dir(), frozen_dir() / "dist", APP_HOME):
+        try:
+            packages.extend(item for item in folder.glob("sbproxy-update-*.tar.gz") if item.is_file())
+        except OSError:
+            continue
+    if packages:
+        return str(max(packages, key=lambda item: item.stat().st_mtime))
+    return ""
+
+
+def load_provision_settings() -> ProvisionSettings:
+    stored = _read_config_payload().get("provision")
+    settings = ProvisionSettings()
+    if isinstance(stored, dict):
+        settings.host = str(stored.get("host") or settings.host)
+        settings.user = str(stored.get("user") or settings.user)
+        settings.key_path = str(stored.get("key_path") or "")
+        settings.remote_dir = str(stored.get("remote_dir") or REMOTE_DIR_DEFAULT)
+        settings.payload = str(stored.get("payload") or "")
+        settings.config_path = str(stored.get("config_path") or "")
+        settings.settings_path = str(stored.get("settings_path") or "")
+        settings.run_apply = bool(stored.get("run_apply", True))
+        settings.overwrite_config = bool(stored.get("overwrite_config", False))
+        settings.reinstall_agent = bool(stored.get("reinstall_agent", False))
+        try:
+            settings.port = int(stored.get("port") or 22)
+        except (TypeError, ValueError):
+            settings.port = 22
+    # A remembered checkout can disappear (or belong to another machine), so
+    # fall back to whatever this install actually carries.
+    if not settings.payload or not Path(settings.payload).exists():
+        settings.payload = find_payload()
+    if not settings.config_path and settings.payload and Path(settings.payload).is_dir():
+        candidate = Path(settings.payload) / "config" / "wifi-socks.conf"
+        if candidate.is_file():
+            settings.config_path = str(candidate)
+    return settings
+
+
+def save_provision_settings(settings: ProvisionSettings) -> None:
+    payload = _read_config_payload()
+    payload["provision"] = settings.to_payload()
+    _write_config_payload(payload)
+
+
+def parse_router_token(text: str) -> str:
+    """Accept only a token shaped like the one install-agent.sh generates."""
+    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    token = lines[0] if lines else ""
+    if not re.fullmatch(r"[A-Za-z0-9._-]{16,128}", token):
+        raise ProvisionError("Không đọc được token agent trên router")
+    return token
+
+
+def probe_router_state(base_url: str, token: str, timeout: int = 8) -> str:
+    """Classify the router: ok, unauthorized, absent, or unreachable."""
+    url = f"{base_url.rstrip('/')}/cgi-bin/sbproxy?action=status"
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        with urlopen(Request(url, headers=headers), timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+        return "ok" if isinstance(payload, dict) and payload.get("ok") else "unauthorized"
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            return "unauthorized"
+        if exc.code == 404:
+            return "absent"
+        return "unreachable"
+    except (URLError, TimeoutError, ValueError, OSError):
+        return "unreachable"
+
+
+ROUTER_INVENTORY_KEYS = ("code", "conf", "deps", "agent", "token", "running")
+
+ROUTER_INVENTORY_LABELS = {
+    "code": "Mã nguồn trên router",
+    "conf": "Cấu hình wifi-socks.conf",
+    "deps": "Gói phụ thuộc (sing-box)",
+    "agent": "Agent CGI",
+    "token": "Token agent",
+    "running": "sing-box đang chạy",
+}
+
+
+def router_inventory_command(remote_dir: str) -> str:
+    """Read-only shell that reports what a router already carries."""
+    yes = "echo 1 || echo 0"
+    return "; ".join((
+        f'echo "code=$([ -f {remote_dir}/scripts/apply.sh ] && {yes})"',
+        f'echo "conf=$([ -s {remote_dir}/config/wifi-socks.conf ] && {yes})"',
+        f'echo "deps=$(command -v sing-box >/dev/null 2>&1 && {yes})"',
+        f'echo "agent=$([ -x /www/cgi-bin/sbproxy ] && {yes})"',
+        f'echo "token=$([ -s {REMOTE_TOKEN_FILE} ] && {yes})"',
+        f'echo "running=$(pgrep sing-box >/dev/null 2>&1 && {yes})"',
+        "exit 0",
+    ))
+
+
+def parse_router_inventory(text: str) -> dict:
+    """Turn `key=1` lines into flags; anything unreported counts as absent."""
+    inventory = {key: False for key in ROUTER_INVENTORY_KEYS}
+    for line in str(text or "").splitlines():
+        key, _separator, value = line.strip().partition("=")
+        if key in inventory:
+            inventory[key] = value.strip() == "1"
+    return inventory
+
+
+def describe_router_inventory(inventory: dict, language: str = "en") -> str:
+    """One line an operator can read: what is present, what is missing."""
+    present = [ROUTER_INVENTORY_LABELS[key] for key in ROUTER_INVENTORY_KEYS if inventory.get(key)]
+    missing = [ROUTER_INVENTORY_LABELS[key] for key in ROUTER_INVENTORY_KEYS if not inventory.get(key)]
+    parts = []
+    if present:
+        parts.append(translate("Đã có", language) + ": " + ", ".join(translate(item, language) for item in present))
+    if missing:
+        parts.append(translate("Chưa có", language) + ": " + ", ".join(translate(item, language) for item in missing))
+    return " · ".join(parts)
+
+
+class ProvisionRunner:
+    """Drive the post-flash sequence step by step and report progress.
+
+    `emit(index, state, detail)` fires on every state change so the UI can tick
+    the checklist live; `runner` and `prober` are injectable so tests never
+    shell out or touch the network.
+    """
+
+    def __init__(self, settings: ProvisionSettings, emit=None, runner=None, prober=None):
+        self.settings = settings
+        self.emit = emit or (lambda *_args: None)
+        self._execute = runner or self._run_process
+        self._probe = prober or probe_router_state
+        self.token = ""
+        self.cancelled = False
+        self.inventory = {key: False for key in ROUTER_INVENTORY_KEYS}
+        self.steps = [
+            ("Kiểm tra kết nối SSH", self.step_check_ssh),
+            ("Kiểm tra hiện trạng router", self.step_inventory),
+            ("Đẩy mã nguồn lên router", self.step_push_code),
+            ("Cài gói phụ thuộc", self.step_install_deps),
+            ("Đẩy cấu hình wifi-socks.conf", self.step_push_config),
+            ("Chạy preflight và dry-run", self.step_preflight),
+            ("Chạy apply.sh khởi tạo", self.step_apply),
+            ("Cài / cập nhật agent", self.step_install_agent),
+            ("Lấy token agent", self.step_fetch_token),
+            ("Kiểm tra agent API", self.step_verify_agent),
+        ]
+
+    # -- process plumbing ---------------------------------------------------
+
+    def _environment(self) -> dict:
+        env = os.environ.copy()
+        if self.settings.password:
+            env["SBPROXY_SSH_PASSWORD"] = self.settings.password
+            env["SBPROXY_ASKPASS"] = "1"
+            env["SSH_ASKPASS"] = askpass_helper()
+            env["SSH_ASKPASS_REQUIRE"] = "force"
+            env.setdefault("DISPLAY", ":0")
+        else:
+            env.pop("SBPROXY_SSH_PASSWORD", None)
+        return env
+
+    def _run_process(self, argv, timeout=600):
+        completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
+            argv, capture_output=True, text=True, timeout=timeout,
+            env=self._environment(), errors="replace",
+        )
+        return completed.returncode, completed.stdout or "", completed.stderr or ""
+
+    def run_command(self, argv, description, timeout=600) -> str:
+        if self.cancelled:
+            raise ProvisionError("Đã dừng theo yêu cầu")
+        log.info("provision: %s", redact(" ".join(argv)))
+        try:
+            code, out, err = self._execute(argv, timeout=timeout)
+        except FileNotFoundError as exc:
+            raise ProvisionError(f"Thiếu công cụ {argv[0]}") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise ProvisionError(f"{description}: quá thời gian chờ") from exc
+        output = (out + ("\n" + err if err.strip() else "")).strip()
+        if code != 0:
+            lines = output.splitlines()
+            raise ProvisionError(f"{description}: {lines[-1] if lines else f'exit {code}'}")
+        return output
+
+    def ssh(self, remote_command, description, timeout=600) -> str:
+        return self.run_command(self.settings.ssh_command(remote_command), description, timeout)
+
+    def upload(self, local, remote, description) -> str:
+        return self.run_command(self.settings.scp_command(str(local), remote), description, timeout=600)
+
+    # -- steps --------------------------------------------------------------
+
+    def step_check_ssh(self) -> str:
+        board = self.ssh(
+            'uname -sr; . /etc/openwrt_release 2>/dev/null && echo "$DISTRIB_DESCRIPTION"; exit 0',
+            "Kiểm tra kết nối SSH", timeout=90,
+        )
+        return board.replace("\n", " · ") or self.settings.target
+
+    def step_inventory(self) -> str:
+        """Look before installing: reuse dependencies, config, and agent."""
+        output = self.ssh(router_inventory_command(self.settings.remote_dir),
+                          "Kiểm tra hiện trạng router", timeout=90)
+        self.inventory = parse_router_inventory(output)
+        return describe_router_inventory(self.inventory)
+
+    def package_payload(self, workdir: Path) -> Path:
+        """Return a tarball of router-side files, building one from a checkout."""
+        source = Path(self.settings.payload)
+        if source.is_file():
+            return source
+        entries = [name for name in PAYLOAD_ENTRIES if (source / name).exists()]
+        if "scripts" not in entries or "agent" not in entries:
+            raise ProvisionError("Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)")
+        package = workdir / "sbproxy-payload.tar.gz"
+        self.run_command(
+            ["tar", "-czf", str(package), "-C", str(source), "--exclude=node_modules", *entries],
+            "Đóng gói mã nguồn", timeout=300,
+        )
+        return package
+
+    def step_push_code(self) -> str:
+        remote = self.settings.remote_dir
+        workdir = Path(tempfile.mkdtemp(prefix="sbproxy-provision-", dir=str(CACHE_DIR) if CACHE_DIR.is_dir() else None))
+        try:
+            package = self.package_payload(workdir)
+            self.upload(package, "/tmp/sbproxy-update.tar.gz", "Đẩy mã nguồn")
+            self.ssh(
+                f"set -e; mkdir -p {remote}; tar xzf /tmp/sbproxy-update.tar.gz -C {remote}; "
+                f"chmod +x {remote}/scripts/*.sh {remote}/agent/install-agent.sh; "
+                "rm -f /tmp/sbproxy-update.tar.gz",
+                "Giải nén mã nguồn", timeout=300,
+            )
+            size = package.stat().st_size if package.is_file() else 0
+            return f"{remote} · {human_bytes(size)}" if size else remote
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    def step_install_deps(self) -> str:
+        if self.inventory.get("deps"):
+            return ""  # sing-box is already installed; nothing to add
+        output = self.ssh(
+            f"cd {self.settings.remote_dir}; sh scripts/install-deps.sh",
+            "Cài gói phụ thuộc", timeout=1200,
+        )
+        lines = output.splitlines()
+        return lines[-1] if lines else "OK"
+
+    def step_push_config(self) -> str:
+        remote = self.settings.remote_dir
+        if self.inventory.get("conf") and not self.settings.overwrite_config:
+            return ""  # the router already has a configuration; keep it
+        pushed = []
+        if self.settings.config_path:
+            if not Path(self.settings.config_path).is_file():
+                raise ProvisionError("Không thấy file wifi-socks.conf đã chọn")
+            self.upload(self.settings.config_path, f"{remote}/config/wifi-socks.conf", "Đẩy wifi-socks.conf")
+            pushed.append("wifi-socks.conf")
+        if self.settings.settings_path:
+            if not Path(self.settings.settings_path).is_file():
+                raise ProvisionError("Không thấy file settings.sh đã chọn")
+            self.upload(self.settings.settings_path, f"{remote}/config/settings.sh", "Đẩy settings.sh")
+            pushed.append("settings.sh")
+        if not pushed:
+            return ""
+        self.ssh(f"chmod 600 {remote}/config/wifi-socks.conf 2>/dev/null; exit 0",
+                 "Đặt quyền cấu hình", timeout=60)
+        return " + ".join(pushed)
+
+    def step_preflight(self) -> str:
+        self.ssh(f"cd {self.settings.remote_dir}; sh scripts/preflight.sh", "Chạy preflight", timeout=600)
+        self.ssh(f"cd {self.settings.remote_dir}; DRYRUN=1 sh scripts/apply.sh >/dev/null",
+                 "Dry-run apply", timeout=600)
+        return "preflight + dry-run OK"
+
+    def step_apply(self) -> str:
+        if not self.settings.run_apply:
+            return ""
+        output = self.ssh(f"cd {self.settings.remote_dir}; sh scripts/apply.sh",
+                          "Chạy apply.sh", timeout=1800)
+        lines = output.splitlines()
+        return lines[-1] if lines else "apply OK"
+
+    def step_install_agent(self) -> str:
+        if self.inventory.get("agent") and self.inventory.get("token") and not self.settings.reinstall_agent:
+            return ""  # agent and token are in place; the token step reads it
+        self.ssh(f"cd {self.settings.remote_dir}; sh agent/install-agent.sh", "Cài agent", timeout=1200)
+        return "uhttpd CGI + healthd"
+
+    def step_fetch_token(self) -> str:
+        raw = self.ssh(f"cat {REMOTE_TOKEN_FILE}", "Đọc token agent", timeout=60)
+        self.token = parse_router_token(raw)
+        save_connection(self.settings.base_url, self.token)
+        return f"{self.settings.base_url} · token ok"
+
+    def step_verify_agent(self) -> str:
+        state = self._probe(self.settings.base_url, self.token)
+        if state != "ok":
+            raise ProvisionError(f"Agent chưa trả lời đúng: {ROUTER_STATE_LABELS.get(state, state)}")
+        return "status ok"
+
+    # -- orchestration ------------------------------------------------------
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+    def run(self) -> bool:
+        """Execute every step in order and stop at the first failure."""
+        self.settings.validate()
+        for index, (label, function) in enumerate(self.steps):
+            if self.cancelled:
+                self.emit(index, STEP_FAILED, "Đã dừng theo yêu cầu")
+                return False
+            self.emit(index, STEP_RUNNING, "")
+            try:
+                detail = function()
+            except ProvisionError as exc:
+                self.emit(index, STEP_FAILED, str(exc))
+                return False
+            except Exception as exc:  # unexpected local failure, same UI path
+                log.exception("provision step failed: %s", label)
+                self.emit(index, STEP_FAILED, str(exc))
+                return False
+            self.emit(index, STEP_OK if detail else STEP_SKIPPED, detail or "Bỏ qua")
+        return True
 
 
 class AgentClient:
@@ -1304,6 +1954,321 @@ class LoadingWindow(tk.Toplevel):
         self.destroy()
 
 
+STEP_ICONS = {
+    STEP_PENDING: "○",
+    STEP_RUNNING: "▶",
+    STEP_OK: "✓",
+    STEP_SKIPPED: "–",
+    STEP_FAILED: "✗",
+}
+
+STEP_STATE_LABELS = {
+    STEP_PENDING: "Chờ",
+    STEP_RUNNING: "Đang chạy",
+    STEP_OK: "Xong",
+    STEP_SKIPPED: "Bỏ qua",
+    STEP_FAILED: "Lỗi",
+}
+
+ROUTER_STATE_LABELS = {
+    "ok": "Agent trả lời OK với token hiện tại",
+    "unauthorized": "Agent đang chạy nhưng token sai hoặc thiếu",
+    "absent": "Router trả lời nhưng chưa cài agent",
+    "unreachable": "Không liên lạc được với router",
+}
+
+
+class SetupWizard(tk.Toplevel):
+    """Post-flash bring-up screen: run every step and show progress live."""
+
+    def __init__(self, parent, settings: ProvisionSettings, language="en", palette=None, on_success=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.on_success = on_success
+        self.runner: ProvisionRunner | None = None
+        self.busy = False
+        self.title(self.t("Cài đặt router sau khi flash"))
+        self.configure(bg=self.palette["bg"])
+        self.transient(parent)
+        self.minsize(880, 640)
+
+        self.host_var = tk.StringVar(value=settings.host)
+        self.user_var = tk.StringVar(value=settings.user)
+        self.port_var = tk.StringVar(value=str(settings.port))
+        self.password_var = tk.StringVar(value=settings.password)
+        self.key_var = tk.StringVar(value=settings.key_path)
+        self.payload_var = tk.StringVar(value=settings.payload)
+        self.config_var = tk.StringVar(value=settings.config_path)
+        self.settings_var = tk.StringVar(value=settings.settings_path)
+        self.remote_var = tk.StringVar(value=settings.remote_dir)
+        self.apply_var = tk.BooleanVar(value=settings.run_apply)
+        self.overwrite_var = tk.BooleanVar(value=settings.overwrite_config)
+        self.reinstall_var = tk.BooleanVar(value=settings.reinstall_agent)
+        self.state_var = tk.StringVar(value=self.t("Chưa chạy bước nào"))
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=14)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="CÀI ĐẶT SAU KHI FLASH LẠI ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(
+            body,
+            text="Đẩy mã nguồn, cài phụ thuộc, đẩy cấu hình, chạy script khởi tạo, cài agent rồi lấy token.",
+            style="Muted.TLabel", wraplength=820,
+        ).pack(anchor="w", pady=(3, 10))
+
+        form = ttk.Frame(body, style="Card.TFrame")
+        form.pack(fill="x")
+        self._field(form, 0, 0, "Router (IP)", self.host_var, width=18)
+        self._field(form, 0, 2, "Tài khoản SSH", self.user_var, width=14)
+        self._field(form, 0, 4, "Port SSH", self.port_var, width=8)
+        self._field(form, 1, 0, "Mật khẩu SSH", self.password_var, width=18, show="•")
+        self._field(form, 1, 2, "SSH key (tuỳ chọn)", self.key_var, width=24, browse="file")
+        self._field(form, 1, 4, "Thư mục trên router", self.remote_var, width=18)
+        self._field(form, 2, 0, "Mã nguồn hoặc gói .tar.gz", self.payload_var, width=34, browse="any", span=3)
+        self._field(form, 2, 4, "wifi-socks.conf", self.config_var, width=18, browse="file")
+        self._field(form, 3, 0, "settings.sh (tuỳ chọn)", self.settings_var, width=34, browse="file", span=3)
+        ttk.Checkbutton(form, text="Chạy apply.sh sau khi đẩy cấu hình", variable=self.apply_var).grid(
+            row=3, column=4, columnspan=2, sticky="w", padx=(8, 0), pady=4)
+        # Default to reusing what the router already carries; both boxes are
+        # opt-in because either one overwrites working router state.
+        ttk.Checkbutton(form, text="Ghi đè cấu hình đã có trên router", variable=self.overwrite_var).grid(
+            row=4, column=1, columnspan=3, sticky="w", pady=4)
+        ttk.Checkbutton(form, text="Cài lại agent dù đã có", variable=self.reinstall_var).grid(
+            row=4, column=4, columnspan=2, sticky="w", padx=(8, 0), pady=4)
+        for column in (1, 3, 5):
+            form.columnconfigure(column, weight=1)
+
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.pack(fill="x", pady=(10, 8))
+        self.run_button = ttk.Button(actions, text="Bắt đầu cài đặt", command=self.start, style="Primary.TButton")
+        self.run_button.pack(side="left")
+        self.check_button = ttk.Button(actions, text="Kiểm tra tình trạng", command=self.check_state)
+        self.check_button.pack(side="left", padx=(8, 0))
+        self.stop_button = ttk.Button(actions, text="Dừng", command=self.stop, style="Warning.TButton", state="disabled")
+        self.stop_button.pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Đóng", command=self.close).pack(side="right")
+        ttk.Label(actions, textvariable=self.state_var, style="Muted.TLabel").pack(side="right", padx=(0, 14))
+
+        self.progress = ttk.Progressbar(body, mode="determinate", maximum=1)
+        self.progress.pack(fill="x", pady=(0, 8))
+
+        self.steps_tree = ttk.Treeview(body, columns=("state", "step", "detail"), show="headings", height=9)
+        for column, title, width in (("state", "Trạng thái", 110), ("step", "Bước", 260), ("detail", "Chi tiết", 430)):
+            self.steps_tree.heading(column, text=title)
+            self.steps_tree.column(column, width=width, anchor="w")
+        self.steps_tree.pack(fill="x")
+
+        ttk.Label(body, text="Nhật ký thao tác").pack(anchor="w", pady=(10, 3))
+        self.log_text = tk.Text(
+            body, height=9, wrap="word", state="disabled",
+            bg=self.palette["input"], fg=self.palette["log_text"], borderwidth=0,
+            highlightthickness=1, highlightbackground=self.palette["border"],
+            padx=10, pady=8, font=("Cascadia Mono", 9),
+        )
+        self.log_text.pack(fill="both", expand=True)
+
+        self.step_labels = [label for label, _function in ProvisionRunner(settings).steps]
+        self.reset_steps()
+        self.protocol("WM_DELETE_WINDOW", self.close)
+        localize_widget_tree(self, self.language)
+
+    # -- form helpers -------------------------------------------------------
+
+    def _field(self, parent, row, column, label, variable, width=16, show=None, browse=None, span=1):
+        ttk.Label(parent, text=label).grid(row=row, column=column, sticky="w", pady=4)
+        holder = ttk.Frame(parent, style="Card.TFrame")
+        holder.grid(row=row, column=column + 1, columnspan=span, sticky="ew", padx=(8, 16), pady=4)
+        entry = ttk.Entry(holder, textvariable=variable, width=width, show=show)
+        entry.pack(side="left", fill="x", expand=True)
+        if browse:
+            ttk.Button(holder, text="…", width=3,
+                       command=lambda: self._browse(variable, browse)).pack(side="left", padx=(5, 0))
+
+    def _browse(self, variable, kind):
+        if kind == "any":
+            path = filedialog.askopenfilename(
+                parent=self, title=self.t("Chọn gói cập nhật"),
+                filetypes=[("tar.gz", "*.tar.gz"), (self.t("Tất cả file"), "*.*")],
+            ) or filedialog.askdirectory(parent=self, title=self.t("Chọn thư mục mã nguồn"))
+        else:
+            path = filedialog.askopenfilename(parent=self, title=self.t("Chọn file"))
+        if path:
+            variable.set(path)
+
+    def collect(self) -> ProvisionSettings:
+        try:
+            port = int(self.port_var.get().strip() or "22")
+        except ValueError:
+            raise ValueError("Port SSH không hợp lệ") from None
+        settings = ProvisionSettings(
+            host=self.host_var.get().strip(),
+            user=self.user_var.get().strip() or "root",
+            port=port,
+            key_path=self.key_var.get().strip(),
+            password=self.password_var.get(),
+            remote_dir=self.remote_var.get().strip() or REMOTE_DIR_DEFAULT,
+            payload=self.payload_var.get().strip(),
+            config_path=self.config_var.get().strip(),
+            settings_path=self.settings_var.get().strip(),
+            run_apply=bool(self.apply_var.get()),
+            overwrite_config=bool(self.overwrite_var.get()),
+            reinstall_agent=bool(self.reinstall_var.get()),
+        )
+        settings.validate()
+        return settings
+
+    # -- checklist rendering ------------------------------------------------
+
+    def reset_steps(self):
+        self.steps_tree.delete(*self.steps_tree.get_children())
+        for index, label in enumerate(self.step_labels):
+            self.steps_tree.insert(
+                "", "end", iid=str(index),
+                values=(f"{STEP_ICONS[STEP_PENDING]} {self.t(STEP_STATE_LABELS[STEP_PENDING])}",
+                        self.t(label), ""),
+            )
+        self.progress.configure(maximum=max(1, len(self.step_labels)), value=0)
+
+    def set_step(self, index, state, detail):
+        if not self.winfo_exists() or index >= len(self.step_labels):
+            return
+        self.steps_tree.item(str(index), values=(
+            f"{STEP_ICONS.get(state, '○')} {self.t(STEP_STATE_LABELS.get(state, state))}",
+            self.t(self.step_labels[index]),
+            self.t(detail) if detail else "",
+        ))
+        self.steps_tree.see(str(index))
+        done = index + (0 if state == STEP_RUNNING else 1)
+        self.progress.configure(value=done)
+        self.state_var.set(f"{done}/{len(self.step_labels)} · {self.t(self.step_labels[index])}")
+        if state == STEP_RUNNING:
+            self.append(f"→ {self.t(self.step_labels[index])}")
+        elif detail:
+            self.append(f"   {STEP_ICONS.get(state, '')} {self.t(detail)}")
+
+    def append(self, text):
+        entry = redact(str(text).rstrip())
+        log.info("wizard: %s", entry)
+        if not self.winfo_exists():
+            return
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", entry + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    # -- actions ------------------------------------------------------------
+
+    def _set_busy(self, busy):
+        self.busy = busy
+        self.run_button.configure(state="disabled" if busy else "normal")
+        self.check_button.configure(state="disabled" if busy else "normal")
+        self.stop_button.configure(state="normal" if busy else "disabled")
+
+    def start(self):
+        if self.busy:
+            return
+        try:
+            settings = self.collect()
+        except ValueError as exc:
+            messagebox.showerror(APP_NAME, self.t(str(exc)), parent=self)
+            return
+        save_provision_settings(settings)
+        self.reset_steps()
+        self._set_busy(True)
+        self.append(self.t("Bắt đầu cài đặt") + f" · {settings.target}")
+
+        def emit(index, state, detail):
+            self.after(0, lambda: self.set_step(index, state, detail))
+
+        self.runner = ProvisionRunner(settings, emit=emit)
+
+        def worker():
+            try:
+                success = self.runner.run()
+            except Exception as exc:  # validation or unexpected local error
+                self.after(0, lambda: self._finish(False, str(exc)))
+                return
+            self.after(0, lambda: self._finish(success, ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish(self, success, error):
+        self._set_busy(False)
+        if error:
+            self.append(f"✗ {self.t(error)}")
+            messagebox.showerror(APP_NAME, self.t(error), parent=self)
+            return
+        if not success:
+            self.state_var.set(self.t("Cài đặt chưa hoàn tất"))
+            self.append(self.t("Cài đặt chưa hoàn tất — hãy xử lý bước lỗi rồi chạy lại."))
+            return
+        self.state_var.set(self.t("Cài đặt hoàn tất"))
+        self.append(self.t("Cài đặt hoàn tất — đã lấy token và mở màn hình điều khiển."))
+        token = self.runner.token if self.runner else ""
+        base_url = self.runner.settings.base_url if self.runner else ""
+        if self.on_success and token:
+            self.on_success(base_url, token)
+        self.close()
+
+    def check_state(self):
+        """Read-only: what does the router answer, and what is installed on it?"""
+        if self.busy:
+            return
+        host = self.host_var.get().strip()
+        if not host:
+            messagebox.showerror(APP_NAME, self.t("Thiếu địa chỉ router"), parent=self)
+            return
+        base_url = f"http://{host}"
+        _base, token = load_connection()
+        try:
+            settings = self.collect()
+        except ValueError:
+            settings = None  # SSH inventory needs valid settings; HTTP probe does not
+        self._set_busy(True)
+        self.state_var.set(self.t("Đang kiểm tra router…"))
+
+        def worker():
+            state = probe_router_state(base_url, token)
+            inventory = ""
+            if settings:
+                runner = ProvisionRunner(settings)
+                try:
+                    inventory = runner.step_inventory()
+                except ProvisionError as exc:
+                    inventory = str(exc)
+            self.after(0, lambda: self._show_state(state, inventory))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_state(self, state, inventory=""):
+        self._set_busy(False)
+        message = self.t(ROUTER_STATE_LABELS.get(state, state))
+        self.state_var.set(message)
+        self.append(f"• {message}")
+        if inventory:
+            self.append(f"• {self.t(inventory)}")
+        messagebox.showinfo(APP_NAME, f"{message}\n\n{self.t(inventory)}" if inventory else message, parent=self)
+
+    def stop(self):
+        if self.runner:
+            self.runner.cancel()
+            self.append(self.t("Đã dừng theo yêu cầu"))
+
+    def close(self):
+        if self.busy and not messagebox.askyesno(
+            APP_NAME, self.t("Đang cài đặt — vẫn đóng cửa sổ?"), parent=self
+        ):
+            return
+        if self.runner:
+            self.runner.cancel()
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+
+
 class NativeApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -1330,6 +2295,9 @@ class NativeApp:
         self.base_var = tk.StringVar(value=base)
         self.token_var = tk.StringVar(value=token)
         self.status_var = tk.StringVar(value=self.t("Chưa kết nối"))
+        self.setup_hint_var = tk.StringVar(value=self.t(
+            "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
+        ))
         self.agent_version = ""
         self.client_ssid_var = tk.StringVar(value=self.t(ALL_SSIDS))
         self.client_query_var = tk.StringVar()
@@ -1375,7 +2343,13 @@ class NativeApp:
             variable.trace_add("write", lambda *_args: self.render_clients())
         self.client_interval_var.trace_add("write", lambda *_args: self.schedule_client_refresh())
         if token:
+            # A token is already provisioned: go straight into the live tool.
             self.root.after(350, self.connect)
+        else:
+            self.status_var.set(self.t("Chưa cấu hình router — hãy chạy cài đặt sau khi flash"))
+            # A known router may already be installed: say so before anyone
+            # starts a setup run that would repeat work.
+            self.root.after(700, lambda: self.check_router_state(announce=False))
 
     def _configure_styles(self):
         p = self.palette
@@ -1459,11 +2433,22 @@ class NativeApp:
         ttk.Label(top, text="Agent token").grid(row=0, column=2, sticky="w")
         ttk.Entry(top, textvariable=self.token_var, show="•", width=37).grid(row=0, column=3, padx=(8, 18), sticky="ew")
         ttk.Button(top, text="Kết nối", command=self.connect, style="Primary.TButton").grid(row=0, column=4, padx=4)
-        ttk.Button(top, text="Làm mới", command=self.refresh_all).grid(row=0, column=5, padx=(4, 0))
+        ttk.Button(top, text="Làm mới", command=self.refresh_all).grid(row=0, column=5, padx=4)
+        # Always reachable: a router can be reflashed while a token is still stored.
+        ttk.Button(top, text="Cài đặt sau khi flash…", command=self.open_setup_wizard).grid(row=0, column=6, padx=(4, 0))
         top.columnconfigure(1, weight=1)
         top.columnconfigure(3, weight=1)
 
+        self.setup_bar = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
+        ttk.Label(self.setup_bar, text="CHƯA CẤU HÌNH ROUTER", style="MetricYellow.TLabel").pack(side="left", padx=(0, 14))
+        ttk.Label(self.setup_bar, textvariable=self.setup_hint_var,
+                  style="MetricYellow.TLabel", wraplength=760).pack(side="left")
+        ttk.Button(self.setup_bar, text="Kiểm tra tình trạng", command=self.check_router_state).pack(side="right")
+        ttk.Button(self.setup_bar, text="Cài đặt sau khi flash…", command=self.open_setup_wizard,
+                   style="Primary.TButton").pack(side="right", padx=(0, 8))
+
         gateway = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
+        self.gateway_bar = gateway
         gateway.pack(fill="x", padx=14, pady=(0, 8))
         gateway_head = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_head.pack(fill="x")
@@ -1483,6 +2468,7 @@ class NativeApp:
         self._build_clients_tab()
         self._build_backup_tab()
         localize_widget_tree(self.root, self.language)
+        self.update_setup_banner()
 
     def _on_language_changed(self, _event=None):
         language = "vi" if self.language_var.get() == "Tiếng Việt" else "en"
@@ -1834,7 +2820,62 @@ class NativeApp:
             self.render_wifi()
             self.refresh_clients()
             self.refresh_backups()
+            self.update_setup_banner()
         self.run_task("Đang kết nối Agent…", work, done)
+
+    def update_setup_banner(self):
+        """Show the setup bar only while no token is configured."""
+        if not hasattr(self, "setup_bar") or not self.setup_bar.winfo_exists():
+            return
+        configured = bool(self.token_var.get().strip())
+        if configured:
+            self.setup_bar.pack_forget()
+        elif not self.setup_bar.winfo_manager():
+            self.setup_bar.pack(fill="x", padx=14, pady=(0, 8), before=self.gateway_bar)
+
+    def open_setup_wizard(self):
+        """Run the post-flash sequence and hand the fetched token to the tool."""
+        settings = load_provision_settings()
+        if not settings.host and self.base_var.get():
+            settings.host = self.base_var.get().split("//")[-1].strip("/")
+        SetupWizard(self.root, settings, self.language, self.palette, on_success=self.adopt_token)
+
+    def adopt_token(self, base_url, token):
+        """Store a freshly provisioned token and open the control screens."""
+        self.base_var.set(base_url)
+        self.token_var.set(token)
+        save_connection(base_url, token)
+        self.append_log(
+            f"Provisioning finished · {base_url}" if self.language == "en"
+            else f"Cài đặt xong · {base_url}"
+        )
+        self.update_setup_banner()
+        self.connect()
+
+    def check_router_state(self, announce=True):
+        """Report what the router currently offers before any change is made."""
+        base = self.base_var.get().strip().rstrip("/") or DEFAULT_BASE
+        token = self.token_var.get().strip()
+        def work():
+            return probe_router_state(base, token)
+        def done(state):
+            message = self.t(ROUTER_STATE_LABELS.get(state, state))
+            self.status_var.set(message)
+            self.setup_hint_var.set(f"{base} · {message}")
+            self.append_log(f"{base} · {message}")
+            if announce:
+                messagebox.showinfo(APP_NAME, f"{base}\n\n{message}", parent=self.root)
+        if not announce:
+            # Launch-time check: never pop a dialog, never block the window.
+            def worker():
+                try:
+                    state = work()
+                except Exception:
+                    return
+                self.root.after(0, lambda: done(state))
+            threading.Thread(target=worker, daemon=True).start()
+            return
+        self.run_task("Đang kiểm tra tình trạng router…", work, done)
 
     def require_client(self) -> AgentClient:
         if not self.client:
@@ -2688,11 +3729,18 @@ def probe_saved_connection() -> bool:
 
 
 def main() -> int:
+    if os.environ.get("SBPROXY_ASKPASS") == "1":
+        # ssh called us as its askpass helper; answer on stdout and exit.
+        return write_askpass_answer(os.environ.get("SBPROXY_SSH_PASSWORD", ""))
     setup_logging(verbose="--verbose" in sys.argv)
     install_exception_logging()
     migrate_legacy_config()
     if "--where" in sys.argv:
-        print(f"home={APP_HOME}\nconfig={CONFIG_FILE}\nlogs={LOG_DIR}\nruntime={RUNTIME_DIR}")
+        # write_stdout, not print: a windowed build has no sys.stdout.
+        write_stdout(
+            f"home={APP_HOME}\nconfig={CONFIG_FILE}\nlogs={LOG_DIR}\n"
+            f"runtime={RUNTIME_DIR}\npayload={find_payload() or '—'}\n"
+        )
         return 0
     provisioned = provision_from_environment()
     if "--provision" in sys.argv:

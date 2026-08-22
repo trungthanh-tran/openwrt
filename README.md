@@ -6,7 +6,8 @@ Create multiple isolated SSIDs on a GL-MT6000 and route each SSID's IPv4 TCP/UDP
 
 ## Status and limitations
 
-- v0.3 is pre-production and requires testing on real hardware.
+- 0.4.x is pre-production and requires testing on real hardware; the
+  current version is in [VERSION](VERSION) and in the console header.
 - OpenWrt 24.10 (`opkg`) and 25.12 (`apk`) are supported; GL.iNet OEM firmware is experimental.
 - Only IPv4 is proxied. IPv6 services are disabled on managed SSIDs to prevent bypass.
 - Port-53 DNS on managed SSIDs is hijacked into sing-box fake-IP; reverse mapping sends hostnames to the matching SOCKS upstream for remote resolution.
@@ -47,11 +48,19 @@ sh scripts/rollback.sh
 - Live LAN mode uses [the local agent](agent/README.en.md) at `http://<router>/sbproxy/`.
 
 The console has two independent frontends over the same Agent API: the
-router-hosted **web build** and a native Tkinter **Windows desktop** app. The
-desktop app uses no HTML/WebView/WebView2, protects its token with Windows
-DPAPI, dry-runs before Apply, warns before important mutations, and includes
-advanced client management. Its interface supports English and Vietnamese,
-plus Dark and Light themes; English is the default. Build it with
+router-hosted **web build** and a native Tkinter **desktop** app. The desktop
+app uses no HTML/WebView/WebView2, protects its token with Windows DPAPI,
+dry-runs before Apply, warns before important mutations, and includes advanced
+client management. Its interface supports English and Vietnamese, plus Dark and
+Light themes; English is the default.
+
+The desktop app can also bring up a freshly flashed router by itself
+(**Post-flash setup**): over SSH it inspects what the router already has, pushes
+the code and configuration, installs dependencies and the agent, runs the
+initial scripts, then reads the token back and opens the control screens —
+reusing anything already installed and reporting every step live. A built
+executable embeds the matching router package, so no repository checkout is
+needed on the operator's machine. Build it with
 `cd console/desktop; .\build.ps1` on Windows or `sh build.sh` on Linux/macOS —
 see [console/desktop/README.md](console/desktop/README.md).
 
@@ -62,11 +71,14 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 - [Complete guide](docs/GUIDE.en.md)
 - [Installation](docs/INSTALL.en.md)
 - [Testing](docs/TESTING.en.md)
-- [Latest-four-commit debugging handoff (Vietnamese)](docs/DEBUGGING.md)
+- [Debugging and handoff runbook (Vietnamese)](docs/DEBUGGING.md)
 - [Rollback](docs/ROLLBACK.en.md)
 - [Administrator guide](docs/admin-guide.en.md)
 - [User guide](docs/user-guide.en.md)
+- [Desktop console](console/desktop/README.md)
+- [Local agent](agent/README.en.md)
 - [PC management](pc/README.en.md)
+- [Automated test matrix](docs/TEST-MATRIX.md)
 
 ## Testing
 

@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](TESTING.md) | English
 
+> The Vietnamese edition ([TESTING.md](TESTING.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 Run these checks after every apply and firmware upgrade.
 
 ## Router checks

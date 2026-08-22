@@ -43,6 +43,8 @@ Khung **Internet Gateway** phía trên các tab cho biết đường ra thực t
 hiện **KHÔNG QUA wwan** hoặc màu vàng/đỏ, bấm **Kiểm tra gateway** rồi báo quản
 trị viên trước khi Apply thêm thay đổi.
 
+> **Bản Desktop hiện thanh vàng “CHƯA CẤU HÌNH ROUTER”?** Router đó chưa có agent hoặc chưa có token. Bấm **Kiểm tra tình trạng** để biết thiếu cái nào (thao tác chỉ đọc, không đổi gì trên router), rồi báo quản trị viên chạy **Cài đặt sau khi flash** — xem [admin-guide.md](admin-guide.md).
+
 > **Nếu không kết nối được (bản Web):** thường do mở console qua `https` nên trình duyệt chặn gọi router `http`. Hãy mở đúng `http://<router>/sbproxy/`, hoặc dùng **bản Desktop** (không bị chặn). Nếu vẫn lỗi, kiểm tra lại token với quản trị viên.
 
 ---

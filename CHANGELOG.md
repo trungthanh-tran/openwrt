@@ -5,6 +5,55 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Cài đặt sau khi flash ngay trong console desktop**: nút **Cài đặt sau khi
+  flash…** chạy toàn bộ chuỗi qua SSH — kiểm tra SSH, đẩy mã nguồn vào
+  `/root/sbproxy`, `install-deps.sh`, đẩy `wifi-socks.conf` (và `settings.sh`
+  nếu chọn), `preflight.sh` + dry-run, `apply.sh`, `agent/install-agent.sh`,
+  đọc `/etc/sbproxy/token` rồi kiểm tra `?action=status`. Từng bước hiển thị
+  trạng thái/chi tiết trực tiếp trên UI và dừng ngay ở bước lỗi đầu tiên.
+- Lấy token xong app lưu như token nhập tay và mở thẳng màn hình điều khiển.
+- Khi chưa có token, cửa sổ chính hiện thanh **CHƯA CẤU HÌNH ROUTER** với nút
+  **Cài đặt sau khi flash…** và **Kiểm tra tình trạng** (agent OK / sai token /
+  chưa cài agent / không liên lạc được); có token sẵn thì app kết nối luôn.
+- Mật khẩu SSH đi qua askpass helper (không nằm trên dòng lệnh, không ghi vào
+  `connection.json`); host/user/port/đường dẫn được nhớ cho lần chạy sau.
+- **Bản build .exe/.bin nhúng sẵn gói router**: `build.ps1` và `build.sh` đóng
+  gói `sbproxy-update-<version>.tar.gz` (cùng danh sách file với
+  `pc/make-package.sh`) vào file thực thi, nên chỉ cần file build là cài được
+  router mới flash — không cần mã nguồn trên máy. Gói tạo ở thư mục tạm ngoài
+  repo; `SBPROXY_PAYLOAD` hoặc file chọn tay vẫn được ưu tiên, và đường dẫn
+  trong bundle không bị lưu lại vì mỗi lần chạy bung ra chỗ khác.
+- **Kiểm tra trước khi cài**: thêm bước *Kiểm tra hiện trạng router* (chỉ đọc)
+  báo router đã có mã nguồn / `wifi-socks.conf` / sing-box / agent / token và
+  sing-box có chạy không. Cái gì đã có thì dùng lại — không cài lại phụ thuộc,
+  giữ cấu hình đang chạy, không cài đè agent còn tốt (vẫn đọc token) — trừ khi
+  tick **Ghi đè cấu hình đã có trên router** hoặc **Cài lại agent dù đã có**.
+- Lần mở app sau: nếu đã biết địa chỉ router mà chưa có token, app kiểm tra ngầm
+  và ghi tình trạng lên thanh vàng thay vì để người dùng cài lại từ đầu; nút
+  **Kiểm tra tình trạng** kèm luôn bảng hiện trạng qua SSH.
+- **Refine toàn bộ tài liệu**: `console/desktop/README.*` viết lại theo mạch
+  chức năng → cài router → dòng lệnh/biến môi trường → build → môi trường/log →
+  dev & test (bỏ phần trùng lặp); README gốc, `docs/GUIDE.*`, `docs/INSTALL.*`,
+  `docs/admin-guide.*`, `docs/user-guide.*`, `agent/README.*` và `pc/README.*`
+  bổ sung đường dẫn cài bằng console desktop và liên kết chéo; bỏ các mốc
+  version cũ (v0.1/v0.2/v0.3) trong phần trạng thái và hạn chế; bản EN rút gọn
+  ghi rõ bản VI là tài liệu hiện trường đầy đủ hơn.
+- Tài liệu chạy tại hiện trường (`console/desktop/README.md` + `README.vi.md`):
+  mang gì theo, kiểm tra `ssh`/`tar`/gói bằng `--where` và `tar -tzf`/`-xzOf`,
+  kiểm tra router trước khi đụng vào, bảng điền từng trường trong wizard, cách
+  cài bằng gói `.tar.gz` khác (`SBPROXY_PAYLOAD` hoặc chọn file).
+- Suite mới `tests/test_desktop_provision.py` và các test GUI cho wizard.
+
+### Fixed
+- Gói đẩy lên router (`pc/update.*`, `pc/make-package.*` và payload nhúng trong
+  bản build) không còn kéo theo `dist/`, `build/` và `__pycache__` — trước đó
+  file `.exe` vừa build trong `console/desktop/dist/` bị đóng gói vào payload,
+  làm gói phình lên hàng chục MB.
+- `--where` và chế độ askpass ghi ra stdout qua file descriptor/Win32 handle,
+  nên bản build `--windowed` (không có `sys.stdout`) vẫn trả lời được `ssh`;
+  `--where` in thêm dòng `payload=` để biết bản build đang dùng gói nào.
+
 ## [0.4.0] - 2026-08-20
 
 ### Added

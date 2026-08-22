@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](README.md) | English
 
+> The Vietnamese edition ([README.md](README.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 The local agent turns the static configuration UI into a LAN-only control panel. It installs a token-protected CGI endpoint, a SOCKS latency daemon, and the self-hosted UI.
 
 ## Install
@@ -14,6 +16,10 @@ sh agent/install-agent.sh
 ```
 
 Open `http://<router>/sbproxy/`, leave Base URL empty, and paste the generated token.
+
+The desktop console runs this same script over SSH, then reads the token back
+for you — see **Post-flash setup** in
+[../console/desktop/README.md](../console/desktop/README.md).
 
 ## API
 

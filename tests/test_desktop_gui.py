@@ -104,5 +104,69 @@ class DesktopGuiSmokeTests(unittest.TestCase):
                         dialog.destroy()
 
 
+class SetupWizardGuiTests(unittest.TestCase):
+    """The post-flash screens must render and gate on the saved token."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.root = tk.Tk()
+            cls.root.withdraw()
+        except tk.TclError as exc:
+            raise unittest.SkipTest(f"Tk display unavailable: {exc}")
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "root"):
+            cls.root.destroy()
+
+    def build_app(self, token):
+        with mock.patch.object(appmod, "load_connection", return_value=(appmod.DEFAULT_BASE, token)),              mock.patch.object(appmod, "load_preferences", return_value=("en", "dark")),              mock.patch.object(appmod.NativeApp, "connect"):
+            app = appmod.NativeApp(self.root)
+        self.root.update_idletasks()
+        return app
+
+    def test_the_setup_bar_appears_only_without_a_token(self):
+        app = self.build_app("")
+        self.assertEqual(app.setup_bar.winfo_manager(), "pack")
+        self.assertIn("ROUTER NOT CONFIGURED", widget_texts(app.setup_bar))
+        app.token_var.set("0123456789abcdef0123")
+        app.update_setup_banner()
+        self.root.update_idletasks()
+        self.assertEqual(app.setup_bar.winfo_manager(), "")
+
+    def test_a_saved_token_starts_the_tool_immediately(self):
+        with mock.patch.object(appmod, "load_connection", return_value=(appmod.DEFAULT_BASE, "0123456789abcdef0123")),              mock.patch.object(appmod, "load_preferences", return_value=("en", "dark")),              mock.patch.object(appmod.NativeApp, "connect") as connect:
+            app = appmod.NativeApp(self.root)
+            self.root.update()
+            self.root.after(400, self.root.quit)
+            self.root.mainloop()
+        self.assertEqual(app.setup_bar.winfo_manager(), "")
+        connect.assert_called()
+
+    def test_the_wizard_renders_every_step_in_both_languages(self):
+        settings = appmod.ProvisionSettings(host="192.168.8.1", payload=str(ROOT))
+        for language, expected in (("en", "Fetch the agent token"), ("vi", "Lấy token agent")):
+            with self.subTest(language=language):
+                wizard = appmod.SetupWizard(self.root, settings, language, appmod.DARK_PALETTE)
+                self.root.update_idletasks()
+                rows = [wizard.steps_tree.item(item, "values") for item in wizard.steps_tree.get_children()]
+                self.assertEqual(len(rows), len(settings and appmod.ProvisionRunner(settings).steps))
+                self.assertIn(expected, [row[1] for row in rows])
+                wizard.set_step(0, appmod.STEP_OK, "OpenWrt 24.10")
+                self.assertIn("OpenWrt 24.10", wizard.steps_tree.item("0", "values")[2])
+                wizard.close()
+
+    def test_a_finished_wizard_hands_the_token_to_the_app(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod, "save_connection") as save,              mock.patch.object(appmod.NativeApp, "connect") as connect:
+            app.adopt_token("http://192.168.8.1", "0123456789abcdef0123")
+        save.assert_called_with("http://192.168.8.1", "0123456789abcdef0123")
+        connect.assert_called_once()
+        self.root.update_idletasks()
+        self.assertEqual(app.setup_bar.winfo_manager(), "")
+        self.assertEqual(app.token_var.get(), "0123456789abcdef0123")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

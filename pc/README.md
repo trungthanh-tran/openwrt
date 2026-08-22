@@ -107,3 +107,7 @@ Chạy `scripts/backup.sh` trên router (tar `/etc/config` + `/etc/sing-box` + n
 - Truyền file dùng scp giao thức cũ / `tar` qua pipe SSH — tương thích **dropbear** của OpenWrt, không cần cài `openssh-sftp-server` trên router.
 - Nếu Linux của bạn có OpenSSH ≥ 9.0 mà scp lỗi SFTP: bản bash không dùng scp nên không bị ảnh hưởng.
 - Backup trên router tự giữ 20 bản gần nhất ([scripts/backup.sh](../scripts/backup.sh)); backup local trên máy không tự xoá — bạn tự quản lý `pc/backups/`.
+
+## Bản GUI cho cùng đường SSH
+
+Cần giao diện thay vì dòng lệnh — kể cả cài router mới flash và lấy token agent về — dùng **Cài đặt sau khi flash** trong [../console/desktop/README.vi.md](../console/desktop/README.vi.md). `pc/make-package.sh` / `pc\make-package.ps1` tạo gói `sbproxy-update-<version>.tar.gz` dùng chung cho wizard đó và cho dialog cập nhật của console web.

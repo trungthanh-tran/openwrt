@@ -181,7 +181,7 @@ logread -e sing-box | tail -20               # log proxy
 > (mặc định `198.18.0.0/15`), sing-box map ngược fake-IP về hostname và gửi **hostname** cho SOCKS
 > (remote resolve). Nhờ đó không leak DNS qua dnsmasq và SOCKS không nhận IP thô. Nếu vẫn lộ, xem mục [Xử lý lỗi](#dns-vẫn-lộ-isp-thật).
 
-> **IPv6:** v0.2 chỉ proxy IPv4 và tắt RA/DHCPv6 trên các SSID sbproxy. Không bật lại IPv6
+> **IPv6:** project chỉ proxy IPv4 và tắt RA/DHCPv6 trên các SSID sbproxy. Không bật lại IPv6
 > trước khi có TPROXY + policy routing IPv6 đầy đủ, nếu không client có thể đi thẳng ra WAN.
 
 ---

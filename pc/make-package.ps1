@@ -18,7 +18,7 @@ if ($Ver -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "VERSION khong hop le: '$
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $Pkg = Join-Path $OutDir "sbproxy-update-$Ver.tar.gz"
-tar -czf $Pkg -C $RepoDir --exclude=node_modules `
+tar -czf $Pkg -C $RepoDir --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ `
   README.md VERSION agent config console docs etc scripts
 if ($LASTEXITCODE -ne 0) { throw 'tar that bai (can Windows 10+ co tar.exe)' }
 

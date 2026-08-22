@@ -1,45 +1,191 @@
-# sbproxy Console Native cho Windows
+# sbproxy Console Native
 
 **Ngôn ngữ:** Tiếng Việt | [English](README.md)
 
-Ứng dụng desktop Tkinter chạy độc lập và gọi trực tiếp Agent API trên router.
-Ứng dụng **không dùng HTML, WebView hay WebView2**; console web tại
-`console/web/control-panel.html` là một ứng dụng riêng.
+Ứng dụng desktop Tkinter chạy độc lập, gọi thẳng Agent API trên router. Ứng
+dụng **không dùng HTML, WebView hay WebView2** — console web tại
+`console/web/control-panel.html` là ứng dụng riêng dùng chung API. Windows là
+nền tảng chính; cùng mã nguồn build được cho Linux và macOS.
+
+Hai việc console web không làm được: cài router vừa flash qua SSH (**Cài đặt
+sau khi flash**) và chạy chỉ với một file thực thi, máy không cần Python cũng
+không cần mã nguồn.
 
 ## Chức năng
 
-- Chuyển trực tiếp giữa giao diện English/Tiếng Việt và theme Dark/Light; lựa
-  chọn được lưu cho lần chạy sau. Mặc định là English + Dark.
+**Cấu hình**
+
 - Quản lý danh sách Wi-Fi/SSID và SOCKS5, lưu cấu hình rồi apply.
-- Thêm/xóa SSID; mọi lần Apply đều dry-run cấu hình tạm trước khi ghi và được
-  Agent dry-run lần cuối trước khi thay đổi router.
-- Hiển thị màn hình loading theo từng bước; timeout: dry-run 60 giây, lưu/backup
-  45 giây và apply 120 giây.
-- Đổi nhanh SOCKS5 cho từng SSID.
-- Xem client, kick, ban và unban.
-- Lọc thiết bị theo SSID, IP/tên/MAC, trạng thái cấm và mức tín hiệu.
-- Bộ lọc nâng cao theo band, online/offline, quyền truy cập, ngưỡng RSSI,
-  lưu lượng và thời gian kết nối; bấm tiêu đề cột để sắp xếp.
-- Dashboard số thiết bị online/yếu/đã chặn/tổng lưu lượng, auto-refresh 5–60s,
-  xem chi tiết, chọn nhiều thiết bị, copy IP/MAC và xuất CSV UTF-8.
-- Khung Internet Gateway hiển thị route thực tế, `wwan`/device, next-hop, IP
-  nguồn, link, DNS và HTTP latency; cảnh báo nếu đường ra không qua `wwan`.
-- Hiển thị cả thiết bị trong blocklist khi đang offline để có thể bỏ cấm.
-- Các thao tác cần chọn mục chỉ nằm trong khung chỉnh sửa sát bảng; toolbar chỉ
+- Thêm/xoá SSID; mỗi lần Apply đều dry-run cấu hình tạm trước khi ghi, và Agent
+  dry-run lần cuối trước khi router đổi trạng thái.
+- Đổi SOCKS5 của một SSID mà không cần sửa toàn bộ.
+- Chọn hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, …) rồi bấm
+  **Random MAC**; hãng và BSSID mới được lưu lại.
+
+**Thiết bị**
+
+- Xem client và kick, cấm, bỏ cấm; thiết bị trong blocklist dù offline vẫn hiện
+  để có thể bỏ cấm.
+- Lọc theo SSID, IP/tên/MAC, band, online/offline, quyền truy cập, RSSI, lưu
+  lượng và thời gian kết nối; bấm tiêu đề cột để sắp xếp.
+- Dashboard số liệu, auto-refresh 5–60 giây, xem chi tiết, chọn nhiều thiết bị,
+  copy IP/MAC và xuất CSV UTF-8.
+
+**Vận hành**
+
+- Khung Internet Gateway: route thực tế, `wwan`/device, next-hop, IP nguồn,
+  link, DNS và HTTP latency; cảnh báo khi đường ra không qua `wwan`.
+- Xem backup, rollback, chạy health check và đọc log thao tác.
+- Cài hoặc sửa router qua SSH ngay trong app — xem
+  [Cài đặt sau khi flash](#cài-đặt-sau-khi-flash).
+
+**Giao diện và an toàn**
+
+- Đổi trực tiếp giữa English/Tiếng Việt và Dark/Light; lựa chọn được lưu (mặc
+  định English + Dark).
+- Màn hình loading theo bước với timeout hữu hạn: dry-run 60 giây, lưu/backup
+  45 giây, apply 120 giây.
+- Tác vụ quan trọng nêu rõ ảnh hưởng và mặc định chọn **Không**.
+- Thao tác phụ thuộc lựa chọn nằm trong khung chỉnh sửa sát bảng; toolbar chỉ
   chứa thao tác toàn cục.
-- Tác vụ quan trọng luôn hiện cảnh báo ảnh hưởng và mặc định chọn **Không**;
-  chỉ thực thi sau khi người dùng xác nhận rõ ràng.
-- Chọn hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, v.v.) rồi bấm
-  **Random MAC** cho từng SSID; provider và BSSID mới được lưu lại.
-- Xem backup, rollback, health và log thao tác.
-- Lưu URL router và token bằng Windows DPAPI cho đúng tài khoản Windows hiện tại.
+- URL router và token được bảo vệ bằng Windows DPAPI cho đúng tài khoản hiện
+  tại (Linux/macOS dùng `chmod 600`).
+
+## Cài đặt sau khi flash
+
+Router vừa flash lại chưa có mã nguồn sbproxy, chưa có agent và chưa có token.
+Bấm **Cài đặt sau khi flash…** — trên thanh vàng hiện khi chưa lưu token, hoặc
+nút luôn có sẵn ở hàng kết nối — để console chạy toàn bộ quy trình qua SSH và
+tick từng bước ngay trên giao diện:
+
+1. Kiểm tra kết nối SSH (và báo bản OpenWrt đang chạy).
+2. Kiểm tra router đang có sẵn gì: mã nguồn, `wifi-socks.conf`, sing-box, agent
+   CGI, token và sing-box có chạy không.
+3. Đẩy mã nguồn vào `/root/sbproxy`.
+4. Cài gói phụ thuộc (`scripts/install-deps.sh`).
+5. Đẩy `config/wifi-socks.conf` — và `config/settings.sh` nếu có chọn.
+6. Chạy `scripts/preflight.sh` và `DRYRUN=1 scripts/apply.sh`.
+7. Chạy `scripts/apply.sh` khởi tạo (tuỳ chọn bằng checkbox).
+8. Cài hoặc cập nhật agent (`agent/install-agent.sh`).
+9. Đọc `/etc/sbproxy/token` và lưu như token nhập tay.
+10. Gọi `?action=status` để chắc chắn agent trả lời.
+
+**Cái gì đang chạy tốt thì không làm lại.** Bước 2 quyết định phần còn lại: đã
+có phụ thuộc thì không cài lại, đã có cấu hình thì giữ nguyên, agent còn tốt kèm
+token thì không cài đè — token vẫn được đọc để mở thẳng màn hình điều khiển.
+Muốn làm lại thì tick **Ghi đè cấu hình đã có trên router** hoặc **Cài lại agent
+dù đã có**.
+
+Chuỗi dừng ngay ở bước lỗi đầu tiên kèm đúng thông báo lỗi của router; sửa xong
+chạy lại được vì mọi bước đã qua đều idempotent. Khi bước cuối đạt, cửa sổ cài
+đặt đóng lại và màn hình điều khiển mở ra với token mới.
+
+**Xác thực** dùng OpenSSH của máy: SSH key, key đã nạp sẵn trong agent, hoặc
+mật khẩu router. Mật khẩu đi tới `ssh` qua askpass helper — không nằm trên dòng
+lệnh — và không bao giờ ghi vào `connection.json`. Địa chỉ router, user, port và
+các đường dẫn được nhớ cho lần chạy sau.
+
+**Kiểm tra trước khi cài.** Có token sẵn thì app kết nối ngay khi mở và vào
+thẳng màn hình điều khiển. Chưa có token thì app kiểm tra ngầm địa chỉ router đã
+lưu và ghi kết quả lên thanh vàng: agent tốt, agent chạy nhưng sai token, router
+sống nhưng chưa có agent, hoặc không liên lạc được. Nút **Kiểm tra tình trạng**
+làm lại việc đó khi bấm và kèm bảng hiện trạng SSH ở bước 2. Cả hai đều **chỉ
+đọc**, nên chỉ chạy cài đặt khi thật sự cần.
+
+## Chạy tại hiện trường: file exe + gói `sbproxy-update-*.tar.gz`
+
+Cần mang theo:
+
+- `sbproxy-console.exe` (Windows) hoặc `sbproxy-console` (Linux/macOS). File này
+  đã nhúng gói router đúng version của nó nên **một mình nó cài được router**.
+- Gói `sbproxy-update-<version>.tar.gz` (tuỳ chọn), chỉ cần khi muốn cài version
+  khác với gói nhúng. Tạo từ mã nguồn bằng `make package`,
+  `sh pc/make-package.sh` hoặc `.\pc\make-package.ps1`; file ra nằm ở `dist/`.
+
+Máy tính cần: Windows 10+ (hoặc Linux/macOS) có OpenSSH client (`ssh`, `scp`) và
+`tar` trong `PATH`, cùng một đường LAN có dây tới router. Không cần Python,
+không cần mã nguồn.
+
+### 1. Kiểm tra công cụ và gói cài
+
+```powershell
+ssh -V; tar --version            # cả hai phải có trong PATH
+.\sbproxy-console.exe --where    # home/config/logs/runtime + gói đang dùng
+
+# Tuỳ chọn, kiểm tra file gói:
+tar -tzf .\sbproxy-update-0.4.0.tar.gz | Select-Object -First 10   # gói chứa gì
+tar -xzOf .\sbproxy-update-0.4.0.tar.gz VERSION                    # gói là version nào
+```
+
+Dòng `payload=` do `--where` in ra chính là gói mà **Cài đặt sau khi flash** sẽ
+đẩy lên router: đường dẫn trong bundle đã bung nếu chạy bản build, hoặc thư mục
+mã nguồn nếu chạy từ source.
+
+### 2. Kiểm tra router trước khi đụng vào
+
+Mở app rồi đọc thanh vàng, hoặc bấm **Kiểm tra tình trạng** — cả hai đều chỉ đọc
+như mô tả ở trên. Nếu cần chạy trong script: `--probe` trả 0 khi token đã lưu
+vẫn dùng được.
+
+### 3. Cài đặt hoặc sửa router
+
+Bấm **Cài đặt sau khi flash…** rồi điền:
+
+| Trường | Điền gì |
+|---|---|
+| Router (IP) | `192.168.8.1` với firmware GL.iNet, `192.168.1.1` với OpenWrt vanilla/recovery |
+| Tài khoản / Port SSH | `root`, `22` |
+| Mật khẩu SSH / SSH key | mật khẩu router, hoặc chọn SSH key (dùng key thì bỏ trống mật khẩu) |
+| Thư mục trên router | `/root/sbproxy` trừ khi bản cài nằm chỗ khác |
+| Mã nguồn hoặc gói `.tar.gz` | để nguyên nếu dùng gói nhúng; bấm `…` chọn `sbproxy-update-<version>.tar.gz` nếu muốn cài gói đó |
+| `wifi-socks.conf` | file cấu hình cần đẩy; để trống nếu giữ cấu hình sẵn có trên router |
+| Ghi đè / Cài lại | chỉ tick khi thực sự muốn thay cấu hình hoặc agent đang chạy |
+
+Bấm **Bắt đầu cài đặt** và theo dõi checklist: bước nào router đã có sẵn sẽ hiện
+*Bỏ qua*, gặp lỗi thì dừng ngay kèm thông báo của router, chạy hết thì app lưu
+token và mở màn hình điều khiển.
+
+Muốn cài gói khác về sau: mở lại wizard chọn `.tar.gz` mới, hoặc trỏ sẵn cho app
+trước khi mở:
+
+```powershell
+$env:SBPROXY_PAYLOAD = "D:\packages\sbproxy-update-0.5.0.tar.gz"
+.\sbproxy-console.exe
+```
+
+Khi router đã chạy agent thì các lần cập nhật sau không cần SSH nữa: upload đúng
+file `.tar.gz` đó trong dialog **Cập nhật** của console web
+(`scripts/self-update.sh` giữ nguyên `wifi-socks.conf` + `settings.sh` và chặn hạ
+version).
+
+## Dòng lệnh và biến môi trường
+
+| Cờ / biến | Tác dụng |
+|---|---|
+| `--where` | In đường dẫn home, config, logs, runtime và gói payload đang dùng |
+| `--probe` | Trả 0 nếu token đã lưu vẫn gọi được agent, ngược lại trả 1 |
+| `--provision` | Lưu `SBPROXY_BASE`/`SBPROXY_TOKEN` rồi thoát (0 nếu thành công, 2 nếu thiếu token) |
+| `--verbose` | Ghi log mức DEBUG cho lần chạy này |
+| `SBPROXY_HOME` | Chỉ định thư mục home riêng của app |
+| `SBPROXY_PAYLOAD` | Gói router hoặc thư mục mã nguồn mà **Cài đặt sau khi flash** sẽ đẩy |
+| `SBPROXY_BASE`, `SBPROXY_TOKEN` | Giá trị kết nối cho `--provision` |
+
+Nạp sẵn kết nối mà không ghi token dạng rõ:
+
+```powershell
+$env:SBPROXY_BASE = "http://192.168.8.1"
+$env:SBPROXY_TOKEN = "<token>"
+.\dist\sbproxy-console.exe --provision
+.\dist\sbproxy-console.exe --probe
+```
+
+Agent dùng `Authorization: Bearer <token>` vì uhttpd có thể loại bỏ header CGI
+tuỳ biến. Chỉ dùng Agent trong LAN/VLAN quản trị; không mở ra WAN.
 
 ## Build
 
 Yêu cầu Python 3.9+ có Tkinter. PyInstaller không cross-compile — build trên
 đúng nền tảng đích.
-
-Windows:
 
 ```powershell
 cd console\desktop
@@ -47,15 +193,17 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
-Linux/macOS (Debian/Ubuntu cần `sudo apt install python3-tk` trước):
-
 ```sh
 cd console/desktop
 sh build.sh
-# -> dist/sbproxy-console
+# -> dist/sbproxy-console        (Debian/Ubuntu: cài sudo apt install python3-tk trước)
 ```
 
-Máy chạy file build ra không cần cài Python hay WebView2.
+Cả hai script nhúng gói router (`sbproxy-update-<version>.tar.gz`, đúng danh
+sách file như `pc/make-package.sh`) để **Cài đặt sau khi flash** dùng được ngay
+trên máy không có mã nguồn. Gói được tạo ở thư mục tạm ngoài repo và bung ra
+cùng bundle khi chạy; `SBPROXY_PAYLOAD` và file chọn trong wizard vẫn được ưu
+tiên hơn. Máy chạy file build ra không cần Python hay WebView2.
 
 Trên Linux, bootloader POSIX không expand `~` hay `$HOME`, nên runtime giải nén
 vào thư mục temp mặc định trừ khi chỉ định đường dẫn tuyệt đối:
@@ -78,45 +226,32 @@ trường Python bên ngoài hay với bản cài khác:
 
 Thứ tự xác định `<home>`:
 
-1. Biến môi trường `SBPROXY_HOME` (tùy ý chỉ định).
+1. Biến `SBPROXY_HOME` (tuỳ ý chỉ định).
 2. Thư mục `data/` nằm cạnh file thực thi — **chế độ portable**, hợp với USB
    hoặc bản copy-anywhere; cứ tạo thư mục là app tự dùng.
 3. Mặc định theo người dùng: `%LOCALAPPDATA%\sbproxy-console-native` (Windows),
    `~/.local/share/sbproxy-console-native` (Linux/macOS).
 
-Chạy `sbproxy-console --where` để in ra đường dẫn thực tế. File
-`connection.json` của bản cũ được tự động migrate vào `config/` ở lần chạy đầu.
+`--where` in ra đường dẫn thực tế. File `connection.json` của bản cũ được tự
+động migrate vào `config/` ở lần chạy đầu.
 
 ## Log để debug
 
 Mọi lệnh gọi agent (action, dung lượng, thời gian, lỗi HTTP/kết nối), tác vụ
-nền, dòng log trên UI và **exception không bắt được** — cả main thread lẫn
-worker thread — đều ghi vào `<home>/logs/console.log`, xoay vòng ở 1 MB và giữ
-5 file. Thông tin nhạy cảm (token, header Bearer, mật khẩu WiFi/SOCKS) được
-che (`***`) trước khi ghi nên file an toàn để gửi kèm báo lỗi. Bấm nút
-**Thư mục log** trên header để mở, hoặc chạy `--verbose` để log mức DEBUG.
+nền, dòng log trên UI và exception không bắt được — cả main thread lẫn worker —
+đều ghi vào `<home>/logs/console.log`, xoay vòng ở 1 MB và giữ 5 file. Token,
+header Bearer, mật khẩu Wi-Fi/SOCKS được che (`***`) trước khi ghi nên file an
+toàn để gửi kèm báo lỗi. Nút **Thư mục log** trên header mở thư mục này; cờ
+`--verbose` ghi thêm mức DEBUG.
 
-## Chạy khi phát triển
+## Chạy khi phát triển và test
 
 ```powershell
 cd console\desktop
-.\run.ps1
+.\run.ps1          # Linux/macOS dùng sh run.sh
 ```
 
-## Nạp sẵn kết nối
-
-Có thể nạp URL và token mà không ghi token rõ vào file:
-
-```powershell
-$env:SBPROXY_BASE = "http://192.168.8.1"
-$env:SBPROXY_TOKEN = "<token>"
-.\dist\sbproxy-console.exe --provision
-.\dist\sbproxy-console.exe --probe
-```
-
-Thông tin được lưu ở
-`%LOCALAPPDATA%\sbproxy-console-native\connection.json`; token được mã hóa bằng
-DPAPI và chỉ tài khoản Windows hiện tại giải mã được. Agent dùng
-`Authorization: Bearer <token>` vì uhttpd có thể loại bỏ header CGI tùy biến.
-
-Chỉ dùng Agent trong LAN/VLAN quản trị; không mở API ra WAN.
+Từ thư mục gốc repo, `sh tests/run-all.sh` (hoặc `make test`) chạy mọi suite an
+toàn trên máy trạm: parse/lọc/API lõi, workflow giao diện, chuỗi cài đặt sau khi
+flash (chạy với fake, không đụng router thật), và test Tk hai ngôn ngữ × hai
+theme khi máy có màn hình. Xem [ma trận test đầy đủ](../../docs/TEST-MATRIX.md).

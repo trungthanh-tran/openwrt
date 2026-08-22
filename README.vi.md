@@ -5,7 +5,7 @@
 Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua một SOCKS5 riêng**, MAC ngẫu nhiên, cách ly client, chặn WebRTC — điều khiển bằng **một file config duy nhất** + vài script.
 
 ## ⚠️ Trạng thái & cảnh báo
-- **v0.3 — pre-production.** Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
+- **0.4.x — pre-production** (version hiện tại nằm ở [VERSION](VERSION) và trên header console). Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
 - Hiện chỉ proxy **IPv4**; IPv6 bị tắt trên các SSID sbproxy để tránh đi thẳng. DNS cổng 53 được hijack vào fake-IP và reverse-map hostname để SOCKS thực hiện remote resolve.
 - Luôn có **backup tự động** trước mỗi thay đổi và **rollback 1 lệnh** — xem [docs/ROLLBACK.md](docs/ROLLBACK.md).
 - Chỉ dùng cho mục đích hợp pháp; đảm bảo tuân thủ điều khoản của nhà cung cấp SOCKS.
@@ -52,7 +52,8 @@ pc/                         # CHẠY TỪ MÁY QUẢN TRỊ (Windows/Linux): upd
   backup.ps1 / backup.sh    #   backup router rồi kéo snapshot về máy
   restore.ps1 / restore.sh  #   đẩy snapshot lên router + rollback
 docs/                       # GUIDE, INSTALL, ROLLBACK, TESTING, user-guide, admin-guide
-tests/run.sh                # unit test POSIX sh cho lib.sh (không cần router)
+tests/                      # test chạy trên máy trạm, không cần router
+  run-all.sh                #   chạy toàn bộ suite (make test)
 Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 ```
 
@@ -62,7 +63,8 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 
 ### Console: bản Web và bản Desktop native
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
-- **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI, dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
+- **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI, dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`.
+- **Cài router vừa flash ngay trong bản Desktop** — chức năng **Cài đặt sau khi flash** chạy qua SSH: kiểm tra router đang có sẵn gì, đẩy mã nguồn và cấu hình, cài phụ thuộc và agent, chạy script khởi tạo rồi đọc token về và mở màn hình điều khiển; phần nào đã cài thì dùng lại và từng bước hiện ngay trên giao diện. File build đã nhúng sẵn gói router nên máy chạy không cần mã nguồn. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
 
 ## Quickstart
 ```sh
@@ -120,3 +122,7 @@ CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước 
 - [docs/TESTING.md](docs/TESTING.md) — cách test từng yêu cầu (IP đúng sock, DNS leak, WebRTC, isolation)
 - [docs/DEBUGGING.md](docs/DEBUGGING.md) — runbook bàn giao/debug 4 commit gần nhất trên máy khác (PC + router)
 - [docs/ROLLBACK.md](docs/ROLLBACK.md) — khi lỗi thì khôi phục thế nào (nhiều mức)
+- [console/desktop/README.vi.md](console/desktop/README.vi.md) — console desktop: cài router sau khi flash, chạy bằng file exe + gói `.tar.gz`
+- [agent/README.md](agent/README.md) — agent LAN trên router (CGI + healthd)
+- [pc/README.md](pc/README.md) — script quản trị từ máy tính qua SSH
+- [docs/TEST-MATRIX.md](docs/TEST-MATRIX.md) — ma trận test tự động

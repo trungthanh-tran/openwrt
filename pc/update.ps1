@@ -68,7 +68,7 @@ Initialize-SbPc $PSBoundParameters
 # 1) Package router-side files; pc/ may contain local secrets and is excluded.
 $tmpTar = Join-Path $env:TEMP "sbproxy-update-$PID.tar.gz"
 Log 'Dong goi repo...'
-tar -czf $tmpTar -C $RepoDir --exclude=node_modules `
+tar -czf $tmpTar -C $RepoDir --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ `
   README.md VERSION agent config console docs etc scripts
 if ($LASTEXITCODE -ne 0) { Die 'tar that bai (can Windows 10+ co tar.exe)' }
 

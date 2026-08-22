@@ -2,6 +2,8 @@
 
 **Language:** [Tiếng Việt](README.md) | English
 
+> The Vietnamese edition ([README.md](README.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 These scripts run on an administrator's Windows, Linux, macOS, or Git Bash computer and manage the router over SSH.
 
 | Task | PowerShell | POSIX shell |
@@ -29,3 +31,10 @@ sh pc/restore.sh --host 192.168.8.1
 Update preserves router-side `wifi-socks.conf` and `settings.sh` unless `-WithSettings`/`--with-settings` is supplied. Backup downloads a complete project snapshot. Restore asks for confirmation and overwrites active router configuration.
 
 Use SSH keys where possible. Keep local backups encrypted because they contain Wi-Fi and SOCKS credentials.
+
+For a GUI over the same SSH path — including first-time installation of a
+freshly flashed router and fetching its agent token — use **Post-flash
+setup** in [../console/desktop/README.md](../console/desktop/README.md).
+`pc/make-package.sh` / `pc\make-package.ps1` build the
+`sbproxy-update-<version>.tar.gz` used by both that wizard and the web
+console's update dialog.

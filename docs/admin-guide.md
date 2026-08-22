@@ -34,6 +34,7 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 2 | `pc/verify-firmware.ps1` hoặc `pc/verify-firmware.sh` | So khớp SHA-256 firmware với giá trị công bố. Việc tải/chọn image vẫn làm thủ công từ nguồn chính thức. |
 | 3 | `pc/backup.ps1` / `pc/backup.sh`, `scripts/backup.sh` | Tạo và tải backup ra máy quản trị. |
 | 4 | — | Flash/U-Boot là thao tác vật lý, có nguy cơ brick nên không tự động hóa. |
+| 5–10 | `console/desktop` **Cài đặt sau khi flash** | Một chuỗi chạy qua SSH: đẩy mã nguồn, cài phụ thuộc, đẩy cấu hình, chạy preflight/dry-run/apply, cài agent và lấy token — từng bước cập nhật ngay trên giao diện. |
 | 6 | `scripts/preflight.sh`, `scripts/install-deps.sh` | Kiểm tra phần cứng rồi cài dependency. |
 | 7, 8 | `scripts/apply.sh`, `scripts/uninstall.sh` | Validate/apply cấu hình hoặc gỡ cấu hình do project tạo. |
 | 9 | `agent/install-agent.sh`, `scripts/rotate-token.sh` | Cài agent local và xoay token. |
@@ -113,6 +114,19 @@ cat /etc/sysupgrade.conf   # phải có /etc/sing-box/, /etc/sbproxy.nft, /etc/s
 - Với GL.iNet firmware, IP quản trị MT6000 mặc định là `192.168.8.1`. OpenWrt vanilla mới flash có thể dùng `192.168.1.1`; luôn kiểm tra IP LAN thực tế trước khi chạy script.
 - Đặt mật khẩu root: LuCI → System → Administration, hoặc SSH rồi `passwd`.
 - SSH trong cấu hình MT6000 của tài liệu này: `ssh root@192.168.8.1`. Host key đổi → xoá dòng cũ trong `~/.ssh/known_hosts`.
+
+> **Làm nhanh Bước 6–10 bằng console desktop:** mở app, bấm **Cài đặt sau khi flash…**, nhập địa chỉ router + thông tin SSH rồi bấm chạy. Chuỗi chạy qua SSH:
+>
+> 1. kiểm tra hiện trạng router (mã nguồn, cấu hình, phụ thuộc, agent, token) — phần nào đã có thì dùng lại;
+> 2. đẩy mã nguồn + `wifi-socks.conf`, cài phụ thuộc;
+> 3. chạy `preflight.sh`, dry-run rồi `apply.sh`;
+> 4. cài agent, đọc `/etc/sbproxy/token`, kiểm tra `?action=status`.
+>
+> Gặp lỗi thì dừng ngay ở bước đó kèm thông báo của router; chạy hết thì token được lưu và màn hình điều khiển mở ra.
+>
+> Máy không có mã nguồn chỉ cần mang `sbproxy-console.exe` (đã nhúng gói router đúng version), thêm gói `sbproxy-update-<version>.tar.gz` khi muốn cài version khác — xem mục *Chạy tại hiện trường* trong [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
+>
+> Các bước bên dưới là cách làm tay tương đương và vẫn là tài liệu gốc.
 
 ## Bước 6 — Đưa project lên router & cài gói
 > **Script tương ứng (router):** `sh scripts/preflight.sh` để kiểm tra chỉ đọc; sau khi xử lý cảnh báo, chạy `sh scripts/install-deps.sh` để cài dependency và đăng ký dữ liệu cần giữ khi sysupgrade.
@@ -211,7 +225,7 @@ cat /etc/sbproxy/token          # token MỚI → paste lại (token cũ lập t
 ### 9.4 Console: bản Web vs bản Desktop
 Hai frontend độc lập dùng chung Agent API:
 - **Web (router-hosted):** `install-agent.sh` copy UI vào `/www/sbproxy/index.html`. Mở `http://<router>/sbproxy/` — same-origin. Nếu mở qua **https** thì trình duyệt chặn mixed-content khi gọi router http.
-- **Desktop (.exe / Linux):** build trên máy quản trị: Windows `cd console/desktop; .\build.ps1` → `dist/sbproxy-console.exe`; Linux/macOS `sh console/desktop/build.sh` → `dist/sbproxy-console` (token lưu `chmod 600` thay cho DPAPI). App chạy trong **môi trường tách biệt**: config/log/cache/runtime nằm dưới một home riêng (`SBPROXY_HOME` → thư mục `data/` cạnh exe cho bản portable → `%LOCALAPPDATA%\sbproxy-console-native`); xem đường dẫn bằng `sbproxy-console --where`. Khi cần debug sự cố hiện trường, lấy `logs/console.log` (xoay vòng 1 MB × 5, đã che token/mật khẩu) qua nút **Thư mục log**, hoặc chạy lại với `--verbose`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
+- **Desktop (.exe / Linux):** build trên máy quản trị: Windows `cd console/desktop; .\build.ps1` → `dist/sbproxy-console.exe`; Linux/macOS `sh console/desktop/build.sh` → `dist/sbproxy-console` (token lưu `chmod 600` thay cho DPAPI). Cả hai script build nhúng sẵn gói `sbproxy-update-<version>.tar.gz` nên file build chạy được **Cài đặt sau khi flash** mà máy không cần mã nguồn. App chạy trong **môi trường tách biệt**: config/log/cache/runtime nằm dưới một home riêng (`SBPROXY_HOME` → thư mục `data/` cạnh exe cho bản portable → `%LOCALAPPDATA%\sbproxy-console-native`); xem đường dẫn bằng `sbproxy-console --where`. Khi cần debug sự cố hiện trường, lấy `logs/console.log` (xoay vòng 1 MB × 5, đã che token/mật khẩu) qua nút **Thư mục log**, hoặc chạy lại với `--verbose`. Đây là app Tkinter native, không dùng HTML/WebView/WebView2; gọi thẳng Agent API và bảo vệ token bằng DPAPI. App dry-run candidate trước Apply, hiển thị loading/timeout, cảnh báo trước tác vụ quan trọng và có bộ lọc thiết bị nâng cao. Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
 
 > **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.
 > Project chỉ hỗ trợ local. Nếu cần truy cập từ ngoài, vào LAN qua VPN do bạn tự quản lý; không mở agent/uhttpd trực tiếp ra WAN.
@@ -232,7 +246,7 @@ logread -e sing-box | tail -20
 | Trên client (từng WiFi) | Đạt khi |
 |---|---|
 | `https://ipinfo.io/ip` | IP = SOCKS gán cho WiFi đó; 2 WiFi khác sock → 2 IP khác |
-| `dnsleaktest.com` | DNS không phải ISP thật (xem hạn chế v0.1, Bước 15) |
+| `dnsleaktest.com` | DNS không phải ISP thật (xem phần hạn chế, Bước 15) |
 | `browserleaks.com/webrtc` | Không lộ IP thật |
 | 2 máy cùng WiFi ping nhau | Không ping được (isolate) |
 
@@ -334,7 +348,7 @@ Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quy�
 ### A · Chống lộ danh tính / IP thật
 | Kênh lộ | Trạng thái | Cách bịt |
 |---|---|---|
-| **IPv6 bypass** | ✅ Chặn ở v0.2 | tproxy hiện chỉ bắt IPv4; `apply.sh` tắt DHCPv6/RA/NDP trên từng SSID sbproxy. Chưa hỗ trợ proxy IPv6. |
+| **IPv6 bypass** | ✅ Đã chặn | tproxy hiện chỉ bắt IPv4; `apply.sh` tắt DHCPv6/RA/NDP trên từng SSID sbproxy. Chưa hỗ trợ proxy IPv6. |
 | **DNS leak** | ✅ Chặn (fake-IP) | DNS cổng 53 của SSID proxy hijack vào sing-box; client nhận fake-IP `198.18.0.0/15`, SOCKS nhận **hostname** (remote resolve). Client dùng DoH/DoT né được hijack → fallback sniff SNI; muốn chặt hơn, chặn cổng 853/resolver DoH trên zone khách. |
 | **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh (Bước 7). |
 | **Rò khi proxy chết** | ✅ Fail-closed | Zone khách `forward=REJECT` → sing-box/tproxy chết thì client **mất mạng** chứ không ra thẳng. Đừng thêm rule forward guest→wan. |

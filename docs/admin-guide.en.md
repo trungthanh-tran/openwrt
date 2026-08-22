@@ -2,6 +2,8 @@
 
 **Language:** English (default) | [Tiếng Việt](admin-guide.md)
 
+> The Vietnamese edition ([admin-guide.md](admin-guide.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
+
 > Companion documents: [GUIDE.en.md](GUIDE.en.md), [INSTALL.en.md](INSTALL.en.md), [TESTING.en.md](TESTING.en.md), [ROLLBACK.en.md](ROLLBACK.en.md).
 
 ## Safety baseline
@@ -21,6 +23,7 @@
 | 2 | `pc/verify-firmware.ps1` or `pc/verify-firmware.sh` | Compare the firmware SHA-256 with the vendor-published value. Image selection remains manual. |
 | 3 | `pc/backup.ps1` / `pc/backup.sh`, `scripts/backup.sh` | Create and download off-device backups. |
 | 4 | — | Flashing and U-Boot recovery are physical, high-risk operations and are intentionally not automated. |
+| 5–10 | `console/desktop` **Post-flash setup** | One SSH-driven sequence that pushes the code, installs dependencies, pushes the configuration, runs preflight/dry-run/apply, installs the agent, and fetches the token — each step reported live in the app. |
 | 6 | `scripts/preflight.sh`, `scripts/install-deps.sh` | Inspect hardware and install dependencies. |
 | 7, 8 | `scripts/apply.sh`, `scripts/uninstall.sh` | Validate/apply or remove project-managed configuration. |
 | 9 | `agent/install-agent.sh`, `scripts/rotate-token.sh` | Install the local agent and rotate its token. |
@@ -40,6 +43,12 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 3. **Back up off-device:** run `.\pc\backup.ps1 -Label before-fw-upgrade` or `sh pc/backup.sh before-fw-upgrade`; the PC helper creates the router snapshot and downloads it to `pc/backups/`.
 4. **Flash firmware:** no script. Image selection, U-Boot/GUI upload, and recovery are intentionally manual because automating them can brick the router.
 5. **Reconnect after upgrade:** after SSH works, run `sh scripts/inventory.sh > inventory-after.txt` and compare it with Step 1.
+
+    > **Steps 6–10 in one pass:** the desktop console's **Post-flash setup…** runs the same sequence over SSH — inspect what the router already has, push the code and `wifi-socks.conf`, install dependencies, run `preflight.sh` and the dry-run, run `apply.sh`, install the agent, read `/etc/sbproxy/token`, and verify `?action=status`. Anything already installed is reused, the run stops at the first failure with the router's own error, and the token is stored on success.
+    >
+    > On a machine with no repository checkout, carry only `sbproxy-console.exe` — it embeds the matching router package — plus a `sbproxy-update-<version>.tar.gz` when a different version must be installed. See the *Field runbook* section of [../console/desktop/README.md](../console/desktop/README.md).
+    >
+    > The manual steps below remain authoritative and are what the console automates.
 6. **Install:** run `sh scripts/preflight.sh`, resolve its findings, then run `sh scripts/install-deps.sh`.
 7. **Configure:** edit `config/wifi-socks.conf` or use the UI, then validate with `DRYRUN=1 sh scripts/apply.sh`.
 8. **Apply:** run `DRYRUN=1 sh scripts/apply.sh` first, then `sh scripts/apply.sh`; use `sh scripts/uninstall.sh` to remove project-managed configuration.
@@ -53,7 +62,7 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
 16. **Update through the console:** build `dist/sbproxy-update-<version>.tar.gz` with `make package` (or `pc/make-package.sh` / `pc\make-package.ps1`), then upload it from the web console's **⬆ Cập nhật** dialog (`POST ?action=update[&force=1]`, 8 MB default cap via `MAX_UPDATE_BYTES`). `scripts/self-update.sh` rejects path traversal and downgrades (unless forced), backs up as `pre-update`, preserves the live `wifi-socks.conf` and `settings.sh`, redeploys the CGI/UI/healthd, and never reloads Wi-Fi by itself. The running version is shown in the console header (`meta.version` from `?action=status`).
 
-**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, includes advanced client filters, and supports English/Vietnamese with Dark/Light modes. Build it with `cd console/desktop; .\build.ps1` on Windows or `sh build.sh` on Linux/macOS (token stored with `chmod 600` instead of DPAPI there) — see [../console/desktop/README.md](../console/desktop/README.md). Both consoles show the project version next to the agent version reported by `?action=status` and flag a mismatch. The desktop app runs in an isolated environment: config, logs, cache, and the bundled Python runtime all live under one home (`SBPROXY_HOME` → a `data/` folder beside the executable for portable installs → `%LOCALAPPDATA%\sbproxy-console-native`); print it with `sbproxy-console --where`. For field debugging collect `logs/console.log` (rotating 1 MB × 5, credentials redacted) via the **Log folder** button, or rerun with `--verbose`.
+**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, includes advanced client filters, and supports English/Vietnamese with Dark/Light modes. Build it with `cd console/desktop; .\build.ps1` on Windows or `sh build.sh` on Linux/macOS (token stored with `chmod 600` instead of DPAPI there) — see [../console/desktop/README.md](../console/desktop/README.md). Both build scripts embed the matching `sbproxy-update-<version>.tar.gz`, so the shipped executable runs **Post-flash setup** on its own without a repository checkout. Both consoles show the project version next to the agent version reported by `?action=status` and flag a mismatch. The desktop app runs in an isolated environment: config, logs, cache, and the bundled Python runtime all live under one home (`SBPROXY_HOME` → a `data/` folder beside the executable for portable installs → `%LOCALAPPDATA%\sbproxy-console-native`); print it with `sbproxy-console --where`. For field debugging collect `logs/console.log` (rotating 1 MB × 5, credentials redacted) via the **Log folder** button, or rerun with `--verbose`.
 
 ## Installation and acceptance
 
@@ -90,7 +99,7 @@ Or rotate only the token with `sh scripts/rotate-token.sh`.
 
 ## Privacy checklist
 
-- IPv6: disabled on managed SSIDs because v0.2 proxies IPv4 only.
+- IPv6: disabled on managed SSIDs because the project proxies IPv4 only.
 - DNS: port-53 traffic on proxied SSIDs is hijacked into sing-box fake-IP, so SOCKS receives hostnames; DoH/DoT clients bypass the hijack and rely on TLS SNI sniffing.
 - WebRTC: port-based STUN/TURN blocking is optional and not a universal guarantee.
 - Fail-closed: guest zones must never receive a direct guest-to-WAN forwarding rule.
