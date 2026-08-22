@@ -98,16 +98,17 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.events = []
         self.saved = []
 
-    def build(self, runner, prober=None):
+    def build(self, runner, prober=None, version_reader=None):
         return appmod.ProvisionRunner(
             self.settings,
             emit=lambda index, state, detail: self.events.append((index, state, detail)),
             runner=runner,
             prober=prober or (lambda *_args, **_kwargs: "ok"),
+            version_reader=version_reader or (lambda *_args, **_kwargs: appmod.APP_VERSION),
         )
 
-    def run_full(self, runner, prober=None):
-        provisioner = self.build(runner, prober)
+    def run_full(self, runner, prober=None, version_reader=None):
+        provisioner = self.build(runner, prober, version_reader)
         with mock.patch.object(appmod, "save_connection", lambda base, token: self.saved.append((base, token))):
             return provisioner.run(), provisioner
 
@@ -150,8 +151,13 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertNotIn("sh scripts/apply.sh", " ".join(runner.remote_commands()).replace("DRYRUN=1 sh scripts/apply.sh", ""))
 
     def installed_router(self, **extra):
-        """A router that already has code, deps, config, agent, and token."""
+        """A router already carrying code, deps, config, agent, and token.
+
+        `same=1` is what the deployed-agent comparison prints when the
+        installed CGI/healthd/UI are byte-identical to the pushed code.
+        """
         results = {"code=$(": (0, "code=1\nconf=1\ndeps=1\nagent=1\ntoken=1\nrunning=1\n", ""),
+                   "same=1;": (0, "same=1", ""),
                    "/etc/sbproxy/token": (0, "0123456789abcdef0123", "")}
         results.update(extra)
         return FakeRunner(results)
@@ -185,6 +191,56 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertIn("sh agent/install-agent.sh", remote)
         uploads = [argv[-1] for argv in runner.calls if argv and argv[0] == "scp"]
         self.assertIn("root@192.168.8.1:/root/sbproxy/config/wifi-socks.conf", uploads)
+
+    def test_an_agent_older_than_the_pushed_code_is_reinstalled(self):
+        # Same inventory, but the deployed CGI/healthd/UI differ from the push.
+        runner = self.installed_router(**{"same=1;": (0, "same=0", "")})
+        ok, _provisioner = self.run_full(runner)
+        self.assertTrue(ok)
+        self.assertIn("sh agent/install-agent.sh", " ".join(runner.remote_commands()))
+
+    def test_verification_fails_when_the_agent_reports_another_version(self):
+        runner = self.installed_router()
+        ok, provisioner = self.run_full(runner, version_reader=lambda *_a, **_k: "0.3.0")
+        self.assertFalse(ok)
+        index, _state, detail = self.events[-1]
+        self.assertEqual(provisioner.steps[index][0], "Kiểm tra agent API")
+        self.assertIn("0.3.0", detail)
+
+    def test_the_pushed_version_comes_from_the_package_name(self):
+        package = self.tmp / "sbproxy-update-0.9.1.tar.gz"
+        package.write_bytes(b"payload")
+        self.settings.payload = str(package)
+        runner = self.installed_router()
+        ok, provisioner = self.run_full(runner, version_reader=lambda *_a, **_k: "0.9.1")
+        self.assertTrue(ok)
+        self.assertEqual(provisioner.pushed_version, "0.9.1")
+
+    def test_a_newer_router_refuses_an_older_package(self):
+        package = self.tmp / "sbproxy-update-0.4.0.tar.gz"
+        package.write_bytes(b"payload")
+        self.settings.payload = str(package)
+        runner = self.installed_router(
+            **{"code=$(": (0, "code=1\nconf=1\ndeps=1\nagent=1\ntoken=1\nversion=0.9.0\n", "")}
+        )
+        ok, provisioner = self.run_full(runner)
+        self.assertFalse(ok)
+        self.assertEqual(provisioner.router_version, "0.9.0")
+        index, _state, detail = self.events[-1]
+        self.assertEqual(provisioner.steps[index][0], "Đẩy mã nguồn lên router")
+        self.assertIn("0.9.0 > 0.4.0", detail)
+        # Nothing was written: the refusal happens before the upload.
+        self.assertEqual([argv for argv in runner.calls if argv and argv[0] == "scp"], [])
+
+    def test_an_equal_or_newer_package_is_accepted(self):
+        package = self.tmp / "sbproxy-update-0.9.0.tar.gz"
+        package.write_bytes(b"payload")
+        self.settings.payload = str(package)
+        runner = self.installed_router(
+            **{"code=$(": (0, "code=1\nconf=1\ndeps=1\nagent=1\ntoken=1\nversion=0.9.0\n", "")}
+        )
+        ok, _provisioner = self.run_full(runner, version_reader=lambda *_a, **_k: "0.9.0")
+        self.assertTrue(ok)
 
     def test_a_missing_agent_is_installed_even_with_a_stale_token(self):
         runner = self.installed_router(**{"code=$(": (0, "code=1\nconf=1\ndeps=1\nagent=0\ntoken=1\n", "")})
@@ -326,6 +382,85 @@ class TokenAndProbeTests(unittest.TestCase):
         self.assertEqual(self._probe_with(raiser(URLError("no route"))), "unreachable")
 
 
+class VersionCompatibilityTests(unittest.TestCase):
+    def test_comparison_orders_versions_and_rejects_junk(self):
+        self.assertEqual(appmod.compare_versions("0.3.0", "0.4.0"), -1)
+        self.assertEqual(appmod.compare_versions("0.4.0", "0.4.0"), 0)
+        self.assertEqual(appmod.compare_versions("0.10.0", "0.9.9"), 1)
+        self.assertEqual(appmod.compare_versions("1.0.0", "0.9.9"), 1)
+        for junk in ("", "unknown", "0.4", "0.4.0-rc1", None):
+            with self.subTest(junk=junk):
+                self.assertIsNone(appmod.compare_versions(junk, "0.4.0"))
+                self.assertIsNone(appmod.compare_versions("0.4.0", junk))
+
+    def test_payload_version_reads_names_and_checkouts(self):
+        tmp = Path(tempfile.mkdtemp())
+        package = tmp / "sbproxy-update-1.2.3.tar.gz"
+        package.write_bytes(b"x")
+        self.assertEqual(appmod.payload_version(package), "1.2.3")
+        self.assertEqual(appmod.payload_version(ROOT), (ROOT / "VERSION").read_text().strip())
+        unnamed = tmp / "package.tar.gz"
+        unnamed.write_bytes(b"x")
+        self.assertEqual(appmod.payload_version(unnamed), "")
+        self.assertEqual(appmod.payload_version(tmp / "missing.tar.gz"), "")
+
+    def test_the_app_version_matches_the_repository_version(self):
+        self.assertEqual(appmod.APP_VERSION, (ROOT / "VERSION").read_text().strip())
+
+    def test_the_update_endpoint_posts_the_package_as_raw_bytes(self):
+        client = appmod.AgentClient("http://192.168.8.1", "token")
+        captured = {}
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return b'{"ok": true, "from": "0.3.0", "to": "0.4.0"}'
+
+        def fake_urlopen(request, timeout=None):
+            captured["url"] = request.full_url
+            captured["method"] = request.get_method()
+            captured["body"] = request.data
+            captured["type"] = request.get_header("Content-type")
+            return Response()
+
+        with mock.patch.object(appmod, "urlopen", fake_urlopen):
+            result = client.update(b"tarball-bytes")
+        self.assertEqual(result["to"], "0.4.0")
+        self.assertEqual(captured["method"], "POST")
+        self.assertEqual(captured["body"], b"tarball-bytes")
+        self.assertEqual(captured["type"], "application/octet-stream")
+        self.assertIn("action=update", captured["url"])
+        self.assertNotIn("force", captured["url"])
+
+        with mock.patch.object(appmod, "urlopen", fake_urlopen):
+            client.update(b"tarball-bytes", force=True)
+        self.assertIn("force=1", captured["url"])
+
+    def test_build_update_package_uses_a_package_as_is(self):
+        tmp = Path(tempfile.mkdtemp())
+        package = tmp / "sbproxy-update-0.4.0.tar.gz"
+        package.write_bytes(b"x")
+        self.assertEqual(appmod.build_update_package(str(package)), package)
+
+    def test_build_update_package_packs_a_checkout(self):
+        package = appmod.build_update_package(str(ROOT))
+        self.assertTrue(package.is_file())
+        self.assertEqual(appmod.payload_version(package), appmod.APP_VERSION)
+        package.unlink()
+
+    def test_build_update_package_rejects_an_invalid_source(self):
+        bare = Path(tempfile.mkdtemp())
+        with self.assertRaises(appmod.ProvisionError):
+            appmod.build_update_package(str(bare))
+        with self.assertRaises(appmod.ProvisionError):
+            appmod.build_update_package(str(bare / "missing"))
+
+
 class ProvisionConfigTests(unittest.TestCase):
     def test_settings_round_trip_through_the_config_file(self):
         tmp = Path(tempfile.mkdtemp())
@@ -394,6 +529,19 @@ class ProvisionTranslationTests(unittest.TestCase):
         for label in labels:
             with self.subTest(label=label):
                 self.assertIn(label, appmod.EN_TRANSLATIONS)
+
+    def test_version_handshake_messages_are_translated(self):
+        for template in (
+            "Agent trên router là v{agent}, cũ hơn console v{app}.",
+            "Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn;"
+            " console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.",
+            "Console v{app} cũ hơn agent v{agent} — hãy cập nhật console trước khi thay đổi router.",
+            "Đã nâng cấp agent: {old} → {new}",
+            "Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn",
+            "Agent vẫn chạy version cũ, hãy chạy lại và tick “Cài lại agent dù đã có”",
+        ):
+            with self.subTest(template=template[:40]):
+                self.assertIn(template, appmod.EN_TRANSLATIONS)
 
     def test_composed_step_errors_are_translated_on_both_sides(self):
         self.assertEqual(

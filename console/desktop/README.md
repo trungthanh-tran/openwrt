@@ -95,6 +95,26 @@ token is wrong, router up without an agent, or unreachable. **Check status**
 repeats that on demand and adds the SSH inventory from step 2. Both are
 read-only, so a setup run is only started when it is actually needed.
 
+## Version compatibility
+
+The console, the router package it carries, and the agent on the router are one
+version. On every connection the console reads `meta.version` from
+`?action=status` and acts on the difference:
+
+| Situation | What the console does |
+|---|---|
+| Same version | Connects normally. |
+| No agent yet | The yellow bar offers **Post-flash setup…**, which installs it. |
+| Agent older than the console | Offers to upgrade it in place; on **Yes** it uploads its own package to `?action=update`. `scripts/self-update.sh` backs the router up as `pre-update`, **keeps `wifi-socks.conf` and `settings.sh`**, redeploys the CGI/UI/healthd, and never touches Wi-Fi. Declining leaves an **Upgrade the agent** button in the yellow bar. |
+| Agent newer than the console | Refuses to drive it: an error explains that a newer console is required, and every mutating action (Apply, SOCKS change, MAC randomization, SSID delete, kick/ban/unban, backup, rollback) is blocked. Reading and status checks still work. |
+
+**Post-flash setup** enforces the same rule over SSH. It reads the router's
+`VERSION` before writing anything and refuses to push an older package onto a
+newer router; it reinstalls the agent whenever the deployed CGI, health daemon,
+or UI differ from the code it just pushed — a version bump alone would otherwise
+leave the old CGI serving; and the last step fails if the agent still reports a
+different version than the package that was installed.
+
 ## Field runbook: the executable plus a `sbproxy-update-*.tar.gz`
 
 What to carry to the site:
@@ -168,6 +188,7 @@ keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades).
 |---|---|
 | `--where` | Print the resolved home, config, logs, runtime, and payload paths |
 | `--probe` | Exit 0 when the stored token still reaches the agent, 1 otherwise |
+| `--where` … `payload=` | The package version this console would install |
 | `--provision` | Store `SBPROXY_BASE`/`SBPROXY_TOKEN` and exit (0 on success, 2 without a token) |
 | `--verbose` | DEBUG-level logging for this run |
 | `SBPROXY_HOME` | Override the private home directory |

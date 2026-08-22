@@ -43,6 +43,16 @@ Ngày theo định dạng YYYY-MM-DD.
   mang gì theo, kiểm tra `ssh`/`tar`/gói bằng `--where` và `tar -tzf`/`-xzOf`,
   kiểm tra router trước khi đụng vào, bảng điền từng trường trong wizard, cách
   cài bằng gói `.tar.gz` khác (`SBPROXY_PAYLOAD` hoặc chọn file).
+- **Ràng buộc version console ↔ agent**: mỗi lần kết nối, console đọc
+  `meta.version`. Chưa có agent → mời chạy cài đặt; agent cũ hơn → hỏi và nâng
+  cấp tại chỗ bằng cách đẩy gói của chính console lên `?action=update`
+  (giữ nguyên `wifi-socks.conf` + `settings.sh`, router tự backup `pre-update`),
+  từ chối thì còn nút **Nâng cấp agent** trên thanh vàng; agent mới hơn console
+  → báo lỗi yêu cầu dùng console mới hơn và khoá mọi thao tác thay đổi.
+- Wizard cũng ràng buộc version: đọc `VERSION` trên router trước khi ghi và từ
+  chối đẩy gói cũ hơn; cài lại agent khi CGI/healthd/UI đã deploy khác với code
+  vừa đẩy (trước đây chỉ cần “đã có agent” là bỏ qua, khiến CGI cũ vẫn chạy sau
+  khi nâng version); bước cuối báo lỗi nếu agent trả về version khác gói vừa cài.
 - Suite mới `tests/test_desktop_provision.py` và các test GUI cho wizard.
 
 ### Fixed

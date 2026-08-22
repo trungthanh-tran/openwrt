@@ -418,6 +418,17 @@ EN_TRANSLATIONS = {
     "Các trường văn bản phải là chuỗi": "Text fields must be strings",
     "Đã đạt giới hạn 200 SSID": "The 200-SSID limit has been reached",
     "Bỏ qua": "Skipped",
+    'Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn': 'The router runs a newer build than this package; use a newer console',
+    'Nâng cấp agent': 'Upgrade the agent',
+    'Đang nâng cấp agent…': 'Upgrading the agent…',
+    'Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn; console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.': 'The router runs agent v{agent}, newer than console v{app}. Use a newer console; this one is read-only and every change is blocked.',
+    'Agent trên router là v{agent}, cũ hơn console v{app}.': 'The router runs agent v{agent}, older than console v{app}.',
+    'Nâng cấp agent lên v{app} ngay bây giờ? Cấu hình wifi-socks.conf và settings.sh trên router được giữ nguyên, router tự backup trước khi cập nhật.': 'Upgrade the agent to v{app} now? The router keeps its wifi-socks.conf and settings.sh, and backs itself up before updating.',
+    'Agent đã ở v{agent}; console này không có bản mới hơn để đẩy lên.': 'The agent is already at v{agent}; this console has nothing newer to push.',
+    'Đã nâng cấp agent: {old} → {new}': 'Agent upgraded: {old} → {new}',
+    'Console v{app} cũ hơn agent v{agent} — hãy cập nhật console trước khi thay đổi router.': 'Console v{app} is older than agent v{agent} — update the console before changing the router.',
+    'Agent vẫn chạy version cũ, hãy chạy lại và tick “Cài lại agent dù đã có”': 'The agent still runs the old version; run again with “Reinstall the agent even if it is present”',
+    'So khớp agent đã cài': 'Compare the installed agent',
     'Kiểm tra hiện trạng router': 'Check what the router already has',
     'Đã có': 'Present',
     'Chưa có': 'Missing',
@@ -755,6 +766,20 @@ def save_preferences(language: str, theme: str) -> None:
     _write_config_payload(payload)
 
 
+def parse_version(value) -> tuple | None:
+    """`"0.4.0"` -> `(0, 4, 0)`; anything else -> None."""
+    match = re.fullmatch(r"\s*([0-9]+)\.([0-9]+)\.([0-9]+)\s*", str(value or ""))
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def compare_versions(left, right) -> int | None:
+    """-1 if left is older, 0 if equal, 1 if newer, None if either is unusable."""
+    first, second = parse_version(left), parse_version(right)
+    if first is None or second is None:
+        return None
+    return (first > second) - (first < second)
+
+
 def clean_agent_version(meta) -> str:
     """Return the agent's semver from status meta, or "" for dirty payloads."""
     value = meta.get("version") if isinstance(meta, dict) else None
@@ -1007,6 +1032,32 @@ def find_payload() -> str:
     return ""
 
 
+def build_update_package(payload: str = "") -> Path:
+    """Return a router package to upload: the payload itself, or a fresh tarball.
+
+    A shipped executable carries `sbproxy-update-<version>.tar.gz`; a source
+    checkout is packaged on the fly with the same file list.
+    """
+    source = Path(payload or find_payload() or "")
+    if not str(source) or not source.exists():
+        raise ProvisionError("Chưa chọn mã nguồn hoặc gói cập nhật")
+    if source.is_file():
+        return source
+    entries = [name for name in PAYLOAD_ENTRIES if (source / name).exists()]
+    if "scripts" not in entries or "agent" not in entries:
+        raise ProvisionError("Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)")
+    ensure_app_home()
+    package = CACHE_DIR / f"sbproxy-update-{payload_version(source) or APP_VERSION}.tar.gz"
+    completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
+        ["tar", "-czf", str(package), "-C", str(source), "--exclude=node_modules",
+         "--exclude=__pycache__", "--exclude=dist", "--exclude=build", *entries],
+        capture_output=True, text=True, timeout=300, errors="replace",
+    )
+    if completed.returncode != 0:
+        raise ProvisionError(f"Đóng gói mã nguồn: {(completed.stderr or '').strip() or 'tar lỗi'}")
+    return package
+
+
 def load_provision_settings() -> ProvisionSettings:
     stored = _read_config_payload().get("provision")
     settings = ProvisionSettings()
@@ -1071,6 +1122,33 @@ def probe_router_state(base_url: str, token: str, timeout: int = 8) -> str:
         return "unreachable"
 
 
+def read_agent_version(base_url: str, token: str, timeout: int = 8) -> str:
+    """Agent semver from `?action=status`, or "" when it cannot be read."""
+    url = f"{base_url.rstrip('/')}/cgi-bin/sbproxy?action=status"
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+    try:
+        with urlopen(Request(url, headers=headers), timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+        return ""
+    meta = payload.get("meta") if isinstance(payload, dict) else None
+    return clean_agent_version(meta)
+
+
+def payload_version(path) -> str:
+    """Version of a router package or checkout, from its name or VERSION file."""
+    candidate = Path(path) if path else None
+    if not candidate or not candidate.exists():
+        return ""
+    if candidate.is_dir():
+        try:
+            return (candidate / "VERSION").read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+    match = re.search(r"sbproxy-update-([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz$", candidate.name)
+    return match.group(1) if match else ""
+
+
 ROUTER_INVENTORY_KEYS = ("code", "conf", "deps", "agent", "token", "running")
 
 ROUTER_INVENTORY_LABELS = {
@@ -1093,6 +1171,7 @@ def router_inventory_command(remote_dir: str) -> str:
         f'echo "agent=$([ -x /www/cgi-bin/sbproxy ] && {yes})"',
         f'echo "token=$([ -s {REMOTE_TOKEN_FILE} ] && {yes})"',
         f'echo "running=$(pgrep sing-box >/dev/null 2>&1 && {yes})"',
+        f'echo "version=$(tr -d \' \\r\\n\' < {remote_dir}/VERSION 2>/dev/null)"',
         "exit 0",
     ))
 
@@ -1105,6 +1184,15 @@ def parse_router_inventory(text: str) -> dict:
         if key in inventory:
             inventory[key] = value.strip() == "1"
     return inventory
+
+
+def parse_inventory_version(text: str) -> str:
+    """The `version=` line of the inventory output, or "" when absent."""
+    for line in str(text or "").splitlines():
+        key, _separator, value = line.strip().partition("=")
+        if key == "version" and parse_version(value):
+            return value.strip()
+    return ""
 
 
 def describe_router_inventory(inventory: dict, language: str = "en") -> str:
@@ -1127,14 +1215,18 @@ class ProvisionRunner:
     shell out or touch the network.
     """
 
-    def __init__(self, settings: ProvisionSettings, emit=None, runner=None, prober=None):
+    def __init__(self, settings: ProvisionSettings, emit=None, runner=None, prober=None,
+                 version_reader=None):
         self.settings = settings
         self.emit = emit or (lambda *_args: None)
         self._execute = runner or self._run_process
         self._probe = prober or probe_router_state
+        self._agent_version = version_reader or read_agent_version
         self.token = ""
         self.cancelled = False
         self.inventory = {key: False for key in ROUTER_INVENTORY_KEYS}
+        self.pushed_version = ""  # version of the package this run put on the router
+        self.router_version = ""   # version already on the router, before the push
         self.steps = [
             ("Kiểm tra kết nối SSH", self.step_check_ssh),
             ("Kiểm tra hiện trạng router", self.step_inventory),
@@ -1205,7 +1297,9 @@ class ProvisionRunner:
         output = self.ssh(router_inventory_command(self.settings.remote_dir),
                           "Kiểm tra hiện trạng router", timeout=90)
         self.inventory = parse_router_inventory(output)
-        return describe_router_inventory(self.inventory)
+        self.router_version = parse_inventory_version(output)
+        summary = describe_router_inventory(self.inventory)
+        return f"v{self.router_version} · {summary}" if self.router_version else summary
 
     def package_payload(self, workdir: Path) -> Path:
         """Return a tarball of router-side files, building one from a checkout."""
@@ -1224,6 +1318,12 @@ class ProvisionRunner:
 
     def step_push_code(self) -> str:
         remote = self.settings.remote_dir
+        available = payload_version(self.settings.payload)
+        if self.router_version and available and compare_versions(available, self.router_version) == -1:
+            raise ProvisionError(
+                "Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn: "
+                f"{self.router_version} > {available}"
+            )
         workdir = Path(tempfile.mkdtemp(prefix="sbproxy-provision-", dir=str(CACHE_DIR) if CACHE_DIR.is_dir() else None))
         try:
             package = self.package_payload(workdir)
@@ -1234,8 +1334,10 @@ class ProvisionRunner:
                 "rm -f /tmp/sbproxy-update.tar.gz",
                 "Giải nén mã nguồn", timeout=300,
             )
+            self.pushed_version = payload_version(package) or payload_version(self.settings.payload)
             size = package.stat().st_size if package.is_file() else 0
-            return f"{remote} · {human_bytes(size)}" if size else remote
+            detail = f"{remote} · {human_bytes(size)}" if size else remote
+            return f"{detail} · v{self.pushed_version}" if self.pushed_version else detail
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
@@ -1285,10 +1387,31 @@ class ProvisionRunner:
         return lines[-1] if lines else "apply OK"
 
     def step_install_agent(self) -> str:
-        if self.inventory.get("agent") and self.inventory.get("token") and not self.settings.reinstall_agent:
-            return ""  # agent and token are in place; the token step reads it
+        if not self.settings.reinstall_agent and self.agent_matches_pushed_code():
+            return ""  # the installed agent is already this exact code
         self.ssh(f"cd {self.settings.remote_dir}; sh agent/install-agent.sh", "Cài agent", timeout=1200)
-        return "uhttpd CGI + healthd"
+        return f"uhttpd CGI + healthd v{self.pushed_version}" if self.pushed_version else "uhttpd CGI + healthd"
+
+    def agent_matches_pushed_code(self) -> bool:
+        """True only when the deployed agent files are the ones just pushed.
+
+        The agent is installed by copying files, so an older CGI keeps serving
+        after a version bump unless it is reinstalled. Comparing the deployed
+        copies with the freshly pushed sources catches that regardless of what
+        any VERSION file claims.
+        """
+        if not (self.inventory.get("agent") and self.inventory.get("token")):
+            return False
+        remote = self.settings.remote_dir
+        answer = self.ssh(
+            "same=1; "
+            f"cmp -s /www/cgi-bin/sbproxy {remote}/agent/cgi/sbproxy || same=0; "
+            f"cmp -s /usr/sbin/sbproxy-healthd {remote}/agent/sbproxy-healthd || same=0; "
+            f"cmp -s /www/sbproxy/index.html {remote}/console/web/control-panel.html || same=0; "
+            'echo "same=$same"; exit 0',
+            "So khớp agent đã cài", timeout=90,
+        )
+        return "same=1" in answer
 
     def step_fetch_token(self) -> str:
         raw = self.ssh(f"cat {REMOTE_TOKEN_FILE}", "Đọc token agent", timeout=60)
@@ -1300,7 +1423,15 @@ class ProvisionRunner:
         state = self._probe(self.settings.base_url, self.token)
         if state != "ok":
             raise ProvisionError(f"Agent chưa trả lời đúng: {ROUTER_STATE_LABELS.get(state, state)}")
-        return "status ok"
+        expected = self.pushed_version or APP_VERSION
+        reported = self._agent_version(self.settings.base_url, self.token)
+        if reported and compare_versions(reported, expected) != 0:
+            # "head: detail" so translate() renders both halves in English.
+            raise ProvisionError(
+                f"Agent vẫn chạy version cũ, hãy chạy lại và tick “Cài lại agent dù đã có”: "
+                f"{reported} ≠ {expected}"
+            )
+        return f"status ok · agent v{reported}" if reported else "status ok"
 
     # -- orchestration ------------------------------------------------------
 
@@ -1334,13 +1465,18 @@ class AgentClient:
         self.token = token.strip()
         self.timeout = timeout
 
-    def _request(self, action: str, method: str = "GET", body=None, text=False, timeout=None):
-        url = f"{self.base_url}/cgi-bin/sbproxy?{urlencode({'action': action})}"
+    def _request(self, action: str, method: str = "GET", body=None, text=False, timeout=None, query=None):
+        parameters = {"action": action}
+        parameters.update(query or {})
+        url = f"{self.base_url}/cgi-bin/sbproxy?{urlencode(parameters)}"
         request_timeout = timeout if timeout is not None else self.timeout
         data = None
         headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/json"}
         if body is not None:
-            if isinstance(body, str):
+            if isinstance(body, bytes):
+                data = body
+                headers["Content-Type"] = "application/octet-stream"
+            elif isinstance(body, str):
                 data = body.encode("utf-8")
                 headers["Content-Type"] = "text/plain; charset=utf-8"
             else:
@@ -1421,6 +1557,13 @@ class AgentClient:
 
     def backup(self, label="native"):
         return self._request("backup", "POST", {"label": label}, timeout=120)
+
+    def update(self, package: bytes, force: bool = False):
+        """Upload a router package; self-update.sh keeps the live configuration."""
+        return self._request(
+            "update", "POST", body=package, timeout=300,
+            query={"force": "1"} if force else None,
+        )
 
     def rollback(self, name: str):
         return self._request("rollback", "POST", {"name": name}, timeout=180)
@@ -2299,6 +2442,11 @@ class NativeApp:
             "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
         ))
         self.agent_version = ""
+        # Set when the router runs a NEWER agent than this console: the API may
+        # have moved on, so every mutation is refused until the app is updated.
+        self.agent_too_new = False
+        self.agent_outdated = False
+        self.upgrade_offered = False
         self.client_ssid_var = tk.StringVar(value=self.t(ALL_SSIDS))
         self.client_query_var = tk.StringVar()
         self.client_state_var = tk.StringVar(value=self.t(ALL_STATES))
@@ -2444,6 +2592,8 @@ class NativeApp:
         ttk.Label(self.setup_bar, textvariable=self.setup_hint_var,
                   style="MetricYellow.TLabel", wraplength=760).pack(side="left")
         ttk.Button(self.setup_bar, text="Kiểm tra tình trạng", command=self.check_router_state).pack(side="right")
+        self.upgrade_button = ttk.Button(self.setup_bar, text="Nâng cấp agent",
+                                         command=self.upgrade_agent, style="Success.TButton")
         ttk.Button(self.setup_bar, text="Cài đặt sau khi flash…", command=self.open_setup_wizard,
                    style="Primary.TButton").pack(side="right", padx=(0, 8))
 
@@ -2820,15 +2970,19 @@ class NativeApp:
             self.render_wifi()
             self.refresh_clients()
             self.refresh_backups()
-            self.update_setup_banner()
+            self.evaluate_agent_compatibility()
         self.run_task("Đang kết nối Agent…", work, done)
 
     def update_setup_banner(self):
-        """Show the setup bar only while no token is configured."""
+        """Show the bar while no token is configured, or on a version mismatch."""
         if not hasattr(self, "setup_bar") or not self.setup_bar.winfo_exists():
             return
-        configured = bool(self.token_var.get().strip())
-        if configured:
+        needed = not self.token_var.get().strip() or self.agent_outdated or self.agent_too_new
+        if self.agent_outdated and not self.upgrade_button.winfo_manager():
+            self.upgrade_button.pack(side="right", padx=(0, 8))
+        elif not self.agent_outdated and self.upgrade_button.winfo_manager():
+            self.upgrade_button.pack_forget()
+        if not needed:
             self.setup_bar.pack_forget()
         elif not self.setup_bar.winfo_manager():
             self.setup_bar.pack(fill="x", padx=14, pady=(0, 8), before=self.gateway_bar)
@@ -2876,6 +3030,92 @@ class NativeApp:
             threading.Thread(target=worker, daemon=True).start()
             return
         self.run_task("Đang kiểm tra tình trạng router…", work, done)
+
+    def evaluate_agent_compatibility(self):
+        """Compare the agent with this console and act on the difference.
+
+        Older agent: offer to upgrade it in place (the router keeps its
+        configuration). Newer agent: refuse to drive it — an old console may
+        not understand the API or configuration format it serves.
+        """
+        order = compare_versions(self.agent_version, APP_VERSION)
+        self.agent_outdated = order == -1
+        self.agent_too_new = order == 1
+        if order is None or order == 0:
+            self.update_setup_banner()
+            return
+        if self.agent_too_new:
+            message = self.t(
+                "Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn;"
+                " console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.",
+                agent=self.agent_version, app=APP_VERSION,
+            )
+            self.setup_hint_var.set(message)
+            self.append_log(message)
+            self.update_setup_banner()
+            messagebox.showerror(APP_NAME, message, parent=self.root)
+            return
+        message = self.t(
+            "Agent trên router là v{agent}, cũ hơn console v{app}.",
+            agent=self.agent_version, app=APP_VERSION,
+        )
+        self.setup_hint_var.set(message)
+        self.append_log(message)
+        self.update_setup_banner()
+        if self.upgrade_offered:
+            return
+        self.upgrade_offered = True
+        if messagebox.askyesno(
+            APP_NAME,
+            message + "\n\n" + self.t(
+                "Nâng cấp agent lên v{app} ngay bây giờ? Cấu hình wifi-socks.conf và settings.sh"
+                " trên router được giữ nguyên, router tự backup trước khi cập nhật.",
+                app=APP_VERSION,
+            ),
+            default=messagebox.YES,
+            parent=self.root,
+        ):
+            self.upgrade_agent()
+
+    def upgrade_agent(self):
+        """Upload this console's router package; the agent keeps its config."""
+        client = self.require_client()
+        if self.agent_version and compare_versions(APP_VERSION, self.agent_version) != 1:
+            messagebox.showinfo(APP_NAME, self.t(
+                "Agent đã ở v{agent}; console này không có bản mới hơn để đẩy lên.",
+                agent=self.agent_version,
+            ), parent=self.root)
+            return
+        def work():
+            package = build_update_package()
+            version = payload_version(package) or APP_VERSION
+            if compare_versions(version, APP_VERSION) not in (0, None):
+                log.warning("update package v%s does not match console v%s", version, APP_VERSION)
+            return client.update(package.read_bytes())
+        def done(result):
+            from_version = str(result.get("from") or "?")
+            to_version = str(result.get("to") or "?")
+            self.append_log(self.t("Đã nâng cấp agent: {old} → {new}", old=from_version, new=to_version))
+            self.agent_outdated = False
+            self.upgrade_offered = False
+            self.update_setup_banner()
+            messagebox.showinfo(APP_NAME, self.t(
+                "Đã nâng cấp agent: {old} → {new}", old=from_version, new=to_version,
+            ), parent=self.root)
+            self.connect()
+        self.run_task("Đang nâng cấp agent…", work, done, show_loading=True, timeout_hint=300)
+
+    def block_if_incompatible(self) -> bool:
+        """Refuse mutations while the router runs a newer agent than this app."""
+        if not getattr(self, "agent_too_new", False):
+            return False
+        message = self.t(
+            "Console v{app} cũ hơn agent v{agent} — hãy cập nhật console trước khi thay đổi router.",
+            app=APP_VERSION, agent=self.agent_version,
+        )
+        self.append_log(message)
+        messagebox.showerror(APP_NAME, message, parent=self.root)
+        return True
 
     def require_client(self) -> AgentClient:
         if not self.client:
@@ -3010,6 +3250,8 @@ class NativeApp:
         raise AgentError("Đã đạt giới hạn 200 SSID")
 
     def add_wifi(self):
+        if self.block_if_incompatible():
+            return
         try:
             next_idx = self.next_idx()
         except AgentError as exc:
@@ -3026,6 +3268,8 @@ class NativeApp:
             self.render_wifi()
 
     def edit_wifi(self):
+        if self.block_if_incompatible():
+            return
         record = self.selected_wifi()
         if not record:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
@@ -3041,6 +3285,8 @@ class NativeApp:
             self.render_wifi()
 
     def delete_wifi(self):
+        if self.block_if_incompatible():
+            return
         record = self.selected_wifi()
         action = (
             f"Delete SSID {record.name} (IDX {record.idx}) from the configuration being edited."
@@ -3062,6 +3308,8 @@ class NativeApp:
             self.render_wifi()
 
     def quick_sock(self):
+        if self.block_if_incompatible():
+            return
         record = self.selected_wifi()
         if not record:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
@@ -3101,6 +3349,8 @@ class NativeApp:
         self.run_task("Đang đổi SOCKS…", lambda: client.set_sock(updated), done)
 
     def rotate_wifi_mac(self):
+        if self.block_if_incompatible():
+            return
         record = self.selected_wifi()
         if not record:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi cần random MAC"), parent=self.root)
@@ -3160,6 +3410,8 @@ class NativeApp:
         )
 
     def save_apply(self):
+        if self.block_if_incompatible():
+            return
         try:
             client = self.require_client()
             content = render_conf(self.records)
@@ -3451,6 +3703,8 @@ class NativeApp:
         return "break"
 
     def manual_ban_client(self):
+        if self.block_if_incompatible():
+            return
         if not self.records:
             messagebox.showinfo(APP_NAME, self.t("Chưa có SSID nào để áp dụng blocklist"), parent=self.root)
             return
@@ -3488,6 +3742,8 @@ class NativeApp:
         )
 
     def client_action(self, action):
+        if self.block_if_incompatible():
+            return
         items = self.selected_client_items()
         if not items:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một hoặc nhiều thiết bị"), parent=self.root)
@@ -3678,6 +3934,8 @@ class NativeApp:
             self.rollback_button.configure(state="disabled")
 
     def create_backup(self):
+        if self.block_if_incompatible():
+            return
         client = self.require_client()
         label = simpledialog.askstring(self.t("Tạo backup"), self.t("Nhãn backup"), initialvalue="native", parent=self.root)
         if label is None:
@@ -3691,6 +3949,8 @@ class NativeApp:
         self.run_task("Đang tạo backup…", lambda: client.backup(label), done)
 
     def rollback(self):
+        if self.block_if_incompatible():
+            return
         selected = self.backup_list.curselection()
         if not selected:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một backup"), parent=self.root)

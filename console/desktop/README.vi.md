@@ -92,6 +92,25 @@ sống nhưng chưa có agent, hoặc không liên lạc được. Nút **Kiểm
 làm lại việc đó khi bấm và kèm bảng hiện trạng SSH ở bước 2. Cả hai đều **chỉ
 đọc**, nên chỉ chạy cài đặt khi thật sự cần.
 
+## Tương thích version
+
+Console, gói router nó mang theo và agent trên router là **cùng một version**.
+Mỗi lần kết nối, console đọc `meta.version` từ `?action=status` rồi xử lý theo
+chênh lệch:
+
+| Tình huống | Console làm gì |
+|---|---|
+| Cùng version | Kết nối bình thường. |
+| Chưa có agent | Thanh vàng mời chạy **Cài đặt sau khi flash…** để cài. |
+| Agent cũ hơn console | Hỏi có nâng cấp không; chọn **Có** thì console đẩy gói của chính nó lên `?action=update`. `scripts/self-update.sh` backup `pre-update`, **giữ nguyên `wifi-socks.conf` và `settings.sh`**, deploy lại CGI/UI/healthd và không đụng vào Wi-Fi. Từ chối thì thanh vàng giữ nút **Nâng cấp agent**. |
+| Agent mới hơn console | Không cho điều khiển: báo lỗi yêu cầu dùng bản console mới hơn và khoá mọi thao tác thay đổi (Apply, đổi SOCKS, random MAC, xoá SSID, kick/cấm/bỏ cấm, backup, rollback). Xem và kiểm tra trạng thái vẫn được. |
+
+**Cài đặt sau khi flash** áp dụng đúng luật đó qua SSH: đọc `VERSION` trên
+router trước khi ghi bất cứ thứ gì và từ chối đẩy gói cũ hơn lên router mới hơn;
+cài lại agent mỗi khi CGI, health daemon hoặc UI đã deploy khác với code vừa đẩy
+— chỉ đổi số version thì CGI cũ vẫn chạy; và bước cuối báo lỗi nếu agent vẫn
+trả về version khác với gói vừa cài.
+
 ## Chạy tại hiện trường: file exe + gói `sbproxy-update-*.tar.gz`
 
 Cần mang theo:
@@ -164,6 +183,7 @@ version).
 |---|---|
 | `--where` | In đường dẫn home, config, logs, runtime và gói payload đang dùng |
 | `--probe` | Trả 0 nếu token đã lưu vẫn gọi được agent, ngược lại trả 1 |
+| `--where` … `payload=` | Gói mà console này sẽ cài lên router |
 | `--provision` | Lưu `SBPROXY_BASE`/`SBPROXY_TOKEN` rồi thoát (0 nếu thành công, 2 nếu thiếu token) |
 | `--verbose` | Ghi log mức DEBUG cho lần chạy này |
 | `SBPROXY_HOME` | Chỉ định thư mục home riêng của app |

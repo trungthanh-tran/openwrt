@@ -148,6 +148,10 @@ def bare_app(language="en"):
     instance.client = None
     instance.log_history = []
     instance.status_var = FakeVar()
+    instance.agent_version = ""
+    instance.agent_too_new = False
+    instance.agent_outdated = False
+    instance.upgrade_offered = False
     return instance
 
 
@@ -581,6 +585,107 @@ class WifiMutationTests(unittest.TestCase):
             instance.add_wifi()
         instance._task_error.assert_called_once()
         dialog.assert_not_called()
+
+
+class AgentCompatibilityTests(unittest.TestCase):
+    """The console and the agent it drives must be the same version."""
+
+    def compat_app(self, agent_version):
+        instance = bare_app()
+        instance.agent_version = agent_version
+        instance.setup_hint_var = FakeVar()
+        instance.append_log = mock.Mock()
+        instance.update_setup_banner = mock.Mock()
+        instance.upgrade_agent = mock.Mock()
+        return instance
+
+    def test_a_matching_agent_needs_no_action(self):
+        instance = self.compat_app(appmod.APP_VERSION)
+        with mock.patch.object(appmod.messagebox, "askyesno") as ask, \
+             mock.patch.object(appmod.messagebox, "showerror") as error:
+            instance.evaluate_agent_compatibility()
+        self.assertFalse(instance.agent_outdated)
+        self.assertFalse(instance.agent_too_new)
+        ask.assert_not_called()
+        error.assert_not_called()
+        instance.upgrade_agent.assert_not_called()
+
+    def test_an_unreadable_agent_version_is_not_treated_as_a_mismatch(self):
+        instance = self.compat_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno") as ask:
+            instance.evaluate_agent_compatibility()
+        self.assertFalse(instance.agent_outdated)
+        self.assertFalse(instance.agent_too_new)
+        ask.assert_not_called()
+
+    def test_an_older_agent_is_offered_an_upgrade_once(self):
+        instance = self.compat_app("0.3.0")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=True) as ask:
+            instance.evaluate_agent_compatibility()
+        self.assertTrue(instance.agent_outdated)
+        ask.assert_called_once()
+        instance.upgrade_agent.assert_called_once()
+        # A second connect must not nag again unless the user asks for it.
+        with mock.patch.object(appmod.messagebox, "askyesno") as ask_again:
+            instance.evaluate_agent_compatibility()
+        ask_again.assert_not_called()
+
+    def test_declining_the_upgrade_leaves_the_banner_asking(self):
+        instance = self.compat_app("0.3.0")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+            instance.evaluate_agent_compatibility()
+        instance.upgrade_agent.assert_not_called()
+        self.assertTrue(instance.agent_outdated)
+        self.assertIn("0.3.0", instance.setup_hint_var.get())
+
+    def test_a_newer_agent_blocks_every_mutation(self):
+        instance = self.compat_app("9.9.9")
+        with mock.patch.object(appmod.messagebox, "showerror") as error:
+            instance.evaluate_agent_compatibility()
+        self.assertTrue(instance.agent_too_new)
+        error.assert_called_once()
+        instance.upgrade_agent.assert_not_called()
+
+        instance.require_client = mock.Mock()
+        instance.confirm_important = mock.Mock(return_value=True)
+        instance.selected_wifi = mock.Mock(return_value=record())
+        instance.render_wifi = mock.Mock()
+        instance.records = [record()]
+        with mock.patch.object(appmod.messagebox, "showerror") as blocked:
+            instance.save_apply()
+            instance.delete_wifi()
+            instance.create_backup()
+        self.assertEqual(blocked.call_count, 3)
+        instance.require_client.assert_not_called()
+        self.assertEqual(instance.records, [record()])
+
+    def test_upgrade_uploads_the_console_package_and_reconnects(self):
+        instance = self.compat_app("0.3.0")
+        # compat_app() stubs upgrade_agent; this test drives the real one.
+        instance.upgrade_agent = appmod.NativeApp.upgrade_agent.__get__(instance)
+        agent = mock.Mock()
+        agent.update.return_value = {"ok": True, "from": "0.3.0", "to": appmod.APP_VERSION}
+        instance.require_client = lambda: agent
+        instance.connect = mock.Mock()
+        synchronous_run_task(instance)
+        package = Path(tempfile.mkdtemp()) / f"sbproxy-update-{appmod.APP_VERSION}.tar.gz"
+        package.write_bytes(b"tarball")
+        with mock.patch.object(appmod, "build_update_package", return_value=package), \
+             mock.patch.object(appmod.messagebox, "showinfo"):
+            instance.upgrade_agent()
+        agent.update.assert_called_once_with(b"tarball")
+        instance.connect.assert_called_once()
+        self.assertFalse(instance.agent_outdated)
+
+    def test_upgrade_refuses_to_push_an_older_console(self):
+        instance = self.compat_app("9.9.9")
+        instance.upgrade_agent = appmod.NativeApp.upgrade_agent.__get__(instance)
+        agent = mock.Mock()
+        instance.require_client = lambda: agent
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.upgrade_agent()
+        info.assert_called_once()
+        agent.update.assert_not_called()
 
 
 if __name__ == "__main__":
