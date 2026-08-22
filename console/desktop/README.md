@@ -19,15 +19,17 @@ with no Python and no repository checkout on the operator's machine.
 - Add or remove SSIDs; every Apply dry-runs the candidate before saving, and
   the Agent enforces a final dry-run before the router changes state.
 - Change one SSID's SOCKS5 endpoint without a full edit.
-- Pick a router vendor/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, …) and
-  click **Random MAC**; the vendor and the new BSSID are persisted.
+- Right-click an SSID row for its item actions: edit, change SOCKS, randomize
+  MAC, or delete. **Random MAC** then asks for a router vendor/OUI (TP-Link,
+  Netgear, ASUS, Xiaomi, Huawei, …); the vendor and new BSSID are persisted.
 
 **Devices**
 
 - List clients and kick, ban, or unban them; offline blocklist entries stay
   visible so they can be unblocked.
 - Filter by SSID, IP/name/MAC, band, online state, access state, RSSI, traffic,
-  and connection duration; click any column heading to sort.
+  and connection duration. Click any Wi-Fi or Devices column heading to sort;
+  click it again to reverse the order.
 - Dashboard counters, 5–60 second auto-refresh, per-device details,
   multi-select actions, IP/MAC copy, and UTF-8 CSV export.
 
@@ -43,11 +45,14 @@ with no Python and no repository checkout on the operator's machine.
 
 - Switch live between English/Vietnamese and Dark/Light; preferences persist
   (defaults: English, Dark).
+- Chrome-like rounded tabs whose active surface connects to the panel below,
+  with distinct idle and hover states in both themes.
 - A staged modal loading screen with finite timeouts: 60 s dry-run, 45 s
   save/backup, 120 s apply.
 - Important actions state their impact first and default to **No**.
-- Selection-dependent actions sit in the edit panel beside their table;
-  toolbars hold only global actions.
+- The fixed edit panel keeps only Edit and Delete; the rest of the
+  selection-dependent actions live in the row context menu, and toolbars hold
+  only global actions.
 - The router URL and token are stored with Windows DPAPI for the current user
   (`chmod 600` on Linux/macOS).
 

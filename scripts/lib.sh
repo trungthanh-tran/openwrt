@@ -51,9 +51,14 @@ validate_conf() {
       idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10); host=trim($5)
       oui=(NF==11)?trim($11):""
       if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "line %d: mac_oui must use the AA:BB:CC format or be empty\n", NR; bad=1 }
-      if (idx !~ /^[1-9][0-9]*$/ || idx > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
-      if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx > 254 || port_base + idx > 65535)) { printf "line %d: idx makes the subnet/port exceed its valid range\n", NR; bad=1 }
-      if (port !~ /^[0-9]+$/ || port < 1 || port > 65535) { printf "line %d: invalid port\n", NR; bad=1 }
+      # BusyBox awk can retain trim() results as pure strings and perform a
+      # lexical comparison (for example, "3" > "200").  Coerce validated
+      # decimal fields before every bounds check so adding IDX 3+ and using
+      # ports beginning with 7-9 works the same on OpenWrt and workstation awk.
+      idx_num=idx+0; port_num=port+0
+      if (idx !~ /^[1-9][0-9]*$/ || idx_num > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
+      if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx_num > 254 || port_base + idx_num > 65535)) { printf "line %d: idx makes the subnet/port exceed its valid range\n", NR; bad=1 }
+      if (port !~ /^[0-9]+$/ || port_num < 1 || port_num > 65535) { printf "line %d: invalid port\n", NR; bad=1 }
       if (band != "2g" && band != "5g") { printf "line %d: band must be 2g or 5g\n", NR; bad=1 }
       if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "line %d: isolate/webrtc must be 0 or 1\n", NR; bad=1 }
       if (length($1) < 1 || length($1) > 32) { printf "line %d: SSID must be 1..32 UTF-8 bytes long\n", NR; bad=1 }

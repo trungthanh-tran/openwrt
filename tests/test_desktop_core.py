@@ -79,6 +79,8 @@ class TranslationTests(unittest.TestCase):
     def test_known_translation_and_vietnamese_identity(self):
         self.assertEqual(app.translate("Thiết bị", "en"), "Devices")
         self.assertEqual(app.translate("Thiết bị", "vi"), "Thiết bị")
+        self.assertEqual(app.translate("CỔNG RA INTERNET", "en"), "INTERNET GATEWAY")
+        self.assertEqual(app.translate("CỔNG RA INTERNET", "vi"), "CỔNG RA INTERNET")
 
     def test_unknown_translation_is_preserved(self):
         self.assertEqual(app.translate("custom text", "en"), "custom text")
@@ -99,7 +101,11 @@ class TranslationTests(unittest.TestCase):
 
     def test_palettes_have_identical_complete_keys(self):
         self.assertEqual(set(app.DARK_PALETTE), set(app.LIGHT_PALETTE))
-        for key in ("bg", "card", "text", "primary", "danger", "input"):
+        for key in (
+            "bg", "card", "text", "primary", "danger", "input",
+            "tab_strip", "tab_idle", "tab_hover", "tab_selected", "tab_selected_text",
+            "table_border", "table_header_border", "table_row_even", "table_row_odd",
+        ):
             self.assertIn(key, app.DARK_PALETTE)
         self.assertEqual(set(app.PALETTES), {"dark", "light"})
 
@@ -559,6 +565,37 @@ class ClientSortTests(unittest.TestCase):
         self.assertEqual(app.client_sort_key({"online": False, "banned": True}, "status"), (True, True))
         self.assertEqual(app.client_sort_key({"host": "Phone"}, "host"), "phone")
         self.assertEqual(app.client_sort_key({}, "host"), "")
+
+
+class WifiSortTests(unittest.TestCase):
+    def test_numeric_and_natural_columns_do_not_sort_as_display_strings(self):
+        two = valid_record(idx=2, host="proxy", port=9000)
+        ten = valid_record(idx=10, host="proxy", port=1080)
+        self.assertLess(app.wifi_sort_key(two, "idx"), app.wifi_sort_key(ten, "idx"))
+        self.assertLess(app.wifi_sort_key(two, "subnet"), app.wifi_sort_key(ten, "subnet"))
+        self.assertGreater(app.wifi_sort_key(two, "socks"), app.wifi_sort_key(ten, "socks"))
+
+    def test_band_mac_flags_and_health_have_typed_sort_keys(self):
+        two_g = valid_record(band="2g", isolate=False, webrtc=False, mac_oui="50:C7:BF")
+        five_g = valid_record(band="5g", isolate=True, webrtc=True, mac_oui="20:E5:2A")
+        self.assertLess(app.wifi_sort_key(two_g, "band"), app.wifi_sort_key(five_g, "band"))
+        self.assertLess(app.wifi_sort_key(two_g, "isolate"), app.wifi_sort_key(five_g, "isolate"))
+        self.assertLess(app.wifi_sort_key(two_g, "webrtc"), app.wifi_sort_key(five_g, "webrtc"))
+        self.assertLess(
+            app.wifi_sort_key(two_g, "mac", runtime={"macaddr": "02:00:00:00:00:01"}),
+            app.wifi_sort_key(five_g, "mac", runtime={"macaddr": "02:00:00:00:00:02"}),
+        )
+        self.assertLess(
+            app.wifi_sort_key(two_g, "health", {"state": "ok", "latency_ms": 900}),
+            app.wifi_sort_key(five_g, "health", {"state": "slow", "latency_ms": 10}),
+        )
+
+    def test_every_column_tolerates_missing_and_dirty_auxiliary_data(self):
+        record = valid_record()
+        for column in ("idx", "name", "band", "subnet", "mac", "socks", "isolate", "webrtc", "health"):
+            with self.subTest(column=column):
+                app.wifi_sort_key(record, column, health=["bad"], runtime="bad")
+                app.wifi_sort_key(object(), column, health={"state": {}, "latency_ms": []}, runtime={"macaddr": {}})
 
 
 class EntryPointTests(unittest.TestCase):

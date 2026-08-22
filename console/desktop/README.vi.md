@@ -19,15 +19,17 @@ không cần mã nguồn.
 - Thêm/xoá SSID; mỗi lần Apply đều dry-run cấu hình tạm trước khi ghi, và Agent
   dry-run lần cuối trước khi router đổi trạng thái.
 - Đổi SOCKS5 của một SSID mà không cần sửa toàn bộ.
-- Chọn hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi, Huawei, …) rồi bấm
-  **Random MAC**; hãng và BSSID mới được lưu lại.
+- Nhấp chuột phải lên một dòng SSID để sửa, đổi SOCKS, random MAC hoặc xoá.
+  **Random MAC** hỏi tiếp hãng router/OUI (TP-Link, Netgear, ASUS, Xiaomi,
+  Huawei, …); hãng và BSSID mới được lưu lại.
 
 **Thiết bị**
 
 - Xem client và kick, cấm, bỏ cấm; thiết bị trong blocklist dù offline vẫn hiện
   để có thể bỏ cấm.
 - Lọc theo SSID, IP/tên/MAC, band, online/offline, quyền truy cập, RSSI, lưu
-  lượng và thời gian kết nối; bấm tiêu đề cột để sắp xếp.
+  lượng và thời gian kết nối. Bấm tiêu đề cột bất kỳ trong bảng Wi-Fi hoặc
+  Thiết bị để sắp xếp; bấm lại để đảo chiều.
 - Dashboard số liệu, auto-refresh 5–60 giây, xem chi tiết, chọn nhiều thiết bị,
   copy IP/MAC và xuất CSV UTF-8.
 
@@ -43,11 +45,13 @@ không cần mã nguồn.
 
 - Đổi trực tiếp giữa English/Tiếng Việt và Dark/Light; lựa chọn được lưu (mặc
   định English + Dark).
+- Tab bo góc kiểu Chrome: tab đang mở liền màu với vùng nội dung, tab chưa chọn
+  và trạng thái hover phân biệt rõ trong cả hai theme.
 - Màn hình loading theo bước với timeout hữu hạn: dry-run 60 giây, lưu/backup
   45 giây, apply 120 giây.
 - Tác vụ quan trọng nêu rõ ảnh hưởng và mặc định chọn **Không**.
-- Thao tác phụ thuộc lựa chọn nằm trong khung chỉnh sửa sát bảng; toolbar chỉ
-  chứa thao tác toàn cục.
+- Khung chỉnh sửa cố định chỉ giữ Sửa và Xoá; các thao tác còn lại nằm trong
+  menu chuột phải của dòng, toolbar chỉ chứa thao tác toàn cục.
 - URL router và token được bảo vệ bằng Windows DPAPI cho đúng tài khoản hiện
   tại (Linux/macOS dùng `chmod 600`).
 

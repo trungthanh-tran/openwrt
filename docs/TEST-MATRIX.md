@@ -32,7 +32,7 @@ Suite: `tests/test_desktop_core.py`
 | Wi-Fi records | 10/11 columns, parse/render, ordering, comments | Every min/max boundary; duplicate IDX; invalid flags/types/delimiters/OUI; blank SOCKS host |
 | Human formatting | Bytes and connection durations at unit boundaries | Negative, malformed, `NaN`, and infinity |
 | Device filters | SSID, query, band, presence, access, signal, traffic, duration in EN and VI | Every RSSI/traffic/time boundary; missing fields; malformed numeric telemetry; combined filters |
-| Device sorting | IP, text, status, numeric columns | Invalid/missing IPv4, IPv6, malformed and negative telemetry |
+| Table sorting | Wi-Fi IDX/subnet, band, BSSID/provider, SOCKS port, flags and health; Devices IP, text, status and numeric columns | Repeated clicks reverse direction; invalid/missing IPv4/IPv6, malformed telemetry, health and runtime data |
 | CLI entry points | `--provision` and `--probe` success | Missing token, failed probe, expected exit codes |
 
 ## Native desktop workflows
