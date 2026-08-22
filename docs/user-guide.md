@@ -71,7 +71,7 @@ trị viên trước khi Apply thêm thay đổi.
 |---|---|---|
 | `123ms` (xanh) | Proxy tốt, phản hồi nhanh. | Không cần làm gì. |
 | `950ms` (vàng) | Proxy chậm (trên ngưỡng). | Theo dõi; cân nhắc đổi SOCKS khác. |
-| `fail` (đỏ) | Proxy chết/không phản hồi (kèm mã lỗi). | Đổi SOCKS cho WiFi đó (nút ⚡). |
+| `fail` (đỏ) | Proxy chết/không phản hồi (kèm mã lỗi). | Đổi SOCKS cho WiFi đó (bản web: nút ⚡; bản desktop: chuột phải → **Đổi SOCKS**). |
 
 Đường biểu đồ đi lên = độ trễ tăng dần (proxy đang xấu đi); thấp và phẳng = ổn định.
 
@@ -135,7 +135,7 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 
 | Hiện tượng | Bạn có thể tự làm |
 |---|---|
-| Một WiFi báo `fail` | Đổi SOCKS cho WiFi đó (đổi host/cổng → nút ⚡). Nhiều sock cùng fail → báo quản trị viên. |
+| Một WiFi báo `fail` | Đổi SOCKS cho WiFi đó (đổi host/cổng: bản web nút ⚡, bản desktop chuột phải → **Đổi SOCKS**). Nhiều sock cùng fail → báo quản trị viên. |
 | Sau khi "Áp" bị lỗi/mất mạng | Vào **🗂 Backup / Rollback** → khôi phục bản "mới nhất" (nhãn `pre-apply`). |
 | Router treo / không vào được sau update firmware | Việc của quản trị viên (recovery). Cung cấp **file backup đã tải về máy** để họ khôi phục nhanh. |
 | Console báo "Mất kết nối" | Mở lại đúng `http://<router>/sbproxy/`; kiểm tra token; hỏi quản trị viên. |

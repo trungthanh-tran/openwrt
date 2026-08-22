@@ -138,6 +138,16 @@ Suite: `tests/test_healthd.sh`
 - Skips malformed config rows and normalizes malformed/`NaN` probe output to a
   safe failure object without calling curl for rejected rows.
 
+## Web console translations
+
+Suite: `tests/test_web_console_i18n.py`
+
+- Every static phrase, tooltip, and rich block in `console/web/control-panel.html`
+  has an English translation, with no duplicate keys.
+- The language choice is persisted and restored, and switching re-renders every
+  dependent surface.
+- Dynamic strings go through `pick()` instead of hard-coding one language.
+
 ## OpenWrt scripts and generated configuration
 
 Suite: `tests/run.sh`

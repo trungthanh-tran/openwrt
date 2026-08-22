@@ -57,7 +57,8 @@ The **Devices** tab lists online clients and offline blocklist entries with
 SSID, band, MAC, IP/hostname, connection time, traffic, and RSSI. Filter by
 SSID, band, presence, access state, RSSI, traffic, or duration; search, sort,
 multi-select, auto-refresh, inspect details, copy addresses, and export CSV.
-Selection-dependent actions live only in the edit panel beside the table.
+Device actions live in the edit panel beside the table (the row context menu is a
+Wi-Fi-table feature).
 **Kick** deauthenticates a device; **Ban** persists a MAC block; **Unban** also
 works for offline blocklist entries.
 

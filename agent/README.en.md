@@ -36,12 +36,16 @@ headers.
 | POST | `apply` | Enforce a final dry-run, then apply only on success |
 | POST | `set_sock` | Change one upstream |
 | POST | `rotate_mac` | Optionally select a provider OUI, randomize BSSID/MAC, persist it, and reload the radio |
-| GET/POST | `backups`, `backup` | List or create snapshots |
+| GET | `backups` | List snapshots |
+| POST | `backup` | Create a snapshot |
 | GET | `download_backup` | Download a snapshot |
 | POST | `rollback` | Restore a snapshot |
 | GET | `health_now` | Run a health probe immediately |
 | GET | `gateway` | Actual Internet route, interface/device, link, DNS, and direct HTTP latency; flags a route that bypasses `wwan` |
 | GET | `clients` | Online clients and offline blocklist entries with band/RSSI/traffic |
+| POST | `kick`, `ban`, `unban` | Deauthenticate a client, or add/remove one MAC in the blocklist |
+| POST | `update` | Upload a `sbproxy-update-<version>.tar.gz`; `scripts/self-update.sh` keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades unless `force=1` |
+| POST | `uninstall` | Remove the project-managed configuration |
 
 ## Security
 

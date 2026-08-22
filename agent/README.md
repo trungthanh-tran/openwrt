@@ -56,6 +56,10 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 | POST | `rollback` | `{name?}` | `{ok,rc,log}` |
 | POST | `uninstall` | — | `{ok,rc,log}` |
 | GET | `backups` | — | `{ok,backups[]}` |
+| POST | `backup` | `{label?}` | Tạo snapshot mới |
+| GET | `download_backup` | — | Tải file snapshot về |
+| POST | `kick` / `ban` / `unban` | `{idx,mac}` | Đá client, thêm/bỏ MAC khỏi blocklist |
+| POST | `update` | package `.tar.gz` | `{ok,rc,log,from,to}`; `scripts/self-update.sh` giữ `wifi-socks.conf` + `settings.sh`, chặn hạ version trừ khi `force=1` |
 | GET | `health_now` | — | probe ngay 1 lần |
 | GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS và HTTP latency; cảnh báo nếu không qua `wwan` |
 | GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |

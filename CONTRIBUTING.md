@@ -6,10 +6,10 @@ config/     wifi-socks.conf(.example), settings.sh   # nguồn cấu hình + tun
 scripts/    lib.sh + entrypoints (apply, verify, doctor, clients, kick/ban…)
 etc/init.d/ sbproxy                                    # init nạp nft + policy routing
 agent/      CGI uhttpd + health daemon (agent LAN)
-console/    web/control-panel.html (UI nguồn) + desktop/ (đóng gói .exe)
+console/    web/control-panel.html (UI nguồn) + desktop/ (app Tkinter native)
 pc/         script quản trị router từ máy Windows/Linux qua SSH
 docs/       *.md — tài liệu (Markdown là định dạng duy nhất)
-tests/      run.sh — unit test POSIX sh cho lib.sh
+tests/      run-all.sh gọi mọi suite — xem docs/TEST-MATRIX.md
 ```
 
 ## Ràng buộc code
@@ -23,13 +23,15 @@ tests/      run.sh — unit test POSIX sh cho lib.sh
 
 ## Quy trình
 ```sh
-make test         # chạy tests/run.sh (không cần router; phần cần jq tự skip)
+make test         # chạy tests/run-all.sh (không cần router; phần cần jq/Tk tự skip)
 make lint         # shellcheck (cần cài shellcheck)
 make check        # lint + test (giống CI)
 ```
 - **Sửa tài liệu:** sửa trực tiếp `docs/*.md`. Dự án chỉ dùng Markdown, không
   sinh bản HTML.
-- Thêm/sửa hành vi generator (`lib.sh`) thì **thêm test** trong `tests/run.sh`.
+- Đổi hành vi thì **thêm test** vào đúng suite: generator/POSIX trong
+  `tests/run.sh`, console desktop trong `tests/test_desktop_*.py`, Agent CGI
+  trong `tests/test_agent.sh`, health daemon trong `tests/test_healthd.sh`.
 - Bump `VERSION` và ghi `CHANGELOG.md` cho thay đổi có ảnh hưởng người dùng.
 
 ## Commit

@@ -49,9 +49,9 @@ sh scripts/rollback.sh
 
 The console has two independent frontends over the same Agent API: the
 router-hosted **web build** and a native Tkinter **desktop** app. The desktop
-app uses no HTML/WebView/WebView2, protects its token with Windows DPAPI,
-dry-runs before Apply, warns before important mutations, and includes advanced
-client management. Its interface supports English and Vietnamese, plus Dark and
+app uses no HTML/WebView/WebView2, protects its token with Windows DPAPI (or
+`chmod 600` on Linux/macOS), dry-runs before Apply, warns before important
+mutations, and includes advanced client management. Its interface supports English and Vietnamese, plus Dark and
 Light themes; English is the default.
 
 The desktop app can also bring up a freshly flashed router by itself
@@ -76,7 +76,7 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 - [Complete guide](docs/GUIDE.en.md)
 - [Installation](docs/INSTALL.en.md)
 - [Testing](docs/TESTING.en.md)
-- [Debugging and handoff runbook (Vietnamese)](docs/DEBUGGING.md)
+- [Debugging guide](docs/DEBUGGING.en.md)
 - [Rollback](docs/ROLLBACK.en.md)
 - [Administrator guide](docs/admin-guide.en.md)
 - [User guide](docs/user-guide.en.md)

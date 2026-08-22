@@ -62,7 +62,30 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
 16. **Update through the console:** build `dist/sbproxy-update-<version>.tar.gz` with `make package` (or `pc/make-package.sh` / `pc\make-package.ps1`), then upload it from the web console's **⬆ Cập nhật** dialog (`POST ?action=update[&force=1]`, 8 MB default cap via `MAX_UPDATE_BYTES`). `scripts/self-update.sh` rejects path traversal and downgrades (unless forced), backs up as `pre-update`, preserves the live `wifi-socks.conf` and `settings.sh`, redeploys the CGI/UI/healthd, and never reloads Wi-Fi by itself. The running version is shown in the console header (`meta.version` from `?action=status`).
 
-**Console builds:** two independent frontends use the same Agent API: the router-hosted **web** UI and a native Tkinter **Windows desktop** `.exe`. The native app uses no HTML/WebView/WebView2, stores its token with DPAPI, dry-runs before Apply, warns before important mutations, includes advanced client filters, and supports English/Vietnamese with Dark/Light modes. It ships as two platform-specific artifacts — PyInstaller does not cross-compile — built with `cd console/desktop; .\build.ps1` on Windows (`dist\sbproxy-console.exe`) or `sh build.sh` on Linux/macOS (`dist/sbproxy-console`, token stored with `chmod 600` instead of DPAPI). Each is self-contained: copy the single file to the administration machine and run `.\sbproxy-console.exe` or `./sbproxy-console` — see [../console/desktop/README.md](../console/desktop/README.md). Both build scripts embed the matching `sbproxy-update-<version>.tar.gz`, so the shipped executable runs **Post-flash setup** on its own without a repository checkout. Both consoles show the project version next to the agent version reported by `?action=status` and flag a mismatch. The desktop console goes further: an older agent is offered an in-place upgrade that keeps `wifi-socks.conf` and `settings.sh`, and a newer agent puts the console in read-only mode until it is updated — see *Version compatibility* in [../console/desktop/README.md](../console/desktop/README.md). The desktop app runs in an isolated environment: config, logs, cache, and the bundled Python runtime all live under one home (`SBPROXY_HOME` → a `data/` folder beside the executable for portable installs → `%LOCALAPPDATA%\sbproxy-console-native`); print it with `sbproxy-console --where`. For field debugging collect `logs/console.log` (rotating 1 MB × 5, credentials redacted) via the **Log folder** button, or rerun with `--verbose`.
+**Console builds.** Two independent frontends share the Agent API: the
+router-hosted **web** UI and the native Tkinter **desktop** console.
+
+- The desktop app uses no HTML/WebView/WebView2. It dry-runs before Apply, warns
+  before important mutations, has the advanced client filters, and supports
+  English/Vietnamese with Dark/Light modes.
+- It ships as two platform-specific artifacts because PyInstaller does not
+  cross-compile: `cd console/desktop; .\build.ps1` → `dist\sbproxy-console.exe`,
+  or `sh build.sh` → `dist/sbproxy-console`. Each is self-contained — copy the
+  single file and run `.\sbproxy-console.exe` or `./sbproxy-console`.
+- The token is stored with DPAPI on Windows and `chmod 600` elsewhere. Config,
+  logs, cache, and the bundled runtime live under one home (`SBPROXY_HOME` → a
+  `data/` folder beside the executable for portable installs →
+  `%LOCALAPPDATA%\sbproxy-console-native`); `--where` prints it.
+- Both build scripts embed the matching `sbproxy-update-<version>.tar.gz`, so
+  the shipped executable runs **Post-flash setup** without a repository checkout.
+- Both consoles show the project version next to the agent version from
+  `?action=status`. The desktop console acts on the difference: an older agent is
+  offered an in-place upgrade that keeps `wifi-socks.conf` and `settings.sh`, and
+  a newer agent puts the console in read-only mode until it is updated.
+- For field debugging collect `logs/console.log` (rotating 1 MB × 5, credentials
+  redacted) with the **Log folder** button, or rerun with `--verbose`.
+
+See [../console/desktop/README.md](../console/desktop/README.md).
 
 ## Installation and acceptance
 

@@ -60,6 +60,17 @@ Ngày theo định dạng YYYY-MM-DD.
 - Suite mới `tests/test_desktop_provision.py` và các test GUI cho wizard.
 
 ### Fixed
+- Rà soát lại toàn bộ tài liệu: bảng API agent bổ sung `kick`/`ban`/`unban`,
+  `update`, `backup`, `download_backup` kèm method đúng cho từng action;
+  `docs/DEBUGGING.md` viết lại (bỏ phạm vi 4 commit cũ, số assertion cũ, yêu cầu
+  Node.js và bước sinh HTML không còn tồn tại) và thêm bản `DEBUGGING.en.md`;
+  `CONTRIBUTING.md` trỏ đúng `tests/run-all.sh` và từng suite; `docs/TEST-MATRIX.md`
+  bổ sung suite `test_web_console_i18n.py`; đoạn "console builds" trong hai
+  admin-guide tách thành danh sách và bỏ phần lặp; user-guide sửa chỗ nói thao tác
+  Wi-Fi chỉ nằm ở khung chỉnh sửa (nay là menu chuột phải) và ghi rõ nút ⚡ là của
+  bản web.
+- Xoá hai file thừa `README.en.md` và `console/desktop/README.en.md` — chỉ là
+  trang chuyển hướng, không tài liệu nào trỏ tới.
 - Gói đẩy lên router (`pc/update.*`, `pc/make-package.*` và payload nhúng trong
   bản build) không còn kéo theo `dist/`, `build/` và `__pycache__` — trước đó
   file `.exe` vừa build trong `console/desktop/dist/` bị đóng gói vào payload,
