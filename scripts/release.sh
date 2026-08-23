@@ -7,7 +7,7 @@ for arg in "$@"; do
     *) echo "Usage: $0 [--push]" >&2; exit 2 ;;
   esac
 done
-ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+ROOT="$(cd -- "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 SOURCE=$(tr -d ' \r\n' < VERSION)
 case "$SOURCE" in *-SNAPSHOT) RELEASE=${SOURCE%-SNAPSHOT};; *) echo "VERSION must end in -SNAPSHOT: $SOURCE" >&2; exit 1;; esac
