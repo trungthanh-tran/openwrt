@@ -36,13 +36,25 @@ jobs:
         shell: pwsh
         run: .\pc\make-package.ps1 -OutDir .\console\desktop\dist
 
+      - name: Package agent and scripts documentation
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $dist = Join-Path $PWD "console\desktop\dist"
+          tar -czf (Join-Path $dist "sbproxy-agent-$version.tar.gz") -C $PWD `
+            README.md README.vi.md LICENSE VERSION agent
+          if ($LASTEXITCODE -ne 0) { throw "Could not package agent" }
+          tar -czf (Join-Path $dist "sbproxy-scripts-docs-$version.tar.gz") -C $PWD `
+            README.md README.vi.md LICENSE VERSION scripts docs CONTRIBUTING.md SECURITY.md
+          if ($LASTEXITCODE -ne 0) { throw "Could not package scripts and docs" }
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sbproxy-${{ github.ref_name || github.sha }}
           path: |
             console/desktop/dist/sbproxy-console.exe
-            console/desktop/dist/sbproxy-update-*.tar.gz
+            console/desktop/dist/sbproxy-*.tar.gz
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -53,5 +65,5 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" `
             .\console\desktop\dist\sbproxy-console.exe `
-            .\console\desktop\dist\sbproxy-update-*.tar.gz `
+            .\console\desktop\dist\sbproxy-*.tar.gz `
             --title "sbproxy ${{ github.ref_name }}" --generate-notes
