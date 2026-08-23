@@ -5,7 +5,7 @@ four downloadable artifacts:
 
 | Artifact | Contents | Use |
 |---|---|---|
-| `sbproxy-console.exe` | Native Tkinter desktop console with the matching router payload embedded | Run the management console on Windows |
+| `sbproxy-console-<version>.exe` | Native Tkinter desktop console with the matching router payload embedded | Run the management console on Windows |
 | `sbproxy-update-<version>.tar.gz` | Complete router-side update package | Install or update `/root/sbproxy` |
 | `sbproxy-agent-<version>.tar.gz` | `agent/`, version metadata, and agent documentation | Deploy or inspect the CGI/health-agent portion |
 | `sbproxy-scripts-docs-<version>.tar.gz` | `scripts/`, `docs/`, project guides, and security/contribution files | Offline operations, review, and field documentation |
