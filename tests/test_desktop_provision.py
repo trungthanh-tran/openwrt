@@ -46,7 +46,7 @@ def make_settings(tmp: Path, **changes) -> appmod.ProvisionSettings:
     source = tmp / "repo"
     (source / "scripts").mkdir(parents=True, exist_ok=True)
     (source / "agent").mkdir(parents=True, exist_ok=True)
-    (source / "VERSION").write_text("0.4.0\n", encoding="utf-8")
+    (source / "VERSION").write_text(f"{appmod.APP_VERSION}\n", encoding="utf-8")
     values = {"host": "192.168.8.1", "payload": str(source)}
     values.update(changes)
     return appmod.ProvisionSettings(**values)
@@ -297,7 +297,7 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertIn("Thư mục mã nguồn không hợp lệ", self.events[-1][2])
 
     def test_a_prebuilt_package_is_uploaded_as_is(self):
-        package = self.tmp / "sbproxy-update-0.4.0.tar.gz"
+        package = self.tmp / f"sbproxy-update-{appmod.APP_VERSION}.tar.gz"
         package.write_bytes(b"payload")
         self.settings.payload = str(package)
         runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})
