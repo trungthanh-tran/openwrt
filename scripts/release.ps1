@@ -1,6 +1,5 @@
 param(
-  [switch]$Push,
-  [switch]$CreateMilestone
+  [switch]$Push
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,12 +21,6 @@ function Set-Version([string]$value) {
   (Get-Content $main -Raw) -replace 'APP_VERSION = "[^"]+"', ('APP_VERSION = "' + $value + '"') | Set-Content $main -NoNewline -Encoding utf8
   $web = Join-Path $repo 'console/web/control-panel.html'
   (Get-Content $web -Raw) -replace 'const UI_VERSION = "[^"]+";', ('const UI_VERSION = "' + $value + '";') | Set-Content $web -NoNewline -Encoding utf8
-}
-
-if ($CreateMilestone) {
-  if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'gh CLI is required for -CreateMilestone' }
-  gh api 'repos/{owner}/{repo}/milestones' -f "title=$Version" -f state=open | Out-Host
-  gh api 'repos/{owner}/{repo}/milestones' -f "title=$next" -f state=open | Out-Host
 }
 
 Set-Version $Version

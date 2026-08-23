@@ -1,12 +1,10 @@
 #!/bin/sh
 set -eu
 PUSH=0
-MILESTONE=0
 for arg in "$@"; do
   case "$arg" in
     --push) PUSH=1 ;;
-    --create-milestone) MILESTONE=1 ;;
-    *) echo "Usage: $0 [--push] [--create-milestone]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [--push]" >&2; exit 2 ;;
   esac
 done
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -20,11 +18,6 @@ EOF
 NEXT="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT"
 [ -z "$(git status --short)" ] || { echo 'working tree is not clean' >&2; exit 1; }
 [ -z "$(git tag --list "$RELEASE")" ] || { echo "tag already exists: $RELEASE" >&2; exit 1; }
-if [ "$MILESTONE" = 1 ]; then
-  command -v gh >/dev/null 2>&1 || { echo 'gh CLI is required for --create-milestone' >&2; exit 1; }
-  gh api "repos/{owner}/{repo}/milestones" -f "title=$RELEASE" -f state=open
-  gh api "repos/{owner}/{repo}/milestones" -f "title=$NEXT" -f state=open
-fi
 for file in VERSION console/desktop/main.py console/web/control-panel.html; do sed -i "s/$SOURCE/$RELEASE/g" "$file"; done
 git add VERSION console/desktop/main.py console/web/control-panel.html
 git commit -m "release: $RELEASE"

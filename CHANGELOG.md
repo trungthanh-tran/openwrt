@@ -8,8 +8,8 @@ Ngày theo định dạng YYYY-MM-DD.
 ### Added
 - GitHub release builder publishes the Windows executable, router update
   package, agent package, and scripts/documentation package.
-- Release scripts support version validation, milestone creation through `gh`,
-  and guarded tag/push operations.
+- Release scripts support version validation and guarded tag/push operations;
+  GitHub milestones remain a separate web/workflow operation.
 
 ## [Unreleased]
 
