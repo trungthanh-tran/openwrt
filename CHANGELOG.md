@@ -3,6 +3,14 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.4.1] - 2026-08-23
+
+### Added
+- GitHub release builder publishes the Windows executable, router update
+  package, agent package, and scripts/documentation package.
+- Release scripts support version validation, milestone creation through `gh`,
+  and guarded tag/push operations.
+
 ## [Unreleased]
 
 ### Added
