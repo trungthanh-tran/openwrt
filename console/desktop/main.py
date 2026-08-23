@@ -37,7 +37,7 @@ from urllib.request import Request, urlopen
 
 APP_NAME = "sbproxy Console Native"
 # Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
-APP_VERSION = "0.4.1"
+APP_VERSION = "0.4.2"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
 
