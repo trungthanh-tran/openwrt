@@ -37,7 +37,7 @@ from urllib.request import Request, urlopen
 
 APP_NAME = "sbproxy Console Native"
 # Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.2-SNAPSHOT"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
 
@@ -801,7 +801,7 @@ def save_preferences(language: str, theme: str) -> None:
 
 def parse_version(value) -> tuple | None:
     """`"0.4.0"` -> `(0, 4, 0)`; anything else -> None."""
-    match = re.fullmatch(r"\s*([0-9]+)\.([0-9]+)\.([0-9]+)\s*", str(value or ""))
+    match = re.fullmatch(r"\s*([0-9]+)\.([0-9]+)\.([0-9]+)(?:-SNAPSHOT)?\s*", str(value or ""))
     return tuple(int(part) for part in match.groups()) if match else None
 
 
@@ -1178,7 +1178,7 @@ def payload_version(path) -> str:
             return (candidate / "VERSION").read_text(encoding="utf-8").strip()
         except OSError:
             return ""
-    match = re.search(r"sbproxy-update-([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz$", candidate.name)
+    match = re.search(r"sbproxy-update-([0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?)\.tar\.gz$", candidate.name)
     return match.group(1) if match else ""
 
 

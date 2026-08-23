@@ -326,10 +326,10 @@ match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/p
 
 echo "== versioning and self-update =="
 project_version="$(tr -d ' \r\n' < "$ROOT/VERSION")"
-match "VERSION is semver" "$project_version" '^[0-9]+\.[0-9]+\.[0-9]+$'
-ui_version="$(sed -n 's/.*const UI_VERSION = "\([0-9.]*\)".*/\1/p' "$ROOT/console/web/control-panel.html")"
+match "VERSION is semver or snapshot" "$project_version" '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$'
+ui_version="$(sed -n 's/.*const UI_VERSION = "\([0-9.]*\(-SNAPSHOT\)\{0,1\}\)".*/\1/p' "$ROOT/console/web/control-panel.html")"
 eq "web console version matches VERSION file" "$ui_version" "$project_version"
-desktop_version="$(sed -n 's/^APP_VERSION = "\([0-9.]*\)"$/\1/p' "$ROOT/console/desktop/main.py")"
+desktop_version="$(sed -n 's/^APP_VERSION = "\([0-9.]*\(-SNAPSHOT\)\{0,1\}\)"$/\1/p' "$ROOT/console/desktop/main.py")"
 eq "desktop console version matches VERSION file" "$desktop_version" "$project_version"
 desktop_main="$(cat "$ROOT/console/desktop/main.py")"
 match "desktop shows agent version from status meta" "$desktop_main" 'clean_agent_version\(meta\)'
