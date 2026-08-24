@@ -5,6 +5,24 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Nhật ký kiểm toán `logs/audit.log`**: ghi mỗi lần **kết nối** (router,
+  version agent, console, sing-box đang chạy hay không) và **mọi thay đổi** gửi
+  xuống router — `apply`, `save_conf`, đổi SOCKS, random MAC, kick/cấm/bỏ cấm,
+  backup, rollback, cập nhật/gỡ agent — kèm user trên máy, kết quả (ok /
+  http-4xx / không liên lạc được) và thời gian phản hồi. Chuỗi cài đặt sau khi
+  flash cũng ghi `provision.start` / `finished` / `failed` / `cancelled` kèm
+  bước hỏng. Thao tác chỉ đọc (status, clients, gateway, backups) không ghi để
+  nhật ký khỏi bị ngập.
+- Nội dung audit vẫn đi qua bộ che bí mật, nên token/mật khẩu không lọt vào file.
+
+### Changed
+- **Log xoay vòng theo ngày và tự xoá sau 7 ngày.** `console.log` và
+  `audit.log` xoay vòng lúc nửa đêm (`console.log.YYYY-MM-DD`), giữ đúng 7 bản.
+  Mỗi lần khởi động app còn dọn mọi file log cũ hơn 7 ngày — kể cả file
+  `console.log.1..5` do cơ chế xoay vòng theo dung lượng cũ để lại, và trường
+  hợp app không mở lúc nửa đêm nên chưa bao giờ xoay vòng.
+
 ## [0.4.6] - 2026-08-25
 
 ### Added

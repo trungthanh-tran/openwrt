@@ -135,10 +135,18 @@ refresh** to reload on the interval beside it (5s–60s).
 Top right: switch **Language** (English / Tiếng Việt) and **Theme** (Dark /
 Light) — both are remembered.
 
-**Log folder** opens the directory holding `console.log` (rotating 1 MB × 5,
-with tokens and passwords redacted). Attach that file when reporting a problem.
-For more detail, start the app with `--verbose`; `sbproxy-console --where`
-prints where the app keeps its data.
+**Log folder** opens the directory holding two files:
+
+- `console.log` — the technical log. Attach it when reporting a problem.
+- `audit.log` — who connected and what was changed: each connection (router,
+  agent version, sing-box state) and every change sent to a router (apply,
+  SOCKS change, MAC rotation, kick/ban/unban, backup, rollback, agent update)
+  with the Windows/Linux user who did it and whether it succeeded.
+
+Both roll over at midnight and **keep seven days**; older files are deleted the
+next time the app starts. Tokens and passwords are redacted in both. For more
+detail, start the app with `--verbose`; `sbproxy-console --where` prints where
+the app keeps its data.
 
 ## 7 · When something goes wrong
 

@@ -76,7 +76,7 @@ state, so keep a backup and a rollback path. Client-side checks live in
 
 Never share `config/wifi-socks.conf`, tokens, `/etc/sbproxy.bans`, backups, or
 SOCKS/Wi-Fi passwords. Mask public IPs, hostnames, SSIDs, MACs, and credentials
-first; the desktop console's `logs/console.log` already redacts secrets.
+first; the desktop console's `logs/console.log` and `logs/audit.log` already redact secrets.
 
 Include: the commit, workstation environment, router model and OpenWrt/sing-box
 versions, expected versus actual behavior, the exact commands, the first failing

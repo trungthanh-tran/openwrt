@@ -306,7 +306,8 @@ trường Python bên ngoài hay với bản cài khác:
 
 ```
 <home>/config/connection.json   URL router + token (DPAPI trên Windows, chmod 600 nơi khác)
-<home>/logs/console.log         log debug xoay vòng (1 MB × 5 file)
+<home>/logs/console.log         log kỹ thuật, xoay vòng mỗi nửa đêm, giữ 7 ngày
+<home>/logs/audit.log           ai kết nối và mọi thay đổi, cùng kiểu xoay vòng
 <home>/cache/                   dữ liệu tạm
 <home>/runtime/                 Python runtime + dependency đóng gói (Windows onefile)
 ```

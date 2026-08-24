@@ -16,7 +16,8 @@ from dataclasses import dataclass
 import ipaddress
 import json
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
+import getpass
 import math
 import os
 from pathlib import Path
@@ -42,8 +43,11 @@ APP_VERSION = "0.4.7-SNAPSHOT"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
 
-LOG_MAX_BYTES = 1024 * 1024
-LOG_BACKUP_COUNT = 5
+# Logs roll over at midnight and nothing older than a week is kept, so a
+# long-lived install never grows without bound and stale operational data does
+# not linger on an operator's machine.
+LOG_RETENTION_DAYS = 7
+LOG_ROTATION_SUFFIX = "%Y-%m-%d"
 
 
 def frozen_dir() -> Path:
@@ -78,6 +82,9 @@ CONFIG_DIR = APP_HOME / "config"
 CONFIG_FILE = CONFIG_DIR / "connection.json"
 LOG_DIR = APP_HOME / "logs"
 LOG_FILE = LOG_DIR / "console.log"
+# Who connected, and every change made to a router, kept apart from the
+# technical log so it can be read (or handed over) on its own.
+AUDIT_FILE = LOG_DIR / "audit.log"
 CACHE_DIR = APP_HOME / "cache"
 # PyInstaller unpacks the bundled Python runtime and dependencies here (set via
 # --runtime-tmpdir at build time) so nothing lands in the shared system temp.
@@ -90,6 +97,7 @@ LEGACY_CONFIG_FILES = (
 )
 
 log = logging.getLogger("sbproxy")
+audit_log = logging.getLogger("sbproxy.audit")
 
 
 def ensure_app_home() -> Path:
@@ -136,33 +144,82 @@ def redact(text) -> str:
     return SECRET_PATTERN.sub(lambda m: f"{m.group(1)}{m.group(2)}***", str(text))
 
 
+def daily_handler(path: Path, formatter: logging.Formatter):
+    """A log file that rolls at midnight and keeps LOG_RETENTION_DAYS of history."""
+    handler = TimedRotatingFileHandler(
+        path, when="midnight", backupCount=LOG_RETENTION_DAYS, encoding="utf-8",
+    )
+    handler.suffix = LOG_ROTATION_SUFFIX
+    handler.setFormatter(formatter)
+    if os.name != "nt":
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    return handler
+
+
+def purge_old_logs(now=None) -> list:
+    """Delete rotated logs past the retention window.
+
+    TimedRotatingFileHandler only prunes when it rotates, which never happens
+    in an app that is opened for ten minutes a day, and it ignores files left
+    by the previous size-based scheme. This runs at every start instead.
+    """
+    cutoff = (now if now is not None else time.time()) - LOG_RETENTION_DAYS * 86400
+    removed = []
+    for path in sorted(LOG_DIR.glob("*.log.*")):
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed.append(path)
+        except OSError:
+            continue  # locked or already gone: nothing to do about it here
+    return removed
+
+
+def audit(action: str, **fields) -> str:
+    """Record a connection or a change made to a router.
+
+    Values are redacted like everything else that reaches a log file, so a
+    token or password in a field cannot leak into the audit trail.
+    """
+    details = " ".join(f"{key}={value}" for key, value in fields.items()
+                       if value is not None and value != "")
+    try:
+        who = getpass.getuser()
+    except Exception:  # no password database entry, no USER/USERNAME
+        who = "?"
+    entry = redact(f"{action} user={who}" + (f" {details}" if details else ""))
+    audit_log.info(entry)
+    return entry
+
+
 def setup_logging(verbose: bool = False) -> Path:
-    """Rotating file log plus stderr, so field issues can be diagnosed later."""
+    """Daily file logs plus stderr, so field issues can be diagnosed later."""
     ensure_app_home()
     log.setLevel(logging.DEBUG if verbose else logging.INFO)
-    for handler in list(log.handlers):
-        log.removeHandler(handler)
-        handler.close()
+    audit_log.setLevel(logging.INFO)
+    for logger in (log, audit_log):
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
     fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(threadName)s %(message)s")
     try:
-        file_handler = RotatingFileHandler(
-            LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
-        )
-        file_handler.setFormatter(fmt)
-        log.addHandler(file_handler)
-        if os.name != "nt":
-            try:
-                os.chmod(LOG_FILE, 0o600)
-            except OSError:
-                pass
+        purge_old_logs()
+        log.addHandler(daily_handler(LOG_FILE, fmt))
+        # Audit entries also reach console.log through propagation, so a
+        # support bundle keeps one timeline.
+        audit_log.addHandler(daily_handler(AUDIT_FILE, logging.Formatter("%(asctime)s %(message)s")))
     except OSError:
         pass  # A read-only home must not stop the app from starting.
     stream = logging.StreamHandler()
     stream.setFormatter(fmt)
     log.addHandler(stream)
     log.info(
-        "start %s v%s | python %s | frozen=%s | home=%s",
-        APP_NAME, APP_VERSION, sys.version.split()[0], bool(getattr(sys, "frozen", False)), APP_HOME,
+        "start %s v%s | python %s | frozen=%s | home=%s | log retention=%s days",
+        APP_NAME, APP_VERSION, sys.version.split()[0], bool(getattr(sys, "frozen", False)),
+        APP_HOME, LOG_RETENTION_DAYS,
     )
     return LOG_FILE
 
@@ -1614,22 +1671,38 @@ class ProvisionRunner:
     def run(self) -> bool:
         """Execute every step in order and stop at the first failure."""
         self.settings.validate()
+        audit("provision.start", router=self.settings.target,
+              payload=payload_version(self.settings.payload) or "?")
         for index, (label, function) in enumerate(self.steps):
             if self.cancelled:
+                audit("provision.cancelled", router=self.settings.target, step=label)
                 self.emit(index, STEP_FAILED, "Đã dừng theo yêu cầu")
                 return False
             self.emit(index, STEP_RUNNING, "")
             try:
                 detail = function()
             except ProvisionError as exc:
+                audit("provision.failed", router=self.settings.target, step=label, detail=exc)
                 self.emit(index, STEP_FAILED, str(exc))
                 return False
             except Exception as exc:  # unexpected local failure, same UI path
                 log.exception("provision step failed: %s", label)
+                audit("provision.failed", router=self.settings.target, step=label, detail=exc)
                 self.emit(index, STEP_FAILED, str(exc))
                 return False
             self.emit(index, STEP_OK if detail else STEP_SKIPPED, detail or "Bỏ qua")
+        audit("provision.finished", router=self.settings.target,
+              agent=self.pushed_version or self.router_version or "?")
         return True
+
+
+# Actions that change the router. Reads (status, clients, gateway, backups)
+# are polled constantly and would drown the audit trail without adding
+# anything to it.
+AUDITED_ACTIONS = frozenset({
+    "save_conf", "apply", "set_sock", "rotate_mac", "backup", "rollback",
+    "update", "uninstall", "kick", "ban", "unban", "rotate_token",
+})
 
 
 class AgentClient:
@@ -1669,12 +1742,15 @@ class AgentClient:
             except Exception:
                 detail = raw.decode("utf-8", "replace") or str(exc)
             log.warning("agent %s %s -> HTTP %s: %s", method, action, exc.code, redact(detail))
+            self._audit(action, router=self.base_url, result=f"http-{exc.code}", detail=detail)
             raise AgentError(f"HTTP {exc.code}: {detail}") from exc
         except (URLError, TimeoutError, OSError) as exc:
             log.warning("agent %s %s -> transport error: %s", method, action, redact(exc))
+            self._audit(action, router=self.base_url, result="unreachable", detail=exc)
             raise AgentError(f"Không kết nối được {self.base_url} trong {request_timeout}s: {exc}") from exc
-        log.info("agent %s %s -> %s bytes in %.0f ms",
-                 method, action, len(raw), (time.monotonic() - started) * 1000)
+        elapsed = (time.monotonic() - started) * 1000
+        log.info("agent %s %s -> %s bytes in %.0f ms", method, action, len(raw), elapsed)
+        self._audit(action, router=self.base_url, result="ok", ms=f"{elapsed:.0f}")
 
         decoded = raw.decode("utf-8", "replace")
         if text:
@@ -1688,6 +1764,10 @@ class AgentClient:
         if payload.get("ok") is False:
             raise AgentError(payload.get("error") or payload.get("log") or "Agent báo lỗi")
         return payload
+
+    def _audit(self, action: str, **fields) -> None:
+        if action in AUDITED_ACTIONS:
+            audit(f"agent.{action}", **fields)
 
     def status(self):
         return self._request("status", timeout=15)
@@ -3365,7 +3445,11 @@ class NativeApp:
             self._task_error(exc)
             return
         def work():
-            status = client.status()
+            try:
+                status = client.status()
+            except AgentError as exc:
+                audit("connect", router=client.base_url, result="failed", detail=exc)
+                raise
             records = parse_conf(client.get_conf())
             try:
                 gateway = client.gateway()
@@ -3381,6 +3465,9 @@ class NativeApp:
             meta = status.get("meta") if isinstance(status.get("meta"), dict) else {}
             running = bool(meta.get("singbox_running"))
             self.agent_version = clean_agent_version(meta)
+            audit("connect", router=self.client.base_url, result="ok",
+                  agent=self.agent_version or "?", console=APP_VERSION,
+                  singbox="running" if running else "stopped")
             self.status_var.set(
                 f"Connected to {self.client.base_url} · sing-box {'running' if running else 'NOT running'}"
                 if self.language == "en" else

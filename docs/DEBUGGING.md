@@ -87,7 +87,7 @@ Sau khi sửa logic router: chạy lại test trên PC, rồi trên router chạ
 
 **Không gửi** `config/wifi-socks.conf`, token, `/etc/sbproxy.bans`, file backup
 hay mật khẩu SOCKS/Wi-Fi. Che IP public, hostname, SSID, MAC và credential bằng
-placeholder trước khi chia sẻ output (`logs/console.log` của desktop đã tự che
+placeholder trước khi chia sẻ output (`logs/console.log` và `logs/audit.log` của desktop đã tự che
 token/mật khẩu).
 
 Một báo lỗi đủ dùng gồm: commit đang chạy, môi trường máy dev, model router +

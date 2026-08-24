@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 import tempfile
 import unittest
 from unittest import mock
@@ -678,25 +679,106 @@ class AppHomeIsolationTests(unittest.TestCase):
             if os.name != "nt":
                 self.assertEqual(home.stat().st_mode & 0o777, 0o700)
 
-    def test_logging_writes_into_the_private_tree_and_rotates(self):
+    def logging_home(self):
+        """Point every log path at a throwaway tree for one test."""
         home = self.root / "home"
         log_dir = home / "logs"
-        with mock.patch.multiple(
+        return log_dir, mock.patch.multiple(
             app, APP_HOME=home, CONFIG_DIR=home / "config", LOG_DIR=log_dir,
             CACHE_DIR=home / "cache", RUNTIME_DIR=home / "runtime",
-            LOG_FILE=log_dir / "console.log", LOG_MAX_BYTES=2048, LOG_BACKUP_COUNT=2,
-        ):
+            LOG_FILE=log_dir / "console.log", AUDIT_FILE=log_dir / "audit.log",
+        )
+
+    @staticmethod
+    def close_handlers():
+        for logger in (app.log, app.audit_log):
+            for handler in list(logger.handlers):
+                handler.close()
+                logger.removeHandler(handler)
+
+    def test_logging_writes_into_the_private_tree_and_rolls_over_daily(self):
+        log_dir, patches = self.logging_home()
+        with patches:
             path = app.setup_logging()
             self.assertEqual(path, log_dir / "console.log")
-            for i in range(400):
-                app.log.info("filler line %s with enough text to force rotation", i)
-            for handler in list(app.log.handlers):
-                handler.close()
-                app.log.removeHandler(handler)
-        written = sorted(p.name for p in log_dir.iterdir())
-        self.assertIn("console.log", written)
-        self.assertTrue(any(name.startswith("console.log.") for name in written), written)
-        self.assertLessEqual(len(written), 3)  # live file + LOG_BACKUP_COUNT
+            app.log.info("hello")
+            app.audit("connect", router="http://192.168.8.1", result="ok")
+            handlers = {
+                "console": app.log.handlers[0],
+                "audit": app.audit_log.handlers[0],
+            }
+            for name, handler in handlers.items():
+                with self.subTest(log=name):
+                    self.assertIsInstance(handler, app.TimedRotatingFileHandler)
+                    self.assertEqual(handler.when, "MIDNIGHT")
+                    self.assertEqual(handler.backupCount, app.LOG_RETENTION_DAYS)
+                    self.assertEqual(handler.suffix, "%Y-%m-%d")
+            self.close_handlers()
+        self.assertEqual(app.LOG_RETENTION_DAYS, 7)
+        written = sorted(item.name for item in log_dir.iterdir())
+        self.assertEqual(written, ["audit.log", "console.log"])
+
+    def test_rotated_logs_older_than_the_window_are_deleted_at_startup(self):
+        log_dir, patches = self.logging_home()
+        log_dir.mkdir(parents=True)
+        stale = log_dir / "console.log.2026-01-01"
+        recent = log_dir / "console.log.2026-08-24"
+        legacy = log_dir / "console.log.3"          # left by the old size-based scheme
+        for item in (stale, recent, legacy):
+            item.write_text("x", encoding="utf-8")
+        old_time = time.time() - 30 * 86400
+        os.utime(stale, (old_time, old_time))
+        os.utime(legacy, (old_time, old_time))
+        with patches:
+            removed = app.purge_old_logs()
+            self.assertEqual(sorted(item.name for item in removed),
+                             ["console.log.2026-01-01", "console.log.3"])
+            self.close_handlers()
+        self.assertFalse(stale.exists())
+        self.assertFalse(legacy.exists())
+        self.assertTrue(recent.exists())
+
+    def test_starting_up_purges_and_keeps_the_live_files(self):
+        log_dir, patches = self.logging_home()
+        log_dir.mkdir(parents=True)
+        stale = log_dir / "audit.log.2026-01-01"
+        stale.write_text("x", encoding="utf-8")
+        old_time = time.time() - 30 * 86400
+        os.utime(stale, (old_time, old_time))
+        with patches:
+            app.setup_logging()
+            app.audit("connect", router="http://192.168.8.1", result="ok")
+            self.close_handlers()
+        self.assertFalse(stale.exists())
+        self.assertTrue((log_dir / "audit.log").is_file())
+
+    def test_the_audit_trail_records_who_and_what_without_secrets(self):
+        log_dir, patches = self.logging_home()
+        with patches:
+            app.setup_logging()
+            app.audit("connect", router="http://192.168.8.1", result="ok",
+                      token="abc123secret", empty="", missing=None)
+            app.audit("agent.apply", router="http://192.168.8.1", result="ok")
+            self.close_handlers()
+        written = (log_dir / "audit.log").read_text(encoding="utf-8")
+        self.assertIn("connect", written)
+        self.assertIn("router=http://192.168.8.1", written)
+        self.assertIn("agent.apply", written)
+        self.assertIn("user=", written)
+        self.assertNotIn("abc123secret", written)
+        self.assertNotIn("empty=", written)
+        self.assertNotIn("missing=", written)
+        # The same events belong in the technical log too, for one timeline.
+        self.assertIn("agent.apply", (log_dir / "console.log").read_text(encoding="utf-8"))
+
+    def test_only_router_changing_actions_reach_the_audit_trail(self):
+        for action in ("apply", "save_conf", "set_sock", "rotate_mac", "backup",
+                       "rollback", "update", "uninstall", "kick", "ban", "unban"):
+            with self.subTest(action=action):
+                self.assertIn(action, app.AUDITED_ACTIONS)
+        for action in ("status", "get_conf", "clients", "gateway", "backups", "dryrun_conf"):
+            with self.subTest(action=action):
+                self.assertNotIn(action, app.AUDITED_ACTIONS)
 
     def test_migration_copies_legacy_config_once_and_never_overwrites(self):
         home = self.root / "home"

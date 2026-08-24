@@ -230,7 +230,9 @@ Hai frontend độc lập dùng chung Agent API:
   - Token lưu bằng DPAPI trên Windows, `chmod 600` trên Linux/macOS. Config/log/cache/runtime nằm dưới **một home riêng** (`SBPROXY_HOME` → thư mục `data/` cạnh file exe cho bản portable → `%LOCALAPPDATA%\sbproxy-console-native`); xem bằng `sbproxy-console --where`.
   - Cả hai script build nhúng sẵn gói `sbproxy-update-<version>.tar.gz` nên chạy được **Cài đặt sau khi flash** trên máy không có mã nguồn.
   - Console đối chiếu version với agent: agent cũ hơn thì hỏi và nâng cấp tại chỗ (giữ nguyên `wifi-socks.conf` + `settings.sh`), agent mới hơn thì console chuyển sang chỉ đọc cho tới khi được cập nhật.
-  - Debug hiện trường: lấy `logs/console.log` (xoay vòng 1 MB × 5, đã che token/mật khẩu) qua nút **Thư mục log**, hoặc chạy lại với `--verbose`.
+  - Debug hiện trường: lấy `logs/console.log` qua nút **Thư mục log**, hoặc chạy lại với `--verbose`.
+  - `logs/audit.log` ghi riêng: mỗi lần kết nối (router, version agent, sing-box) và mọi thay đổi đẩy xuống router (apply, đổi SOCKS, random MAC, kick/cấm/bỏ cấm, backup, rollback, cập nhật agent) kèm user hệ điều hành và kết quả.
+  - Cả hai file xoay vòng **mỗi nửa đêm**, **giữ 7 ngày**, token/mật khẩu đã bị che; file cũ hơn bị xoá ở lần chạy kế tiếp.
   - Chi tiết: [../console/desktop/README.vi.md](../console/desktop/README.vi.md).
 
 > **Mixed-content:** chế độ Live của **bản Web** chỉ chạy khi mở UI qua **http** từ chính router; bản Desktop không vướng giới hạn này.

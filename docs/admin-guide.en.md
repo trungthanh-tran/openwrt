@@ -82,8 +82,13 @@ router-hosted **web** UI and the native Tkinter **desktop** console.
   `?action=status`. The desktop console acts on the difference: an older agent is
   offered an in-place upgrade that keeps `wifi-socks.conf` and `settings.sh`, and
   a newer agent puts the console in read-only mode until it is updated.
-- For field debugging collect `logs/console.log` (rotating 1 MB × 5, credentials
-  redacted) with the **Log folder** button, or rerun with `--verbose`.
+- For field debugging collect `logs/console.log` with the **Log folder** button,
+  or rerun with `--verbose`. Beside it, `logs/audit.log` records each connection
+  (router, agent version, sing-box state) and every change pushed to a router
+  (apply, SOCKS change, MAC rotation, kick/ban/unban, backup, rollback, agent
+  update) with the OS user and the result. Both roll over at midnight, keep
+  seven days, and have credentials redacted; anything older is deleted at the
+  next start.
 
 See [../console/desktop/README.md](../console/desktop/README.md).
 

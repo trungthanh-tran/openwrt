@@ -318,7 +318,8 @@ mixes with other Python environments or with another copy of the app:
 
 ```
 <home>/config/connection.json   router URL + token (DPAPI on Windows, chmod 600 elsewhere)
-<home>/logs/console.log         rotating debug log (1 MB × 5 files)
+<home>/logs/console.log         technical log, rolls at midnight, 7 days kept
+<home>/logs/audit.log           who connected and every change made, same rotation
 <home>/cache/                   scratch data
 <home>/runtime/                 bundled Python runtime and dependencies (Windows onefile)
 ```

@@ -127,10 +127,17 @@ bảng tự cập nhật theo chu kỳ chọn ở ô bên cạnh (5s–60s).
 Góc trên bên phải: đổi **Ngôn ngữ** (Tiếng Việt / English) và **Giao diện**
 (Dark / Light) — app nhớ lựa chọn cho lần sau.
 
-Nút **Thư mục log** mở nơi chứa `console.log` (xoay vòng 1 MB × 5, token và mật
-khẩu đã bị che). Khi báo lỗi cho quản trị viên, gửi kèm file này. Cần chi tiết
-hơn thì chạy app với tham số `--verbose`; muốn biết app lưu dữ liệu ở đâu thì
-chạy `sbproxy-console --where`.
+Nút **Thư mục log** mở thư mục chứa hai file:
+
+- `console.log` — log kỹ thuật. Báo lỗi cho quản trị viên thì gửi kèm file này.
+- `audit.log` — ai kết nối và đã đổi gì: mỗi lần kết nối (router, version agent,
+  trạng thái sing-box) và mọi thay đổi gửi xuống router (apply, đổi SOCKS,
+  random MAC, kick/cấm/bỏ cấm, backup, rollback, cập nhật agent) kèm tên user
+  trên máy và kết quả thành công hay không.
+
+Cả hai xoay vòng **mỗi nửa đêm** và **giữ 7 ngày**; file cũ hơn bị xoá ở lần mở
+app kế tiếp. Token và mật khẩu đều đã bị che. Cần chi tiết hơn thì chạy app với
+`--verbose`; muốn biết app lưu dữ liệu ở đâu thì chạy `sbproxy-console --where`.
 
 ## 7 · Gặp sự cố
 
