@@ -69,9 +69,10 @@ done.
 
 1. Start `sbproxy-console.exe` (Linux/macOS: `chmod +x ./sbproxy-console`, then
    `./sbproxy-console`).
-2. The yellow **Router not configured** bar appears → press **Check status** to
-   confirm the router answers (read-only).
-3. Press **Post-flash setup…** and fill in:
+2. With no token stored, the app **opens the setup form by itself** on that
+   first run. If you closed it, reopen it with **Post-flash setup…** — on the
+   yellow **Router not configured** bar or in the top row.
+3. Fill in the form:
    - **Router (IP)**: the address from step 2.
    - **SSH account / port**: `root` / `22`.
    - **SSH password**: the one from step 3 (or pick an SSH key).
@@ -79,11 +80,13 @@ done.
      embedded package.
    - **wifi-socks.conf**: leave empty if you do not have one yet; Wi-Fi and
      SOCKS entries are easier to add in the app afterwards.
-4. Press **Start setup** and watch the checklist: check SSH → inspect what the
+4. Optional: press **Check status** to see what the router already carries —
+   read-only, it changes nothing.
+5. Press **Start setup** and watch the checklist: check SSH → inspect what the
    router already has → push the code → install dependencies → push the
    configuration → preflight and dry-run → `apply.sh` → install the agent →
    fetch the token → verify the agent.
-5. When it finishes, the wizard closes and the control screens open on the new
+6. When it finishes, the wizard closes and the control screens open on the new
    token.
 
 Expect the dependency step to take the longest — a few minutes, depending on the

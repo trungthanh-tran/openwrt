@@ -60,19 +60,22 @@ Kiểm tra nhanh từ máy tính: `ssh root@192.168.8.1` — đăng nhập đư�
 
 1. Chạy `sbproxy-console.exe` (Linux/macOS: `chmod +x ./sbproxy-console` rồi
    `./sbproxy-console`).
-2. App hiện thanh vàng **CHƯA CẤU HÌNH ROUTER** → bấm **Kiểm tra tình trạng** để
-   xác nhận router phản hồi (thao tác chỉ đọc).
-3. Bấm **Cài đặt sau khi flash…** rồi điền:
+2. Chưa có token thì app **tự mở form cài đặt** ngay lần chạy đầu. Nếu đã đóng
+   form, mở lại bằng nút **Cài đặt sau khi flash…** (trên thanh vàng
+   **CHƯA CẤU HÌNH ROUTER** hoặc ở hàng trên cùng).
+3. Điền vào form:
    - **Router (IP)**: IP đã ghi ở bước 2.
    - **Tài khoản / Port SSH**: `root` / `22`.
    - **Mật khẩu SSH**: mật khẩu vừa đặt ở bước 3 (hoặc chọn SSH key).
    - **Mã nguồn hoặc gói .tar.gz**: **để nguyên** — app dùng gói nhúng sẵn.
    - **wifi-socks.conf**: để trống nếu chưa có; cấu hình Wi-Fi/SOCKS nhập trong
      app sau khi cài xong.
-4. Bấm **Bắt đầu cài đặt** và theo dõi checklist. App sẽ: kiểm tra SSH → xem
+4. (Tuỳ chọn) Bấm **Kiểm tra tình trạng** để xem router đã có sẵn gì — thao tác
+   chỉ đọc, không đổi gì trên router.
+5. Bấm **Bắt đầu cài đặt** và theo dõi checklist. App sẽ: kiểm tra SSH → xem
    router có sẵn gì → đẩy mã nguồn → cài gói phụ thuộc → đẩy cấu hình →
    preflight + dry-run → `apply.sh` → cài agent → lấy token → kiểm tra agent.
-5. Chạy xong, cửa sổ cài đặt tự đóng và màn hình điều khiển mở ra với token vừa lấy.
+6. Chạy xong, cửa sổ cài đặt tự đóng và màn hình điều khiển mở ra với token vừa lấy.
 
 Thời gian: phần cài gói phụ thuộc lâu nhất (vài phút, tuỳ mạng của router).
 

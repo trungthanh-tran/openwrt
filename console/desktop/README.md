@@ -62,11 +62,14 @@ New router, start to finish? Follow the four-step
 [quick start](../../docs/QUICKSTART.en.md) instead; this section explains what
 the wizard does.
 
-A freshly flashed router carries no sbproxy code, no agent, and no token. Open
-**Post-flash setup…** — from the yellow bar shown while no token is stored, or
-from the button in the connection row, which is always available — and the
-console runs the whole bring-up over SSH, ticking each step in the checklist as
-it goes:
+A freshly flashed router carries no sbproxy code, no agent, and no token. With
+no token stored the console **opens the setup form by itself** on startup, so
+the very first launch asks for the router address, SSH account, port, and
+password without anyone having to find a button. Closing that window is safe:
+**Post-flash setup…** reopens the same one — from the yellow bar, or from the
+button in the connection row, which is always available. From there the console
+runs the whole bring-up over SSH, ticking each step in the checklist as it
+goes:
 
 1. Check the SSH connection (and report the OpenWrt release).
 2. Check what the router already has: code, `wifi-socks.conf`, sing-box, the
@@ -98,11 +101,12 @@ an askpass helper — never on the command line — and is never written to
 next run.
 
 **Checking before installing.** With a stored token the app connects on launch
-and opens the control screens. Without one it quietly probes the stored router
-address and puts the answer in the yellow bar: agent healthy, agent up but the
-token is wrong, router up without an agent, or unreachable. **Check status**
-repeats that on demand and adds the SSH inventory from step 2. Both are
-read-only, so a setup run is only started when it is actually needed.
+and opens the control screens. Without one it opens the setup form and quietly
+probes the stored router address, putting the answer in the yellow bar: agent
+healthy, agent up but the token is wrong, router up without an agent, or
+unreachable. **Check status** repeats that on demand and adds the SSH inventory
+from step 2. Both are read-only, so a setup run is only started when it is
+actually needed.
 
 ## Version compatibility
 

@@ -546,6 +546,7 @@ EN_TRANSLATIONS = {
     'CHƯA CẤU HÌNH ROUTER': 'ROUTER NOT CONFIGURED',
     'Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
     'Cài đặt sau khi flash…': 'Post-flash setup…',
+    'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
     'Đang kiểm tra tình trạng router…': 'Checking the router status…',
 }
 
@@ -2553,6 +2554,7 @@ class NativeApp:
         self.client_column_titles = {}
         self.wifi_edit_buttons = {}
         self.client_edit_buttons = {}
+        self.setup_wizard: SetupWizard | None = None
         self._configure_styles()
         self._build_ui()
         for variable in (
@@ -2575,6 +2577,9 @@ class NativeApp:
             # A known router may already be installed: say so before anyone
             # starts a setup run that would repeat work.
             self.root.after(700, lambda: self.check_router_state(announce=False))
+            # Without a token the SSH form is the only useful next action, so
+            # open it instead of leaving people to hunt for the button.
+            self.root.after(900, self.open_setup_wizard)
 
     def _configure_styles(self):
         p = self.palette
@@ -3181,10 +3186,32 @@ class NativeApp:
 
     def open_setup_wizard(self):
         """Run the post-flash sequence and hand the fetched token to the tool."""
-        settings = load_provision_settings()
-        if not settings.host and self.base_var.get():
-            settings.host = self.base_var.get().split("//")[-1].strip("/")
-        SetupWizard(self.root, settings, self.language, self.palette, on_success=self.adopt_token)
+        existing = getattr(self, "setup_wizard", None)
+        if existing is not None and existing.winfo_exists():
+            # Never stack two wizards: the first-run auto-open and the two
+            # buttons all share one window.
+            existing.deiconify()
+            existing.lift()
+            existing.focus_force()
+            return
+        try:
+            settings = load_provision_settings()
+            if not settings.host and self.base_var.get():
+                settings.host = self.base_var.get().split("//")[-1].strip("/")
+            self.setup_wizard = SetupWizard(
+                self.root, settings, self.language, self.palette, on_success=self.adopt_token
+            )
+        except Exception as exc:  # a dead button is worse than a visible error
+            log.exception("cannot open the setup wizard")
+            self.setup_wizard = None
+            messagebox.showerror(
+                APP_NAME,
+                f'{self.t("Không mở được cửa sổ cài đặt")}: {exc}',
+                parent=self.root,
+            )
+            return
+        self.setup_wizard.lift()
+        self.setup_wizard.focus_force()
 
     def adopt_token(self, base_url, token):
         """Store a freshly provisioned token and open the control screens."""

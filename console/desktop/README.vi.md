@@ -61,9 +61,11 @@ Router mới, làm từ đầu tới cuối? Theo
 [hướng dẫn 4 bước](../../docs/QUICKSTART.md); phần này giải thích wizard làm gì.
 
 Router vừa flash lại chưa có mã nguồn sbproxy, chưa có agent và chưa có token.
-Bấm **Cài đặt sau khi flash…** — trên thanh vàng hiện khi chưa lưu token, hoặc
-nút luôn có sẵn ở hàng kết nối — để console chạy toàn bộ quy trình qua SSH và
-tick từng bước ngay trên giao diện:
+Khi chưa lưu token, console **tự mở form cài đặt** lúc khởi động, nên ngay lần
+chạy đầu đã có sẵn ô nhập IP router, tài khoản SSH, port và mật khẩu — không
+phải đi tìm nút. Đóng form cũng không sao: **Cài đặt sau khi flash…** mở lại
+đúng cửa sổ đó, trên thanh vàng hoặc ở hàng kết nối (nút này luôn có). Từ đó
+console chạy toàn bộ quy trình qua SSH và tick từng bước ngay trên giao diện:
 
 1. Kiểm tra kết nối SSH (và báo bản OpenWrt đang chạy).
 2. Kiểm tra router đang có sẵn gì: mã nguồn, `wifi-socks.conf`, sing-box, agent
@@ -93,8 +95,8 @@ lệnh — và không bao giờ ghi vào `connection.json`. Địa chỉ router,
 các đường dẫn được nhớ cho lần chạy sau.
 
 **Kiểm tra trước khi cài.** Có token sẵn thì app kết nối ngay khi mở và vào
-thẳng màn hình điều khiển. Chưa có token thì app kiểm tra ngầm địa chỉ router đã
-lưu và ghi kết quả lên thanh vàng: agent tốt, agent chạy nhưng sai token, router
+thẳng màn hình điều khiển. Chưa có token thì app mở form cài đặt, đồng thời kiểm
+tra ngầm địa chỉ router đã lưu và ghi kết quả lên thanh vàng: agent tốt, agent chạy nhưng sai token, router
 sống nhưng chưa có agent, hoặc không liên lạc được. Nút **Kiểm tra tình trạng**
 làm lại việc đó khi bấm và kèm bảng hiện trạng SSH ở bước 2. Cả hai đều **chỉ
 đọc**, nên chỉ chạy cài đặt khi thật sự cần.

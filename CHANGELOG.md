@@ -5,6 +5,14 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- Lần đầu mở app khi **chưa có token**, form nhập IP router / tài khoản SSH /
+  port / mật khẩu **tự mở** thay vì chỉ hiện thanh vàng — trước đây phải tự tìm
+  nút **Cài đặt sau khi flash…** mới thấy form.
+- Nút **Cài đặt sau khi flash…** không còn chết thầm lặng: lỗi lúc dựng cửa sổ
+  được ghi log và báo bằng hộp thoại. Mở nhiều lần chỉ dùng lại đúng một cửa sổ
+  thay vì chồng nhiều wizard lên nhau.
+
 ## [0.4.2] - 2026-08-24
 
 ### Added

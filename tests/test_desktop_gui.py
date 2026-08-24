@@ -285,6 +285,49 @@ class SetupWizardGuiTests(unittest.TestCase):
         self.root.update_idletasks()
         self.assertEqual(app.setup_bar.winfo_manager(), "")
         self.assertEqual(app.token_var.get(), "0123456789abcdef0123")
+    def test_a_first_run_without_a_token_opens_the_ssh_form_itself(self):
+        """No token means the SSH form is the only useful action: show it."""
+        with mock.patch.object(appmod, "load_connection", return_value=(appmod.DEFAULT_BASE, "")),              mock.patch.object(appmod, "load_preferences", return_value=("en", "dark")),              mock.patch.object(appmod.NativeApp, "connect"),              mock.patch.object(appmod.NativeApp, "check_router_state"),              mock.patch.object(appmod, "load_provision_settings",
+                               return_value=appmod.ProvisionSettings(payload=str(ROOT))):
+            app = appmod.NativeApp(self.root)
+            self.root.update()
+            self.root.after(1200, self.root.quit)
+            self.root.mainloop()
+        try:
+            self.assertIsNotNone(app.setup_wizard)
+            self.assertTrue(app.setup_wizard.winfo_exists())
+            labels = widget_texts(app.setup_wizard)
+            for field in ("Router (IP)", "SSH account", "SSH port", "SSH password"):
+                self.assertIn(field, labels)
+        finally:
+            if app.setup_wizard is not None:
+                app.setup_wizard.close()
+
+    def test_the_button_reuses_the_open_wizard_instead_of_stacking_windows(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod, "load_provision_settings",
+                               return_value=appmod.ProvisionSettings(payload=str(ROOT))):
+            app.open_setup_wizard()
+            first = app.setup_wizard
+            app.open_setup_wizard()
+        try:
+            self.assertIs(app.setup_wizard, first)
+        finally:
+            first.close()
+        # A closed wizard must not block a later run.
+        with mock.patch.object(appmod, "load_provision_settings",
+                               return_value=appmod.ProvisionSettings(payload=str(ROOT))):
+            app.open_setup_wizard()
+        self.assertIsNot(app.setup_wizard, first)
+        app.setup_wizard.close()
+
+    def test_a_wizard_that_cannot_be_built_reports_instead_of_dying_silently(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod, "load_provision_settings", side_effect=OSError("config unreadable")),              mock.patch.object(appmod.messagebox, "showerror") as error:
+            app.open_setup_wizard()
+        error.assert_called_once()
+        self.assertIn("config unreadable", error.call_args[0][1])
+        self.assertIsNone(app.setup_wizard)
 
 
 if __name__ == "__main__":
