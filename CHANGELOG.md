@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-08-25
+
 ### Added
 - **Preflight tự dò radio của board** thay vì giả định `radio0`/`radio1`: đọc
   danh sách `wifi-device` từ UCI (bao nhiêu radio, tên gì cũng được), suy ra
