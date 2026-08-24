@@ -1,10 +1,12 @@
 #!/bin/sh
 set -eu
 PUSH=0
+RUN_TESTS=1
 for arg in "$@"; do
   case "$arg" in
     --push) PUSH=1 ;;
-    *) echo "Usage: $0 [--push]" >&2; exit 2 ;;
+    --skip-tests) RUN_TESTS=0 ;;
+    *) echo "Usage: $0 [--push] [--skip-tests]" >&2; exit 2 ;;
   esac
 done
 ROOT="$(cd -- "$(dirname "$0")/.." && pwd)"
@@ -18,6 +20,13 @@ EOF
 NEXT="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT"
 [ -z "$(git status --short)" ] || { echo 'working tree is not clean' >&2; exit 1; }
 [ -z "$(git tag --list "$RELEASE")" ] || { echo "tag already exists: $RELEASE" >&2; exit 1; }
+if [ "$RUN_TESTS" = 1 ]; then
+  echo "Running the full test suite before releasing $RELEASE..."
+  sh tests/run-all.sh || { echo "tests failed; release aborted" >&2; exit 1; }
+  echo "Tests passed."
+else
+  echo "WARNING: skipping tests at the operator's request" >&2
+fi
 for file in VERSION console/desktop/main.py console/web/control-panel.html; do sed -i "s/$SOURCE/$RELEASE/g" "$file"; done
 git add VERSION console/desktop/main.py console/web/control-panel.html
 git commit -m "release: $RELEASE"

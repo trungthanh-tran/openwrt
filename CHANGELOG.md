@@ -3,15 +3,9 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
-## [0.4.1] - 2026-08-23
-
-### Added
-- GitHub release builder publishes the Windows executable, router update
-  package, agent package, and scripts/documentation package.
-- Release scripts support version validation and guarded tag/push operations;
-  GitHub milestones remain a separate web/workflow operation.
-
 ## [Unreleased]
+
+## [0.4.2] - 2026-08-24
 
 ### Added
 - **Hướng dẫn cài nhanh bằng file exe** (`docs/QUICKSTART.md` + bản EN): 4 bước
@@ -71,7 +65,15 @@ Ngày theo định dạng YYYY-MM-DD.
   phần chạy tại hiện trường; README gốc, admin-guide và user-guide ghi chú tương ứng.
 - Suite mới `tests/test_desktop_provision.py` và các test GUI cho wizard.
 
+### Changed
+- `scripts/release.sh` / `release.ps1` chạy toàn bộ `tests/run-all.sh` trước khi
+  commit, tag và push; test hỏng thì dừng ngay, không tạo tag. Chỉ bỏ qua được
+  bằng `--skip-tests` / `-SkipTests` khi thật sự cần.
+
 ### Fixed
+- `release.ps1` không còn kiểm tra `$Version` trước khi biến đó được tính ra từ
+  `VERSION` — lỗi khiến script luôn báo "Version must be semver" và không chạy
+  được.
 - Rà soát lại toàn bộ tài liệu: bảng API agent bổ sung `kick`/`ban`/`unban`,
   `update`, `backup`, `download_backup` kèm method đúng cho từng action;
   `docs/DEBUGGING.md` viết lại (bỏ phạm vi 4 commit cũ, số assertion cũ, yêu cầu
@@ -90,6 +92,14 @@ Ngày theo định dạng YYYY-MM-DD.
 - `--where` và chế độ askpass ghi ra stdout qua file descriptor/Win32 handle,
   nên bản build `--windowed` (không có `sys.stdout`) vẫn trả lời được `ssh`;
   `--where` in thêm dòng `payload=` để biết bản build đang dùng gói nào.
+
+## [0.4.1] - 2026-08-23
+
+### Added
+- GitHub release builder publishes the Windows executable, router update
+  package, agent package, and scripts/documentation package.
+- Release scripts support version validation and guarded tag/push operations;
+  GitHub milestones remain a separate web/workflow operation.
 
 ## [0.4.0] - 2026-08-20
 

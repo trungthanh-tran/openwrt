@@ -42,3 +42,20 @@ make check        # lint + test (giống CI)
 Nhiều thứ (TPROXY, hostapd ubus, wifi) chỉ kiểm được trên GL-MT6000 thật.
 Sau khi đổi code liên quan router: `sh scripts/apply.sh` → `sh scripts/verify.sh`
 → `sh scripts/doctor.sh`, và các bài client trong `docs/TESTING.md`.
+
+## Phát hành
+`VERSION` luôn giữ dạng `X.Y.Z-SNAPSHOT` trong lúc phát triển. Khi phát hành:
+
+```sh
+sh scripts/release.sh          # chuẩn bị local
+sh scripts/release.sh --push   # chuẩn bị rồi push main + tag
+```
+Windows: `pwsh scripts/release.ps1 [-Push]`.
+
+Script kiểm tra cây làm việc sạch, tag chưa tồn tại, **chạy toàn bộ
+`tests/run-all.sh`** rồi mới bỏ hậu tố `-SNAPSHOT`, commit `release: X.Y.Z`,
+tạo tag và bump sang `-SNAPSHOT` kế tiếp. Test hỏng là dừng, không tạo tag.
+`--skip-tests` / `-SkipTests` chỉ dùng khi thật sự cần.
+
+Trước khi chạy: chuyển mục `## [Unreleased]` trong `CHANGELOG.md` thành
+`## [X.Y.Z] - YYYY-MM-DD` và để lại một mục `## [Unreleased]` trống.

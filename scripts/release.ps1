@@ -1,12 +1,12 @@
 param(
-  [switch]$Push
+  [switch]$Push,
+  [switch]$SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
 
-if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "Version must be semver" }
 $source = (Get-Content VERSION -Raw).Trim()
 if ($source -notmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)-SNAPSHOT$') { throw "VERSION must end in -SNAPSHOT: $source" }
 $major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
@@ -14,6 +14,15 @@ $Version = "$major.$minor.$patch"
 $next = "$major.$minor.$($patch + 1)-SNAPSHOT"
 if (@(git status --short).Count -gt 0) { throw 'Working tree is not clean' }
 if (@(git tag --list $Version).Count -gt 0) { throw "Tag $Version already exists" }
+
+if ($SkipTests) {
+  Write-Warning 'Skipping tests at the operator request'
+} else {
+  Write-Host "Running the full test suite before releasing $Version..."
+  & sh tests/run-all.sh
+  if ($LASTEXITCODE -ne 0) { throw 'Tests failed; release aborted' }
+  Write-Host 'Tests passed.'
+}
 
 function Set-Version([string]$value) {
   Set-Content VERSION $value -NoNewline -Encoding utf8
