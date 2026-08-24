@@ -70,9 +70,14 @@ Kiểm tra nhanh từ máy tính: `ssh root@192.168.8.1` — đăng nhập đư�
    - **Mã nguồn hoặc gói .tar.gz**: **để nguyên** — app dùng gói nhúng sẵn.
    - **wifi-socks.conf**: để trống nếu chưa có; cấu hình Wi-Fi/SOCKS nhập trong
      app sau khi cài xong.
-4. (Tuỳ chọn) Bấm **Kiểm tra tình trạng** để xem router đã có sẵn gì — thao tác
-   chỉ đọc, không đổi gì trên router.
-5. Bấm **Bắt đầu cài đặt** và theo dõi checklist. App sẽ: kiểm tra SSH → xem
+4. Bấm **Kiểm tra tình trạng**. App đăng nhập SSH và đọc hiện trạng router
+   (chỉ đọc, không đổi gì). Kết nối được mà router **chưa có agent** thì app hỏi
+   luôn *“Cài ngay bây giờ?”*:
+   - **Có** → chạy luôn toàn bộ cài đặt (khỏi bấm thêm).
+   - **Không** → console báo **KHÔNG CẤU HÌNH ĐƯỢC ROUTER**, làm mờ toàn bộ
+     phần điều khiển và chỉ để lại một nút **Cài agent ngay**; bấm nút đó là
+     cài, cài xong console mở khoá.
+5. Hoặc bấm thẳng **Bắt đầu cài đặt** và theo dõi checklist. App sẽ: kiểm tra SSH → xem
    router có sẵn gì → đẩy mã nguồn → cài gói phụ thuộc → đẩy cấu hình →
    preflight + dry-run → `apply.sh` → cài agent → lấy token → kiểm tra agent.
 6. Chạy xong, cửa sổ cài đặt tự đóng và màn hình điều khiển mở ra với token vừa lấy.
@@ -90,7 +95,9 @@ Thời gian: phần cài gói phụ thuộc lâu nhất (vài phút, tuỳ mạn
    - `nslookup example.com` phải trả IP trong dải `198.18.0.0/15` (fake-IP).
 3. Khung **Internet Gateway** trong app cho biết đường ra thực tế và độ trễ.
 
-Danh sách kiểm tra đầy đủ: [TESTING.md](TESTING.md).
+Dùng app hằng ngày (thêm WiFi, xem thiết bị, backup):
+[desktop-user-guide.md](desktop-user-guide.md). Danh sách kiểm tra đầy đủ:
+[TESTING.md](TESTING.md).
 
 ## Gặp lỗi thì làm gì
 

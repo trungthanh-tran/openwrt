@@ -80,9 +80,14 @@ done.
      embedded package.
    - **wifi-socks.conf**: leave empty if you do not have one yet; Wi-Fi and
      SOCKS entries are easier to add in the app afterwards.
-4. Optional: press **Check status** to see what the router already carries —
-   read-only, it changes nothing.
-5. Press **Start setup** and watch the checklist: check SSH → inspect what the
+4. Press **Check status**. The app signs in over SSH and reads what the router
+   carries (read-only). If the login works but there is **no agent**, it asks
+   right there — *“Install it now?”*:
+   - **Yes** → the whole setup runs immediately, no further clicks.
+   - **No** → the console shows **ROUTER CANNOT BE CONFIGURED**, dims every
+     control, and leaves exactly one button: **Install the agent now**. Press
+     it to install; a finished install unlocks the console.
+5. Or press **Start setup** directly and watch the checklist: check SSH → inspect what the
    router already has → push the code → install dependencies → push the
    configuration → preflight and dry-run → `apply.sh` → install the agent →
    fetch the token → verify the agent.
@@ -103,7 +108,9 @@ router's own Internet connection.
    - `nslookup example.com` returns an address in `198.18.0.0/15` (fake-IP).
 3. The **Internet Gateway** card shows the real egress route and its latency.
 
-The complete acceptance list is in [TESTING.en.md](TESTING.en.md).
+Day-to-day use of the app — adding networks, watching devices, backups — is in
+the [desktop console user guide](desktop-user-guide.en.md). The complete
+acceptance list is in [TESTING.en.md](TESTING.en.md).
 
 ## When something fails
 

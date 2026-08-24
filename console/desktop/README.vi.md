@@ -59,6 +59,7 @@ không cần mã nguồn.
 
 Router mới, làm từ đầu tới cuối? Theo
 [hướng dẫn 4 bước](../../docs/QUICKSTART.md); phần này giải thích wizard làm gì.
+Dùng app hằng ngày: [hướng dẫn người dùng bản desktop](../../docs/desktop-user-guide.md).
 
 Router vừa flash lại chưa có mã nguồn sbproxy, chưa có agent và chưa có token.
 Khi chưa lưu token, console **tự mở form cài đặt** lúc khởi động, nên ngay lần
@@ -93,6 +94,16 @@ chạy lại được vì mọi bước đã qua đều idempotent. Khi bước 
 mật khẩu router. Mật khẩu đi tới `ssh` qua askpass helper — không nằm trên dòng
 lệnh — và không bao giờ ghi vào `connection.json`. Địa chỉ router, user, port và
 các đường dẫn được nhớ cho lần chạy sau.
+
+**Quyết định ngay lúc kết nối.** Nút **Kiểm tra tình trạng** đăng nhập SSH và
+đọc hiện trạng router mà không đổi gì. Nếu đăng nhập được nhưng router chưa có
+agent, wizard hỏi luôn có cài ngay không. Chọn **Có** thì chạy hết chuỗi cài
+đặt. Chọn **Không** thì tôn trọng lựa chọn đó nhưng nói thẳng: router không có
+agent thì console không điều khiển được gì — màn hình hiện **KHÔNG CẤU HÌNH
+ĐƯỢC ROUTER**, làm mờ hàng kết nối, khung cổng ra và toàn bộ tab, chỉ để lại một
+nút **Cài agent ngay** (dùng lại thông tin SSH vừa nhập nên bấm là cài luôn).
+Cài xong thì console tự mở khoá. Ngôn ngữ, giao diện và nút mở thư mục log vẫn
+dùng được trong lúc bị khoá.
 
 **Kiểm tra trước khi cài.** Có token sẵn thì app kết nối ngay khi mở và vào
 thẳng màn hình điều khiển. Chưa có token thì app mở form cài đặt, đồng thời kiểm

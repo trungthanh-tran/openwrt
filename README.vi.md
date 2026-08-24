@@ -129,7 +129,8 @@ CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước 
 - [docs/GUIDE.md](docs/GUIDE.md) — hướng dẫn toàn tập một mạch: firmware → cấu hình → test → xử lý lỗi
 
 **Vận hành**
-- **[docs/user-guide.md](docs/user-guide.md) — Hướng dẫn NGƯỜI DÙNG: dùng console hằng ngày, không cần dòng lệnh.**
+- **[docs/desktop-user-guide.md](docs/desktop-user-guide.md) — Hướng dẫn NGƯỜI DÙNG bản desktop (.exe): dùng app hằng ngày, không cần dòng lệnh.**
+- [docs/user-guide.md](docs/user-guide.md) — hướng dẫn người dùng bản console web trong trình duyệt
 - [docs/admin-guide.md](docs/admin-guide.md) — hướng dẫn QUẢN TRỊ theo bước, kèm script tương ứng
 - [docs/TESTING.md](docs/TESTING.md) — kiểm tra IP đúng sock, DNS leak, WebRTC, cách ly client
 - [docs/ROLLBACK.md](docs/ROLLBACK.md) — khôi phục khi lỗi (nhiều mức)

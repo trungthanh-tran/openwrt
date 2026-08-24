@@ -90,7 +90,8 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 
 **Operate**
 
-- [User guide](docs/user-guide.en.md) — daily console use
+- [Desktop console user guide](docs/desktop-user-guide.en.md) — daily use of the app
+- [User guide](docs/user-guide.en.md) — daily use of the browser console
 - [Administrator guide](docs/admin-guide.en.md) — every step with its script
 - [Testing](docs/TESTING.en.md) · [Rollback](docs/ROLLBACK.en.md) · [Debugging](docs/DEBUGGING.en.md)
 

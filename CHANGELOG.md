@@ -5,6 +5,19 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- Kết nối SSH thành công mà router **chưa có agent** thì app hỏi ngay *“Cài ngay
+  bây giờ?”*. Chọn cài là chạy luôn chuỗi cài đặt rồi lấy token và kiểm tra
+  agent; chọn không thì console báo **KHÔNG CẤU HÌNH ĐƯỢC ROUTER**, làm mờ hàng
+  kết nối / khung cổng ra / toàn bộ tab và chỉ còn một nút **Cài agent ngay**.
+  Nút đó dùng lại thông tin SSH vừa nhập (chỉ giữ trong bộ nhớ, không ghi ra
+  đĩa) nên bấm là cài ngay; cài xong console tự mở khoá. Router đã có sẵn agent
+  và token thì không bị hỏi lại.
+- **Hướng dẫn người dùng cho console desktop** (`docs/desktop-user-guide.md` +
+  bản EN): mở app lần đầu, kết nối hằng ngày, tab Wi-Fi/SOCKS5, tab thiết bị,
+  tab backup, log và xử lý sự cố — viết cho người dùng, không cần dòng lệnh.
+  `user-guide.md` giữ nguyên vai trò hướng dẫn bản console web.
+
 ### Fixed
 - Lần đầu mở app khi **chưa có token**, form nhập IP router / tài khoản SSH /
   port / mật khẩu **tự mở** thay vì chỉ hiện thanh vàng — trước đây phải tự tìm

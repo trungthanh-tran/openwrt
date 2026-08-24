@@ -328,6 +328,85 @@ class SetupWizardGuiTests(unittest.TestCase):
         error.assert_called_once()
         self.assertIn("config unreadable", error.call_args[0][1])
         self.assertIsNone(app.setup_wizard)
+    def open_wizard(self, app, inventory):
+        """Open the wizard and answer its state probe with a fixed inventory."""
+        settings = appmod.ProvisionSettings(host="192.168.8.1", password="secret", payload=str(ROOT))
+        with mock.patch.object(appmod, "load_provision_settings", return_value=settings):
+            app.open_setup_wizard()
+        wizard = app.setup_wizard
+        wizard._show_state("absent", "", dict(inventory), True)
+        return wizard
+
+    def test_a_working_login_asks_whether_to_install_and_yes_runs_the_setup(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=True) as ask, \
+             mock.patch.object(appmod.SetupWizard, "start") as start:
+            wizard = self.open_wizard(app, {"agent": False, "token": False})
+        ask.assert_called_once()
+        start.assert_called_once()
+        self.assertFalse(wizard.declined)
+        wizard.close()
+
+    def test_an_installed_router_is_not_asked_to_reinstall(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno") as ask, \
+             mock.patch.object(appmod.messagebox, "showinfo") as info:
+            wizard = self.open_wizard(app, {"agent": True, "token": True})
+        ask.assert_not_called()
+        info.assert_called_once()
+        wizard.close()
+
+    def test_declining_the_install_locks_the_console_behind_one_button(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+            self.open_wizard(app, {"agent": False, "token": False})
+        self.root.update_idletasks()
+        self.assertTrue(app.console_locked)
+        self.assertEqual(app.lock_bar.winfo_manager(), "pack")
+        self.assertEqual(app.setup_bar.winfo_manager(), "")
+        self.assertIn("ROUTER CANNOT BE CONFIGURED", widget_texts(app.lock_bar))
+        # Everything that drives the router is dimmed; the one way out is not.
+        self.assertTrue(app.tabs.instate(["disabled"]))
+        self.assertTrue(app.connection_row.instate(["disabled"]))
+        self.assertFalse(app.lock_button.instate(["disabled"]))
+        # The credentials just typed are kept in memory for the install button.
+        self.assertEqual(app.pending_provision.host, "192.168.8.1")
+
+    def test_the_lock_button_installs_straight_away_with_known_credentials(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+            self.open_wizard(app, {"agent": False, "token": False})
+        with mock.patch.object(appmod.NativeApp, "open_setup_wizard") as opened:
+            app.install_agent_now()
+        opened.assert_called_once()
+        self.assertTrue(opened.call_args.kwargs["autostart"])
+        self.assertEqual(opened.call_args.kwargs["settings"].host, "192.168.8.1")
+
+    def test_the_lock_survives_a_language_switch(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+            self.open_wizard(app, {"agent": False, "token": False})
+        app.language = "vi"
+        app.t = lambda value, **kw: appmod.translate(value, "vi", **kw)
+        app._rebuild_ui()
+        self.root.update_idletasks()
+        self.assertTrue(app.console_locked)
+        self.assertEqual(app.lock_bar.winfo_manager(), "pack")
+        self.assertTrue(app.tabs.instate(["disabled"]))
+        self.assertIn("KHÔNG CẤU HÌNH ĐƯỢC ROUTER", widget_texts(app.lock_bar))
+
+    def test_a_provisioned_token_lifts_the_lock(self):
+        app = self.build_app("")
+        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+            self.open_wizard(app, {"agent": False, "token": False})
+        with mock.patch.object(appmod, "save_connection"), mock.patch.object(appmod.NativeApp, "connect"):
+            app.adopt_token("http://192.168.8.1", "0123456789abcdef0123")
+        self.root.update_idletasks()
+        self.assertFalse(app.console_locked)
+        self.assertEqual(app.lock_bar.winfo_manager(), "")
+        self.assertFalse(app.tabs.instate(["disabled"]))
+        self.assertFalse(app.connection_row.instate(["disabled"]))
+        self.assertIsNone(app.pending_provision)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,9 @@
 
 **Language:** English (default) | [Tiếng Việt](user-guide.md)
 
+> Using the **desktop app** instead of the browser?
+> See [desktop-user-guide.en.md](desktop-user-guide.en.md).
+
 > The Vietnamese edition ([user-guide.md](user-guide.md)) is the fuller field reference: it keeps the long troubleshooting tables and command transcripts that are summarised here.
 
 > Technical and administration detail: [admin-guide.en.md](admin-guide.en.md).

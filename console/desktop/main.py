@@ -524,6 +524,13 @@ EN_TRANSLATIONS = {
     'Chạy apply.sh sau khi đẩy cấu hình': 'Run apply.sh after pushing the configuration',
     'Bắt đầu cài đặt': 'Start setup',
     'Kiểm tra tình trạng': 'Check status',
+    'KHÔNG CẤU HÌNH ĐƯỢC ROUTER': 'ROUTER CANNOT BE CONFIGURED',
+    'Cài agent ngay': 'Install the agent now',
+    'Kết nối SSH thành công nhưng router chưa cài xong agent. Cài ngay bây giờ?': 'The SSH login works but the router has no agent installed yet. Install it now?',
+    'Router đã có agent và token — không cần cài lại.': 'The router already has an agent and a token — no reinstall is needed.',
+    'Đã chọn không cài — console bị khoá cho tới khi agent được cài.': 'Installing was declined — the console stays locked until an agent is installed.',
+    'Router chưa cài agent nên console không điều khiển được gì. Hãy cài agent rồi thử lại.': 'With no agent on the router this console cannot control anything. Install the agent, then try again.',
+    'Không cấu hình được router — chưa cài agent': 'The router cannot be configured — no agent installed',
     'Dừng': 'Stop',
     'Đóng': 'Close',
     'Bước': 'Step',
@@ -2187,6 +2194,28 @@ STEP_STATE_LABELS = {
     STEP_FAILED: "Lỗi",
 }
 
+def set_widget_tree_disabled(widget, disabled, remembered=None):
+    """Grey out (or restore) every ttk control below `widget`.
+
+    `remembered` collects what this call actually disabled, so lifting the lock
+    never enables a control that was already disabled for its own reason (an
+    empty selection, a task in flight).
+    """
+    for child in widget.winfo_children():
+        try:
+            if disabled:
+                if not child.instate(["disabled"]):
+                    child.state(["disabled"])
+                    if remembered is not None:
+                        remembered.append(child)
+            elif remembered is None or child in remembered:
+                child.state(["!disabled"])
+        except (AttributeError, tk.TclError):
+            pass
+        set_widget_tree_disabled(child, disabled, remembered)
+    return remembered
+
+
 ROUTER_STATE_LABELS = {
     "ok": "Agent trả lời OK với token hiện tại",
     "unauthorized": "Agent đang chạy nhưng token sai hoặc thiếu",
@@ -2198,14 +2227,18 @@ ROUTER_STATE_LABELS = {
 class SetupWizard(tk.Toplevel):
     """Post-flash bring-up screen: run every step and show progress live."""
 
-    def __init__(self, parent, settings: ProvisionSettings, language="en", palette=None, on_success=None):
+    def __init__(self, parent, settings: ProvisionSettings, language="en", palette=None,
+                 on_success=None, on_decline=None, autostart=False):
         super().__init__(parent)
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
         self.on_success = on_success
+        self.on_decline = on_decline
         self.runner: ProvisionRunner | None = None
         self.busy = False
+        self.declined = False
+        self.last_settings: ProvisionSettings | None = None
         self.title(self.t("Cài đặt router sau khi flash"))
         self.configure(bg=self.palette["bg"])
         self.transient(parent)
@@ -2289,6 +2322,10 @@ class SetupWizard(tk.Toplevel):
         self.reset_steps()
         self.protocol("WM_DELETE_WINDOW", self.close)
         localize_widget_tree(self, self.language)
+        if autostart:
+            # Reached from the locked console, where installing was already
+            # chosen: do not ask the same question twice.
+            self.after(250, self.start)
 
     # -- form helpers -------------------------------------------------------
 
@@ -2391,6 +2428,7 @@ class SetupWizard(tk.Toplevel):
             messagebox.showerror(APP_NAME, self.t(str(exc)), parent=self)
             return
         save_provision_settings(settings)
+        self.last_settings = settings
         self.reset_steps()
         self._set_busy(True)
         self.append(self.t("Bắt đầu cài đặt") + f" · {settings.target}")
@@ -2445,27 +2483,62 @@ class SetupWizard(tk.Toplevel):
         self._set_busy(True)
         self.state_var.set(self.t("Đang kiểm tra router…"))
 
+        self.last_settings = settings
+
         def worker():
             state = probe_router_state(base_url, token)
-            inventory = ""
+            inventory, details, reachable = "", None, False
             if settings:
                 runner = ProvisionRunner(settings)
                 try:
                     inventory = runner.step_inventory()
+                    details = dict(runner.inventory)
+                    reachable = True
                 except ProvisionError as exc:
                     inventory = str(exc)
-            self.after(0, lambda: self._show_state(state, inventory))
+            self.after(0, lambda: self._show_state(state, inventory, details, reachable))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _show_state(self, state, inventory=""):
+    def _show_state(self, state, inventory="", details=None, reachable=False):
         self._set_busy(False)
         message = self.t(ROUTER_STATE_LABELS.get(state, state))
         self.state_var.set(message)
         self.append(f"• {message}")
         if inventory:
             self.append(f"• {self.t(inventory)}")
+        if reachable and details is not None:
+            # SSH works, so the only open question left is whether to install.
+            self._offer_install(details)
+            return
         messagebox.showinfo(APP_NAME, f"{message}\n\n{self.t(inventory)}" if inventory else message, parent=self)
+
+    def current_settings(self) -> ProvisionSettings | None:
+        """Whatever the form holds right now, or the last run's settings."""
+        try:
+            return self.collect()
+        except ValueError:
+            return self.last_settings
+
+    def _offer_install(self, inventory):
+        """Ask, right after a working SSH login, whether to provision now."""
+        if inventory.get("agent") and inventory.get("token"):
+            messagebox.showinfo(
+                APP_NAME, self.t("Router đã có agent và token — không cần cài lại."), parent=self,
+            )
+            return
+        if messagebox.askyesno(
+            APP_NAME,
+            self.t("Kết nối SSH thành công nhưng router chưa cài xong agent. Cài ngay bây giờ?"),
+            parent=self,
+        ):
+            self.start()
+            return
+        self.declined = True
+        self.append(self.t("Đã chọn không cài — console bị khoá cho tới khi agent được cài."))
+        if self.on_decline:
+            self.on_decline(self.current_settings())
+        self.close()
 
     def stop(self):
         if self.runner:
@@ -2513,6 +2586,7 @@ class NativeApp:
         self.base_var = tk.StringVar(value=base)
         self.token_var = tk.StringVar(value=token)
         self.status_var = tk.StringVar(value=self.t("Chưa kết nối"))
+        self.lock_hint_var = tk.StringVar(value="")
         self.setup_hint_var = tk.StringVar(value=self.t(
             "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
         ))
@@ -2555,6 +2629,13 @@ class NativeApp:
         self.wifi_edit_buttons = {}
         self.client_edit_buttons = {}
         self.setup_wizard: SetupWizard | None = None
+        # Router reachable over SSH but knowingly left without an agent: the
+        # console cannot drive anything, so it locks until one is installed.
+        self.console_locked = False
+        self.locked_widgets = []
+        # In-memory only, never written to disk: lets "Install the agent now"
+        # reuse the credentials just typed into the wizard.
+        self.pending_provision: ProvisionSettings | None = None
         self._configure_styles()
         self._build_ui()
         for variable in (
@@ -2740,6 +2821,7 @@ class NativeApp:
         ttk.Button(preferences, text=self.t("Thư mục log"), command=self.open_log_folder).pack(side="left", padx=(10, 0))
 
         top = ttk.Frame(self.root, style="Card.TFrame", padding=(14, 12))
+        self.connection_row = top
         top.pack(fill="x", padx=14, pady=(12, 8))
         ttk.Label(top, text="Router").grid(row=0, column=0, sticky="w")
         ttk.Entry(top, textvariable=self.base_var, width=31).grid(row=0, column=1, padx=(8, 18), sticky="ew")
@@ -2761,6 +2843,15 @@ class NativeApp:
                                          command=self.upgrade_agent, style="Success.TButton")
         ttk.Button(self.setup_bar, text="Cài đặt sau khi flash…", command=self.open_setup_wizard,
                    style="Primary.TButton").pack(side="right", padx=(0, 8))
+
+        self.lock_bar = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
+        ttk.Label(self.lock_bar, text="KHÔNG CẤU HÌNH ĐƯỢC ROUTER",
+                  style="MetricRed.TLabel").pack(side="left", padx=(0, 14))
+        ttk.Label(self.lock_bar, textvariable=self.lock_hint_var,
+                  style="MetricRed.TLabel", wraplength=700).pack(side="left")
+        self.lock_button = ttk.Button(self.lock_bar, text="Cài agent ngay",
+                                      command=self.install_agent_now, style="Primary.TButton")
+        self.lock_button.pack(side="right")
 
         gateway = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
         self.gateway_bar = gateway
@@ -2784,6 +2875,7 @@ class NativeApp:
         self._build_backup_tab()
         localize_widget_tree(self.root, self.language)
         self.update_setup_banner()
+        self._apply_lock_state()
 
     def _on_language_changed(self, _event=None):
         language = "vi" if self.language_var.get() == "Tiếng Việt" else "en"
@@ -3170,9 +3262,74 @@ class NativeApp:
             self.evaluate_agent_compatibility()
         self.run_task("Đang kết nối Agent…", work, done)
 
+    def lock_console(self, settings=None, reason=""):
+        """No agent on the router: dim every control and offer one way out."""
+        self.pending_provision = settings or self.pending_provision
+        self.console_locked = True
+        self.lock_hint_var.set(reason or self.t(
+            "Router chưa cài agent nên console không điều khiển được gì. Hãy cài agent rồi thử lại."
+        ))
+        self.status_var.set(self.t("Không cấu hình được router — chưa cài agent"))
+        self.append_log(self.lock_hint_var.get())
+        self._apply_lock_state()
+
+    def unlock_console(self):
+        """Lift the lock once an agent is actually installed."""
+        if not self.console_locked:
+            return
+        self.console_locked = False
+        self._apply_lock_state()
+
+    def _apply_lock_state(self):
+        """Render the current lock state onto freshly built widgets."""
+        if not hasattr(self, "lock_bar") or not self.lock_bar.winfo_exists():
+            return
+        panels = [panel for panel in (getattr(self, "connection_row", None),
+                                      getattr(self, "gateway_bar", None),
+                                      getattr(self, "tabs", None))
+                  if panel is not None and panel.winfo_exists()]
+        if self.console_locked:
+            if not self.lock_bar.winfo_manager():
+                self.lock_bar.pack(fill="x", padx=14, pady=(0, 8), before=self.gateway_bar)
+            self.locked_widgets = []
+            for panel in panels:
+                set_widget_tree_disabled(panel, True, self.locked_widgets)
+                try:
+                    panel.state(["disabled"])  # the notebook itself, so tabs cannot be switched
+                    self.locked_widgets.append(panel)
+                except (AttributeError, tk.TclError):
+                    pass
+            # The setup bar would offer a second, weaker path out of the lock.
+            self.setup_bar.pack_forget()
+            return
+        self.lock_bar.pack_forget()
+        for panel in panels:
+            set_widget_tree_disabled(panel, False, self.locked_widgets)
+            if panel in self.locked_widgets:
+                try:
+                    panel.state(["!disabled"])
+                except (AttributeError, tk.TclError):
+                    pass
+        self.locked_widgets = []
+        self.update_setup_banner()
+
+    def install_agent_now(self):
+        """The single action a locked console offers."""
+        settings = self.pending_provision
+        ready = bool(settings and (settings.password or settings.key_path))
+        self.open_setup_wizard(settings=settings, autostart=ready)
+
+    def decline_install(self, settings=None):
+        """The wizard reported that installing was refused."""
+        self.lock_console(settings)
+
     def update_setup_banner(self):
         """Show the bar while no token is configured, or on a version mismatch."""
         if not hasattr(self, "setup_bar") or not self.setup_bar.winfo_exists():
+            return
+        if getattr(self, "console_locked", False):
+            # The red lock bar already carries the only available action.
+            self.setup_bar.pack_forget()
             return
         needed = not self.token_var.get().strip() or self.agent_outdated or self.agent_too_new
         if self.agent_outdated and not self.upgrade_button.winfo_manager():
@@ -3184,7 +3341,7 @@ class NativeApp:
         elif not self.setup_bar.winfo_manager():
             self.setup_bar.pack(fill="x", padx=14, pady=(0, 8), before=self.gateway_bar)
 
-    def open_setup_wizard(self):
+    def open_setup_wizard(self, settings=None, autostart=False):
         """Run the post-flash sequence and hand the fetched token to the tool."""
         existing = getattr(self, "setup_wizard", None)
         if existing is not None and existing.winfo_exists():
@@ -3195,11 +3352,14 @@ class NativeApp:
             existing.focus_force()
             return
         try:
-            settings = load_provision_settings()
+            if settings is None:
+                settings = load_provision_settings()
             if not settings.host and self.base_var.get():
                 settings.host = self.base_var.get().split("//")[-1].strip("/")
             self.setup_wizard = SetupWizard(
-                self.root, settings, self.language, self.palette, on_success=self.adopt_token
+                self.root, settings, self.language, self.palette,
+                on_success=self.adopt_token, on_decline=self.decline_install,
+                autostart=autostart,
             )
         except Exception as exc:  # a dead button is worse than a visible error
             log.exception("cannot open the setup wizard")
@@ -3215,6 +3375,8 @@ class NativeApp:
 
     def adopt_token(self, base_url, token):
         """Store a freshly provisioned token and open the control screens."""
+        self.pending_provision = None
+        self.unlock_console()
         self.base_var.set(base_url)
         self.token_var.set(token)
         save_connection(base_url, token)

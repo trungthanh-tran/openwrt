@@ -60,7 +60,8 @@ with no Python and no repository checkout on the operator's machine.
 
 New router, start to finish? Follow the four-step
 [quick start](../../docs/QUICKSTART.en.md) instead; this section explains what
-the wizard does.
+the wizard does. For everyday use of the app, see the
+[desktop console user guide](../../docs/desktop-user-guide.en.md).
 
 A freshly flashed router carries no sbproxy code, no agent, and no token. With
 no token stored the console **opens the setup form by itself** on startup, so
@@ -99,6 +100,16 @@ loaded in the agent, or the router password. The password reaches `ssh` through
 an askpass helper — never on the command line — and is never written to
 `connection.json`. Router address, user, port, and paths are remembered for the
 next run.
+
+**Deciding at the point of connection.** **Check status** signs in over SSH and
+reads the inventory without changing anything. When the login works but the
+router has no agent, the wizard asks whether to install it now. Yes runs the
+whole sequence. No is honoured, and honestly: an agent-less router cannot be
+driven from here, so the console shows **ROUTER CANNOT BE CONFIGURED**, dims the
+connection row, the gateway card, and every tab, and offers a single **Install
+the agent now** button — it reuses the credentials just typed, so it installs
+straight away. A finished install lifts the lock. Language, theme, and the log
+folder stay reachable while locked.
 
 **Checking before installing.** With a stored token the app connects on launch
 and opens the control screens. Without one it opens the setup form and quietly
