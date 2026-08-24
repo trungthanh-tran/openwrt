@@ -140,7 +140,7 @@ cp config/wifi-socks.conf.example config/wifi-socks.conf
 sh scripts/preflight.sh        # kiểm tra phần cứng (chỉ đọc)
 sh scripts/install-deps.sh     # cài gói + đăng ký sysupgrade.conf
 ```
-**Preflight — 3 điều phải xác nhận:** (1) mapping `radio0/1` ↔ băng tần → sửa `RADIO_2G/5G` trong `settings.sh`; (2) `iw list` "valid interface combinations" = số AP tối đa/radio → chốt số SSID ≤ số này; (3) các gói `[THIẾU]`.
+**Preflight — 3 điều phải xác nhận:** (1) mapping radio ↔ băng tần — preflight tự liệt kê radio thật của board và **báo thẳng giá trị đúng** cho `RADIO_2G/5G` nếu `settings.sh` sai; (2) `iw list` "valid interface combinations" = số AP tối đa/radio → chốt số SSID ≤ số này; (3) các gói `[THIẾU]`.
 
 ## Bước 7 — Cấu hình WiFi / SOCKS
 > **Script tương ứng:** cấu hình bằng `config/wifi-socks.conf` hoặc UI; chạy `DRYRUN=1 sh scripts/apply.sh` để validate toàn bộ mà chưa ghi UCI hay `/etc`. Không có script tự sinh credential vì mật khẩu và SOCKS là đầu vào của quản trị viên.

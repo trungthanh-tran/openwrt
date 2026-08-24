@@ -5,6 +5,21 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Preflight tự dò radio của board** thay vì giả định `radio0`/`radio1`: đọc
+  danh sách `wifi-device` từ UCI (bao nhiêu radio, tên gì cũng được), suy ra
+  băng tần từ `band` hoặc `hwmode`, rồi **đối chiếu `RADIO_2G`/`RADIO_5G` trong
+  `config/settings.sh` với phần cứng thật**. Sai thì báo đúng tên radio nên
+  dùng (`RADIO_2G=radio0 is a 5g radio, not 2g - use radio1`), thiếu thì báo
+  thiếu. Các hàm `list_radios`, `radio_band`, `radio_for_band`,
+  `check_radio_mapping` nằm trong `scripts/lib.sh` và có test riêng.
+
+### Fixed
+- **Bản .exe không còn nháy cửa sổ console ở mỗi bước cài đặt.** `ssh`/`tar` là
+  chương trình console; chạy từ bản build `--windowed` (không có console sẵn)
+  thì Windows cấp cho mỗi lần gọi một cửa sổ mới. Mọi tiến trình con giờ chạy
+  với `CREATE_NO_WINDOW` + `STARTF_USESHOWWINDOW`/`SW_HIDE`.
+
 ## [0.4.5] - 2026-08-25
 
 ### Fixed

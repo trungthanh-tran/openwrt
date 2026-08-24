@@ -105,7 +105,7 @@ Dùng app hằng ngày (thêm WiFi, xem thiết bị, backup):
 |---|---|
 | Bước "Kiểm tra kết nối SSH" lỗi | Sai IP, sai mật khẩu, hoặc chưa bật SSH. Thử `ssh root@<ip>` trong PowerShell để thấy lỗi thật. |
 | Dừng ở "Cài gói phụ thuộc" | Router chưa ra được Internet (cần WAN để tải gói). Kiểm tra dây WAN/uplink rồi chạy lại. |
-| Dừng ở "Chạy preflight" | Đọc thông báo của router: thường là thiếu gói hoặc mapping radio sai trong `config/settings.sh`. |
+| Dừng ở "Chạy preflight" | Đọc thông báo của router trong khung nhật ký. Nếu là mapping radio, preflight nói thẳng nên đặt `RADIO_2G`/`RADIO_5G` bằng gì trong `config/settings.sh`. |
 | Chạy lại được không? | Được. Mọi bước đều idempotent; phần nào đã cài app sẽ **Bỏ qua**. |
 | Muốn cài lại cấu hình/agent từ đầu | Tick **Ghi đè cấu hình đã có trên router** hoặc **Cài lại agent dù đã có** trong wizard. |
 | App báo `Security validation failure: parent process has different executable!` | Lỗi của bản exe 0.4.3 trở về trước. Dùng bản **0.4.4** trở lên. |

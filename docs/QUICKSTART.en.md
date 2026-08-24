@@ -118,7 +118,7 @@ acceptance list is in [TESTING.en.md](TESTING.en.md).
 |---|---|
 | "Check the SSH connection" fails | Wrong address, wrong password, or SSH is off. Run `ssh root@<ip>` yourself to see the real error. |
 | Stops at "Install dependencies" | The router has no Internet yet (it downloads packages). Fix the WAN uplink and run it again. |
-| Stops at "Run preflight" | Read the router's own message: usually a missing package or the wrong radio mapping in `config/settings.sh`. |
+| Stops at "Run preflight" | Read the router's own message in the log pane. For a radio mismatch, preflight names the value `RADIO_2G`/`RADIO_5G` should have in `config/settings.sh`. |
 | Can I run it again? | Yes. Every step is idempotent and anything already done is marked *Skipped*. |
 | Reinstall the configuration or agent | Tick **Overwrite the configuration already on the router** or **Reinstall the agent even if it is present**. |
 | `Security validation failure: parent process has different executable!` | A bug in the 0.4.3 and older executables. Use **0.4.4** or newer. |

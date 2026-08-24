@@ -121,6 +121,52 @@ net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
 radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "invalid band: $1";; esac; }
 
+# --- Radio discovery --------------------------------------------------------
+# Boards differ in how many radios they carry and in which one holds which
+# band, so read them from UCI instead of assuming radio0=2.4G. Every `uci -q
+# get` is guarded: it exits non-zero for anything absent, and callers run under
+# `set -e`.
+list_radios() {
+  uci -q show wireless 2>/dev/null \
+    | sed -n "s/^wireless\.\([^.=]*\)='\{0,1\}wifi-device'\{0,1\}$/\1/p" | tr '\n' ' '
+}
+
+# Band of one radio section: 2g, 5g, 6g, or ? when it cannot be determined.
+radio_band() {
+  _band="$(uci -q get "wireless.$1.band" || true)"
+  case "$_band" in 2g|5g|6g) echo "$_band"; return 0 ;; esac
+  case "$(uci -q get "wireless.$1.hwmode" || true)" in
+    11ng*|11g*|*11g) echo "2g" ;;
+    11a*|11na*) echo "5g" ;;   # 11a, 11ac, 11ax and 11na all live on 5 GHz
+    *) echo "?" ;;
+  esac
+}
+
+# First radio serving $1 (2g|5g|6g), or nothing when the board has none.
+radio_for_band() {
+  for _radio in $(list_radios); do
+    if [ "$(radio_band "$_radio")" = "$1" ]; then echo "$_radio"; return 0; fi
+  done
+  return 0
+}
+
+# Compare one settings.sh radio choice with the hardware.
+#   $1 = band (2g|5g)  $2 = configured section  $3 = variable name
+# Prints an [OK] line when they agree and warns with the right value otherwise.
+check_radio_mapping() {
+  _radios=" $(list_radios) "
+  _detected="$(radio_for_band "$1")"
+  if [ -z "$2" ]; then
+    warn "$3 is not set in config/settings.sh${_detected:+ - this board uses $_detected for $1}"
+  elif [ "${_radios#* "$2" }" = "$_radios" ]; then
+    warn "$3=$2 does not exist on this board${_detected:+ - use $_detected}"
+  elif [ "$(radio_band "$2")" != "$1" ]; then
+    warn "$3=$2 is a $(radio_band "$2") radio, not $1${_detected:+ - use $_detected}"
+  else
+    echo "  [OK] $3=$2 is the $1 radio."
+  fi
+}
+
 # Generate a random MAC.
 #   gen_mac              -> locally administered, unicast, first octet 02.
 #   gen_mac aa:bb:cc     -> given vendor OUI + 3 random octets (impersonates a

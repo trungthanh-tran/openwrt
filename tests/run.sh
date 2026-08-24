@@ -20,6 +20,10 @@ if [ "${1:-}" = "-q" ] && [ "${2:-}" = "get" ]; then
     "${UCI_STATE:-/dev/null}" 2>/dev/null
   exit $?
 fi
+if [ "${1:-}" = "-q" ] && [ "${2:-}" = "show" ]; then
+  grep "^${3:-}\." "${UCI_STATE:-/dev/null}" 2>/dev/null
+  exit 0
+fi
 exit 0
 SH
 
@@ -54,6 +58,7 @@ sk()      { skip=$((skip + 1)); printf '  skip %s (%s)\n' "$1" "$2"; }
 eq()      { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi; }
 match()   { if printf '%s' "$2" | grep -Eq "$3"; then ok "$1"; else no "$1 — no /$3/"; fi; }
 nomatch() { if printf '%s' "$2" | grep -Eq "$3"; then no "$1 — unexpected /$3/"; else ok "$1"; fi; }
+contains() { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
 dies()    { if ( "$@" ) >/dev/null 2>&1; then no "$L — expected non-zero"; else ok "$L"; fi; }
 mkc()     { printf '%s\n' "$1" > "$STUB/c.conf"; }
 # Run a $STUB/c.conf validator (validate_conf/check_unique_idx) in a subshell so
@@ -68,6 +73,59 @@ eq "tproxy_port 3"  "$(tproxy_port 3)"  "12003"
 eq "radio_of 2g"    "$(radio_of 2g)"    "radio0"
 eq "radio_of 5g"    "$(radio_of 5g)"    "radio1"
 L="radio_of invalid band dies"; dies radio_of 6g
+
+echo "== radio discovery =="
+radio_state() {  # write a fake UCI dump and point the stub at it
+  UCI_STATE="$STUB/wireless.state"; export UCI_STATE
+  printf '%s\n' "$@" > "$UCI_STATE"
+}
+
+radio_state \
+  "wireless.radio0=wifi-device" "wireless.radio0.band=2g" \
+  "wireless.radio1=wifi-device" "wireless.radio1.band=5g"
+eq "two radios are listed in order" "$(list_radios)" "radio0 radio1 "
+eq "band comes from the band option" "$(radio_band radio0)" "2g"
+eq "5g radio is found by band" "$(radio_for_band 5g)" "radio1"
+eq "no 6g radio on this board" "$(radio_for_band 6g)" ""
+
+radio_state \
+  "wireless.radio0=wifi-device" "wireless.radio0.band=5g" \
+  "wireless.radio1=wifi-device" "wireless.radio1.band=2g" \
+  "wireless.radio2=wifi-device" "wireless.radio2.band=6g"
+eq "three radios are listed" "$(list_radios)" "radio0 radio1 radio2 "
+eq "2.4G is not assumed to be radio0" "$(radio_for_band 2g)" "radio1"
+eq "6g radio is found" "$(radio_for_band 6g)" "radio2"
+
+radio_state \
+  "wireless.wlan0=wifi-device" "wireless.wlan0.hwmode=11ng" \
+  "wireless.wlan1=wifi-device" "wireless.wlan1.hwmode=11ac"
+eq "radios need not be named radioN" "$(list_radios)" "wlan0 wlan1 "
+eq "hwmode 11ng means 2.4G" "$(radio_band wlan0)" "2g"
+eq "hwmode 11ac means 5G" "$(radio_band wlan1)" "5g"
+eq "hwmode is used when band is absent" "$(radio_for_band 2g)" "wlan0"
+
+radio_state "wireless.radio0=wifi-device"
+eq "an unreadable radio reports ?" "$(radio_band radio0)" "?"
+
+radio_state "wireless.wan=interface"
+eq "no radios means an empty list" "$(list_radios)" ""
+eq "no radios means no match" "$(radio_for_band 2g)" ""
+
+echo "== settings.sh radio mapping =="
+# The board here is deliberately reversed: radio0 is 5 GHz, radio1 is 2.4 GHz.
+radio_state \
+  "wireless.radio0=wifi-device" "wireless.radio0.band=5g" \
+  "wireless.radio1=wifi-device" "wireless.radio1.band=2g"
+contains "a correct mapping is confirmed" "$(check_radio_mapping 5g radio0 RADIO_5G 2>&1)" "[OK] RADIO_5G=radio0"
+contains "a swapped mapping names the right radio" \
+  "$(check_radio_mapping 2g radio0 RADIO_2G 2>&1)" "RADIO_2G=radio0 is a 5g radio, not 2g - use radio1"
+contains "a missing radio is reported" \
+  "$(check_radio_mapping 2g radio7 RADIO_2G 2>&1)" "RADIO_2G=radio7 does not exist on this board - use radio1"
+contains "an unset variable is reported" \
+  "$(check_radio_mapping 2g "" RADIO_2G 2>&1)" "RADIO_2G is not set in config/settings.sh - this board uses radio1"
+contains "a band the board lacks warns without a suggestion" \
+  "$(check_radio_mapping 6g "" RADIO_6G 2>&1)" "RADIO_6G is not set in config/settings.sh"
+unset UCI_STATE
 
 echo "== uci_dquote =="
 eq "escape double-quote" "$(uci_dquote 'a"b')" 'a\"b'

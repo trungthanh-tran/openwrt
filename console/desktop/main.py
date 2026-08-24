@@ -929,6 +929,26 @@ def write_stdout(text: str) -> bool:
         return False
 
 
+def hidden_process_options() -> dict:
+    """subprocess keywords that keep a console window from appearing.
+
+    ssh, scp and tar are console programs. Started from a windowed build (which
+    has no console of its own) Windows gives each one a fresh console window,
+    so a provisioning run flashes a black window for every single step.
+    CREATE_NO_WINDOW suppresses that; STARTF_USESHOWWINDOW covers the shells
+    that ignore it. Both are Windows-only.
+    """
+    if os.name != "nt":
+        return {}
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = subprocess.SW_HIDE
+    return {
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        "startupinfo": startupinfo,
+    }
+
+
 # Onefile bootloader state that a grandchild process must not inherit.
 PYINSTALLER_CHILD_VARS = (
     "_PYI_ARCHIVE_FILE",
@@ -1174,6 +1194,7 @@ def build_update_package(payload: str = "") -> Path:
         ["tar", "-czf", str(package), "-C", str(source), "--exclude=node_modules",
          "--exclude=__pycache__", "--exclude=dist", "--exclude=build", *entries],
         capture_output=True, text=True, timeout=300, errors="replace",
+        **hidden_process_options(),
     )
     if completed.returncode != 0:
         raise ProvisionError(f"Đóng gói mã nguồn: {(completed.stderr or '').strip() or 'tar lỗi'}")
@@ -1379,17 +1400,15 @@ class ProvisionRunner:
         return env
 
     def _run_process(self, argv, timeout=600, stdin_path=None):
+        options = dict(
+            capture_output=True, text=True, timeout=timeout,
+            env=self._environment(), errors="replace", **hidden_process_options(),
+        )
         if stdin_path is None:
-            completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
-                argv, capture_output=True, text=True, timeout=timeout,
-                env=self._environment(), errors="replace",
-            )
+            completed = subprocess.run(argv, **options)  # noqa: S603 - fixed argv, never a shell
         else:
             with open(stdin_path, "rb") as source:
-                completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
-                    argv, stdin=source, capture_output=True, text=True, timeout=timeout,
-                    env=self._environment(), errors="replace",
-                )
+                completed = subprocess.run(argv, stdin=source, **options)  # noqa: S603
         return completed.returncode, completed.stdout or "", completed.stderr or ""
 
     def run_command(self, argv, description, timeout=600, stdin_path=None) -> str:

@@ -11,16 +11,20 @@ echo "==== 1. Device and firmware ===="
 cat /proc/device-tree/model 2>/dev/null && echo || true
 
 echo; echo "==== 2. Radio-to-band mapping (compare with config/settings.sh) ===="
-if command -v wifi >/dev/null 2>&1; then
-  for r in radio0 radio1 radio2; do
-    # `uci -q get` exits non-zero for a radio that does not exist (a two-radio
-    # board has no radio2). Under `set -e` an unguarded assignment would end
-    # preflight right here, reporting nothing but this section's header.
-    b=$(uci -q get wireless.$r.band || true); h=$(uci -q get wireless.$r.hwmode || true)
-    if [ -n "$b$h" ]; then echo "  $r -> band=${b:-?} hwmode=${h:-?}"; fi
+# Radio names, bands and the settings.sh mapping all come from UCI (see the
+# radio helpers in lib.sh), so this works on any number of radios in any order.
+RADIOS="$(list_radios)"
+if [ -z "$RADIOS" ]; then
+  warn "No wifi-device section found in UCI — is the wireless driver installed?"
+else
+  for r in $RADIOS; do
+    echo "  $r -> band=$(radio_band "$r") \
+hwmode=$(uci -q get "wireless.$r.hwmode" || echo '-') \
+path=$(uci -q get "wireless.$r.path" || echo '-')"
   done
+  check_radio_mapping 2g "${RADIO_2G:-}" RADIO_2G
+  check_radio_mapping 5g "${RADIO_5G:-}" RADIO_5G
 fi
-warn "Set RADIO_2G/RADIO_5G in settings.sh to match the table above."
 
 echo; echo "==== 3. BSSID limit (maximum APs per radio) ===="
 if command -v iw >/dev/null 2>&1; then
