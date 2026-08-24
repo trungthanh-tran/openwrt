@@ -21,6 +21,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -865,7 +866,16 @@ STEP_FAILED = "failed"
 
 
 class ProvisionError(RuntimeError):
-    """A provisioning step failed; the message is already operator-readable."""
+    """A provisioning step failed; the message is already operator-readable.
+
+    `output` keeps everything the failed command printed, so the wizard can
+    show the router's own words even though the checklist has room for one
+    line.
+    """
+
+    def __init__(self, message, output=""):
+        super().__init__(message)
+        self.output = output
 
 
 def askpass_helper() -> str:
@@ -945,6 +955,44 @@ def clean_child_environment(env: dict) -> dict:
     return env
 
 
+def is_decoration(line: str) -> bool:
+    """True for a banner or section header that explains no failure.
+
+    Router scripts print headings like `==== 2. Radio-to-band mapping ====`.
+    When a script dies right after one, that heading is the last unindented
+    line and makes a useless error message.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return True
+    return bool(re.fullmatch(r"[=\-*#~_]{2,}.*?[=\-*#~_]{2,}", stripped)) or \
+        bool(re.fullmatch(r"[=\-*#~_]{3,}", stripped))
+
+
+def failure_line(output: str) -> str:
+    """The most useful single line of a failed command's output.
+
+    Three cases this has to survive: a tool that rejects its arguments and
+    answers with a wrapped usage block (whose last line is the meaningless
+    fragment "[-S program] source ... target"), a router script that dies
+    right after printing a section header, and an ordinary error on the last
+    line.
+    """
+    lines = [line.rstrip() for line in str(output or "").splitlines() if line.strip()]
+    if not lines:
+        return ""
+    for line in lines:
+        if line.lower().startswith("usage:"):
+            return line
+    for line in reversed(lines):
+        if line.lower().startswith(("[sbproxy][err]", "error", "fatal")):
+            return line
+    for line in reversed(lines):
+        if not is_decoration(line):
+            return line.strip()
+    return lines[-1].strip()
+
+
 def write_askpass_answer(password: str) -> int:
     """Hand the password to ssh; a nonzero result makes ssh fail loudly."""
     if write_stdout(f"{password}\n"):
@@ -1018,10 +1066,17 @@ class ProvisionSettings:
     def ssh_command(self, remote_command: str) -> list[str]:
         return ["ssh", "-p", str(int(self.port))] + self._common_options() + [self.target, remote_command]
 
-    def scp_command(self, local: str, remote: str) -> list[str]:
-        # OpenWrt images usually ship without sftp-server, so force legacy SCP.
-        return (["scp", "-O", "-P", str(int(self.port))] + self._common_options()
-                + [local, f"{self.target}:{remote}"])
+    def upload_command(self, remote: str) -> list[str]:
+        """Write a file on the router by piping it into `cat` over ssh.
+
+        scp is deliberately not used. Its SFTP mode needs an sftp-server the
+        stock OpenWrt/dropbear images do not carry, its legacy mode needs an
+        `scp` binary on the router that those images do not carry either, and
+        the `-O` flag that selects legacy mode does not exist in OpenSSH
+        clients older than 8.6 -- those answer with a usage message instead of
+        copying anything. `cat` is in BusyBox on every image.
+        """
+        return self.ssh_command(f"cat > {shlex.quote(remote)}")
 
     def to_payload(self) -> dict:
         """Persistable form — the password is deliberately left out."""
@@ -1283,9 +1338,11 @@ class ProvisionRunner:
     """
 
     def __init__(self, settings: ProvisionSettings, emit=None, runner=None, prober=None,
-                 version_reader=None):
+                 version_reader=None, on_output=None):
         self.settings = settings
         self.emit = emit or (lambda *_args: None)
+        # Everything a failing command printed, for the log pane.
+        self.on_output = on_output or (lambda _text: None)
         self._execute = runner or self._run_process
         self._probe = prober or probe_router_state
         self._agent_version = version_reader or read_agent_version
@@ -1321,34 +1378,64 @@ class ProvisionRunner:
             env.pop("SBPROXY_SSH_PASSWORD", None)
         return env
 
-    def _run_process(self, argv, timeout=600):
-        completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
-            argv, capture_output=True, text=True, timeout=timeout,
-            env=self._environment(), errors="replace",
-        )
+    def _run_process(self, argv, timeout=600, stdin_path=None):
+        if stdin_path is None:
+            completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
+                argv, capture_output=True, text=True, timeout=timeout,
+                env=self._environment(), errors="replace",
+            )
+        else:
+            with open(stdin_path, "rb") as source:
+                completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
+                    argv, stdin=source, capture_output=True, text=True, timeout=timeout,
+                    env=self._environment(), errors="replace",
+                )
         return completed.returncode, completed.stdout or "", completed.stderr or ""
 
-    def run_command(self, argv, description, timeout=600) -> str:
+    def run_command(self, argv, description, timeout=600, stdin_path=None) -> str:
         if self.cancelled:
             raise ProvisionError("Đã dừng theo yêu cầu")
         log.info("provision: %s", redact(" ".join(argv)))
+        # Only pass the keyword when it is used, so an injected runner that
+        # does not take it keeps working for every other call.
+        extra = {"stdin_path": stdin_path} if stdin_path else {}
         try:
-            code, out, err = self._execute(argv, timeout=timeout)
+            code, out, err = self._execute(argv, timeout=timeout, **extra)
         except FileNotFoundError as exc:
             raise ProvisionError(f"Thiếu công cụ {argv[0]}") from exc
         except subprocess.TimeoutExpired as exc:
             raise ProvisionError(f"{description}: quá thời gian chờ") from exc
         output = (out + ("\n" + err if err.strip() else "")).strip()
         if code != 0:
-            lines = output.splitlines()
-            raise ProvisionError(f"{description}: {lines[-1] if lines else f'exit {code}'}")
+            # One line reaches the checklist; the whole thing reaches the log,
+            # which is what a support bundle needs.
+            log.warning("provision failed (%s): %s", description, redact(output) or f"exit {code}")
+            if output:
+                self.on_output(output)
+            raise ProvisionError(f"{description}: {failure_line(output) or f'exit {code}'}", output)
         return output
 
     def ssh(self, remote_command, description, timeout=600) -> str:
         return self.run_command(self.settings.ssh_command(remote_command), description, timeout)
 
     def upload(self, local, remote, description) -> str:
-        return self.run_command(self.settings.scp_command(str(local), remote), description, timeout=600)
+        """Send a local file to `remote` and prove that all of it arrived."""
+        source = Path(local)
+        try:
+            size = source.stat().st_size
+        except OSError as exc:
+            raise ProvisionError(f"{description}: không đọc được file cần đẩy") from exc
+        self.run_command(self.settings.upload_command(remote), description,
+                         timeout=600, stdin_path=str(source))
+        # A truncated transfer can still exit 0, so compare what actually landed.
+        answer = self.ssh(f"wc -c < {shlex.quote(remote)}", description, timeout=120)
+        landed = answer.split()[-1] if answer.split() else ""
+        if landed != str(size):
+            raise ProvisionError(
+                f"{description}: file trên router lệch kích thước "
+                f"({landed or '?'} / {size} byte)"
+            )
+        return f"{remote} · {human_bytes(size)}"
 
     # -- steps --------------------------------------------------------------
 
@@ -2462,7 +2549,10 @@ class SetupWizard(tk.Toplevel):
         def emit(index, state, detail):
             self.after(0, lambda: self.set_step(index, state, detail))
 
-        self.runner = ProvisionRunner(settings, emit=emit)
+        def show_output(text):
+            self.after(0, lambda: self.append(text))
+
+        self.runner = ProvisionRunner(settings, emit=emit, on_output=show_output)
 
         def worker():
             try:

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Headless tests for the post-flash provisioning sequence.
 
-Nothing here touches a router: every ssh/scp/tar call goes through an injected
-fake runner, and the agent probe is stubbed.
+Nothing here touches a router: every ssh/tar call goes through an injected fake
+runner, and the agent probe is stubbed. The fake emulates just enough of the
+real tools -- `tar` creates its output file, an upload records what was piped
+in, and `wc -c` answers with what that upload carried -- for the size check in
+ProvisionRunner.upload to behave as it does against a real router.
 """
 
 from __future__ import annotations
@@ -30,16 +33,32 @@ class FakeRunner:
     def __init__(self, results=None):
         self.calls = []
         self.results = results or {}
+        self.uploads = []          # (local path, remote path)
+        self.remote_sizes = {}     # remote path -> bytes delivered
 
-    def __call__(self, argv, timeout=600):
+    def __call__(self, argv, timeout=600, stdin_path=None):
         self.calls.append(list(argv))
+        command = argv[-1] if argv else ""
+        if argv and argv[0] == "tar" and "-czf" in argv:
+            # Real tar leaves a file behind; upload() stats it.
+            Path(argv[argv.index("-czf") + 1]).write_bytes(b"fake package payload")
+        if stdin_path is not None:
+            remote = command.partition("cat > ")[2].strip().strip("'")
+            self.uploads.append((stdin_path, remote))
+            self.remote_sizes[remote] = Path(stdin_path).stat().st_size
         for needle, result in self.results.items():
             if any(needle in part for part in argv):
                 return result
+        if command.startswith("wc -c < "):
+            remote = command.partition("wc -c < ")[2].strip().strip("'")
+            return (0, f"{self.remote_sizes.get(remote, 0)}\n", "")
         return (0, "", "")
 
     def remote_commands(self):
         return [argv[-1] for argv in self.calls if argv and argv[0] == "ssh"]
+
+    def uploaded_to(self):
+        return [remote for _local, remote in self.uploads]
 
 
 def make_settings(tmp: Path, **changes) -> appmod.ProvisionSettings:
@@ -67,10 +86,13 @@ class ProvisionSettingsTests(unittest.TestCase):
         self.assertNotIn("BatchMode=yes", command)
         self.assertIn("NumberOfPasswordPrompts=1", command)
 
-    def test_scp_forces_the_legacy_protocol_for_openwrt(self):
-        command = make_settings(self.tmp, port=2222).scp_command("local.tar.gz", "/tmp/x.tar.gz")
-        self.assertEqual(command[:4], ["scp", "-O", "-P", "2222"])
-        self.assertEqual(command[-1], "root@192.168.8.1:/tmp/x.tar.gz")
+    def test_uploads_go_through_ssh_rather_than_scp(self):
+        """scp needs tools the stock images lack and a flag old clients lack."""
+        command = make_settings(self.tmp, port=2222).upload_command("/tmp/x .tar.gz")
+        self.assertEqual(command[:3], ["ssh", "-p", "2222"])
+        self.assertEqual(command[-2], "root@192.168.8.1")
+        self.assertEqual(command[-1], "cat > '/tmp/x .tar.gz'")
+        self.assertNotIn("scp", command)
 
     def test_validate_rejects_bad_input(self):
         for changes, message in (
@@ -135,9 +157,9 @@ class ProvisionRunnerTests(unittest.TestCase):
         runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})
         ok, _provisioner = self.run_full(runner)
         self.assertTrue(ok)
-        uploads = [argv[-1] for argv in runner.calls if argv and argv[0] == "scp"]
-        self.assertIn("root@192.168.8.1:/root/sbproxy/config/wifi-socks.conf", uploads)
-        self.assertIn("root@192.168.8.1:/root/sbproxy/config/settings.sh", uploads)
+        uploads = runner.uploaded_to()
+        self.assertIn("/root/sbproxy/config/wifi-socks.conf", uploads)
+        self.assertIn("/root/sbproxy/config/settings.sh", uploads)
 
     def test_steps_without_work_report_skipped(self):
         self.settings.config_path = ""
@@ -170,7 +192,7 @@ class ProvisionRunnerTests(unittest.TestCase):
         remote = " ; ".join(runner.remote_commands())
         self.assertNotIn("install-deps.sh", remote)
         self.assertNotIn("sh agent/install-agent.sh", remote)
-        self.assertEqual([argv for argv in runner.calls if argv and argv[0] == "scp"][1:], [])
+        self.assertEqual(runner.uploaded_to()[1:], [])
         # The token is still read and stored, so the tool opens on it.
         self.assertIn("cat /etc/sbproxy/token", remote)
         self.assertEqual(self.saved, [("http://192.168.8.1", "0123456789abcdef0123")])
@@ -189,8 +211,8 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertTrue(ok)
         remote = " ; ".join(runner.remote_commands())
         self.assertIn("sh agent/install-agent.sh", remote)
-        uploads = [argv[-1] for argv in runner.calls if argv and argv[0] == "scp"]
-        self.assertIn("root@192.168.8.1:/root/sbproxy/config/wifi-socks.conf", uploads)
+        uploads = runner.uploaded_to()
+        self.assertIn("/root/sbproxy/config/wifi-socks.conf", uploads)
 
     def test_an_agent_older_than_the_pushed_code_is_reinstalled(self):
         # Same inventory, but the deployed CGI/healthd/UI differ from the push.
@@ -230,7 +252,7 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertEqual(provisioner.steps[index][0], "Đẩy mã nguồn lên router")
         self.assertIn("0.9.0 > 0.4.0", detail)
         # Nothing was written: the refusal happens before the upload.
-        self.assertEqual([argv for argv in runner.calls if argv and argv[0] == "scp"], [])
+        self.assertEqual(runner.uploaded_to(), [])
 
     def test_an_equal_or_newer_package_is_accepted(self):
         package = self.tmp / "sbproxy-update-0.9.0.tar.gz"
@@ -304,7 +326,7 @@ class ProvisionRunnerTests(unittest.TestCase):
         ok, _provisioner = self.run_full(runner)
         self.assertTrue(ok)
         self.assertFalse([argv for argv in runner.calls if argv and argv[0] == "tar"])
-        self.assertIn([argv for argv in runner.calls if argv[0] == "scp"][0][-2], str(package))
+        self.assertEqual(runner.uploads[0][0], str(package))
 
 
 class RouterInventoryTests(unittest.TestCase):
@@ -614,6 +636,83 @@ class AskpassTests(unittest.TestCase):
             env = provisioner._environment()
         self.assertNotIn("_PYI_APPLICATION_HOME_DIR", env)
         self.assertNotIn("SBPROXY_SSH_PASSWORD", env)
+
+
+class UploadTests(unittest.TestCase):
+    """Uploads travel through ssh, and short transfers must be caught."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def test_a_truncated_upload_is_caught_by_the_size_check(self):
+        """`cat >` can exit 0 having written only part of the file."""
+        source = self.tmp / "payload.bin"
+        source.write_bytes(b"0123456789")
+        runner = FakeRunner({"wc -c <": (0, "4\n", "")})
+        provisioner = appmod.ProvisionRunner(make_settings(self.tmp), runner=runner)
+        with self.assertRaises(appmod.ProvisionError) as caught:
+            provisioner.upload(source, "/tmp/payload.bin", "Đẩy mã nguồn")
+        self.assertIn("4 / 10", str(caught.exception))
+
+    def test_a_complete_upload_reports_the_size_it_delivered(self):
+        source = self.tmp / "payload.bin"
+        source.write_bytes(b"0123456789")
+        runner = FakeRunner()
+        provisioner = appmod.ProvisionRunner(make_settings(self.tmp), runner=runner)
+        detail = provisioner.upload(source, "/tmp/payload.bin", "Đẩy mã nguồn")
+        self.assertEqual(runner.uploads, [(str(source), "/tmp/payload.bin")])
+        self.assertIn("/tmp/payload.bin", detail)
+
+    def test_a_missing_local_file_is_reported_before_ssh_runs(self):
+        runner = FakeRunner()
+        provisioner = appmod.ProvisionRunner(make_settings(self.tmp), runner=runner)
+        with self.assertRaises(appmod.ProvisionError):
+            provisioner.upload(self.tmp / "absent.bin", "/tmp/absent.bin", "Đẩy mã nguồn")
+        self.assertEqual(runner.calls, [])
+
+    def test_a_usage_block_is_reported_by_its_header_not_its_last_fragment(self):
+        """The old report showed "[-S program] source ... target" and nothing else."""
+        usage = (
+            "usage: scp [-346BCpqrTv] [-c cipher] [-F ssh_config] [-i identity_file]\n"
+            "           [-J destination] [-l limit] [-o ssh_option] [-P port]\n"
+            "           [-S program] source ... target"
+        )
+        self.assertTrue(appmod.failure_line(usage).startswith("usage: scp"))
+        runner = FakeRunner({"cat >": (1, "", usage)})
+        provisioner = appmod.ProvisionRunner(make_settings(self.tmp), runner=runner)
+        source = self.tmp / "payload.bin"
+        source.write_bytes(b"x")
+        with self.assertRaises(appmod.ProvisionError) as caught:
+            provisioner.upload(source, "/tmp/payload.bin", "Đẩy mã nguồn")
+        self.assertIn("usage: scp", str(caught.exception))
+
+    def test_a_script_that_dies_after_a_section_header_reports_its_last_content(self):
+        """preflight.sh prints headings; a heading explains no failure."""
+        output = (
+            "==== 1. Device and firmware ====\n"
+            "DISTRIB_DESCRIPTION='OpenWrt 24.10'\n"
+            "==== 2. Radio-to-band mapping (compare with config/settings.sh) ====\n"
+            "  radio0 -> band=2g hwmode=?\n"
+            "  radio1 -> band=5g hwmode=?"
+        )
+        self.assertEqual(appmod.failure_line(output), "radio1 -> band=5g hwmode=?")
+
+    def test_an_explicit_error_line_wins_over_later_noise(self):
+        output = "==== 6. Config ====\n[sbproxy][ERR] wifi-socks.conf: idx trùng nhau\n==== done ===="
+        self.assertIn("idx trùng nhau", appmod.failure_line(output))
+        self.assertEqual(appmod.failure_line(""), "")
+
+    def test_the_whole_output_reaches_the_log_pane_and_the_error(self):
+        output = "==== 2. Radio ====\n  radio0 -> band=2g"
+        seen = []
+        runner = FakeRunner({"preflight": (1, output, "")})
+        provisioner = appmod.ProvisionRunner(
+            make_settings(self.tmp), runner=runner, on_output=seen.append,
+        )
+        with self.assertRaises(appmod.ProvisionError) as caught:
+            provisioner.step_preflight()
+        self.assertEqual(seen, [output])
+        self.assertEqual(caught.exception.output, output)
 
 
 if __name__ == "__main__":

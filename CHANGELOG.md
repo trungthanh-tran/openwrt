@@ -5,6 +5,25 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Bước “Đẩy mã nguồn lên router” lỗi với một dòng usage của `scp`** (đoạn
+  `[-S program] source ... target`). Việc đẩy file giờ đi qua chính `ssh`
+  (`cat > <file>`) thay vì `scp`: `scp` chế độ SFTP cần sftp-server mà ảnh
+  OpenWrt/dropbear thường không có, chế độ legacy cần binary `scp` trên router
+  cũng không có, còn cờ `-O` để chọn chế độ legacy thì OpenSSH cũ hơn 8.6
+  không hiểu nên in usage. `cat` thì ảnh nào cũng có. Sau khi đẩy, console đối
+  chiếu `wc -c` trên router với kích thước file gốc nên truyền thiếu là báo lỗi
+  ngay, không âm thầm đi tiếp.
+- **`scripts/preflight.sh` chết giữa chừng ở mục 2 trên router hai radio.**
+  `uci -q get wireless.radio2.band` trả mã lỗi cho radio không tồn tại, mà
+  script chạy `set -e` nên phép gán không được bảo vệ làm dừng luôn preflight —
+  console báo lỗi bằng đúng dòng tiêu đề `==== 2. Radio-to-band mapping ====`.
+  Đã bảo vệ phép gán (và cả phần liệt kê gói của apk/opkg).
+- **Lỗi của một bước không còn hiện ra dưới dạng dòng vô nghĩa.** Console bỏ
+  qua dòng trang trí/tiêu đề mục, ưu tiên dòng `usage:` hoặc dòng có
+  `[sbproxy][ERR]`, và **in toàn bộ output của lệnh hỏng vào khung nhật ký**
+  cũng như `console.log` (đã che thông tin nhạy cảm).
+
 ## [0.4.4] - 2026-08-24
 
 ### Fixed

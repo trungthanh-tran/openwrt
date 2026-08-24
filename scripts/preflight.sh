@@ -13,8 +13,11 @@ cat /proc/device-tree/model 2>/dev/null && echo || true
 echo; echo "==== 2. Radio-to-band mapping (compare with config/settings.sh) ===="
 if command -v wifi >/dev/null 2>&1; then
   for r in radio0 radio1 radio2; do
-    b=$(uci -q get wireless.$r.band); h=$(uci -q get wireless.$r.hwmode)
-    [ -n "$b$h" ] && echo "  $r -> band=${b:-?} hwmode=${h:-?}"
+    # `uci -q get` exits non-zero for a radio that does not exist (a two-radio
+    # board has no radio2). Under `set -e` an unguarded assignment would end
+    # preflight right here, reporting nothing but this section's header.
+    b=$(uci -q get wireless.$r.band || true); h=$(uci -q get wireless.$r.hwmode || true)
+    if [ -n "$b$h" ]; then echo "  $r -> band=${b:-?} hwmode=${h:-?}"; fi
   done
 fi
 warn "Set RADIO_2G/RADIO_5G in settings.sh to match the table above."
@@ -32,8 +35,8 @@ df -h / /tmp /overlay 2>/dev/null || true
 
 echo; echo "==== 5. Required packages ===="
 for p in sing-box nftables kmod-nft-tproxy ip-full iw-full jq; do
-  if command -v apk >/dev/null 2>&1; then installed="$(apk list -I "$p" 2>/dev/null)"
-  else installed="$(opkg list-installed "$p" 2>/dev/null)"; fi
+  if command -v apk >/dev/null 2>&1; then installed="$(apk list -I "$p" 2>/dev/null || true)"
+  else installed="$(opkg list-installed "$p" 2>/dev/null || true)"; fi
   if [ -n "$installed" ]; then echo "  [OK] $p"; else echo "  [MISSING] $p"; fi
 done
 
