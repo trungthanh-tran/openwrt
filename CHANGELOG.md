@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-24
+
 ### Added
 - Kết nối SSH thành công mà router **chưa có agent** thì app hỏi ngay *“Cài ngay
   bây giờ?”*. Chọn cài là chạy luôn chuỗi cài đặt rồi lấy token và kiểm tra
