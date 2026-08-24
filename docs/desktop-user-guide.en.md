@@ -149,6 +149,7 @@ prints where the app keeps its data.
 | **Check the SSH connection** fails | Wrong address or password, or SSH is off. Run `ssh root@<ip>` yourself to see the real error. |
 | Stops at **Install dependencies** | The router cannot reach the Internet to fetch packages. Fix the WAN uplink and run it again. |
 | Is re-running the setup safe? | Yes. Every step is idempotent and anything already done is marked *Skipped*. |
+| `Security validation failure: parent process has different executable!` | A bug in the 0.4.3 and older executables. Download **0.4.4** or newer. |
 | The app reports a version mismatch | See *Version compatibility* in [../console/desktop/README.md](../console/desktop/README.md). |
 | Cannot reach the agent | Check that your computer and the router share the management LAN, and that the token is still valid. |
 

@@ -587,6 +587,33 @@ class AskpassTests(unittest.TestCase):
         self.assertEqual(env["SBPROXY_SSH_PASSWORD"], "hunter2")
         self.assertEqual(env["SSH_ASKPASS_REQUIRE"], "force")
         self.assertNotIn("hunter2", " ".join(settings.ssh_command("true")))
+    def test_the_frozen_bootloader_state_never_reaches_the_askpass_child(self):
+        """ssh runs the askpass helper, so it must not inherit onefile state.
+
+        With those variables present the PyInstaller bootloader compares its
+        parent (ssh) against its own executable and aborts with "Security
+        validation failure: parent process has different executable!".
+        """
+        inherited = {name: "leftover" for name in appmod.PYINSTALLER_CHILD_VARS}
+        settings = appmod.ProvisionSettings(host="192.168.8.1", payload=str(ROOT), password="hunter2")
+        provisioner = appmod.ProvisionRunner(settings)
+        with mock.patch.dict(appmod.os.environ, inherited, clear=False):
+            env = provisioner._environment()
+        for name in appmod.PYINSTALLER_CHILD_VARS:
+            with self.subTest(variable=name):
+                self.assertNotIn(name, env)
+        self.assertEqual(env["PYINSTALLER_RESET_ENVIRONMENT"], "1")
+        # The helper ssh is told to run is still this application.
+        self.assertTrue(env["SSH_ASKPASS"])
+
+    def test_a_run_without_a_password_is_cleaned_the_same_way(self):
+        inherited = {"_PYI_APPLICATION_HOME_DIR": "leftover"}
+        settings = appmod.ProvisionSettings(host="192.168.8.1", payload=str(ROOT))
+        provisioner = appmod.ProvisionRunner(settings)
+        with mock.patch.dict(appmod.os.environ, inherited, clear=False):
+            env = provisioner._environment()
+        self.assertNotIn("_PYI_APPLICATION_HOME_DIR", env)
+        self.assertNotIn("SBPROXY_SSH_PASSWORD", env)
 
 
 if __name__ == "__main__":

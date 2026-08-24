@@ -108,6 +108,7 @@ Dùng app hằng ngày (thêm WiFi, xem thiết bị, backup):
 | Dừng ở "Chạy preflight" | Đọc thông báo của router: thường là thiếu gói hoặc mapping radio sai trong `config/settings.sh`. |
 | Chạy lại được không? | Được. Mọi bước đều idempotent; phần nào đã cài app sẽ **Bỏ qua**. |
 | Muốn cài lại cấu hình/agent từ đầu | Tick **Ghi đè cấu hình đã có trên router** hoặc **Cài lại agent dù đã có** trong wizard. |
+| App báo `Security validation failure: parent process has different executable!` | Lỗi của bản exe 0.4.3 trở về trước. Dùng bản **0.4.4** trở lên. |
 | App báo agent version khác | Xem *Tương thích version* trong [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |
 
 Muốn làm tay từng lệnh thay vì dùng app: [INSTALL.md](INSTALL.md) và

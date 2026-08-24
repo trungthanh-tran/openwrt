@@ -99,7 +99,11 @@ against the new token.
 loaded in the agent, or the router password. The password reaches `ssh` through
 an askpass helper — never on the command line — and is never written to
 `connection.json`. Router address, user, port, and paths are remembered for the
-next run.
+next run. Because `ssh` — not the console — launches that helper, the
+environment handed to `ssh` is stripped of PyInstaller's onefile variables
+(`_PYI_*`, `_MEIPASS2`); without that the bootloader sees `ssh.exe` as its
+parent and aborts with *Security validation failure: parent process has
+different executable!*.
 
 **Deciding at the point of connection.** **Check status** signs in over SSH and
 reads the inventory without changing anything. When the login works but the

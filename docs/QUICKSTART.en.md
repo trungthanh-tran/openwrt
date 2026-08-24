@@ -121,6 +121,7 @@ acceptance list is in [TESTING.en.md](TESTING.en.md).
 | Stops at "Run preflight" | Read the router's own message: usually a missing package or the wrong radio mapping in `config/settings.sh`. |
 | Can I run it again? | Yes. Every step is idempotent and anything already done is marked *Skipped*. |
 | Reinstall the configuration or agent | Tick **Overwrite the configuration already on the router** or **Reinstall the agent even if it is present**. |
+| `Security validation failure: parent process has different executable!` | A bug in the 0.4.3 and older executables. Use **0.4.4** or newer. |
 | The app reports a version mismatch | See *Version compatibility* in [../console/desktop/README.md](../console/desktop/README.md). |
 
 Prefer to run each command yourself? See [INSTALL.en.md](INSTALL.en.md) and the

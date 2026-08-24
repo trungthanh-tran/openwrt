@@ -919,6 +919,32 @@ def write_stdout(text: str) -> bool:
         return False
 
 
+# Onefile bootloader state that a grandchild process must not inherit.
+PYINSTALLER_CHILD_VARS = (
+    "_PYI_ARCHIVE_FILE",
+    "_PYI_APPLICATION_HOME_DIR",
+    "_PYI_PARENT_PROCESS_LEVEL",
+    "_PYI_SPLASH_IPC",
+    "_MEIPASS2",
+)
+
+
+def clean_child_environment(env: dict) -> dict:
+    """Strip the PyInstaller state ssh would pass on to the askpass helper.
+
+    ssh spawns SSH_ASKPASS itself, so this executable runs with ssh — not with
+    itself — as its parent. The onefile bootloader finds its own variables in
+    the inherited environment, checks that the parent runs the same executable,
+    and aborts with "Security validation failure: parent process has different
+    executable!". Removing those variables (and asking the bootloader to reset)
+    makes the askpass call bootstrap like any ordinary first run.
+    """
+    for name in PYINSTALLER_CHILD_VARS:
+        env.pop(name, None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
 def write_askpass_answer(password: str) -> int:
     """Hand the password to ssh; a nonzero result makes ssh fail loudly."""
     if write_stdout(f"{password}\n"):
@@ -1284,7 +1310,7 @@ class ProvisionRunner:
     # -- process plumbing ---------------------------------------------------
 
     def _environment(self) -> dict:
-        env = os.environ.copy()
+        env = clean_child_environment(os.environ.copy())
         if self.settings.password:
             env["SBPROXY_SSH_PASSWORD"] = self.settings.password
             env["SBPROXY_ASKPASS"] = "1"

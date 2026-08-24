@@ -5,6 +5,16 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Bấm “Bắt đầu cài đặt” trên bản .exe báo `Security validation failure: parent
+  process has different executable!` và dừng ngay.** `ssh` mới là tiến trình gọi
+  helper askpass, nên app chạy với cha là `ssh.exe`; bootloader onefile của
+  PyInstaller thấy biến môi trường của chính nó được kế thừa, đối chiếu tiến
+  trình cha với file thực thi của mình rồi huỷ. Môi trường đưa cho `ssh` giờ
+  được gỡ sạch `_PYI_*` / `_MEIPASS2` và đặt `PYINSTALLER_RESET_ENVIRONMENT=1`,
+  nên lần gọi askpass khởi động như một tiến trình bình thường. Bản chạy từ mã
+  nguồn không dính lỗi này.
+
 ## [0.4.3] - 2026-08-24
 
 ### Added

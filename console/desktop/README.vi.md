@@ -93,7 +93,11 @@ chạy lại được vì mọi bước đã qua đều idempotent. Khi bước 
 **Xác thực** dùng OpenSSH của máy: SSH key, key đã nạp sẵn trong agent, hoặc
 mật khẩu router. Mật khẩu đi tới `ssh` qua askpass helper — không nằm trên dòng
 lệnh — và không bao giờ ghi vào `connection.json`. Địa chỉ router, user, port và
-các đường dẫn được nhớ cho lần chạy sau.
+các đường dẫn được nhớ cho lần chạy sau. Vì `ssh` mới là bên gọi helper askpass
+(không phải console), môi trường đưa cho `ssh` được gỡ sạch biến onefile của
+PyInstaller (`_PYI_*`, `_MEIPASS2`); thiếu bước này bootloader thấy cha là
+`ssh.exe` và huỷ với lỗi *Security validation failure: parent process has
+different executable!*.
 
 **Quyết định ngay lúc kết nối.** Nút **Kiểm tra tình trạng** đăng nhập SSH và
 đọc hiện trạng router mà không đổi gì. Nếu đăng nhập được nhưng router chưa có

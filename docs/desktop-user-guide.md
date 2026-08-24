@@ -141,6 +141,7 @@ chạy `sbproxy-console --where`.
 | Bước **Kiểm tra kết nối SSH** lỗi | Sai IP, sai mật khẩu hoặc router chưa bật SSH. Thử `ssh root@<ip>` để thấy lỗi thật. |
 | Dừng ở **Cài gói phụ thuộc** | Router chưa ra được Internet để tải gói. Kiểm tra WAN rồi chạy lại. |
 | Chạy lại cài đặt có sao không? | Không. Mọi bước đều idempotent, phần nào đã có app sẽ **Bỏ qua**. |
+| App báo `Security validation failure: parent process has different executable!` | Lỗi của bản exe 0.4.3 trở về trước. Tải bản **0.4.4** trở lên. |
 | App báo agent version khác | Xem *Tương thích version* trong [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |
 | Không kết nối được Agent | Kiểm tra máy tính và router cùng mạng LAN quản trị, và token còn đúng. |
 
