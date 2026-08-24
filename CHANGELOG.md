@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-25
+
 ### Fixed
 - **Bước “Đẩy mã nguồn lên router” lỗi với một dòng usage của `scp`** (đoạn
   `[-S program] source ... target`). Việc đẩy file giờ đi qua chính `ssh`
