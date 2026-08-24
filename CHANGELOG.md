@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-08-25
+
 ### Added
 - **Nhật ký kiểm toán `logs/audit.log`**: ghi mỗi lần **kết nối** (router,
   version agent, console, sing-box đang chạy hay không) và **mọi thay đổi** gửi
