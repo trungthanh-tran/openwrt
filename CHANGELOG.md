@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-24
+
 ### Fixed
 - **Bấm “Bắt đầu cài đặt” trên bản .exe báo `Security validation failure: parent
   process has different executable!` và dừng ngay.** `ssh` mới là tiến trình gọi
