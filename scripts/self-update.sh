@@ -128,6 +128,25 @@ fi
 deploy "$SB_ROOT/agent/sbproxy-healthd" "$HEALTHD_DEST"
 deploy "$SB_ROOT/agent/init.d/sbproxy-healthd" "$HEALTHD_INIT_DEST"
 
+# ---- migrate /etc/sbproxy/env ----
+# The agent sources this file before running any script, so a value left in it
+# overrides the shipped default forever. install-agent.sh used to pin the
+# uplink with GATEWAY_EXPECTED_INTERFACE=wwan, which now makes every wired-WAN
+# router report a degraded gateway; retire exactly that line so an in-place
+# update fixes the router instead of only the scripts. A different value is an
+# operator's own choice and is left alone.
+ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
+if [ -f "$ENV_FILE" ] && grep -q '^GATEWAY_EXPECTED_INTERFACE=wwan$' "$ENV_FILE"; then
+  ENV_TMP="$ENV_FILE.$$"
+  if sed 's/^GATEWAY_EXPECTED_INTERFACE=wwan$/#GATEWAY_EXPECTED_INTERFACE=/' "$ENV_FILE" > "$ENV_TMP" \
+     && cat "$ENV_TMP" > "$ENV_FILE"; then
+    log "migrated $ENV_FILE: any uplink is accepted again"
+  else
+    log "warning: could not migrate $ENV_FILE; the gateway check may stay pinned to wwan"
+  fi
+  rm -f "$ENV_TMP"
+fi
+
 if [ "${SB_NO_SERVICE:-0}" != 1 ]; then
   if [ -x "$HEALTHD_INIT_DEST" ]; then "$HEALTHD_INIT_DEST" restart >/dev/null 2>&1 || true; fi
   if [ -x /etc/init.d/uhttpd ]; then /etc/init.d/uhttpd reload >/dev/null 2>&1 || true; fi

@@ -502,6 +502,7 @@ eq "status reports unknown version without VERSION file" "$(json_value "$out" '.
 
 # Dedicated fake root so an applied update never clobbers the shared stubs.
 SB2="$TMP/router2"
+AGENT_ENV="$TMP/sbproxy.env"
 mkdir -p "$SB2/config" "$SB2/scripts" "$TMP/deploy"
 printf '%s\n' '0.4.0' > "$SB2/VERSION"
 printf '%s\n' 'Alpha|2g|1|alpha-password|proxy1.example|1080|||1|0|50:C7:BF' > "$SB2/config/wifi-socks.conf"
@@ -534,7 +535,7 @@ run_agent_pkg() { # query package-file
     SB_ROOT="$SB2" CONF="$SB2/config/wifi-socks.conf" \
     CGI_DEST="$TMP/deploy/sbproxy" UI_DEST="$TMP/deploy/index.html" \
     HEALTHD_DEST="$TMP/deploy/sbproxy-healthd" HEALTHD_INIT_DEST="$TMP/deploy/init-healthd" \
-    SB_NO_SERVICE=1 sh "$AGENT" < "$2"
+    ENV_FILE="$AGENT_ENV" SB_NO_SERVICE=1 sh "$AGENT" < "$2"
 }
 
 out="$(run_agent GET 'action=update' 'Bearer agent-test-token')"
@@ -574,6 +575,28 @@ eq "forced downgrade rewrites VERSION" "$(json_value "$out" '.to')" '0.3.0'
 out="$(REQUEST_METHOD=GET QUERY_STRING='action=status' HTTP_AUTHORIZATION='Bearer agent-test-token' \
   SB_ROOT="$SB2" CONF="$SB2/config/wifi-socks.conf" sh "$AGENT")"
 eq "status reports installed version" "$(json_value "$out" '.meta.version')" '0.3.0'
+
+# The agent sources /etc/sbproxy/env before every script, so a value left there
+# outlives the scripts. An update is the only chance to retire one.
+printf '%s\n' 'SB_ROOT=/root/sbproxy' 'GATEWAY_EXPECTED_INTERFACE=wwan' 'INTERVAL=15' > "$AGENT_ENV"
+make_pkg 0.6.0 "$TMP/pkg-0.6.0.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.6.0.tar.gz")"
+eq "update succeeds with an env file present" "$(json_value "$out" '.ok')" 'true'
+not_contains "the retired uplink pin is gone" "$(cat "$AGENT_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wwan'
+contains "the pin stays commented for reference" "$(cat "$AGENT_ENV")" '#GATEWAY_EXPECTED_INTERFACE='
+contains "unrelated env settings survive" "$(cat "$AGENT_ENV")" 'INTERVAL=15'
+contains "the install path survives" "$(cat "$AGENT_ENV")" 'SB_ROOT=/root/sbproxy'
+
+printf '%s\n' 'GATEWAY_EXPECTED_INTERFACE=wan' > "$AGENT_ENV"
+make_pkg 0.7.0 "$TMP/pkg-0.7.0.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.7.0.tar.gz")"
+eq "update succeeds again" "$(json_value "$out" '.ok')" 'true'
+contains "an operator's own pin is never touched" "$(cat "$AGENT_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wan'
+
+rm -f "$AGENT_ENV"
+make_pkg 0.8.0 "$TMP/pkg-0.8.0.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.8.0.tar.gz")"
+eq "update succeeds without any env file" "$(json_value "$out" '.ok')" 'true'
 
 echo ""
 printf 'AGENT TOTAL: pass=%d fail=%d\n' "$pass" "$fail"

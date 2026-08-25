@@ -83,6 +83,11 @@ Trình duyệt **chặn** trang https gọi tới router http. Vì vậy:
 
 ## Cấu hình
 `/etc/sbproxy/env` (do install-agent tạo): `SB_ROOT`, `CONF`, `PROBE_URL`, `INTERVAL` (giây giữa các lần probe), `SLOW_MS` (ngưỡng "chậm"), `PROBE_TIMEOUT`.
+`GATEWAY_EXPECTED_INTERFACE` để trống nghĩa là chấp nhận mọi uplink; đặt tên một
+interface (`wan`, `wwan`, …) nếu muốn ép đúng một đường ra. File này được agent
+nạp trước mọi script nên **giá trị trong đó thắng mặc định trong code**;
+`self-update.sh` chỉ tự gỡ đúng dòng ghim `wwan` mà bản cũ ghi sẵn, không đụng
+vào lựa chọn do người vận hành đặt.
 Đổi xong: `/etc/init.d/sbproxy-healthd restart`.
 
 ## Gỡ agent

@@ -14,6 +14,13 @@ Ngày theo định dạng YYYY-MM-DD.
   dây, PPPoE, LTE, Wi-Fi as WAN). Vẫn ghim được bằng
   `GATEWAY_EXPECTED_INTERFACE` trong `/etc/sbproxy/env` nếu muốn ép một đường
   ra duy nhất.
+- **Nâng cấp agent tại chỗ giờ gỡ được luôn dòng ghim cũ trong
+  `/etc/sbproxy/env`.** Agent nạp file env trước mọi script, nên giá trị nằm đó
+  luôn thắng mặc định trong code: nếu chỉ thay `gateway.sh` thì router đã cài từ
+  trước vẫn đọc `GATEWAY_EXPECTED_INTERFACE=wwan` và tiếp tục báo degraded.
+  `self-update.sh` (đường mà nút **Nâng cấp agent** dùng) giờ comment đúng dòng
+  ghim cũ đó ra — giá trị do người vận hành tự đặt thì không đụng tới, và các
+  biến khác trong file giữ nguyên.
 - Đường ra **vòng qua bridge của SSID được proxy** (`br-w<idx>`) — tức routing
   loop — giờ bị bắt và gọi đúng tên, đây mới là trường hợp luôn sai bất kể WAN
   dựng kiểu gì. `gateway` trả thêm trường `egress_problem`
