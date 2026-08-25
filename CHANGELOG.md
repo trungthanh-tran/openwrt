@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.11] - 2026-08-25
+
 ### Added
 - **`DNS_UPSTREAM` trong `config/settings.sh`** (mặc định `1.1.1.1`): resolver mà
   sing-box hỏi thật. Trước đây địa chỉ này nằm cứng trong `lib.sh`, không có
