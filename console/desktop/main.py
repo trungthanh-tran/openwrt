@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import ipaddress
 import json
 import logging
+import random
 from logging.handlers import TimedRotatingFileHandler
 import getpass
 import math
@@ -906,6 +907,133 @@ def save_preferences(language: str, theme: str) -> None:
     payload["language"] = language if language in ("en", "vi") else "en"
     payload["theme"] = theme if theme in PALETTES else "dark"
     _write_config_payload(payload)
+
+
+# --- Proxy pool ------------------------------------------------------------
+# A slot is a row's position in the pool, so identity here must match the one
+# lib.sh uses when it carries pins across a replacement: the endpoint and its
+# credentials, never the label.
+PROXY_SCHEMES = {"socks5": "socks5", "socks5h": "socks5", "socks": "socks5", "http": "http"}
+DEFAULT_PROXY_TYPE = "socks5"
+
+
+def _proxy_port(value: str) -> int:
+    """Port as an int, or ValueError with a message the operator can act on."""
+    if not value.isdigit():
+        raise ValueError("cổng phải là số")
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise ValueError("cổng phải trong khoảng 1..65535")
+    return port
+
+
+def _proxy_host(value: str) -> str:
+    if not value:
+        raise ValueError("thiếu host")
+    if len(value) > 253 or any(c.isspace() for c in value):
+        raise ValueError("host không hợp lệ")
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:-_")
+    if set(value) - allowed:
+        raise ValueError("host không hợp lệ")
+    return value
+
+
+def parse_proxy_line(line: str) -> tuple:
+    """One pasted line -> (type, host, port, user, password, label).
+
+    Accepted, in the order they are tried:
+        scheme://user:pass@host:port
+        scheme://host:port
+        user:pass@host:port
+        host:port:user:pass
+        host:port
+    """
+    text = line.strip()
+    proxy_type = DEFAULT_PROXY_TYPE
+    if "://" in text:
+        scheme, _, text = text.partition("://")
+        scheme = scheme.strip().lower()
+        if scheme not in PROXY_SCHEMES:
+            raise ValueError(f"loại proxy không hỗ trợ: {scheme}")
+        proxy_type = PROXY_SCHEMES[scheme]
+
+    user = password = ""
+    if "@" in text:
+        # Split on the LAST @: a password is allowed to contain one, and
+        # splitting on the first would read the host out of the password.
+        credentials, _, text = text.rpartition("@")
+        # Split credentials on the FIRST colon, for the same reason.
+        user, _, password = credentials.partition(":")
+
+    parts = text.split(":")
+    if len(parts) == 4 and not user:
+        # host:port:user:pass -- only meaningful when no @ supplied credentials.
+        host, port, user, password = parts
+    elif len(parts) == 2:
+        host, port = parts
+    else:
+        raise ValueError("thiếu cổng" if len(parts) == 1 else "không nhận ra định dạng")
+
+    return (proxy_type, _proxy_host(host.strip()), _proxy_port(port.strip()),
+            user, password, "")
+
+
+def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
+    """Parse a pasted list into (rows, dropped).
+
+    `dropped` carries (line number, original text, reason) for every line left
+    out, so the console can say what happened instead of quietly shortening the
+    list -- including when the cap is reached.
+    """
+    rows: list = []
+    dropped: list = []
+    seen: set = set()
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "|" in line:
+            dropped.append((number, line, "chứa ký tự | vốn là dấu phân cách của cấu hình"))
+            continue
+        if any(ord(c) < 32 or ord(c) == 127 for c in line):
+            dropped.append((number, line, "chứa ký tự điều khiển"))
+            continue
+        try:
+            row = parse_proxy_line(line)
+        except ValueError as exc:
+            dropped.append((number, line, str(exc)))
+            continue
+        identity = row[:5]
+        if identity in seen:
+            dropped.append((number, line, "trùng với một proxy đã có ở trên"))
+            continue
+        if limit is not None and len(rows) >= limit:
+            dropped.append((number, line, f"vượt quá giới hạn {limit} proxy cho một Wi-Fi"))
+            continue
+        seen.add(identity)
+        rows.append(row)
+    return rows, dropped
+
+
+def split_devices_evenly(devices, slots: int, seed=None) -> dict:
+    """Deal devices over slots: shuffle, then round-robin.
+
+    The counts differ by at most one, and the layout is reproducible from the
+    seed -- which is what lets the preview and the request that follows it agree
+    instead of shuffling twice.
+    """
+    if slots <= 0:
+        raise ValueError("Wi-Fi này chưa có proxy nào trong pool")
+    unique: list = []
+    for mac in devices:
+        mac = str(mac).strip().lower()
+        if mac and mac not in unique:
+            unique.append(mac)
+    if not unique:
+        return {}
+    order = list(unique)
+    random.Random(seed).shuffle(order)
+    return {mac: index % slots for index, mac in enumerate(order)}
 
 
 def parse_version(value) -> tuple | None:
