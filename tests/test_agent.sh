@@ -496,6 +496,24 @@ out="$(auth_run POST 'action=uninstall' '{}')"
 eq "uninstall succeeds" "$(json_value "$out" '.ok')" 'true'
 contains "uninstall invokes script" "$(cat "$CALLS")" 'uninstall'
 
+echo "== agent reports the router's own settings =="
+out="$(auth_run GET 'action=status')"
+eq "status carries NET_BASE" "$(json_value "$out" '.meta.net_base')" '10'
+eq "status carries TPROXY_PORT_BASE" "$(json_value "$out" '.meta.tproxy_port_base')" '12000'
+eq "status carries BSSID_LIMIT" "$(json_value "$out" '.meta.bssid_limit')" '16'
+
+printf '%s\n' 'NET_BASE=40' 'TPROXY_PORT_BASE=21000' 'BSSID_LIMIT=8' > "$TMP/router/config/settings.sh"
+out="$(auth_run GET 'action=status')"
+eq "an edited NET_BASE is reported" "$(json_value "$out" '.meta.net_base')" '40'
+eq "an edited port base is reported" "$(json_value "$out" '.meta.tproxy_port_base')" '21000'
+eq "an edited BSSID limit is reported" "$(json_value "$out" '.meta.bssid_limit')" '8'
+
+printf '%s\n' 'NET_BASE=not-a-number' > "$TMP/router/config/settings.sh"
+out="$(auth_run GET 'action=status')"
+eq "a broken value falls back" "$(json_value "$out" '.meta.net_base')" '10'
+eq "status still answers" "$(json_value "$out" '.ok')" 'true'
+rm -f "$TMP/router/config/settings.sh"
+
 echo "== agent uplink selection =="
 GW_ENV="$TMP/set-gateway.env"
 set_gateway() { # json-body

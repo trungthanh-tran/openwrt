@@ -187,6 +187,8 @@ Mở `http://<router>/sbproxy/` → **🔌 Kết nối router** → dán token. 
 |---|---|---|
 | `INTERVAL` | 15 | Giây giữa các lần probe. |
 | `SLOW_MS` | 800 | Ngưỡng coi là "chậm". |
+| `DNS_UPSTREAM` | `1.1.1.1` | Resolver sing-box hỏi thật (IP hoặc hostname). Đổi khi bị chặn hoặc cần DNS nội bộ. |
+| `ALLOW_UNSUPPORTED_BOARD` | `0` | `1` = chỉ cảnh báo thay vì dừng trên board không phải GL-MT6000. |
 | `PROBE_URL` | gstatic /generate_204 | URL đo latency. |
 | `PROBE_TIMEOUT` | 8 | Timeout mỗi probe (giây). |
 | `GATEWAY_EXPECTED_INTERFACE` | *(rỗng)* | Interface bắt buộc làm đường ra. Rỗng = tự động, chấp nhận uplink mà default route đang dùng. Console ghi giá trị này khi bạn chọn trong ô **Đường ra**. |

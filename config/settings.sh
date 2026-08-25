@@ -2,8 +2,15 @@
 # shellcheck disable=SC2034  # Values are consumed by scripts that source this file.
 # Adjust this file for your hardware before running apply.sh.
 
+# --- Platform ---------------------------------------------------------------
+# Refuse to run on anything other than the boards this project is tested on.
+# Set to 1 to downgrade that to a warning when trying another device; nothing
+# else changes, and the scripts are still only verified on the GL-MT6000.
+ALLOW_UNSUPPORTED_BOARD=0
+
 # --- Radio-to-band mapping --------------------------------------------------
-# OpenWrt does not guarantee radio0=2.4G. Verify with scripts/preflight.sh.
+# OpenWrt does not guarantee radio0=2.4G. preflight.sh lists the radios this
+# board really has and names the right values when these are wrong.
 RADIO_2G="radio0"
 RADIO_5G="radio1"
 # Required ISO 3166-1 alpha-2 code for the router's operating country.
@@ -31,6 +38,9 @@ IPV6_MODE="disable"
 # not resolved IPs. Must not overlap any real subnet in use (198.18.0.0/15 is
 # the RFC 2544 benchmark range and is safe on typical networks).
 FAKEIP_RANGE="198.18.0.0/15"
+# Resolver sing-box forwards real lookups to. Any reachable IP or hostname; use
+# the ISP resolver or an internal server when 1.1.1.1 is blocked or unwanted.
+DNS_UPSTREAM="1.1.1.1"
 
 # --- Firewall ---------------------------------------------------------------
 # Guest-zone input policy. ACCEPT keeps DHCP/DNS and TPROXY reliable while separate

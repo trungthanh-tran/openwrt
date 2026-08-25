@@ -46,7 +46,7 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 `X-SB-Token` trên HTTP server có chuyển tiếp custom header vào CGI.
 | Method | action | Body | Trả về |
 |---|---|---|---|
-| GET | `status` | — | `{ssids[], health{ts,probes{idx:{state,latency_ms,code}}}, meta}` |
+| GET | `status` | — | `{ssids[], health{ts,probes{idx:{state,latency_ms,code}}}, meta}` — `meta` gồm `version`, `singbox_running`, `applied` và `net_base`/`tproxy_port_base`/`bssid_limit` đọc từ `config/settings.sh`, để console không phải đoán |
 | GET | `get_conf` | — | text/plain wifi-socks.conf |
 | POST | `save_conf` | text | `{ok,saved}` |
 | POST | `dryrun_conf` | text | Dry-run config tạm, không ghi file thật |

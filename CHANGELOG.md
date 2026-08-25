@@ -6,6 +6,27 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **`DNS_UPSTREAM` trong `config/settings.sh`** (mặc định `1.1.1.1`): resolver mà
+  sing-box hỏi thật. Trước đây địa chỉ này nằm cứng trong `lib.sh`, không có
+  cách nào đổi ngoài sửa code — ai bị chặn 1.1.1.1 hoặc phải dùng DNS nội bộ đều
+  kẹt. Nhận IP hoặc hostname; ký tự lạ bị `validate_settings` từ chối vì giá trị
+  đi thẳng vào cấu hình sing-box.
+- **`ALLOW_UNSUPPORTED_BOARD` trong `config/settings.sh`** (mặc định `0`): đặt
+  `1` để `validate_platform` chỉ cảnh báo thay vì dừng trên thiết bị không phải
+  GL-MT6000. Thông báo lỗi cũ giờ chỉ luôn cách bật tham số này.
+- `status` trả thêm `meta.net_base`, `meta.tproxy_port_base`, `meta.bssid_limit`
+  — đúng giá trị `config/settings.sh` router đang dùng.
+
+### Fixed
+- **Hai console không còn tự chép hằng số của router.** Console desktop hiển thị
+  subnet bằng `192.168.{10 + idx}` và console web đặt cứng
+  `NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16`, trong khi router đọc
+  các giá trị này từ `config/settings.sh` và chúng **được phép sửa** — đổi
+  `NET_BASE` là cả hai console hiện sai subnet, sai gateway, sai cổng TPROXY và
+  web console kiểm tra sai giới hạn BSSID. Giờ cả hai lấy từ `status.meta`, chỉ
+  dùng hằng số cũ khi agent quá cũ không gửi.
+
+### Added
 - **Chọn interface làm đường ra ngay trên console.** Khung Internet Gateway có
   thêm ô **Đường ra** liệt kê mọi interface router báo về (tên, device, IP,
   đang dùng / không hoạt động / SSID proxy). Mặc định là **Tự động** — bám theo

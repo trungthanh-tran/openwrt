@@ -42,6 +42,10 @@ APP_NAME = "sbproxy Console Native"
 APP_VERSION = "0.4.11-SNAPSHOT"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
+# Fallbacks for an agent too old to report the router's effective settings.sh
+# values; a connected agent overrides these from status meta.
+DEFAULT_NET_BASE = 10
+DEFAULT_TPROXY_PORT_BASE = 12000
 
 # Logs roll over at midnight and nothing older than a week is kept, so a
 # long-lived install never grows without bound and stale operational data does
@@ -2870,6 +2874,9 @@ class NativeApp:
             "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
         ))
         self.agent_version = ""
+        # Mirrors config/settings.sh on the router; never assumed, always read.
+        self.net_base = DEFAULT_NET_BASE
+        self.tproxy_port_base = DEFAULT_TPROXY_PORT_BASE
         # Set when the router runs a NEWER agent than this console: the API may
         # have moved on, so every mutation is refused until the app is updated.
         self.agent_too_new = False
@@ -3535,6 +3542,7 @@ class NativeApp:
             meta = status.get("meta") if isinstance(status.get("meta"), dict) else {}
             running = bool(meta.get("singbox_running"))
             self.agent_version = clean_agent_version(meta)
+            self.adopt_router_settings(meta)
             audit("connect", router=self.client.base_url, result="ok",
                   agent=self.agent_version or "?", console=APP_VERSION,
                   singbox="running" if running else "stopped")
@@ -3777,6 +3785,20 @@ class NativeApp:
             ), parent=self.root)
             self.connect()
         self.run_task("Đang nâng cấp agent…", work, done, show_loading=True, timeout_hint=300)
+
+    def adopt_router_settings(self, meta) -> None:
+        """Take the router's own NET_BASE/TPROXY_PORT_BASE from status meta."""
+        meta = meta if isinstance(meta, dict) else {}
+        for key, attribute, fallback in (
+            ("net_base", "net_base", DEFAULT_NET_BASE),
+            ("tproxy_port_base", "tproxy_port_base", DEFAULT_TPROXY_PORT_BASE),
+        ):
+            value = meta.get(key)
+            setattr(self, attribute, int(value) if isinstance(value, int) and value >= 0 else fallback)
+
+    def subnet_of(self, idx: int) -> str:
+        """Subnet the router gives an SSID, using its own NET_BASE."""
+        return f"192.168.{self.net_base + int(idx)}.0/24"
 
     def block_if_incompatible(self) -> bool:
         """Refuse mutations while the router runs a newer agent than this app."""
@@ -4320,7 +4342,7 @@ class NativeApp:
                 tag = "error"
             row_tag = "row_even" if pos % 2 == 0 else "row_odd"
             tags = (row_tag, tag) if tag else (row_tag,)
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, f"192.168.{10 + record.idx}.0/24", mac_display, f"{record.host}:{record.port}", self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, f"{record.host}:{record.port}", self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
         self.update_client_filter_options()
         self.update_wifi_editor()
 

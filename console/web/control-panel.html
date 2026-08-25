@@ -619,7 +619,10 @@
     updateConnHint();
     renderVersion();
   }
-  const NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, MARK = 1;
+  // Defaults only: a connected agent reports the router's effective
+  // config/settings.sh values through status meta (see applyRouterSettings).
+  let NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16;
+  const MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
 
@@ -658,6 +661,17 @@
   function save() { localStorage.setItem(LS_KEY, JSON.stringify(ssids)); }
 
   // ---- derived ----
+  // The router is the source of truth for these; an agent too old to send them
+  // leaves the defaults in place.
+  function applyRouterSettings(meta) {
+    if (!meta) return;
+    const take = (value, fallback) =>
+      (Number.isInteger(value) && value >= 0) ? value : fallback;
+    NET_BASE = take(meta.net_base, NET_BASE);
+    TPROXY_BASE = take(meta.tproxy_port_base, TPROXY_BASE);
+    BSSID_LIMIT = take(meta.bssid_limit, BSSID_LIMIT);
+  }
+
   const octet = i => NET_BASE + i;
   const subnet = i => `192.168.${octet(i)}.0/24`;
   const gw = i => `192.168.${octet(i)}.1`;
@@ -743,6 +757,7 @@
       agent.connected = true;
       agent.health = (d.health && d.health.probes) || {};
       agent.version = (d.meta && d.meta.version) || "";
+      applyRouterSettings(d.meta);
       recordHistory();
       updateLiveUI(); renderRows();
       const run = d.meta && d.meta.singbox_running;
@@ -767,6 +782,7 @@
       if (!d || !d.ok) throw new Error((d && d.error) || pick("bad response", "phản hồi lỗi"));
       agent.connected = true; agent.health = (d.health && d.health.probes) || {};
       agent.version = (d.meta && d.meta.version) || "";
+      applyRouterSettings(d.meta);
       updateLiveUI(); renderRows(); startPoll();
       setConnStatus(pick("Connected ✓", "Đã kết nối ✓"), "ok");
       toast(pick("Connected to the router", "Đã kết nối router"));
@@ -1341,6 +1357,7 @@
       if (d && d.ok) {
         agent.connected = true; agent.health = (d.health && d.health.probes) || {};
         agent.version = (d.meta && d.meta.version) || "";
+        applyRouterSettings(d.meta);
         updateLiveUI(); renderRows(); startPoll();
       }
     }).catch(() => {});

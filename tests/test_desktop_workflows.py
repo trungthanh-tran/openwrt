@@ -193,6 +193,8 @@ def bare_app(language="en"):
     instance.log_history = []
     instance.status_var = FakeVar()
     instance.agent_version = ""
+    instance.net_base = appmod.DEFAULT_NET_BASE
+    instance.tproxy_port_base = appmod.DEFAULT_TPROXY_PORT_BASE
     instance.agent_too_new = False
     instance.agent_outdated = False
     instance.upgrade_offered = False
@@ -306,6 +308,31 @@ class ConnectionWorkflowTests(unittest.TestCase):
         self.assertTrue(all(button.options["state"] == "normal" for button in instance.wifi_edit_buttons.values()))
         self.assertTrue(all(options["state"] == "normal" for options in instance.wifi_context_menu.entries.values()))
         self.assertIn("test1", instance.wifi_selection_var.get())
+
+
+class RouterSettingsTests(unittest.TestCase):
+    """Subnets shown to the operator follow the router, not a constant here."""
+
+    def test_the_default_matches_a_stock_settings_file(self):
+        instance = bare_app()
+        self.assertEqual(instance.net_base, 10)
+        self.assertEqual(instance.subnet_of(1), "192.168.11.0/24")
+
+    def test_an_edited_net_base_is_adopted_from_status(self):
+        instance = bare_app()
+        instance.adopt_router_settings({"net_base": 40, "tproxy_port_base": 21000})
+        self.assertEqual(instance.net_base, 40)
+        self.assertEqual(instance.tproxy_port_base, 21000)
+        self.assertEqual(instance.subnet_of(1), "192.168.41.0/24")
+        self.assertEqual(instance.subnet_of(3), "192.168.43.0/24")
+
+    def test_an_agent_that_reports_nothing_keeps_the_defaults(self):
+        instance = bare_app()
+        for meta in ({}, {"version": "0.4.9"}, None, {"net_base": "40"}, {"net_base": -1}):
+            with self.subTest(meta=meta):
+                instance.adopt_router_settings(meta)
+                self.assertEqual(instance.net_base, appmod.DEFAULT_NET_BASE)
+                self.assertEqual(instance.tproxy_port_base, appmod.DEFAULT_TPROXY_PORT_BASE)
 
 
 class GatewayWorkflowTests(unittest.TestCase):

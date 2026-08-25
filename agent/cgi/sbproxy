@@ -4,7 +4,8 @@
 # Authentication: Authorization: Bearer <token>, matching /etc/sbproxy/token.
 # X-SB-Token remains supported on HTTP servers that forward custom CGI headers.
 #
-# GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}}
+# GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}} — meta carries
+#                               the effective settings.sh values a console needs
 # GET  ?action=get_conf      -> wifi-socks.conf as text/plain
 # GET  ?action=backups       -> {backups:[...]}
 # POST ?action=save_conf     body=text  -> ghi wifi-socks.conf (validate)
@@ -46,6 +47,15 @@ hdr() {
 json_ok()  { hdr "200 OK" "application/json"; printf '%s\n' "$1"; exit 0; }
 json_err() { hdr "$1" "application/json"; jq -n --arg e "$2" '{ok:false,error:$e}'; exit 0; }
 have() { command -v "$1" >/dev/null 2>&1; }
+# Effective settings.sh numbers, read in a subshell so nothing here inherits the
+# file's other variables. A console derives subnets and TPROXY ports from these
+# instead of repeating the defaults and drifting when settings.sh is edited.
+settings_numbers() {
+  (
+    [ -f "$SB_ROOT/config/settings.sh" ] && . "$SB_ROOT/config/settings.sh" 2>/dev/null
+    printf '%s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" "${BSSID_LIMIT:-16}"
+  ) 2>/dev/null
+}
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 body_has_nul() {
   if have od; then
@@ -168,9 +178,20 @@ case "$ACTION" in
     applied="false"; [ -f "$SINGBOX_CONF" ] || [ -f /etc/sing-box/config.json ] && applied="true"
     running="false"; pgrep -f sing-box >/dev/null 2>&1 && running="true"
     ver="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || true)"; [ -n "$ver" ] || ver="unknown"
+    # shellcheck disable=SC2046  # three plain integers, deliberately split
+    set -- $(settings_numbers)
+    net_base="${1:-10}"; tproxy_base="${2:-12000}"; bssid_limit="${3:-16}"
+    case "$net_base$tproxy_base$bssid_limit" in
+      ''|*[!0-9]*) net_base=10; tproxy_base=12000; bssid_limit=16 ;;
+    esac
     json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
                      --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
-      '{ok:true, ssids:$ssids, health:$health, meta:{singbox_running:$running, applied:$applied, version:$ver}}')"
+                     --argjson net_base "$net_base" --argjson tproxy_port_base "$tproxy_base" \
+                     --argjson bssid_limit "$bssid_limit" \
+      '{ok:true, ssids:$ssids, health:$health,
+        meta:{singbox_running:$running, applied:$applied, version:$ver,
+              net_base:$net_base, tproxy_port_base:$tproxy_port_base,
+              bssid_limit:$bssid_limit}}')"
     ;;
 
   get_conf)

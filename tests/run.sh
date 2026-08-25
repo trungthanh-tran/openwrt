@@ -74,6 +74,63 @@ eq "radio_of 2g"    "$(radio_of 2g)"    "radio0"
 eq "radio_of 5g"    "$(radio_of 5g)"    "radio1"
 L="radio_of invalid band dies"; dies radio_of 6g
 
+echo "== configurable resolver =="
+DNS_CONF="$STUB/dns.conf"
+printf '%s\n' '#' > "$DNS_CONF"
+build_dns() { # upstream -> path of the generated sing-box config
+  ( CONF="$DNS_CONF" DNS_UPSTREAM="$1" SINGBOX_CONF="$STUB/dns.json" \
+      NFT_FILE="$STUB/dns.nft" build_singbox ) >/dev/null 2>&1
+  printf '%s' "$STUB/dns.json"
+}
+if command -v jq >/dev/null 2>&1; then
+  eq "the default resolver is 1.1.1.1" \
+    "$(jq -r '.dns.servers[] | select(.tag=="upstream") | .server' "$(build_dns '')")" "1.1.1.1"
+  eq "an ISP resolver is used as given" \
+    "$(jq -r '.dns.servers[] | select(.tag=="upstream") | .server' "$(build_dns '9.9.9.9')")" "9.9.9.9"
+  eq "a hostname resolver works too" \
+    "$(jq -r '.dns.servers[] | select(.tag=="upstream") | .server' "$(build_dns 'dns.example.internal')")" \
+    "dns.example.internal"
+  if jq -e . "$(build_dns 'dns.example.internal')" >/dev/null 2>&1; then
+    ok "the generated config stays valid JSON"
+  else
+    no "the generated config stays valid JSON"
+  fi
+else
+  sk "configurable resolver" "jq is not installed"
+fi
+run_lib() {  # run a snippet with lib.sh already sourced
+  sh -c '. "$SB_ROOT/scripts/lib.sh"; '"$1"
+}
+if run_lib 'WIFI_COUNTRY=VN; DNS_UPSTREAM=""; validate_settings' >/dev/null 2>&1; then
+  ok "an empty resolver falls back to the default"
+else
+  no "an empty resolver falls back to the default"
+fi
+L="DNS_UPSTREAM rejects shell metacharacters"
+dies run_lib 'WIFI_COUNTRY=VN; DNS_UPSTREAM="1.1.1.1;id"; validate_settings'
+if run_lib 'WIFI_COUNTRY=VN; DNS_UPSTREAM="9.9.9.9"; validate_settings' >/dev/null 2>&1; then
+  ok "a plain resolver passes validation"
+else
+  no "a plain resolver passes validation"
+fi
+
+echo "== unsupported board override =="
+# ubus and /proc/device-tree/model are absent here, so the board never matches.
+if run_lib 'ALLOW_UNSUPPORTED_BOARD=0; validate_platform' >/dev/null 2>&1; then
+  no "an unknown board is refused by default"
+else
+  ok "an unknown board is refused by default"
+fi
+if run_lib 'ALLOW_UNSUPPORTED_BOARD=1; validate_platform' >/dev/null 2>&1; then
+  ok "ALLOW_UNSUPPORTED_BOARD=1 downgrades it to a warning"
+else
+  no "ALLOW_UNSUPPORTED_BOARD=1 downgrades it to a warning"
+fi
+match "the refusal explains the override" \
+  "$(run_lib 'ALLOW_UNSUPPORTED_BOARD=0; validate_platform' 2>&1)" 'ALLOW_UNSUPPORTED_BOARD=1'
+match "the override still warns" \
+  "$(run_lib 'ALLOW_UNSUPPORTED_BOARD=1; validate_platform' 2>&1)" 'WARN'
+
 echo "== empty configuration =="
 # A freshly provisioned router carries a comment-only wifi-socks.conf, and the
 # console can legitimately be left with zero SSIDs. Both must still produce

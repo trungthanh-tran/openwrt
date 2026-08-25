@@ -29,7 +29,13 @@ validate_platform() {
   model="$(cat /proc/device-tree/model 2>/dev/null | tr -d '\000' || true)"
   case "$board:$model" in
     glinet,gl-mt6000:*|*:*GL-MT6000*) : ;;
-    *) die "Unsupported device: board=${board:-?}, model=${model:-?} (GL-MT6000 required)." ;;
+    *)
+      if [ "${ALLOW_UNSUPPORTED_BOARD:-0}" = "1" ]; then
+        warn "Unsupported device: board=${board:-?}, model=${model:-?} — continuing because ALLOW_UNSUPPORTED_BOARD=1 (tested on the GL-MT6000 only)."
+      else
+        die "Unsupported device: board=${board:-?}, model=${model:-?} (GL-MT6000 required; set ALLOW_UNSUPPORTED_BOARD=1 in config/settings.sh to override)."
+      fi
+      ;;
   esac
   [ -z "$(cat /etc/glversion 2>/dev/null)" ] || warn "GL.iNet OEM firmware detected; support is experimental and requires separate testing."
 }
@@ -40,6 +46,10 @@ validate_settings() {
     *) die "WIFI_COUNTRY must be a two-letter uppercase country code in config/settings.sh (for example, VN)." ;;
   esac
   [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 only supports IPV6_MODE=disable."
+  # Empty means "use the built-in default", the same as everywhere else here.
+  case "${DNS_UPSTREAM:-1.1.1.1}" in
+    *[!A-Za-z0-9.:_-]*) die "DNS_UPSTREAM may only contain letters, digits, . : _ and -." ;;
+  esac
 }
 
 validate_conf() {
@@ -372,6 +382,8 @@ build_singbox() {
   # Persist the fakeip<->hostname map across sing-box restarts (e.g. set-sock.sh)
   # so clients holding cached fake-IPs keep working without a fresh DNS query.
   SINGBOX_CACHE="${SINGBOX_CACHE:-/etc/sing-box/cache.db}"
+  # Quoted through jq so a hostname or an unusual resolver cannot break the JSON.
+  dns_upstream_json="$(jq -Rn --arg v "${DNS_UPSTREAM:-1.1.1.1}" '$v')"
   inbounds=""; outbounds=""; rules=""; sep=""
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"
@@ -405,7 +417,7 @@ build_singbox() {
   "dns": {
     "servers": [
       { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE" },
-      { "type": "udp", "tag": "upstream", "server": "1.1.1.1" }
+      { "type": "udp", "tag": "upstream", "server": $dns_upstream_json }
     ],
     "rules": [
       { "query_type": ["HTTPS", "SVCB"], "action": "predefined", "rcode": "NOTIMP" },
