@@ -211,12 +211,22 @@ cat > "$CONF.dirty" <<'EOF'
 Valid|2g|1|valid-password|proxy.example|1080|alice|hidden-secret|1|1|
 BadIdx|2g|not-a-number|password12|proxy.example|1080|||1|1|
 TooHigh|2g|201|password12|proxy.example|1080|||1|1|
-Extra|2g|2|password12|proxy.example|1080|||1|1||surplus
+Extra|2g|2|password12|proxy.example|1080|||1|1||socks5|surplus
 EOF
 mv "$CONF" "$CONF.clean"
 mv "$CONF.dirty" "$CONF"
 out="$(auth_run GET 'action=status')"
 eq "status skips corrupt config rows" "$(json_value "$out" '.ssids | map(.idx) | join(",")')" '1'
+# The 12th column became proxy_type, so "too many columns" now means 13. A row
+# naming a proxy type nobody supports is still shown, falling back to socks5:
+# status reports the file as it is, and validate_conf is what refuses to apply it.
+cat > "$CONF" <<'EOF'
+Valid|2g|1|valid-password|proxy.example|1080|alice|hidden-secret|1|1||socks5
+Odd|2g|3|password12|proxy.example|1080|||1|1||nonesuch
+EOF
+out="$(auth_run GET 'action=status')"
+eq "an unknown proxy type falls back rather than vanishing"   "$(json_value "$out" '.ssids | map(.idx) | join(",")')" '1,3'
+eq "and it is reported as socks5" "$(json_value "$out" '.ssids[1].proxy_type')" 'socks5'
 not_contains "status never leaks secrets from mixed config" "$out" 'hidden-secret'
 mv "$CONF" "$CONF.dirty"
 mv "$CONF.clean" "$CONF"
