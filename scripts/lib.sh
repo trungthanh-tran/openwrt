@@ -464,6 +464,112 @@ assign_spread() { # idx "mac mac ..."
   log "Spread $_sp_j device(s) over $_sp_n proxies on idx=$_sp_idx (seed $_sp_seed)"
 }
 
+# Replace one idx's pool with the rows in $2 (type|host|port|user|pass|label,
+# one per line) and carry every pin across by proxy identity.
+#
+# Slot numbers are positions in the new list, so they move freely. What must not
+# move is which proxy a device is using: a pin whose proxy is still in the list
+# follows it to its new slot, and a pin whose proxy is gone is reassigned to the
+# least-loaded slot and marked auto. Nothing is written until the new pool has
+# passed validation.
+pool_replace() { # idx newrows-file
+  _pr_idx="$1"; _pr_src="$2"
+  case "$_pr_idx" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
+  [ -f "$_pr_src" ] || die "no such file: $_pr_src"
+
+  _pr_dir="${TMPDIR:-/tmp}"
+  _pr_old="$_pr_dir/sbproxy-pool-old.$$"
+  _pr_new="$_pr_dir/sbproxy-pool-new.$$"
+  _pr_cand="$_pr_dir/sbproxy-pool-cand.$$"
+  _pr_map="$_pr_dir/sbproxy-pool-map.$$"
+
+  pool_rows "$_pr_idx" > "$_pr_old"
+
+  # Prefix each incoming row with the idx, dropping blanks, comments and exact
+  # duplicates. First occurrence wins, because slot order follows the list.
+  awk -F'|' -v idx="$_pr_idx" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF < 5 || NF > 6 { print "line " NR ": expected 5 or 6 columns, found " NF > "/dev/stderr"; bad = 1; next }
+    {
+      key = tolower(trim($1)) "|" trim($2) "|" trim($3) "|" $4 "|" $5
+      if (key in seen) next
+      seen[key] = 1
+      printf "%s|%s|%s|%s|%s|%s|%s\n", idx, tolower(trim($1)), trim($2), trim($3), $4, $5, (NF >= 6 ? trim($6) : "")
+    }
+    END { exit bad ? 1 : 0 }
+  ' "$_pr_src" > "$_pr_new" || { rm -f "$_pr_old" "$_pr_new"; die "the new pool is malformed"; }
+
+  # Build the candidate file: every other idx untouched, this idx replaced.
+  : > "$_pr_cand"
+  if [ -f "${POOLS:-}" ]; then
+    awk -F'|' -v idx="$_pr_idx" '
+      function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+      { sub(/\r$/, "") }
+      /^[[:space:]]*#/ || /^[[:space:]]*$/ { print; next }
+      trim($1) == idx { next }
+      { print }
+    ' "$POOLS" > "$_pr_cand"
+  fi
+  cat "$_pr_new" >> "$_pr_cand"
+
+  # Validate before anything is replaced, so a bad paste leaves the router alone.
+  ( POOLS="$_pr_cand" validate_pools ) || { rm -f "$_pr_old" "$_pr_new" "$_pr_cand"; die "the new pool is invalid"; }
+
+  # old slot -> new slot, by identity. Missing means the proxy is gone.
+  awk -F'|' '
+    FILENAME == old { key = $2 "|" $3 "|" $4 "|" $5 "|" $6; oldslot[key] = $1; next }
+    # n+0 forces numeric context: an uninitialised awk variable concatenates as
+    # the empty string, so the very first new slot would come out blank and its
+    # device would look like it had lost its proxy.
+    { key = $2 "|" $3 "|" $4 "|" $5 "|" $6; if (key in oldslot) print oldslot[key] "|" (n+0); n++ }
+  ' old="$_pr_old" "$_pr_old" "$_pr_new" > "$_pr_map"
+
+  mv "$_pr_cand" "$POOLS"
+  rm -f "$_pr_new"
+
+  # Carry the pins across.
+  if [ -f "${ASSIGN_FILE:-}" ]; then
+    _pr_keep="$_pr_dir/sbproxy-pool-keep.$$"
+    _pr_lost="$_pr_dir/sbproxy-pool-lost.$$"
+    : > "$_pr_keep"; : > "$_pr_lost"
+    while IFS='|' read -r _pr_ri _pr_rm _pr_rs _pr_rc; do
+      case "$_pr_ri" in ''|\#*) continue ;; esac
+      if [ "$_pr_ri" != "$_pr_idx" ]; then
+        printf '%s|%s|%s|%s\n' "$_pr_ri" "$_pr_rm" "$_pr_rs" "$_pr_rc" >> "$_pr_keep"
+        continue
+      fi
+      _pr_to="$(awk -F'|' -v s="$_pr_rs" '$1 == s { print $2; exit }' "$_pr_map")"
+      if [ -n "$_pr_to" ]; then
+        printf '%s|%s|%s|%s\n' "$_pr_ri" "$_pr_rm" "$_pr_to" "$_pr_rc" >> "$_pr_keep"
+      else
+        printf '%s\n' "$_pr_rm" >> "$_pr_lost"
+      fi
+    done < "$ASSIGN_FILE"
+    mv "$_pr_keep" "$ASSIGN_FILE"
+
+    # Whatever lost its proxy is spread over the new pool rather than dropped --
+    # unless the pool is now empty, in which case there is nowhere to put it and
+    # the SSID falls back to its wifi-socks.conf proxy. Without this check the
+    # reassignment below calls die() and takes the whole caller down with it.
+    _pr_left="$(pool_count "$_pr_idx")"
+    while read -r _pr_lm; do
+      [ -n "$_pr_lm" ] || continue
+      if [ "$_pr_left" -le 0 ]; then
+        log "Dropped the pin for $_pr_lm on idx=$_pr_idx: that Wi-Fi no longer has a pool"
+        continue
+      fi
+      assign_set "$_pr_idx" "$_pr_lm" "$(assign_pick_slot "$_pr_idx")" auto
+      log "Reassigned $_pr_lm on idx=$_pr_idx: its proxy is no longer in the pool"
+    done < "$_pr_lost"
+    rm -f "$_pr_lost"
+  fi
+
+  rm -f "$_pr_old" "$_pr_map"
+  log "Replaced the pool of idx=$_pr_idx with $(pool_count "$_pr_idx") proxies"
+}
+
 # Slot with the fewest devices currently pinned to it. Ties go to the lowest
 # slot, so `auto` is deterministic and a fresh pool fills up in order.
 assign_pick_slot() { # idx

@@ -575,6 +575,98 @@ assign_set 1 aa:bb:cc:dd:ee:03 2 auto
 eq "a tie goes to the lowest slot" "$(assign_pick_slot 1)" "0"
 : > "$ASSIGN_FILE"
 
+echo "== replacing a pool =="
+# Three proxies, one device pinned to each, plus a device on another SSID.
+POOLS="$STUB/rep.conf"
+printf '%s\n' '1|socks5|1.1.1.1|1080|u|p|A' '1|socks5|2.2.2.2|1080|||B' \
+               '1|http|3.3.3.3|8080|||C' '2|socks5|9.9.9.9|1080|||Z' > "$POOLS"
+: > "$ASSIGN_FILE"
+assign_set 1 aa:bb:cc:dd:ee:01 0 manual
+assign_set 1 aa:bb:cc:dd:ee:02 1 manual
+assign_set 1 aa:bb:cc:dd:ee:03 2 manual
+assign_set 2 aa:bb:cc:dd:ee:09 0 manual
+BASE="$(sort "$ASSIGN_FILE")"
+
+slot_of() { awk -F'|' -v i="$1" -v m="$2" '$1==i && $2==m { print $3; exit }' "$ASSIGN_FILE"; }
+src_of()  { awk -F'|' -v i="$1" -v m="$2" '$1==i && $2==m { print $4; exit }' "$ASSIGN_FILE"; }
+newpool() { printf '%s\n' "$@" > "$STUB/new.conf"; }
+
+newpool 'socks5|1.1.1.1|1080|u|p|A' 'socks5|2.2.2.2|1080|||B' 'http|3.3.3.3|8080|||C'
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "an identical list moves nobody" "$(sort "$ASSIGN_FILE")" "$BASE"
+eq "and leaves the pool the same size" "$(pool_count 1)" "3"
+
+# Appending must not disturb anyone already pinned.
+newpool 'socks5|1.1.1.1|1080|u|p|A' 'socks5|2.2.2.2|1080|||B' 'http|3.3.3.3|8080|||C' \
+        'socks5|4.4.4.4|1080|||D'
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "appending a proxy moves nobody" "$(sort "$ASSIGN_FILE" | head -3)" "$(printf '%s' "$BASE" | head -3)"
+eq "and the new proxy is the last slot" "$(pool_count 1)" "4"
+
+# Reordering is where slot-preservation would silently change a device's exit
+# IP: the pin must follow its proxy to the new position.
+newpool 'http|3.3.3.3|8080|||C' 'socks5|1.1.1.1|1080|u|p|A' 'socks5|2.2.2.2|1080|||B'
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "reordering follows the proxy, not the slot number (was 0)" "$(slot_of 1 aa:bb:cc:dd:ee:01)" "1"
+eq "reordering follows the proxy, not the slot number (was 1)" "$(slot_of 1 aa:bb:cc:dd:ee:02)" "2"
+eq "reordering follows the proxy, not the slot number (was 2)" "$(slot_of 1 aa:bb:cc:dd:ee:03)" "0"
+eq "a manual pin stays manual when it merely moves" "$(src_of 1 aa:bb:cc:dd:ee:01)" "manual"
+
+# Removing a proxy: its device is reassigned, the others still follow.
+newpool 'socks5|1.1.1.1|1080|u|p|A' 'socks5|2.2.2.2|1080|||B'
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "a surviving proxy keeps its device" "$(slot_of 1 aa:bb:cc:dd:ee:01)" "0"
+eq "the other surviving proxy too"      "$(slot_of 1 aa:bb:cc:dd:ee:02)" "1"
+eq "the orphaned device is reassigned, not dropped" \
+  "$([ -n "$(slot_of 1 aa:bb:cc:dd:ee:03)" ] && echo yes)" "yes"
+eq "and its pin is marked automatic"    "$(src_of 1 aa:bb:cc:dd:ee:03)" "auto"
+
+# A label is cosmetic. Renaming a proxy must not move anyone.
+newpool 'socks5|1.1.1.1|1080|u|p|RENAMED' 'socks5|2.2.2.2|1080|||ALSO-RENAMED'
+before="$(slot_of 1 aa:bb:cc:dd:ee:01)"
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "renaming a proxy moves nobody" "$(slot_of 1 aa:bb:cc:dd:ee:01)" "$before"
+eq "the new label is stored"       "$(pool_rows 1 | awk -F'|' 'NR==1 {print $7}')" "RENAMED"
+
+echo "== replacing a pool: other SSIDs and bad input =="
+eq "another SSID keeps its pool"  "$(pool_count 2)" "1"
+eq "another SSID keeps its pins"  "$(slot_of 2 aa:bb:cc:dd:ee:09)" "0"
+
+pool_before="$(cat "$POOLS")"; assign_before="$(cat "$ASSIGN_FILE")"
+newpool 'socks5|1.1.1.1' 'socks5|2.2.2.2|1080|||B'
+arun "a malformed list is refused" die pool_replace 1 "$STUB/new.conf"
+eq "a refused replacement leaves the pool untouched"   "$(cat "$POOLS")" "$pool_before"
+eq "a refused replacement leaves the pins untouched"   "$(cat "$ASSIGN_FILE")" "$assign_before"
+
+# Two different refusals, and the operator needs to be able to tell them apart:
+# a row of the wrong shape is reported per line, a row that parses but is out of
+# range is reported by the validator. Exit status alone cannot separate them.
+newpool 'socks5|1.1.1.1' 'socks5|2.2.2.2|1080|||B'
+amsg "a short row is reported by line and column count" "line 1: expected 5 or 6 columns"   pool_replace 1 "$STUB/new.conf"
+
+newpool 'socks5|1.2.3.4|99999|||X'
+arun "an out-of-range port is refused" die pool_replace 1 "$STUB/new.conf"
+amsg "an out-of-range port is reported by the validator" "the new pool is invalid"   pool_replace 1 "$STUB/new.conf"
+eq "and still leaves the pool untouched" "$(cat "$POOLS")" "$pool_before"
+
+newpool 'socks5|5.5.5.5|1080|||X' 'socks5|5.5.5.5|1080|||X-again' 'socks5|6.6.6.6|1080|||Y'
+pool_replace 1 "$STUB/new.conf" >/dev/null 2>&1
+eq "duplicate entries collapse, first one wins" "$(pool_count 1)" "2"
+eq "and the first label is the one kept" "$(pool_rows 1 | awk -F'|' 'NR==1 {print $7}')" "X"
+
+# An SSID that never had a pool can be given one.
+: > "$ASSIGN_FILE"
+newpool 'socks5|7.7.7.7|1080|||N'
+pool_replace 5 "$STUB/new.conf" >/dev/null 2>&1
+eq "an SSID with no pool can be given one" "$(pool_count 5)" "1"
+
+# Clearing a pool is legitimate: the SSID falls back to wifi-socks.conf.
+assign_set 5 aa:bb:cc:dd:ee:05 0 manual
+: > "$STUB/new.conf"
+pool_replace 5 "$STUB/new.conf" >/dev/null 2>&1
+eq "an empty list clears the pool"   "$(pool_count 5)" "0"
+eq "and removes the pins that had nowhere to go" "$(grep -c '^5|' "$ASSIGN_FILE")" "0"
+
 echo "== apply and preflight validate the pool =="
 match "apply.sh validates the pool file"    "$(cat "$ROOT/scripts/apply.sh")"    'validate_pools'
 match "apply.sh reassigns orphaned pins"    "$(cat "$ROOT/scripts/apply.sh")"    'assign_prune'
