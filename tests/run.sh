@@ -224,7 +224,9 @@ match "gen_mac default is locally-admin 02:" "$(gen_mac)"          '^02:([0-9a-f
 
 echo "== validate_conf =="
 mkc 'A|2g|1|password12|1.2.3.4|1080|u|p|1|1|50:C7:BF'; vrun "accept 11-col"        ok  validate_conf
+mkc 'A|2g|1|password12|1.2.3.4|8080|u|p|1|1||http';    vrun "accept HTTP 12-col"   ok  validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0';            vrun "accept 10-col"        ok  validate_conf
+mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0||ftp';       vrun "reject proxy type"    die validate_conf
 mkc 'A|2g|3|password12|1.2.3.4|8080|||1|0';            vrun "accept idx=3 port=8080" ok validate_conf
 mkc 'A|5g|200|password12|1.2.3.4|65535|||1|0';         vrun "accept upper idx/port" ok validate_conf
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|ZZ:GG:HH';   vrun "reject bad mac_oui"   die validate_conf
@@ -348,7 +350,7 @@ match "native app keeps selected client actions in edit panel" "$desktop_py" 'Đ
 match "native app disables item actions without selection" "$desktop_py" 'def update_client_editor\('
 match "native app warns before important actions" "$desktop_py" 'def confirm_important\('
 match "important action warning defaults to No" "$desktop_py" 'default=messagebox\.NO'
-match "quick SOCKS change requires warning" "$desktop_py" 'Đổi endpoint SOCKS5 đang dùng cho SSID'
+match "quick proxy change requires warning" "$desktop_py" 'Đổi proxy .* đang dùng cho SSID'
 match "native app checks Internet gateway" "$desktop_py" 'def refresh_gateway\('
 match "native app names a bad egress" "$desktop_py" 'ĐI QUA SSID ĐƯỢC PROXY'
 match "native app supports English and Vietnamese" "$desktop_py" 'EN_TRANSLATIONS = \{'
@@ -410,7 +412,7 @@ nomatch "no webrtc drop for webrtc=0" "$nft" 'iifname "br-w2" udp dport \{ 3478'
 echo "== build_singbox =="
 if command -v jq >/dev/null 2>&1; then
   mkc 'A|2g|1|password12|1.2.3.4|1080|user1|pass1|1|1|
-B|5g|2|password12|5.6.7.8|1080|||1|0|'
+B|5g|2|password12|5.6.7.8|8080|||1|0||http'
   ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/config.json" FAKEIP_RANGE="198.18.0.0/15" build_singbox ) >/dev/null 2>&1
   cfg="$(cat "$STUB/config.json" 2>/dev/null)"
   if printf '%s' "$cfg" | jq -e . >/dev/null 2>&1; then ok "JSON parses"; else no "JSON parses"; fi
@@ -419,7 +421,8 @@ B|5g|2|password12|5.6.7.8|1080|||1|0|'
   nomatch "no inet6_range (IPv4-only)"   "$cfg" 'inet6_range'
   match   "cache_file store_fakeip"      "$cfg" 'store_fakeip'
   match   "hijack-dns route rule"        "$cfg" 'hijack-dns'
-  eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "2"
+  eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "1"
+  eq      "http outbound count"   "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="http")]|length')" "1"
   eq      "socks outbound network" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network')" "tcp"
   eq      "auth on user row"      "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.username')" "user1"
   eq      "no auth on empty row"  "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w2")|.username // "none"')" "none"

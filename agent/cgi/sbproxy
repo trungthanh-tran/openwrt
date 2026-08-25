@@ -147,23 +147,25 @@ valid_snapshot_name() {
   return 0
 }
 
-# Build SSID JSON without exposing wifi_key or sock_pass.
-# Reads the optional 11th column (mac_oui); older 10-column rows leave it empty.
+# Build SSID JSON without exposing wifi_key or proxy password.
+# Legacy 10/11-column rows default to SOCKS5.
 ssids_json() {
-  { awk -F'|' 'NF == 10 || NF == 11 { if ($0 !~ /^[[:space:]]*#/) print }' "$CONF" 2>/dev/null | \
-    while IFS='|' read -r name band idx _wifi_key host port user pass iso web oui; do
+  { awk -F'|' 'NF == 10 || NF == 11 || NF == 12 { if ($0 !~ /^[[:space:]]*#/) print }' "$CONF" 2>/dev/null | \
+    while IFS='|' read -r name band idx _wifi_key host port user pass iso web oui proxy_type; do
       idx="$(trim_field "$idx")"
       case "$idx" in ''|*[!0-9]*|0*) continue;; esac
       [ "$idx" -ge 1 ] 2>/dev/null && [ "$idx" -le 200 ] 2>/dev/null || continue
       iso="$(trim_field "$iso")"; web="$(trim_field "$web")"
       oui="$(trim_field "$oui")"
+      proxy_type="$(trim_field "${proxy_type:-socks5}")"
+      case "$proxy_type" in socks5|http) :;; *) proxy_type="socks5";; esac
       mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
       jq -n --arg name "$name" --arg band "$band" --argjson idx "$idx" \
             --arg host "$host" --arg port "$(trim_field "$port")" --arg user "$user" \
-            --arg oui "$oui" --arg mac "$mac" \
+            --arg oui "$oui" --arg mac "$mac" --arg proxy_type "$proxy_type" \
             --argjson iso "$([ "$iso" = 1 ] && echo true || echo false)" \
             --argjson web "$([ "$web" = 1 ] && echo true || echo false)" \
-        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui,macaddr:$mac}'
+        '{name:$name,band:$band,idx:$idx,host:$host,port:$port,proxy_type:$proxy_type,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui,macaddr:$mac}'
     done; } | jq -s 'sort_by(.idx)'
 }
 
@@ -259,13 +261,15 @@ case "$ACTION" in
         else all(explode[]; . >= 32 and (. < 127 or . > 159)) end;
       (.idx | integer) and (.host | clean) and (.port | integer) and
       ((has("user") | not) or (.user | clean)) and
-      ((has("pass") | not) or (.pass | clean))
-    ' "idx/host/port/user/pass sai kiểu hoặc chứa ký tự điều khiển"
+      ((has("pass") | not) or (.pass | clean)) and
+      ((has("type") | not) or (.type == "socks5" or .type == "http"))
+    ' "idx/host/port/user/pass/type sai kiểu hoặc chứa ký tự điều khiển"
     idx="$(jq -r '.idx' "$BODY_FILE")"
     host="$(jq -r '.host' "$BODY_FILE")"
     port="$(jq -r '.port' "$BODY_FILE")"
     user="$(jq -r '.user // ""' "$BODY_FILE")"
     pass="$(jq -r '.pass // ""' "$BODY_FILE")"
+    proxy_type="$(jq -r '.type // "socks5"' "$BODY_FILE")"
     [ -n "$idx" ] && [ -n "$host" ] && [ -n "$port" ] || json_err "400 Bad Request" "thiếu idx/host/port"
     require_valid_idx "$idx"
     case "$port" in *[!0-9]*|'') json_err "400 Bad Request" "port không hợp lệ" ;; esac
@@ -276,7 +280,7 @@ case "$ACTION" in
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] \
       || json_err "400 Bad Request" "user/pass dài quá 255 ký tự"
     case "$user$pass" in *'|'*) json_err "400 Bad Request" "user/pass không được chứa ký tự |" ;; esac
-    OUT="$(cd "$SB_ROOT" && sh scripts/set-sock.sh "$idx" "$host" "$port" "$user" "$pass" 2>&1)"; RC=$?
+    OUT="$(cd "$SB_ROOT" && sh scripts/set-sock.sh "$idx" "$host" "$port" "$user" "$pass" "$proxy_type" 2>&1)"; RC=$?
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 

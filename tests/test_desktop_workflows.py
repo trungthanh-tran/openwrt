@@ -460,32 +460,35 @@ class GatewayWorkflowTests(unittest.TestCase):
         instance = self.make_instance("vi")
         instance.render_gateway(self.gateway_payload())
         values = instance.gateway_iface_combo.options["values"]
-        self.assertEqual(len(values), 5)                      # automatic + four
-        self.assertTrue(values[0].startswith("Tự động (wan)"))  # the live uplink
+        self.assertEqual(len(values), 4)                      # automatic + three uplinks
+        self.assertTrue(values[0].endswith("Tự động (wan)"))  # the live uplink
         self.assertIn("wan (eth1) · 192.168.88.74 · đang dùng", values)
         self.assertIn("lan (br-lan) · 192.168.1.1", values)
         self.assertIn("wwan (phy0-sta0) · không hoạt động", values)
-        self.assertIn("w1 (br-w1) · 192.168.11.1 · SSID proxy", values)
+        self.assertNotIn("w1", " ".join(values))
+        self.assertEqual(instance.gateway_iface_combo.options["style"], "GatewayUp.TCombobox")
 
     def test_automatic_is_selected_when_no_interface_is_pinned(self):
         instance = self.make_instance("en")
         instance.render_gateway(self.gateway_payload())
-        self.assertEqual(instance.gateway_iface_var.get(), "Automatic (wan)")
+        self.assertTrue(instance.gateway_iface_var.get().endswith("Automatic (wan)"))
         self.assertEqual(instance.gateway_iface_choices[instance.gateway_iface_var.get()], "")
 
     def test_a_pinned_interface_is_preselected(self):
         instance = self.make_instance("en")
         instance.render_gateway(self.gateway_payload(expected_interface="wwan"))
         selected = instance.gateway_iface_var.get()
-        self.assertTrue(selected.startswith("wwan"))
+        self.assertIn("wwan", selected)
         self.assertEqual(instance.gateway_iface_choices[selected], "wwan")
+        self.assertEqual(instance.gateway_iface_combo.options["style"], "GatewayDown.TCombobox")
 
     def test_choosing_an_interface_saves_it_and_reloads_the_card(self):
         instance = self.make_instance("en")
         instance.render_gateway(self.gateway_payload())
         # The router answers the follow-up read with the pin now in place.
         instance.client.gateway_result = self.gateway_payload(expected_interface="wwan")
-        instance.gateway_iface_var.set("wwan (phy0-sta0) · down")
+        wwan = next(label for label, name in instance.gateway_iface_choices.items() if name == "wwan")
+        instance.gateway_iface_var.set(wwan)
         instance._on_gateway_interface_changed()
         self.assertEqual(instance.client.calls, [("set_gateway", "wwan"), ("gateway",)])
         self.assertEqual(instance.gateway_iface_choices[instance.gateway_iface_var.get()], "wwan")
@@ -493,7 +496,8 @@ class GatewayWorkflowTests(unittest.TestCase):
     def test_choosing_automatic_clears_the_pin(self):
         instance = self.make_instance("en")
         instance.render_gateway(self.gateway_payload(expected_interface="wwan"))
-        instance.gateway_iface_var.set("Automatic (wan)")
+        automatic = next(label for label, name in instance.gateway_iface_choices.items() if name == "")
+        instance.gateway_iface_var.set(automatic)
         instance._on_gateway_interface_changed()
         self.assertEqual(instance.client.calls[0], ("set_gateway", ""))
 
@@ -839,6 +843,20 @@ class DataExportAndBackupTests(unittest.TestCase):
         self.assertEqual(instance.root.jobs[0][1], 7000)
 
 
+class DialogGeometryTests(unittest.TestCase):
+    def test_dialogs_are_centered_on_the_screen(self):
+        window = mock.Mock()
+        window.winfo_width.return_value = 1
+        window.winfo_height.return_value = 1
+        window.winfo_reqwidth.return_value = 600
+        window.winfo_reqheight.return_value = 300
+        window.winfo_screenwidth.return_value = 1920
+        window.winfo_screenheight.return_value = 1080
+        appmod.center_dialog(window)
+        window.update_idletasks.assert_called_once()
+        window.geometry.assert_called_once_with("+660+390")
+
+
 class WifiMutationTests(unittest.TestCase):
     def test_delete_wifi_requires_selection_and_confirmation(self):
         instance = bare_app()
@@ -874,11 +892,12 @@ class AgentCompatibilityTests(unittest.TestCase):
         instance.append_log = mock.Mock()
         instance.update_setup_banner = mock.Mock()
         instance.upgrade_agent = mock.Mock()
+        instance.reinstall_agent_over_ssh = mock.Mock()
         return instance
 
     def test_a_matching_agent_needs_no_action(self):
         instance = self.compat_app(appmod.APP_VERSION)
-        with mock.patch.object(appmod.messagebox, "askyesno") as ask, \
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice") as ask, \
              mock.patch.object(appmod.messagebox, "showerror") as error:
             instance.evaluate_agent_compatibility()
         self.assertFalse(instance.agent_outdated)
@@ -889,7 +908,7 @@ class AgentCompatibilityTests(unittest.TestCase):
 
     def test_an_unreadable_agent_version_is_not_treated_as_a_mismatch(self):
         instance = self.compat_app("")
-        with mock.patch.object(appmod.messagebox, "askyesno") as ask:
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice") as ask:
             instance.evaluate_agent_compatibility()
         self.assertFalse(instance.agent_outdated)
         self.assertFalse(instance.agent_too_new)
@@ -897,23 +916,30 @@ class AgentCompatibilityTests(unittest.TestCase):
 
     def test_an_older_agent_is_offered_an_upgrade_once(self):
         instance = self.compat_app("0.3.0")
-        with mock.patch.object(appmod.messagebox, "askyesno", return_value=True) as ask:
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice", return_value="api") as ask:
             instance.evaluate_agent_compatibility()
         self.assertTrue(instance.agent_outdated)
         ask.assert_called_once()
         instance.upgrade_agent.assert_called_once()
         # A second connect must not nag again unless the user asks for it.
-        with mock.patch.object(appmod.messagebox, "askyesno") as ask_again:
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice") as ask_again:
             instance.evaluate_agent_compatibility()
         ask_again.assert_not_called()
 
     def test_declining_the_upgrade_leaves_the_banner_asking(self):
         instance = self.compat_app("0.3.0")
-        with mock.patch.object(appmod.messagebox, "askyesno", return_value=False):
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice", return_value=None):
             instance.evaluate_agent_compatibility()
         instance.upgrade_agent.assert_not_called()
         self.assertTrue(instance.agent_outdated)
         self.assertIn("0.3.0", instance.setup_hint_var.get())
+
+    def test_an_old_agent_can_be_reinstalled_over_ssh_from_the_dialog(self):
+        instance = self.compat_app("0.3.0")
+        with mock.patch.object(appmod, "ask_agent_upgrade_choice", return_value="ssh"):
+            instance.evaluate_agent_compatibility()
+        instance.upgrade_agent.assert_not_called()
+        instance.reinstall_agent_over_ssh.assert_called_once()
 
     def test_a_newer_agent_blocks_every_mutation(self):
         instance = self.compat_app("9.9.9")

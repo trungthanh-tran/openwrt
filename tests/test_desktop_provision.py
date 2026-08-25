@@ -184,6 +184,20 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertEqual(skipped, {"Chạy apply.sh khởi tạo"})
         self.assertNotIn("sh scripts/apply.sh", " ".join(runner.remote_commands()).replace("DRYRUN=1 sh scripts/apply.sh", ""))
 
+    def test_agent_only_reinstall_never_touches_dependencies_or_configuration(self):
+        self.settings.agent_only = True
+        self.settings.reinstall_agent = True
+        runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})
+        ok, _provisioner = self.run_full(runner)
+        self.assertTrue(ok)
+        remote = " ; ".join(runner.remote_commands())
+        self.assertIn("tar xzf", remote)
+        self.assertIn("sh agent/install-agent.sh", remote)
+        self.assertNotIn("install-deps.sh", remote)
+        self.assertNotIn("scripts/preflight.sh", remote)
+        self.assertNotIn("sh scripts/apply.sh", remote)
+        self.assertEqual(runner.uploaded_to()[1:], [])
+
     def test_a_router_without_a_configuration_gets_an_empty_documented_one(self):
         """Nothing ships wifi-socks.conf: the real file is never committed.
 
@@ -513,6 +527,7 @@ class VersionCompatibilityTests(unittest.TestCase):
             captured["method"] = request.get_method()
             captured["body"] = request.data
             captured["type"] = request.get_header("Content-type")
+            captured["length"] = request.get_header("Content-length")
             return Response()
 
         with mock.patch.object(appmod, "urlopen", fake_urlopen):
@@ -521,6 +536,7 @@ class VersionCompatibilityTests(unittest.TestCase):
         self.assertEqual(captured["method"], "POST")
         self.assertEqual(captured["body"], b"tarball-bytes")
         self.assertEqual(captured["type"], "application/octet-stream")
+        self.assertEqual(captured["length"], str(len(b"tarball-bytes")))
         self.assertIn("action=update", captured["url"])
         self.assertNotIn("force", captured["url"])
 

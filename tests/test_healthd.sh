@@ -49,6 +49,7 @@ Slow|5g|2|password12|slow.example|2080|alice|secret|1|1
 Edge|2g|3|password12|edge.example|3080|||1|1
 BadCode|2g|4|password12|badcode.example|4080|||1|1
 Offline|5g|5|password12|offline.example|5080|||1|1
+Http|2g|6|password12|http.example|6080|bob|pw|1|1||http
 
 EOF
 
@@ -65,7 +66,7 @@ export PATH="$BIN:$PATH"
 export PROBE_URL='https://probe.example/204' PROBE_TIMEOUT=3 SLOW_MS=800
 if sh "$HEALTHD" --once; then ok "--once succeeds"; else no "--once succeeds"; fi
 if jq -e . "$HEALTH_FILE" >/dev/null 2>&1; then ok "health output is valid JSON"; else no "health output is valid JSON"; fi
-eq "all configured probes emitted" "$(jq '.probes | length' "$HEALTH_FILE")" '5'
+eq "all configured probes emitted" "$(jq '.probes | length' "$HEALTH_FILE")" '6'
 eq "204 below threshold is ok" "$(jq -r '.probes["1"].state' "$HEALTH_FILE")" 'ok'
 eq "latency rounds to milliseconds" "$(jq -r '.probes["1"].latency_ms' "$HEALTH_FILE")" '100'
 eq "latency above threshold is slow" "$(jq -r '.probes["2"].state' "$HEALTH_FILE")" 'slow'
@@ -77,6 +78,7 @@ eq "curl transport failure code defaults zero" "$(jq -r '.probes["5"].code' "$HE
 if jq -e '.ts | type == "number" and . > 0' "$HEALTH_FILE" >/dev/null; then ok "timestamp is numeric"; else no "timestamp is numeric"; fi
 contains "unauthenticated proxy URL uses socks5h" "$(cat "$CURL_CALLS")" 'socks5h://fast.example:1080'
 contains "authenticated proxy URL uses credentials" "$(cat "$CURL_CALLS")" 'socks5h://alice:secret@slow.example:2080'
+contains "HTTP proxy URL uses HTTP scheme" "$(cat "$CURL_CALLS")" 'http://bob:pw@http.example:6080'
 if find "$TMP" -maxdepth 1 -name 'health.json.tmp.*' | grep -q .; then no "temporary output cleaned"; else ok "temporary output cleaned"; fi
 
 echo "== health daemon edge failures =="

@@ -481,6 +481,12 @@ EN_TRANSLATIONS = {
     "Chọn thiết bị trong bảng để điều khiển": "Select devices in the table to control",
     "Chọn một backup để khôi phục": "Select a backup to restore",
     "Đổi SOCKS5": "Change SOCKS5",
+    "Loại proxy": "Proxy type",
+    "Nhập nhanh proxy": "Quick proxy input",
+    "Tách & điền": "Parse & fill",
+    "Nhập proxy theo dạng host:port:user:password": "Enter the proxy as host:port:user:password",
+    "Chuỗi proxy nhập nhanh không hợp lệ": "Invalid quick proxy value",
+    "Loại proxy phải là SOCKS5 hoặc HTTP": "Proxy type must be SOCKS5 or HTTP",
     "Agent trả dữ liệu không phải JSON": "The Agent returned non-JSON data",
     "Agent trả JSON không phải object": "The Agent returned JSON that is not an object",
     "Agent báo lỗi": "The Agent reported an error",
@@ -515,6 +521,13 @@ EN_TRANSLATIONS = {
     "Bỏ qua": "Skipped",
     'Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn': 'The router runs a newer build than this package; use a newer console',
     'Nâng cấp agent': 'Upgrade the agent',
+    'Cài đè agent qua SSH': 'Reinstall the agent over SSH',
+    'Nâng cấp tự động': 'Automatic upgrade',
+    'Để sau': 'Later',
+    'CẬP NHẬT AGENT': 'UPDATE AGENT',
+    'Chọn cách cập nhật phù hợp. Cả hai cách đều giữ nguyên wifi-socks.conf và settings.sh.': 'Choose an update method. Both methods preserve wifi-socks.conf and settings.sh.',
+    'Dùng API self-update của agent. Nhanh nhất khi agent hiện tại hoạt động bình thường.': 'Use the agent self-update API. This is fastest when the current agent works normally.',
+    'Dùng SSH để cài đè agent, dành cho agent cũ bị lỗi nhận diện gói .tar.gz. Không chạy apply cấu hình.': 'Use SSH to reinstall the agent when an old agent cannot recognize .tar.gz packages. Configuration is not applied.',
     'Đang nâng cấp agent…': 'Upgrading the agent…',
     'Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn; console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.': 'The router runs agent v{agent}, newer than console v{app}. Use a newer console; this one is read-only and every change is blocked.',
     'Agent trên router là v{agent}, cũ hơn console v{app}.': 'The router runs agent v{agent}, older than console v{app}.',
@@ -631,6 +644,14 @@ EN_TRANSLATIONS = {
     'Gói cập nhật rỗng': 'The update package is empty',
     'Đường ra': 'Egress',
     'Đang đổi đường ra…': 'Changing the egress…',
+    'Đang cập nhật gateway trên router…': 'Updating the gateway setting on the router…',
+    'Đang lưu lựa chọn gateway…': 'Saving the gateway selection…',
+    'Đã lưu lựa chọn; đang kiểm tra kết nối qua gateway…': 'Selection saved; checking connectivity through the gateway…',
+    'Đã cập nhật gateway: {interface}': 'Gateway updated: {interface}',
+    'Cài agent riêng — bỏ qua gói phụ thuộc': 'Agent-only install — dependencies are unchanged',
+    'Cài agent riêng — giữ nguyên cấu hình': 'Agent-only install — configuration is preserved',
+    'Cài agent riêng — không chạy preflight': 'Agent-only install — preflight is skipped',
+    'Cài agent riêng — không apply cấu hình': 'Agent-only install — configuration is not applied',
     'Đường ra: dùng {interface}': 'Egress: using {interface}',
     'tự động': 'automatic',
     'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
@@ -1120,6 +1141,7 @@ class ProvisionSettings:
     run_apply: bool = True
     overwrite_config: bool = False
     reinstall_agent: bool = False
+    agent_only: bool = False
 
     def validate(self) -> None:
         if not str(self.host).strip():
@@ -1598,6 +1620,8 @@ class ProvisionRunner:
             shutil.rmtree(workdir, ignore_errors=True)
 
     def step_install_deps(self) -> str:
+        if self.settings.agent_only:
+            return Skipped("Cài agent riêng — bỏ qua gói phụ thuộc")
         if self.inventory.get("deps"):
             return ""  # sing-box is already installed; nothing to add
         output = self.ssh(
@@ -1608,6 +1632,8 @@ class ProvisionRunner:
         return lines[-1] if lines else "OK"
 
     def step_push_config(self) -> str:
+        if self.settings.agent_only:
+            return Skipped("Cài agent riêng — giữ nguyên cấu hình")
         remote = self.settings.remote_dir
         if self.inventory.get("conf") and not self.settings.overwrite_config:
             return ""  # the router already has a configuration; keep it
@@ -1646,7 +1672,7 @@ class ProvisionRunner:
             "grep '^#' config/wifi-socks.conf.example > config/wifi-socks.conf; "
             "else { "
             "echo '# wifi-socks.conf - one Wi-Fi per row, fields separated by |'; "
-            "echo '# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc|mac_oui'; "
+            "echo '# name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type'; "
             "} > config/wifi-socks.conf; fi; "
             "chmod 600 config/wifi-socks.conf; echo state=created",
             "Tạo wifi-socks.conf trống", timeout=90,
@@ -1669,6 +1695,8 @@ class ProvisionRunner:
         return "have=1" in answer
 
     def step_preflight(self) -> str:
+        if self.settings.agent_only:
+            return Skipped("Cài agent riêng — không chạy preflight")
         self.ssh(f"cd {self.settings.remote_dir}; sh scripts/preflight.sh", "Chạy preflight", timeout=600)
         # apply.sh refuses to run without a configuration, and starting without
         # one is a supported path: Wi-Fi entries get added in the console after
@@ -1680,6 +1708,8 @@ class ProvisionRunner:
         return "preflight + dry-run OK"
 
     def step_apply(self) -> str:
+        if self.settings.agent_only:
+            return Skipped("Cài agent riêng — không apply cấu hình")
         if not self.settings.run_apply:
             return ""
         if not self.router_has_config():
@@ -1802,6 +1832,13 @@ class AgentClient:
             else:
                 data = json.dumps(body).encode("utf-8")
                 headers["Content-Type"] = "application/json"
+            # CGI agents (especially uhttpd/dropbear-era deployments) rely on
+            # CONTENT_LENGTH to expose a POST body on stdin.  urllib normally
+            # adds this header later, but making it explicit is important for
+            # raw archive uploads: some frozen/runtime HTTP stacks otherwise
+            # send the request without a length and the CGI sees an empty
+            # temporary file, producing the misleading "not a .tar.gz" error.
+            headers["Content-Length"] = str(len(data))
         request = Request(url, data=data, headers=headers, method=method)
         started = time.monotonic()
         log.debug("agent %s %s (timeout=%ss, body=%s bytes)",
@@ -1862,6 +1899,7 @@ class AgentClient:
         return self._request("set_sock", "POST", {
             "idx": record.idx, "host": record.host, "port": record.port,
             "user": record.user, "pass": record.socks_password,
+            "type": record.proxy_type,
         }, timeout=60)
 
     def set_gateway(self, interface: str):
@@ -1900,6 +1938,25 @@ class AgentClient:
         return self._request("rollback", "POST", {"name": name}, timeout=180)
 
 
+def parse_proxy_compact(value: str) -> tuple[str, int, str, str]:
+    """Parse host:port:user:password copied from a proxy provider."""
+    if not isinstance(value, str):
+        raise ValueError("Chuỗi proxy nhập nhanh không hợp lệ")
+    parts = value.strip().split(":", 3)
+    if len(parts) != 4:
+        raise ValueError("Nhập proxy theo dạng host:port:user:password")
+    host, port_text, user, password = (part.strip() for part in parts)
+    if not host:
+        raise ValueError("Thiếu địa chỉ SOCKS5")
+    try:
+        port = int(port_text)
+    except ValueError as exc:
+        raise ValueError("Port SOCKS5 không hợp lệ") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError("Port SOCKS5 không hợp lệ")
+    return host, port, user, password
+
+
 @dataclass
 class WifiRecord:
     name: str
@@ -1913,14 +1970,17 @@ class WifiRecord:
     isolate: bool = True
     webrtc: bool = True
     mac_oui: str = ""
+    proxy_type: str = "socks5"
 
     @classmethod
     def from_row(cls, row: str) -> "WifiRecord":
         columns = row.rstrip("\r\n").split("|")
-        if len(columns) not in (10, 11):
-            raise ValueError(f"Dòng cấu hình cần 10 hoặc 11 cột: {row}")
+        if len(columns) not in (10, 11, 12):
+            raise ValueError(f"Dòng cấu hình cần 10, 11 hoặc 12 cột: {row}")
         if len(columns) == 10:
             columns.append("")
+        if len(columns) == 11:
+            columns.append("socks5")
         if columns[8].strip() not in ("0", "1") or columns[9].strip() not in ("0", "1"):
             raise ValueError("isolate và webrtc phải là 0 hoặc 1")
         record = cls(
@@ -1929,6 +1989,7 @@ class WifiRecord:
             port=int(columns[5].strip()), user=columns[6], socks_password=columns[7],
             isolate=columns[8].strip() == "1", webrtc=columns[9].strip() == "1",
             mac_oui=columns[10].strip(),
+            proxy_type=columns[11].strip().lower() or "socks5",
         )
         record.validate()
         return record
@@ -1962,6 +2023,8 @@ class WifiRecord:
             raise ValueError("Thông tin xác thực SOCKS5 quá dài")
         if isinstance(self.port, bool) or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
             raise ValueError("Port SOCKS5 không hợp lệ")
+        if self.proxy_type not in ("socks5", "http"):
+            raise ValueError("Loại proxy phải là SOCKS5 hoặc HTTP")
         if not isinstance(self.isolate, bool) or not isinstance(self.webrtc, bool):
             raise ValueError("isolate và webrtc phải là boolean")
         if not isinstance(self.mac_oui, str):
@@ -1976,6 +2039,7 @@ class WifiRecord:
             str(self.port), self.user, self.socks_password,
             "1" if self.isolate else "0", "1" if self.webrtc else "0",
             self.mac_oui.upper(),
+            self.proxy_type,
         ])
 
 
@@ -2000,7 +2064,7 @@ def render_conf(records: list[WifiRecord]) -> str:
     rows = [record.to_row() for record in sorted(records, key=lambda item: item.idx)]
     header = (
         "# wifi-socks.conf — generated by sbproxy Console Native\n"
-        "# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc|mac_oui\n"
+        "# name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type\n"
     )
     return header + "\n".join(rows) + ("\n" if rows else "")
 
@@ -2214,6 +2278,18 @@ def wifi_sort_key(record, column, health=None, runtime=None):
     return ""
 
 
+def center_dialog(window: tk.Toplevel) -> None:
+    """Place a dialog in the center of its current screen."""
+    window.update_idletasks()
+    width = max(window.winfo_width(), window.winfo_reqwidth())
+    height = max(window.winfo_height(), window.winfo_reqheight())
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    x = max(0, (screen_width - width) // 2)
+    y = max(0, (screen_height - height) // 2)
+    window.geometry(f"+{x}+{y}")
+
+
 class WifiDialog(tk.Toplevel):
     def __init__(self, parent, record: WifiRecord | None, next_idx: int, language="en", palette=None):
         super().__init__(parent)
@@ -2234,20 +2310,33 @@ class WifiDialog(tk.Toplevel):
             "user": tk.StringVar(value=record.user), "socks_password": tk.StringVar(value=record.socks_password),
             "vendor": tk.StringVar(value=vendor_label(record.mac_oui)), "isolate": tk.BooleanVar(value=record.isolate),
             "webrtc": tk.BooleanVar(value=record.webrtc),
+            "proxy_type": tk.StringVar(value=record.proxy_type.upper()),
         }
+        self.compact_socks = tk.StringVar()
         fields = [
             ("SSID", "name", None), ("Băng tần", "band", "combo"), ("IDX", "idx", None),
+            ("Loại proxy", "proxy_type", "proxy_type"),
             ("Mật khẩu Wi‑Fi", "wifi_password", "secret"), ("SOCKS host", "host", None),
             ("SOCKS port", "port", None), ("SOCKS user", "user", None),
             ("SOCKS password", "socks_password", "secret"), ("Hãng router / MAC", "vendor", "vendor"),
         ]
         body = ttk.Frame(self, padding=14)
         body.grid(sticky="nsew")
+        ttk.Label(body, text="Nhập nhanh proxy").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 8))
+        compact = ttk.Frame(body)
+        compact.grid(row=0, column=1, sticky="ew", pady=(0, 8))
+        compact_entry = ttk.Entry(compact, textvariable=self.compact_socks, width=27)
+        compact_entry.pack(side="left", fill="x", expand=True)
+        ttk.Button(compact, text="Tách & điền", command=self._fill_compact_socks).pack(side="left", padx=(8, 0))
+        compact_entry.bind("<Return>", lambda _event: self._fill_compact_socks())
         first = None
         for row, (label, key, kind) in enumerate(fields):
+            row += 1
             ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
             if kind == "combo":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=("2g", "5g"), state="readonly", width=33)
+            elif kind == "proxy_type":
+                widget = ttk.Combobox(body, textvariable=self.values[key], values=("SOCKS5", "HTTP"), state="readonly", width=33)
             elif kind == "vendor":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=vendor_choices(record.mac_oui), state="readonly", width=33)
             else:
@@ -2255,20 +2344,30 @@ class WifiDialog(tk.Toplevel):
             widget.grid(row=row, column=1, sticky="ew", pady=4)
             first = first or widget
         checks = ttk.Frame(body)
-        checks.grid(row=len(fields), column=0, columnspan=2, sticky="w", pady=(8, 4))
+        checks.grid(row=len(fields) + 1, column=0, columnspan=2, sticky="w", pady=(8, 4))
         ttk.Checkbutton(checks, text="Cách ly client", variable=self.values["isolate"]).pack(side="left", padx=(0, 18))
         ttk.Checkbutton(checks, text="Chặn WebRTC", variable=self.values["webrtc"]).pack(side="left")
         actions = ttk.Frame(body)
-        actions.grid(row=len(fields) + 1, column=0, columnspan=2, sticky="e", pady=(14, 0))
+        actions.grid(row=len(fields) + 2, column=0, columnspan=2, sticky="e", pady=(14, 0))
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Lưu", command=self._save).pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._save())
         self.bind("<Escape>", lambda _event: self.destroy())
-        self.update_idletasks()
-        self.geometry(f"+{parent.winfo_rootx() + 120}+{parent.winfo_rooty() + 70}")
         if first:
             first.focus_set()
         localize_widget_tree(self, self.language)
+        center_dialog(self)
+
+    def _fill_compact_socks(self):
+        try:
+            host, port, user, password = parse_proxy_compact(self.compact_socks.get())
+        except ValueError as exc:
+            messagebox.showerror(self.t("Dữ liệu không hợp lệ"), self.t(str(exc)), parent=self)
+            return
+        self.values["host"].set(host)
+        self.values["port"].set(str(port))
+        self.values["user"].set(user)
+        self.values["socks_password"].set(password)
 
     def _save(self):
         try:
@@ -2279,6 +2378,7 @@ class WifiDialog(tk.Toplevel):
                 user=self.values["user"].get(), socks_password=self.values["socks_password"].get(),
                 isolate=self.values["isolate"].get(), webrtc=self.values["webrtc"].get(),
                 mac_oui=vendor_oui(self.values["vendor"].get()),
+                proxy_type=self.values["proxy_type"].get().lower(),
             )
             result.validate()
         except (ValueError, TypeError) as exc:
@@ -2330,10 +2430,9 @@ class RandomMacDialog(tk.Toplevel):
         self._update_preview()
         self.bind("<Return>", lambda _event: self._submit())
         self.bind("<Escape>", lambda _event: self.destroy())
-        self.update_idletasks()
-        self.geometry(f"+{parent.winfo_rootx() + 180}+{parent.winfo_rooty() + 120}")
         provider.focus_set()
         localize_widget_tree(self, self.language)
+        center_dialog(self)
 
     def _update_preview(self):
         try:
@@ -2386,10 +2485,9 @@ class ManualBanDialog(tk.Toplevel):
         ttk.Button(actions, text="Thêm vào blocklist", command=self._submit, style="Danger.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._submit())
         self.bind("<Escape>", lambda _event: self.destroy())
-        self.update_idletasks()
-        self.geometry(f"+{parent.winfo_rootx() + 200}+{parent.winfo_rooty() + 140}")
         mac_entry.focus_set()
         localize_widget_tree(self, self.language)
+        center_dialog(self)
 
     def _submit(self):
         mac = self.mac_var.get().strip().lower()
@@ -2431,12 +2529,9 @@ class LoadingWindow(tk.Toplevel):
         self.progress.start(10)
         ttk.Label(body, textvariable=self.elapsed_var, style="Muted.TLabel").pack(anchor="e", pady=(9, 0))
 
-        self.update_idletasks()
-        x = parent.winfo_rootx() + max(20, (parent.winfo_width() - self.winfo_reqwidth()) // 2)
-        y = parent.winfo_rooty() + max(20, (parent.winfo_height() - self.winfo_reqheight()) // 2)
-        self.geometry(f"+{x}+{y}")
-        self.grab_set()
         localize_widget_tree(self, self.language)
+        center_dialog(self)
+        self.grab_set()
         self._tick()
 
     def _tick(self):
@@ -2684,6 +2779,7 @@ class SetupWizard(tk.Toplevel):
         self.apply_var = tk.BooleanVar(value=settings.run_apply)
         self.overwrite_var = tk.BooleanVar(value=settings.overwrite_config)
         self.reinstall_var = tk.BooleanVar(value=settings.reinstall_agent)
+        self.agent_only = bool(settings.agent_only)
         self.state_var = tk.StringVar(value=self.t("Chưa chạy bước nào"))
 
         body = ttk.Frame(self, style="Card.TFrame", padding=14)
@@ -2750,6 +2846,7 @@ class SetupWizard(tk.Toplevel):
         self.reset_steps()
         self.protocol("WM_DELETE_WINDOW", self.close)
         localize_widget_tree(self, self.language)
+        center_dialog(self)
         if autostart:
             # Reached from the locked console, where installing was already
             # chosen: do not ask the same question twice.
@@ -2796,6 +2893,7 @@ class SetupWizard(tk.Toplevel):
             run_apply=bool(self.apply_var.get()),
             overwrite_config=bool(self.overwrite_var.get()),
             reinstall_agent=bool(self.reinstall_var.get()),
+            agent_only=self.agent_only,
         )
         settings.validate()
         return settings
@@ -2990,6 +3088,76 @@ class SetupWizard(tk.Toplevel):
         self.destroy()
 
 
+class AgentUpgradeChoiceDialog(tk.Toplevel):
+    """Explicit three-way choice shown when the console finds an old agent."""
+
+    def __init__(self, parent, message, language="en", palette=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.choice = None
+        self.title(self.t("Nâng cấp agent"))
+        self.configure(bg=self.palette["bg"])
+        self.transient(parent)
+        self.resizable(False, False)
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=18)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="CẬP NHẬT AGENT", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(body, text=message, style="Muted.TLabel", wraplength=620).pack(
+            anchor="w", fill="x", pady=(6, 12)
+        )
+        ttk.Label(
+            body,
+            text="Chọn cách cập nhật phù hợp. Cả hai cách đều giữ nguyên wifi-socks.conf và settings.sh.",
+            style="Muted.TLabel", wraplength=620,
+        ).pack(anchor="w", fill="x", pady=(0, 14))
+
+        api = ttk.Frame(body, style="Card.TFrame")
+        api.pack(fill="x", pady=(0, 8))
+        ttk.Button(
+            api, text="Nâng cấp tự động", command=lambda: self.finish("api"),
+            style="Success.TButton", width=24,
+        ).pack(side="left")
+        ttk.Label(
+            api,
+            text="Dùng API self-update của agent. Nhanh nhất khi agent hiện tại hoạt động bình thường.",
+            style="Muted.TLabel", wraplength=390,
+        ).pack(side="left", padx=(12, 0))
+
+        ssh = ttk.Frame(body, style="Card.TFrame")
+        ssh.pack(fill="x", pady=(0, 14))
+        ttk.Button(
+            ssh, text="Cài đè agent qua SSH", command=lambda: self.finish("ssh"), width=24,
+        ).pack(side="left")
+        ttk.Label(
+            ssh,
+            text="Dùng SSH để cài đè agent, dành cho agent cũ bị lỗi nhận diện gói .tar.gz. Không chạy apply cấu hình.",
+            style="Muted.TLabel", wraplength=390,
+        ).pack(side="left", padx=(12, 0))
+
+        ttk.Button(body, text="Để sau", command=lambda: self.finish(None)).pack(anchor="e")
+        self.protocol("WM_DELETE_WINDOW", lambda: self.finish(None))
+        localize_widget_tree(self, self.language)
+        center_dialog(self)
+        self.grab_set()
+
+    def finish(self, choice):
+        self.choice = choice
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+
+
+def ask_agent_upgrade_choice(parent, message, language="en", palette=None):
+    dialog = AgentUpgradeChoiceDialog(parent, message, language, palette)
+    dialog.wait_window()
+    return dialog.choice
+
+
 class AgentUpdateWindow(tk.Toplevel):
     """Live checklist for an agent upgrade: every step, the router's own log."""
 
@@ -3043,6 +3211,7 @@ class AgentUpdateWindow(tk.Toplevel):
         self.close_button.pack(side="right")
         self.protocol("WM_DELETE_WINDOW", self.close)
         localize_widget_tree(self, self.language)
+        center_dialog(self)
         self.after(120, self.start)
 
     def append(self, text):
@@ -3130,6 +3299,7 @@ class NativeApp:
         self.gateway_payload = {}
         # Uplink choice: display label -> logical interface name ("" = automatic).
         self.gateway_iface_choices = {}
+        self.gateway_iface_states = {}
         self.gateway_syncing = False
         self.backup_names = []
         self.log_history = []
@@ -3260,6 +3430,13 @@ class NativeApp:
         style.configure("MetricGreen.TLabel", background=p["metric"], foreground=p["good_text"], font=("Segoe UI Semibold", 11))
         style.configure("MetricYellow.TLabel", background=p["metric"], foreground=p["warn_text"], font=("Segoe UI Semibold", 11))
         style.configure("MetricRed.TLabel", background=p["metric"], foreground=p["bad_text"], font=("Segoe UI Semibold", 11))
+        for name, color in (
+            ("GatewayUp.TCombobox", p["good_text"]),
+            ("GatewayDown.TCombobox", p["bad_text"]),
+            ("GatewayUnknown.TCombobox", p["text"]),
+        ):
+            style.configure(name, foreground=color, fieldbackground=p["input"])
+            style.map(name, foreground=[("readonly", color)], fieldbackground=[("readonly", p["input"])])
         style.configure("TButton", background=p["button"], foreground=p["text"], borderwidth=0, padding=(12, 8), font=("Segoe UI Semibold", 9))
         style.map("TButton", background=[("active", p["button_active"]), ("pressed", p["button_pressed"])])
         for name, color, active in (
@@ -3403,6 +3580,10 @@ class NativeApp:
         ttk.Button(self.setup_bar, text="Kiểm tra tình trạng", command=self.check_router_state).pack(side="right")
         self.upgrade_button = ttk.Button(self.setup_bar, text="Nâng cấp agent",
                                          command=self.upgrade_agent, style="Success.TButton")
+        self.ssh_upgrade_button = ttk.Button(
+            self.setup_bar, text="Cài đè agent qua SSH",
+            command=self.reinstall_agent_over_ssh,
+        )
         ttk.Button(self.setup_bar, text="Cài đặt sau khi flash…", command=self.open_setup_wizard,
                    style="Primary.TButton").pack(side="right", padx=(0, 8))
 
@@ -3426,6 +3607,7 @@ class NativeApp:
         ttk.Button(gateway_head, text="Kiểm tra cổng ra", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
         self.gateway_iface_combo = ttk.Combobox(
             gateway_head, textvariable=self.gateway_iface_var, state="readonly", width=34,
+            style="GatewayUnknown.TCombobox", postcommand=self._color_gateway_interface_menu,
         )
         self.gateway_iface_combo.pack(side="right", padx=(0, 8))
         self.gateway_iface_combo.bind("<<ComboboxSelected>>", self._on_gateway_interface_changed)
@@ -3537,7 +3719,7 @@ class NativeApp:
             ("Đẩy cấu hình & Apply", self.save_apply, "Success.TButton"),
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
-        columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "socks": "SOCKS5", "isolate": "Isolate", "webrtc": "WebRTC", "health": "Health"}
+        columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "socks": "Proxy", "isolate": "Isolate", "webrtc": "WebRTC", "health": "Health"}
         self.wifi_column_titles = columns.copy()
         self.wifi_tree = self._tree(tab, columns, {"idx": 50, "name": 150, "band": 55, "subnet": 130, "mac": 220, "socks": 195, "isolate": 70, "webrtc": 75, "health": 100})
         for column, title in columns.items():
@@ -3912,6 +4094,10 @@ class NativeApp:
             self.upgrade_button.pack(side="right", padx=(0, 8))
         elif not self.agent_outdated and self.upgrade_button.winfo_manager():
             self.upgrade_button.pack_forget()
+        if self.agent_outdated and not self.ssh_upgrade_button.winfo_manager():
+            self.ssh_upgrade_button.pack(side="right", padx=(0, 8))
+        elif not self.agent_outdated and self.ssh_upgrade_button.winfo_manager():
+            self.ssh_upgrade_button.pack_forget()
         if not needed:
             self.setup_bar.pack_forget()
         elif not self.setup_bar.winfo_manager():
@@ -4022,17 +4208,20 @@ class NativeApp:
         if self.upgrade_offered:
             return
         self.upgrade_offered = True
-        if messagebox.askyesno(
-            APP_NAME,
+        choice = ask_agent_upgrade_choice(
+            self.root,
             message + "\n\n" + self.t(
                 "Nâng cấp agent lên v{app} ngay bây giờ? Cấu hình wifi-socks.conf và settings.sh"
                 " trên router được giữ nguyên, router tự backup trước khi cập nhật.",
                 app=APP_VERSION,
             ),
-            default=messagebox.YES,
-            parent=self.root,
-        ):
+            self.language,
+            self.palette,
+        )
+        if choice == "api":
             self.upgrade_agent()
+        elif choice == "ssh":
+            self.reinstall_agent_over_ssh()
 
     def upgrade_agent(self):
         """Upload this console's router package; the agent keeps its config."""
@@ -4051,6 +4240,17 @@ class NativeApp:
             self.update_setup_banner()
             self.connect()
         AgentUpdateWindow(self.root, AgentUpdater(client), self.language, self.palette, on_success=done)
+
+    def reinstall_agent_over_ssh(self):
+        """Repair an old agent without touching router configuration."""
+        settings = load_provision_settings()
+        settings.host = settings.host or self.base_var.get().split("//")[-1].strip("/")
+        settings.payload = settings.payload or find_payload()
+        settings.agent_only = True
+        settings.reinstall_agent = True
+        settings.overwrite_config = False
+        settings.run_apply = False
+        self.open_setup_wizard(settings=settings)
 
     def adopt_router_settings(self, meta) -> None:
         """Take the router's own NET_BASE/TPROXY_PORT_BASE from status meta."""
@@ -4186,7 +4386,7 @@ class NativeApp:
         interfaces = payload.get("interfaces")
         interfaces = interfaces if isinstance(interfaces, list) else []
         current = ""
-        labels, mapping = [], {}
+        labels, mapping, states = [], {}, {}
         for entry in interfaces:
             if not isinstance(entry, dict):
                 continue
@@ -4206,16 +4406,18 @@ class NativeApp:
             elif not entry.get("up"):
                 parts.append("· không hoạt động" if self.language != "en" else "· down")
             if entry.get("proxied"):
-                parts.append("· SSID proxy" if self.language != "en" else "· proxied SSID")
+                continue
             label = " ".join(parts)
             labels.append(label)
             mapping[label] = name
+            states[label] = "up" if entry.get("up") else "down"
         automatic = (
             f"Tự động ({current})" if current else "Tự động"
         ) if self.language != "en" else (
             f"Automatic ({current})" if current else "Automatic"
         )
         mapping[automatic] = ""
+        states[automatic] = "up" if current else "down"
         values = [automatic] + labels
         expected = str(payload.get("expected_interface") or "")
         selected = automatic
@@ -4224,18 +4426,50 @@ class NativeApp:
                 selected = label
                 break
         self.gateway_iface_choices = mapping
+        self.gateway_iface_states = states
         self.gateway_syncing = True
         try:
             self.gateway_iface_combo.configure(values=values)
             self.gateway_iface_var.set(selected)
+            self._style_selected_gateway_interface(selected)
         finally:
             self.gateway_syncing = False
+
+    def _style_selected_gateway_interface(self, label=None):
+        label = self.gateway_iface_var.get() if label is None else label
+        state = self.gateway_iface_states.get(label, "unknown")
+        style = {
+            "up": "GatewayUp.TCombobox",
+            "down": "GatewayDown.TCombobox",
+        }.get(state, "GatewayUnknown.TCombobox")
+        self.gateway_iface_combo.configure(style=style)
+
+    def _color_gateway_interface_menu(self):
+        """Color rows after ttk has populated the native popdown listbox."""
+        self.root.after_idle(self._apply_gateway_interface_menu_colors)
+
+    def _apply_gateway_interface_menu_colors(self):
+        try:
+            popdown = self.root.tk.call("ttk::combobox::PopdownWindow", str(self.gateway_iface_combo))
+            listbox = f"{popdown}.f.l"
+            values = self.gateway_iface_combo.cget("values")
+            for index, label in enumerate(values):
+                state = self.gateway_iface_states.get(str(label), "unknown")
+                color = self.palette["good_text"] if state == "up" else (
+                    self.palette["bad_text"] if state == "down" else self.palette["text"]
+                )
+                self.root.tk.call(listbox, "itemconfigure", index, "-foreground", color)
+        except (tk.TclError, AttributeError):
+            # Themes/platforms without the standard ttk popdown still retain
+            # the selected-value color configured above.
+            pass
 
     def _on_gateway_interface_changed(self, _event=None):
         """Persist the operator's uplink choice on the router."""
         if self.gateway_syncing:
             return
         chosen = self.gateway_iface_var.get()
+        self._style_selected_gateway_interface(chosen)
         interface = self.gateway_iface_choices.get(chosen, "")
         if interface == str(self.gateway_payload.get("expected_interface") or ""):
             return  # nothing changed
@@ -4244,14 +4478,23 @@ class NativeApp:
             return
         client = self.require_client()
         def work():
+            self.update_loading("Đang lưu lựa chọn gateway…")
             client.set_gateway(interface)
+            self.update_loading("Đã lưu lựa chọn; đang kiểm tra kết nối qua gateway…")
             return client.gateway()
         def done(payload):
-            self.append_log(self.t(
-                "Đường ra: dùng {interface}", interface=interface or self.t("tự động"),
-            ))
+            selected = interface or self.t("tự động")
+            message = self.t("Đã cập nhật gateway: {interface}", interface=selected)
+            self.append_log(message)
+            self.status_var.set(message)
             self.render_gateway(payload)
-        self.run_task("Đang đổi đường ra…", work, done)
+        self.run_task(
+            "Đang cập nhật gateway trên router…",
+            work,
+            done,
+            show_loading=True,
+            timeout_hint=45,
+        )
 
     def refresh_gateway(self):
         try:
@@ -4401,9 +4644,9 @@ class NativeApp:
             return
         updated = dialog.result
         action = (
-            f"Change the SOCKS5 endpoint used by SSID {record.name}."
+            f"Change the {updated.proxy_type.upper()} proxy used by SSID {record.name}."
             if self.language == "en" else
-            f"Đổi endpoint SOCKS5 đang dùng cho SSID {record.name}."
+            f"Đổi proxy {updated.proxy_type.upper()} đang dùng cho SSID {record.name}."
         )
         impact = (
             "The change is sent to the router immediately. Existing sessions may disconnect, and an invalid endpoint may leave the SSID without Internet access."
@@ -4608,7 +4851,8 @@ class NativeApp:
                 tag = "error"
             row_tag = "row_even" if pos % 2 == 0 else "row_odd"
             tags = (row_tag, tag) if tag else (row_tag,)
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, f"{record.host}:{record.port}", self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
+            proxy_display = f"{record.proxy_type.upper()} · {record.host}:{record.port}"
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
         self.update_client_filter_options()
         self.update_wifi_editor()
 

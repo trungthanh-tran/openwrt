@@ -56,10 +56,14 @@ validate_conf() {
   awk -F'|' -v net_base="${NET_BASE:-10}" -v port_base="${TPROXY_PORT_BASE:-12000}" '
     function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
     /^#/ || /^[[:space:]]*$/ { next }
-    NF != 10 && NF != 11 { printf "line %d: expected 10 or 11 columns, found %d\n", NR, NF; bad=1; next }
+    NF != 10 && NF != 11 && NF != 12 { printf "line %d: expected 10, 11 or 12 columns, found %d\n", NR, NF; bad=1; next }
     {
       idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10); host=trim($5)
       oui=(NF==11)?trim($11):""
+      if (NF>=11) oui=trim($11)
+      proxy_type=(NF==12)?tolower(trim($12)):"socks5"
+      if (proxy_type == "") proxy_type="socks5"
+      if (proxy_type != "socks5" && proxy_type != "http") { printf "line %d: proxy_type must be socks5 or http\n", NR; bad=1 }
       if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "line %d: mac_oui must use the AA:BB:CC format or be empty\n", NR; bad=1 }
       # BusyBox awk can retain trim() results as pure strings and perform a
       # lexical comparison (for example, "3" > "200").  Coerce validated
@@ -209,14 +213,15 @@ gen_mac() {
 uci_dquote() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 # Iterate over valid SSID rows and call:
-#   cb name band idx key host port user pass isolate webrtc mac_oui
-# mac_oui (column 11) is optional; older 10-column configs pass it empty.
+#   cb name band idx key host port user pass isolate webrtc mac_oui proxy_type
+# Columns 11/12 are optional; legacy rows default to an empty OUI and SOCKS5.
 for_each_ssid() {
   _cb="$1"
-  while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui; do
+  while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui proxy_type extra; do
     case "$name" in ''|\#*) continue;; esac
+    [ -z "$extra" ] || { warn "Skipping row with too many columns: $name"; continue; }
     [ -n "$idx" ] || { warn "Skipping row with missing idx: $name"; continue; }
-    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui"
+    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui" "${proxy_type:-socks5}"
   done < "$CONF"
 }
 
@@ -386,7 +391,7 @@ build_singbox() {
   dns_upstream_json="$(jq -Rn --arg v "${DNS_UPSTREAM:-1.1.1.1}" '$v')"
   inbounds=""; outbounds=""; rules=""; sep=""
   _sb_row() {
-    name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"
+    name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"; proxy_type="${12:-socks5}"
     tp="$(tproxy_port "$idx")"
     inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp}"
     host_json="$(jq -Rn --arg v "$host" '$v')"
@@ -394,9 +399,13 @@ build_singbox() {
       user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
       auth=",\"username\":$user_json,\"password\":$pass_json"
     else auth=""; fi
-    # Use TCP-only SOCKS upstreams. UDP/QUIC is blocked in nftables so web
-    # clients fall back to TCP HTTP/HTTPS, which all SOCKS5 providers support.
-    outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\",\"network\":\"tcp\"$auth}"
+    # Both supported upstream types are TCP-only. UDP/QUIC is blocked so web
+    # clients fall back to TCP HTTP/HTTPS through the selected proxy.
+    if [ "$proxy_type" = "http" ]; then
+      outbounds="$outbounds$sep{\"type\":\"http\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port$auth}"
+    else
+      outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\",\"network\":\"tcp\"$auth}"
+    fi
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
     sep=","
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"

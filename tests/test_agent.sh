@@ -46,7 +46,7 @@ SH
 
 cat > "$SB_ROOT/scripts/set-sock.sh" <<'SH'
 #!/bin/sh
-printf 'set-sock:%s:%s:%s:%s:%s:%s\n' "$#" "$1" "$2" "$3" "${4:-}" "${5:-}" >> "$CALLS"
+printf 'set-sock:%s:%s:%s:%s:%s:%s:%s\n' "$#" "$1" "$2" "$3" "${4:-}" "${5:-}" "${6:-}" >> "$CALLS"
 echo "set-sock output"
 exit "${SET_SOCK_RC:-0}"
 SH
@@ -380,7 +380,10 @@ done
 eq "invalid SOCKS payloads invoke no script" "$(wc -l < "$CALLS" | tr -d ' ')" '0'
 out="$(auth_run POST 'action=set_sock' '{"idx":1,"host":"proxy.example","port":1080,"user":"alice smith","pass":"safe pass"}')"
 eq "set_sock success" "$(json_value "$out" '.ok')" 'true'
-contains "set_sock preserves quoted arguments" "$(cat "$CALLS")" 'set-sock:5:1:proxy.example:1080:alice smith:safe pass'
+contains "set_sock preserves quoted arguments" "$(cat "$CALLS")" 'set-sock:6:1:proxy.example:1080:alice smith:safe pass:socks5'
+out="$(auth_run POST 'action=set_sock' '{"idx":1,"host":"http.example","port":8080,"type":"http"}')"
+eq "set_sock accepts HTTP proxy type" "$(json_value "$out" '.ok')" 'true'
+contains "set_sock forwards HTTP proxy type" "$(cat "$CALLS")" 'set-sock:6:1:http.example:8080:::http'
 export SET_SOCK_RC=4
 out="$(auth_run POST 'action=set_sock' '{"idx":1,"host":"proxy","port":1080}')"
 eq "set_sock script failure propagates" "$(json_value "$out" '.ok,.rc' | paste -sd ':')" 'false:4'

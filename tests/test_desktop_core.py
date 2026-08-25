@@ -327,10 +327,26 @@ class AgentClientRequestTests(unittest.TestCase):
             request.assert_called_once_with("set_sock", "POST", {
                 "idx": 1, "host": "proxy.example", "port": 1080,
                 "user": "alice", "pass": "secret123",
+                "type": "socks5",
             }, timeout=60)
 
 
 class WifiRecordTests(unittest.TestCase):
+    def test_parse_compact_proxy(self):
+        parsed = app.parse_proxy_compact(
+            " 81.22.139.101:12323:14a24cde3eaec:51dd401c3f\t "
+        )
+        self.assertEqual(parsed, ("81.22.139.101", 12323, "14a24cde3eaec", "51dd401c3f"))
+
+    def test_parse_compact_proxy_preserves_colons_in_password(self):
+        parsed = app.parse_proxy_compact("proxy.example:1080:user:pass:with:colons")
+        self.assertEqual(parsed, ("proxy.example", 1080, "user", "pass:with:colons"))
+
+    def test_parse_compact_proxy_rejects_invalid_input(self):
+        for value in ("", "proxy:1080", "proxy:not-a-port:user:pass", "proxy:65536:user:pass"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                app.parse_proxy_compact(value)
+
     def test_parse_10_and_11_column_rows(self):
         ten = "A|2g|1|password12|proxy|1080|||1|0"
         eleven = ten + "|aa:bb:cc\r\n"
@@ -338,7 +354,7 @@ class WifiRecordTests(unittest.TestCase):
         self.assertEqual(app.WifiRecord.from_row(eleven).mac_oui, "aa:bb:cc")
 
     def test_wrong_column_counts_rejected(self):
-        for count in (0, 1, 9, 12):
+        for count in (0, 1, 9, 13):
             row = "|".join(["x"] * count)
             with self.subTest(count=count), self.assertRaises(ValueError):
                 app.WifiRecord.from_row(row)
@@ -393,7 +409,11 @@ class WifiRecordTests(unittest.TestCase):
 
     def test_to_row_normalizes_flags_and_oui(self):
         row = valid_record(isolate=False, webrtc=True, mac_oui="aa:bb:cc").to_row()
-        self.assertEqual(row.split("|")[8:], ["0", "1", "AA:BB:CC"])
+        self.assertEqual(row.split("|")[8:], ["0", "1", "AA:BB:CC", "socks5"])
+
+    def test_http_proxy_type_round_trip(self):
+        record = valid_record(proxy_type="http")
+        self.assertEqual(app.WifiRecord.from_row(record.to_row()).proxy_type, "http")
 
     def test_parse_ignores_comments_blank_lines_and_sorts(self):
         content = """# header

@@ -1,5 +1,5 @@
 #!/bin/sh
-# sbproxy-healthd — probe each SOCKS5 endpoint and write latency JSON for the UI.
+# sbproxy-healthd — probe each proxy endpoint and write latency JSON for the UI.
 # Installed at /usr/sbin/sbproxy-healthd; runs under procd or once with --once.
 #
 # Output format in $HEALTH_FILE:
@@ -22,9 +22,10 @@ command -v curl >/dev/null 2>&1 || { echo "healthd: curl is missing"; exit 1; }
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 
 probe_one() {
-  # Arguments: host port user pass; output: "state latency_ms code".
-  host="$1"; port="$2"; user="$3"; pass="$4"
-  if [ -n "$user" ]; then px="socks5h://$user:$pass@$host:$port"; else px="socks5h://$host:$port"; fi
+  # Arguments: host port user pass type; output: "state latency_ms code".
+  host="$1"; port="$2"; user="$3"; pass="$4"; proxy_type="${5:-socks5}"
+  [ "$proxy_type" = "http" ] && scheme="http" || scheme="socks5h"
+  if [ -n "$user" ]; then px="$scheme://$user:$pass@$host:$port"; else px="$scheme://$host:$port"; fi
   # %{http_code} %{time_total}
   res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
          -w '%{http_code} %{time_total}' "$PROBE_URL" 2>/dev/null)"
@@ -43,9 +44,11 @@ run_once() {
   [ -r "$CONF" ] || { echo "healthd: cannot read config $CONF" >&2; return 1; }
   probes="{}"
   # Read the source configuration.
-  while IFS='|' read -r name band idx wifi_key host port user pass isolate webrtc _oui extra; do
+  while IFS='|' read -r name band idx wifi_key host port user pass isolate webrtc _oui proxy_type extra; do
     case "$name" in ''|\#*) continue;; esac
     [ -z "$extra" ] || continue
+    proxy_type="$(trim_field "${proxy_type:-socks5}")"
+    case "$proxy_type" in socks5|http) :;; *) continue;; esac
     band="$(trim_field "$band")"
     isolate="$(trim_field "$isolate")"; webrtc="$(trim_field "$webrtc")"
     case "$band" in 2g|5g) :;; *) continue;; esac
@@ -63,7 +66,7 @@ run_once() {
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || continue
     # probe_one emits exactly three whitespace-free fields.
     # shellcheck disable=SC2046
-    set -- $(probe_one "$host" "$port" "$user" "$pass")
+    set -- $(probe_one "$host" "$port" "$user" "$pass" "$proxy_type")
     state="$1"; ms="$2"; code="$3"
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" \
               --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
