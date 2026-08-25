@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-08-25
+
 ### Fixed
 - **Khung Internet Gateway luôn báo “degraded · NOT VIA wwan” trên router dùng
   WAN dây.** `install-agent.sh` ghi cứng `GATEWAY_EXPECTED_INTERFACE=wwan` vào
