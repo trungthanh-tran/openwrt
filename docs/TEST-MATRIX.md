@@ -74,7 +74,7 @@ Suite: `tests/test_desktop_provision.py`
 ## Dirty and adversarial data
 
 Suite: `tests/test_dirty_data.py`, plus dirty-input sections in
-`tests/test_agent.sh`, `tests/test_healthd.sh`, and `tests/run.sh`.
+`tests/test_agent.sh`, `tests/test_healthd.sh`, `tests/test_gateway.sh`, and `tests/run.sh`.
 
 | Trust boundary | Cases locked by tests |
 |---|---|
@@ -137,6 +137,19 @@ Suite: `tests/test_healthd.sh`
 - Verifies missing config and missing `jq` fail without publishing output.
 - Skips malformed config rows and normalizes malformed/`NaN` probe output to a
   safe failure object without calling curl for rejected rows.
+
+## Internet gateway
+
+Suite: `tests/test_gateway.sh`
+
+- `ip`, `ubus`, `curl` and `nslookup` are stubbed, so every egress shape runs on
+  a workstation: wired WAN, Wi-Fi as WAN, a pinned `GATEWAY_EXPECTED_INTERFACE`,
+  a routing loop through a proxied SSID bridge, no default route, broken DNS and
+  a failing HTTP probe.
+- Asserts the reported state, the resolved logical interface and device, and the
+  `egress_problem` verdict (`""`, `proxied-bridge`, `not-expected`).
+- Guards the rule that any uplink the default route picks is acceptable unless
+  an interface is pinned.
 
 ## Web console translations
 

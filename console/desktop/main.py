@@ -3824,7 +3824,8 @@ class NativeApp:
         self.gateway_state_var.set(self.t(text))
         self.gateway_state_label.configure(style=style)
 
-        expected = str(payload.get("expected_interface") or "wwan")
+        # Empty means the agent accepts whatever uplink the default route uses.
+        expected = str(payload.get("expected_interface") or "")
         logical = str(payload.get("interface") or "—")
         device = str(payload.get("device") or "—")
         via = str(payload.get("gateway") or ("direct" if self.language == "en" else "trực tiếp"))
@@ -3835,7 +3836,16 @@ class NativeApp:
             f"Đường ra: {logical}/{device} · qua {via} · IP nguồn {source}"
         )
         if payload.get("expected_active") is False:
-            route += f" · NOT VIA {expected}" if self.language == "en" else f" · KHÔNG QUA {expected}"
+            problem = str(payload.get("egress_problem") or "")
+            if problem == "proxied-bridge":
+                route += (" · EGRESS THROUGH A PROXIED SSID" if self.language == "en"
+                          else " · ĐI QUA SSID ĐƯỢC PROXY")
+            elif expected:
+                route += (f" · NOT VIA {expected}" if self.language == "en"
+                          else f" · KHÔNG QUA {expected}")
+            else:
+                route += (" · UNEXPECTED EGRESS" if self.language == "en"
+                          else " · ĐƯỜNG RA BẤT THƯỜNG")
         self.gateway_route_var.set(route)
 
         link = "OK" if payload.get("link_ok") else ("ERROR" if self.language == "en" else "LỖI")

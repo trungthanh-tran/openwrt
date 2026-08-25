@@ -5,6 +5,26 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Khung Internet Gateway luôn báo “degraded · NOT VIA wwan” trên router dùng
+  WAN dây.** `install-agent.sh` ghi cứng `GATEWAY_EXPECTED_INTERFACE=wwan` vào
+  `/etc/sbproxy/env`, nên mọi đường ra không phải Wi-Fi-as-WAN đều bị coi là
+  sai — kể cả khi link, DNS và HTTP đều tốt. Mặc định giờ là **không ghim
+  interface nào**: uplink nào mà default route chọn cũng được chấp nhận (WAN
+  dây, PPPoE, LTE, Wi-Fi as WAN). Vẫn ghim được bằng
+  `GATEWAY_EXPECTED_INTERFACE` trong `/etc/sbproxy/env` nếu muốn ép một đường
+  ra duy nhất.
+- Đường ra **vòng qua bridge của SSID được proxy** (`br-w<idx>`) — tức routing
+  loop — giờ bị bắt và gọi đúng tên, đây mới là trường hợp luôn sai bất kể WAN
+  dựng kiểu gì. `gateway` trả thêm trường `egress_problem`
+  (`""` / `proxied-bridge` / `not-expected`) và console hiển thị theo đó thay vì
+  luôn in “KHÔNG QUA wwan”.
+
+### Added
+- `tests/test_gateway.sh`: bộ test đầu tiên cho `scripts/gateway.sh` (stub
+  `ip`/`ubus`/`curl`/`nslookup`) phủ WAN dây, Wi-Fi as WAN, interface bị ghim,
+  routing loop qua SSID, mất route, DNS hỏng và HTTP hỏng.
+
 ## [0.4.9] - 2026-08-25
 
 ### Added

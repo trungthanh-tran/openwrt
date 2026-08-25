@@ -3,7 +3,11 @@
 # access through that device. Read-only; intended for the Agent and diagnostics.
 set -u
 
-EXPECTED_INTERFACE="${GATEWAY_EXPECTED_INTERFACE:-wwan}"
+# Which logical interface the router is expected to leave through. Empty means
+# "whatever the default route uses is fine", which is the right answer for a
+# wired WAN, a PPPoE session, an LTE stick or Wi-Fi-as-WAN alike. Set it in
+# /etc/sbproxy/env only when one specific uplink must be enforced.
+EXPECTED_INTERFACE="${GATEWAY_EXPECTED_INTERFACE-}"
 ROUTE_TARGET="${GATEWAY_ROUTE_TARGET:-1.1.1.1}"
 DNS_NAME="${GATEWAY_DNS_NAME:-openwrt.org}"
 PROBE_URL="${GATEWAY_PROBE_URL:-https://www.gstatic.com/generate_204}"
@@ -45,10 +49,22 @@ link_ok=false
 case "$operstate" in up|unknown) link_ok=true ;; esac
 [ "$actual_up" = "true" ] && link_ok=true
 
+# Traffic leaving through one of the project's own SSID bridges means the
+# router is routing its uplink back into a proxied network: a loop, and the one
+# egress that is always wrong no matter how the WAN is built.
+egress_problem=""
+case "$device" in
+  br-w[0-9]*) egress_problem=proxied-bridge ;;
+esac
+
 expected_active=false
-if [ -z "$EXPECTED_INTERFACE" ] || [ "$logical_interface" = "$EXPECTED_INTERFACE" ] || \
+if [ -n "$egress_problem" ]; then
+  expected_active=false
+elif [ -z "$EXPECTED_INTERFACE" ] || [ "$logical_interface" = "$EXPECTED_INTERFACE" ] || \
    { [ -n "$expected_device" ] && [ "$device" = "$expected_device" ]; }; then
   expected_active=true
+else
+  egress_problem=not-expected
 fi
 
 dns_checked=false
@@ -89,6 +105,7 @@ jq -n \
   --arg interface "$logical_interface" --arg device "$device" \
   --arg gateway "$gateway" --arg source_ip "$source_ip" --arg operstate "$operstate" \
   --arg route "$route_line" --arg probe_url "$PROBE_URL" \
+  --arg egress_problem "$egress_problem" \
   --argjson route_ok "$route_ok" --argjson link_ok "$link_ok" \
   --argjson expected_active "$expected_active" --argjson dns_checked "$dns_checked" \
   --argjson dns_ok "$dns_ok" --argjson http_ok "$http_ok" \
@@ -97,5 +114,6 @@ jq -n \
   '{ok:true,state:$state,expected_interface:$expected_interface,interface:$interface,
     device:$device,gateway:$gateway,source_ip:$source_ip,operstate:$operstate,
     route:$route,route_ok:$route_ok,link_ok:$link_ok,expected_active:$expected_active,
+    egress_problem:$egress_problem,
     dns_checked:$dns_checked,dns_ok:$dns_ok,http_ok:$http_ok,http_code:$http_code,
     latency_ms:$latency_ms,probe_url:$probe_url,checked_at:$checked_at}'

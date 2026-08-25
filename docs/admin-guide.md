@@ -43,7 +43,7 @@ sbproxy-healthd (procd) ─ curl socks5h ─▶ /tmp/sbproxy-health.json (latenc
 | 12 | `scripts/rollback.sh`, `pc/restore.ps1` / `pc/restore.sh` | Rollback hoặc khôi phục snapshot. Failsafe/U-Boot vẫn thủ công. |
 | 13 | `scripts/diagnose.sh` | Gom bằng chứng chẩn đoán, không restart hay sửa trạng thái. |
 | 10, 13 | `scripts/doctor.sh` | Báo cáo trạng thái tổng thể (chỉ đọc): gói, sing-box + fake-IP DNS, tproxy/hijack, Wi-Fi, agent; exit ≠ 0 nếu có FAIL. |
-| 10, 13 | `scripts/gateway.sh` | Kiểm tra read-only default route, đối chiếu `wwan`, link, DNS và HTTP trực tiếp. |
+| 10, 13 | `scripts/gateway.sh` | Kiểm tra read-only default route, link, DNS và HTTP trực tiếp. Uplink nào cũng được; ghim một interface bằng `GATEWAY_EXPECTED_INTERFACE` trong `/etc/sbproxy/env`. |
 | 14 | `agent/cgi/sbproxy` | Hiện thực API LAN được UI gọi. |
 | 14 | `scripts/clients.sh`, `scripts/{kick,ban,unban}.sh` | Liệt kê thiết bị theo SSID và kick/cấm/bỏ cấm theo MAC. |
 | — | `console/desktop/build.ps1` (Windows) / `build.sh` (Linux/macOS) | Build app Tkinter native `console/desktop/main.py` thành `.exe` / binary Linux; không dùng HTML/WebView. Xem [../console/desktop/README.vi.md](../console/desktop/README.vi.md). |

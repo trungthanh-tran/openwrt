@@ -41,7 +41,7 @@ headers.
 | GET | `download_backup` | Download a snapshot |
 | POST | `rollback` | Restore a snapshot |
 | GET | `health_now` | Run a health probe immediately |
-| GET | `gateway` | Actual Internet route, interface/device, link, DNS, and direct HTTP latency; flags a route that bypasses `wwan` |
+| GET | `gateway` | Actual Internet route, interface/device, link, DNS, and direct HTTP latency. Any uplink the default route picks is accepted; `egress_problem` names a loop through a proxied SSID bridge, or a mismatch when `GATEWAY_EXPECTED_INTERFACE` pins one interface |
 | GET | `clients` | Online clients and offline blocklist entries with band/RSSI/traffic |
 | POST | `kick`, `ban`, `unban` | Deauthenticate a client, or add/remove one MAC in the blocklist |
 | POST | `update` | Upload a `sbproxy-update-<version>.tar.gz`; `scripts/self-update.sh` keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades unless `force=1` |

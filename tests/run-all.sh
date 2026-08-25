@@ -28,3 +28,6 @@ sh tests/test_agent.sh
 
 echo "===== Agent health daemon integration suite ====="
 sh tests/test_healthd.sh
+
+echo "===== Internet gateway suite ====="
+sh tests/test_gateway.sh

@@ -338,13 +338,55 @@ class GatewayWorkflowTests(unittest.TestCase):
         for untranslated in ("Gateway", "Link:", " via ", " src "):
             self.assertNotIn(untranslated, combined)
 
-    def test_render_gateway_unknown_defaults_and_non_expected_warning(self):
+    def test_render_gateway_unknown_defaults_and_unexpected_egress(self):
         instance = self.make_instance("vi")
         instance.render_gateway({"expected_active": False, "dns_checked": False})
-        self.assertIn("KHÔNG QUA wwan", instance.gateway_route_var.get())
+        self.assertIn("ĐƯỜNG RA BẤT THƯỜNG", instance.gateway_route_var.get())
         self.assertIn("chưa kiểm tra", instance.gateway_link_var.get())
         self.assertIn("LỖI", instance.gateway_http_var.get())
         self.assertEqual(instance.gateway_state_label.options["style"], "MetricBlue.TLabel")
+
+    def test_a_wired_wan_is_not_reported_as_a_problem(self):
+        """The agent enforces no interface by default, so any uplink is fine."""
+        for language, expected in (("en", "Egress: wan/eth1"), ("vi", "Đường ra: wan/eth1")):
+            with self.subTest(language=language):
+                instance = self.make_instance(language)
+                instance.render_gateway({
+                    "state": "ok", "expected_interface": "", "interface": "wan",
+                    "device": "eth1", "gateway": "192.168.88.1", "source_ip": "192.168.88.74",
+                    "expected_active": True, "egress_problem": "", "link_ok": True,
+                    "dns_checked": True, "dns_ok": True, "http_ok": True,
+                    "http_code": 204, "latency_ms": 260,
+                })
+                route = instance.gateway_route_var.get()
+                self.assertIn(expected, route)
+                self.assertNotIn("wwan", route)
+                self.assertNotIn("NOT VIA", route)
+                self.assertNotIn("KHÔNG QUA", route)
+
+    def test_a_routing_loop_through_a_proxied_ssid_is_named(self):
+        for language, expected in (("en", "EGRESS THROUGH A PROXIED SSID"),
+                                   ("vi", "ĐI QUA SSID ĐƯỢC PROXY")):
+            with self.subTest(language=language):
+                instance = self.make_instance(language)
+                instance.render_gateway({
+                    "state": "degraded", "expected_interface": "", "interface": "w1",
+                    "device": "br-w1", "expected_active": False,
+                    "egress_problem": "proxied-bridge", "link_ok": True,
+                    "dns_checked": True, "dns_ok": True, "http_ok": True,
+                    "http_code": 204, "latency_ms": 30,
+                })
+                self.assertIn(expected, instance.gateway_route_var.get())
+
+    def test_an_enforced_interface_is_still_named_when_it_is_bypassed(self):
+        instance = self.make_instance("en")
+        instance.render_gateway({
+            "state": "degraded", "expected_interface": "wwan", "interface": "wan",
+            "device": "eth1", "expected_active": False, "egress_problem": "not-expected",
+            "link_ok": True, "dns_checked": True, "dns_ok": True,
+            "http_ok": True, "http_code": 204, "latency_ms": 30,
+        })
+        self.assertIn("NOT VIA wwan", instance.gateway_route_var.get())
 
     def test_render_gateway_degraded_and_down_styles(self):
         instance = self.make_instance()

@@ -293,7 +293,7 @@ match "native app warns before important actions" "$desktop_py" 'def confirm_imp
 match "important action warning defaults to No" "$desktop_py" 'default=messagebox\.NO'
 match "quick SOCKS change requires warning" "$desktop_py" 'Đổi endpoint SOCKS5 đang dùng cho SSID'
 match "native app checks Internet gateway" "$desktop_py" 'def refresh_gateway\('
-match "native app highlights non-wwan route" "$desktop_py" 'KHÔNG QUA'
+match "native app names a bad egress" "$desktop_py" 'ĐI QUA SSID ĐƯỢC PROXY'
 match "native app supports English and Vietnamese" "$desktop_py" 'EN_TRANSLATIONS = \{'
 match "native app supports dark and light themes" "$desktop_py" 'PALETTES = \{"dark": DARK_PALETTE, "light": LIGHT_PALETTE\}'
 match "native app persists UI preferences" "$desktop_py" 'def save_preferences\('

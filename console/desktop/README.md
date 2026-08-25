@@ -35,8 +35,11 @@ with no Python and no repository checkout on the operator's machine.
 
 **Operations**
 
-- Internet Gateway card: actual route, `wwan`/device, next hop, source IP,
-  link, DNS, and HTTP latency; warns when egress bypasses `wwan`.
+- Internet Gateway card: actual route, interface/device, next hop, source IP,
+  link, DNS, and HTTP latency. Any uplink is accepted — wired WAN, PPPoE, LTE,
+  Wi-Fi as WAN — and it warns only when traffic leaves through a proxied SSID
+  bridge (a loop) or bypasses the interface pinned in
+  `GATEWAY_EXPECTED_INTERFACE`.
 - Inspect backups, roll back, run health checks, and read the operation log.
 - Install or repair a router over SSH from the app — see
   [Post-flash setup](#post-flash-setup).

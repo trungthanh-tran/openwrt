@@ -61,7 +61,7 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 | POST | `kick` / `ban` / `unban` | `{idx,mac}` | Đá client, thêm/bỏ MAC khỏi blocklist |
 | POST | `update` | package `.tar.gz` | `{ok,rc,log,from,to}`; `scripts/self-update.sh` giữ `wifi-socks.conf` + `settings.sh`, chặn hạ version trừ khi `force=1` |
 | GET | `health_now` | — | probe ngay 1 lần |
-| GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS và HTTP latency; cảnh báo nếu không qua `wwan` |
+| GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS và HTTP latency. Mặc định chấp nhận mọi uplink; `egress_problem` chỉ ra đường ra vòng qua SSID được proxy, hoặc lệch với `GATEWAY_EXPECTED_INTERFACE` nếu có ghim |
 | GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |
 
 Test nhanh:

@@ -30,7 +30,10 @@ BACKUP_DIR=/root/sbproxy-backups
 PROBE_URL=https://www.gstatic.com/generate_204
 INTERVAL=15
 SLOW_MS=800
-GATEWAY_EXPECTED_INTERFACE=wwan
+# Leave unset: any uplink the default route picks is accepted, and only an
+# egress through a proxied SSID bridge is reported as wrong. Set it to a
+# logical interface name (wan, wwan, ...) to enforce one specific uplink.
+#GATEWAY_EXPECTED_INTERFACE=
 GATEWAY_PROBE_URL=https://www.gstatic.com/generate_204
 GATEWAY_PROBE_TIMEOUT=8
 EOF
