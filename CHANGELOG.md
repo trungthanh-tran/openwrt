@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-08-25
+
 ### Added
 - **Router chưa có `wifi-socks.conf` thì console tạo sẵn một file trống** kèm
   nguyên phần chú thích các cột lấy từ `wifi-socks.conf.example` (chỉ dòng
