@@ -79,7 +79,9 @@ done.
    - **Source folder or .tar.gz**: **leave it as it is** — the app uses its
      embedded package.
    - **wifi-socks.conf**: leave empty if you do not have one yet; Wi-Fi and
-     SOCKS entries are easier to add in the app afterwards.
+     SOCKS entries are easier to add in the app afterwards. With it empty the
+     checklist marks the dry-run and `apply.sh` as *Skipped* — there is nothing
+     to apply yet — and still installs the agent and fetches the token.
 4. Press **Check status**. The app signs in over SSH and reads what the router
    carries (read-only). If the login works but there is **no agent**, it asks
    right there — *“Install it now?”*:

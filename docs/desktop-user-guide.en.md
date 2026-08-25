@@ -31,6 +31,7 @@ itself** and asks for the router's SSH details:
 | **SSH port** | `22` |
 | **SSH password** | The root password set on the router (or pick an SSH key) |
 | **Source folder or .tar.gz** | **Leave it alone** — the executable carries its own package |
+| **wifi-socks.conf** | Leave empty if you have none; add the networks in the app afterwards |
 
 Then press **Check status**. The app signs in over SSH and reads what the router
 already has (**read-only** — it changes nothing), and then:
@@ -45,6 +46,11 @@ already has (**read-only** — it changes nothing), and then:
     and a finished install unlocks the console.
 - **Agent and token already present** → it says no reinstall is needed; close
   the form and press **Connect**.
+
+> With no `wifi-socks.conf` yet, the checklist marks the dry-run and `apply.sh`
+> as *Skipped* — nothing to apply — but still installs the agent and fetches the
+> token. Add an SSID in the **Wi-Fi / SOCKS5** tab and press **Push
+> configuration & Apply** to finish the router off.
 
 > The SSH password lives only in the running session: it is never written to a
 > configuration file, never appears on a command line, and is redacted in logs.

@@ -5,6 +5,17 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Cài đặt hỏng ở bước “Chạy preflight và dry-run” khi chưa có
+  `wifi-socks.conf`** với lỗi `[sbproxy][ERR] Missing configuration:
+  /root/sbproxy/config/wifi-socks.conf`. Để trống ô cấu hình là đường đi được
+  hướng dẫn (thêm Wi-Fi trong app sau khi cài xong), nhưng `apply.sh` lại đòi
+  phải có file đó, nên dry-run chết và cả chuỗi dừng ngay trước khi cài agent.
+  Console giờ hỏi router xem đã có `wifi-socks.conf` chưa: chưa có thì **bỏ qua
+  dry-run và apply** (ghi rõ lý do trên checklist) rồi chạy tiếp tới cài agent,
+  lấy token và mở màn hình điều khiển. Thêm SSID trong app rồi bấm **Đẩy cấu
+  hình & Apply** là router được cấu hình đầy đủ.
+
 ## [0.4.7] - 2026-08-25
 
 ### Added

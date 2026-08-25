@@ -922,6 +922,10 @@ STEP_SKIPPED = "skipped"
 STEP_FAILED = "failed"
 
 
+class Skipped(str):
+    """A step that legitimately did nothing; the text says why."""
+
+
 class ProvisionError(RuntimeError):
     """A provisioning step failed; the message is already operator-readable.
 
@@ -1602,8 +1606,26 @@ class ProvisionRunner:
                  "Đặt quyền cấu hình", timeout=60)
         return " + ".join(pushed)
 
+    def router_has_config(self) -> bool:
+        """True when the router carries a non-empty wifi-socks.conf.
+
+        Asked of the router rather than inferred, so it stays right whether the
+        file was pushed by this run, left over from an earlier one, or absent
+        because the operator has none yet.
+        """
+        answer = self.ssh(
+            f"[ -s {self.settings.remote_dir}/config/wifi-socks.conf ] && echo have=1; exit 0",
+            "Kiểm tra wifi-socks.conf", timeout=60,
+        )
+        return "have=1" in answer
+
     def step_preflight(self) -> str:
         self.ssh(f"cd {self.settings.remote_dir}; sh scripts/preflight.sh", "Chạy preflight", timeout=600)
+        # apply.sh refuses to run without a configuration, and starting without
+        # one is a supported path: Wi-Fi entries get added in the console after
+        # the agent is up.
+        if not self.router_has_config():
+            return Skipped("preflight OK · chưa có wifi-socks.conf nên bỏ qua dry-run")
         self.ssh(f"cd {self.settings.remote_dir}; DRYRUN=1 sh scripts/apply.sh >/dev/null",
                  "Dry-run apply", timeout=600)
         return "preflight + dry-run OK"
@@ -1611,6 +1633,8 @@ class ProvisionRunner:
     def step_apply(self) -> str:
         if not self.settings.run_apply:
             return ""
+        if not self.router_has_config():
+            return Skipped("Chưa có wifi-socks.conf — thêm Wi-Fi trong app rồi bấm Đẩy cấu hình & Apply")
         output = self.ssh(f"cd {self.settings.remote_dir}; sh scripts/apply.sh",
                           "Chạy apply.sh", timeout=1800)
         lines = output.splitlines()
@@ -1690,7 +1714,8 @@ class ProvisionRunner:
                 audit("provision.failed", router=self.settings.target, step=label, detail=exc)
                 self.emit(index, STEP_FAILED, str(exc))
                 return False
-            self.emit(index, STEP_OK if detail else STEP_SKIPPED, detail or "Bỏ qua")
+            skipped = isinstance(detail, Skipped) or not detail
+            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bỏ qua")
         audit("provision.finished", router=self.settings.target,
               agent=self.pushed_version or self.router_version or "?")
         return True

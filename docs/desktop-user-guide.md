@@ -29,6 +29,7 @@ có token) app **tự mở form cài đặt** và hỏi thông tin SSH của rou
 | **Port SSH** | `22` |
 | **Mật khẩu SSH** | Mật khẩu root đã đặt trên router (hoặc chọn SSH key) |
 | **Mã nguồn hoặc gói .tar.gz** | **Để nguyên** — bản exe đã có sẵn gói cài |
+| **wifi-socks.conf** | Để trống nếu chưa có; thêm Wi-Fi trong app sau khi cài xong |
 
 Điền xong bấm **Kiểm tra tình trạng**. App đăng nhập SSH và xem router đang có
 gì (thao tác **chỉ đọc**, không đổi gì trên router), rồi:
@@ -41,6 +42,10 @@ gì (thao tác **chỉ đọc**, không đổi gì trên router), rồi:
     ngay bằng thông tin SSH vừa nhập, cài xong app tự mở khoá.
 - **Router đã có agent và token** → app báo không cần cài lại; đóng form và bấm
   **Kết nối**.
+
+> Chưa có `wifi-socks.conf` thì checklist **Bỏ qua** phần dry-run và `apply.sh`
+> (chưa có gì để áp) nhưng vẫn cài agent và lấy token. Vào tab **Wi-Fi / SOCKS5**
+> thêm SSID rồi bấm **Đẩy cấu hình & Apply** là router chạy đầy đủ.
 
 > Mật khẩu SSH chỉ nằm trong bộ nhớ của phiên làm việc: không ghi ra file cấu
 > hình, không xuất hiện trên dòng lệnh, và bị che trong log.

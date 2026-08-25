@@ -69,7 +69,8 @@ Kiểm tra nhanh từ máy tính: `ssh root@192.168.8.1` — đăng nhập đư�
    - **Mật khẩu SSH**: mật khẩu vừa đặt ở bước 3 (hoặc chọn SSH key).
    - **Mã nguồn hoặc gói .tar.gz**: **để nguyên** — app dùng gói nhúng sẵn.
    - **wifi-socks.conf**: để trống nếu chưa có; cấu hình Wi-Fi/SOCKS nhập trong
-     app sau khi cài xong.
+     app sau khi cài xong. Khi để trống, checklist sẽ **Bỏ qua** phần dry-run và
+     `apply.sh` (chưa có gì để áp) rồi vẫn cài agent và lấy token như thường.
 4. Bấm **Kiểm tra tình trạng**. App đăng nhập SSH và đọc hiện trạng router
    (chỉ đọc, không đổi gì). Kết nối được mà router **chưa có agent** thì app hỏi
    luôn *“Cài ngay bây giờ?”*:
