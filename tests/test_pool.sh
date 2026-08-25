@@ -22,9 +22,13 @@ POOL_PORT_STRIDE=256
 POOL_SLOTS_PER_SSID_MAX=256
 TPROXY_PORT_BASE=12000
 
-pass=0; fail=0
-ok()   { pass=$((pass + 1)); printf '  ok   %s\n' "$1"; }
-no()   { fail=$((fail + 1)); printf '  FAIL %s\n' "$1"; }
+# Deliberately not named pass/fail: build_singbox assigns an SSID's proxy
+# password to a global called `pass`, which would silently reset the counter
+# and make every later assertion score 1. tests/run.sh only escapes this
+# because it happens to call the generator inside a command substitution.
+n_ok=0; n_bad=0
+ok()   { n_ok=$((n_ok + 1)); printf '  ok   %s\n' "$1"; }
+no()   { n_bad=$((n_bad + 1)); printf '  FAIL %s\n' "$1"; }
 eq()   { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi; }
 contains() { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
 
@@ -130,8 +134,94 @@ vsrun "a pool base that overlaps the legacy range" die "POOL_PORT_BASE=12000"
 vsrun "a stride that pushes ports past 65535"    die "POOL_PORT_STRIDE=400"
 vsrun "a zero stride"                            die "POOL_PORT_STRIDE=0"
 vsrun "a non-numeric stride"                     die "POOL_PORT_STRIDE=abc"
+
+# Exit status alone is not enough here: a garbage value also makes `[ -ge ]`
+# fail, so these assert on the message that identifies which guard fired.
+vsmsg() { # label pattern VAR=VALUE...
+  _lbl="$1"; _pat="$2"; shift 2
+  _out="$( ( for _kv in "$@"; do eval "$_kv"; done; validate_pool_settings ) 2>&1 )"
+  if printf '%s' "$_out" | grep -Eq "$_pat"; then ok "$_lbl"; else no "$_lbl — no /$_pat/ in [$_out]"; fi
+}
+vsmsg "a non-numeric stride is named as such" "must be integers" "POOL_PORT_STRIDE=abc"
+vsmsg "a non-numeric base is named as such"   "must be integers" "POOL_PORT_BASE=13o00"
+vsmsg "an over-large stride names the port"   "past 65535"       "POOL_PORT_STRIDE=400"
+vsmsg "an overlap names both ranges"          "overlaps TPROXY_PORT_BASE" "POOL_PORT_BASE=12000"
+vsmsg "a cap above the stride names both"     "must not exceed POOL_PORT_STRIDE" "POOL_SLOTS_PER_SSID_MAX=257"
 vsrun "a base just clear of the legacy range"    ok  "POOL_PORT_BASE=12201"
 
+echo "== sing-box generation =="
+if ! command -v jq >/dev/null 2>&1; then
+  printf '  skip sing-box generation (jq is not installed)
+'
+else
+  # build_singbox writes to $SINGBOX_CONF; point everything at the sandbox.
+  SINGBOX_CONF="$STUB/config.json"
+  SINGBOX_CACHE="/etc/sing-box/cache.db"
+  FAKEIP_RANGE="198.18.0.0/15"; DNS_UPSTREAM="1.1.1.1"; SINGBOX_LOG_LEVEL="warn"
+  NET_BASE=10
+
+  gen() { # <pool file or ->  : regenerate and echo the config path
+    if [ "$1" = "-" ]; then POOLS="$STUB/no-such-pool.conf"; else POOLS="$1"; fi
+    build_singbox >/dev/null 2>&1
+    printf '%s' "$SINGBOX_CONF"
+  }
+  tags() { jq -c "[.$2[].tag]" "$1"; }
+
+  # The invariant for every step: an SSID with no pool generates exactly what
+  # it did before the pool feature existed. The golden file was produced by the
+  # pre-F2 generator; if this ever fails, the change was not backwards
+  # compatible and the fixture must not simply be refreshed to match.
+  CONF="$ROOT/config/wifi-socks.conf.example"
+  gen - >/dev/null
+  if cmp -s "$SINGBOX_CONF" "$ROOT/tests/fixtures/singbox-nopool.json"; then
+    ok "no pool generates a byte-identical config"
+  else
+    no "no pool generates a byte-identical config — output drifted from the golden"
+  fi
+
+  POOL3="$STUB/p3.conf"
+  printf '%s
+'     '1|socks5|9.9.9.9|1080|pu|pw|VN-01'     '1|http|10.0.0.7|8080|||US-02'     '1|socks5|proxy.example.com|1080|a|b|SG-03' > "$POOL3"
+
+  gen "$POOL3" >/dev/null
+  eq "a pooled config is valid JSON" "$(jq -e . "$SINGBOX_CONF" >/dev/null 2>&1 && echo yes)" "yes"
+  eq "pool slots add inbounds, legacy inbound stays"     "$(tags "$SINGBOX_CONF" inbounds)"     '["in-w1","in-w1-s0","in-w1-s1","in-w1-s2","in-w2","in-w3"]'
+  eq "pool slots add outbounds, direct stays last"     "$(tags "$SINGBOX_CONF" outbounds)"     '["out-w1","out-w1-s0","out-w1-s1","out-w1-s2","out-w2","out-w3","direct"]'
+  eq "slot inbounds listen on the pool ports"     "$(jq -c '[.inbounds[]|select(.tag|startswith("in-w1-s"))|.listen_port]' "$SINGBOX_CONF")"     "[$(pool_port 1 0),$(pool_port 1 1),$(pool_port 1 2)]"
+  eq "the legacy inbound keeps its own port"     "$(jq -r '.inbounds[]|select(.tag=="in-w1")|.listen_port' "$SINGBOX_CONF")" "$(tproxy_port 1)"
+  eq "every slot inbound is a tproxy listener"     "$(jq -c '[.inbounds[]|select(.tag|startswith("in-w1-s"))|.type]|unique' "$SINGBOX_CONF")"     '["tproxy"]'
+
+  eq "a socks5 slot becomes a socks outbound"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s0")|[.type,.server,.server_port,.version,.network,.username,.password]' "$SINGBOX_CONF")"     '["socks","9.9.9.9",1080,"5","tcp","pu","pw"]'
+  eq "an http slot becomes an http outbound"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s1")|[.type,.server,.server_port]' "$SINGBOX_CONF")"     '["http","10.0.0.7",8080]'
+  eq "a slot without credentials carries no auth fields"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s1")|has("username")' "$SINGBOX_CONF")" "false"
+  eq "a hostname slot is passed through unresolved"     "$(jq -r '.outbounds[]|select(.tag=="out-w1-s2")|.server' "$SINGBOX_CONF")" "proxy.example.com"
+
+  eq "each slot is routed to its own outbound"     "$(jq -c '[.route.rules[]|select((.inbound[0]? // "")|startswith("in-w1-s"))|select(.outbound)|.outbound]' "$SINGBOX_CONF")"     '["out-w1-s0","out-w1-s1","out-w1-s2"]'
+  eq "each slot inbound is sniffed"     "$(jq '[.route.rules[]|select((.inbound[0]? // "")|startswith("in-w1-s"))|select(.action=="sniff")]|length' "$SINGBOX_CONF")" "3"
+  eq "the legacy route rule survives for unpinned devices"     "$(jq -c '[.route.rules[]|select(.inbound==["in-w1"])|select(.outbound)|.outbound]' "$SINGBOX_CONF")"     '["out-w1"]'
+
+  # A credential is quoted through jq, so JSON metacharacters must survive.
+  NASTY="$STUB/nasty.conf"
+  printf '%s
+' '1|socks5|9.9.9.9|1080|u"x|p\y|L' > "$NASTY"
+  gen "$NASTY" >/dev/null
+  eq "a password with a quote and a backslash round-trips"     "$(jq -r '.outbounds[]|select(.tag=="out-w1-s0")|.password' "$SINGBOX_CONF")" 'p\y'
+  eq "a config with nasty credentials is still valid JSON"     "$(jq -e . "$SINGBOX_CONF" >/dev/null 2>&1 && echo yes)" "yes"
+
+  # A pool on an SSID that has no wifi-socks.conf row must not invent one.
+  ORPHAN="$STUB/orphan.conf"
+  printf '%s
+' '9|socks5|9.9.9.9|1080|||' > "$ORPHAN"
+  gen "$ORPHAN" >/dev/null
+  eq "a pool for an unknown idx generates nothing"     "$(jq -c '[.inbounds[].tag]' "$SINGBOX_CONF")" '["in-w1","in-w2","in-w3"]'
+
+  # An empty wifi-socks.conf must still produce loadable JSON (0.4.9 regression).
+  : > "$STUB/empty.conf"
+  CONF="$STUB/empty.conf"; gen - >/dev/null
+  eq "an empty SSID table is still valid JSON"     "$(jq -e . "$SINGBOX_CONF" >/dev/null 2>&1 && echo yes)" "yes"
+  CONF="$ROOT/config/wifi-socks.conf.example"
+fi
+
 echo
-echo "POOL TOTAL: pass=$pass fail=$fail"
-[ "$fail" -eq 0 ]
+echo "POOL TOTAL: pass=$n_ok fail=$n_bad"
+[ "$n_bad" -eq 0 ]

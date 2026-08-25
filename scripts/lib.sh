@@ -66,7 +66,8 @@ validate_pool_settings() {
   case "$_base:$_stride:$_cap:$_legacy" in
     *[!0-9:]*) die "POOL_PORT_BASE, POOL_PORT_STRIDE and POOL_SLOTS_PER_SSID_MAX must be integers." ;;
   esac
-  [ "$_stride" -ge 1 ] || die "POOL_PORT_STRIDE must be at least 1."
+  # cap >= 1 together with cap <= stride is what forces stride >= 1; a separate
+  # stride floor here would be unreachable.
   [ "$_cap" -ge 1 ] || die "POOL_SLOTS_PER_SSID_MAX must be at least 1."
   [ "$_cap" -le "$_stride" ] || \
     die "POOL_SLOTS_PER_SSID_MAX ($_cap) must not exceed POOL_PORT_STRIDE ($_stride)."
@@ -506,26 +507,44 @@ build_singbox() {
   # Quoted through jq so a hostname or an unusual resolver cannot break the JSON.
   dns_upstream_json="$(jq -Rn --arg v "${DNS_UPSTREAM:-1.1.1.1}" '$v')"
   inbounds=""; outbounds=""; rules=""; sep=""
+  # One outbound object. Shared by the wifi-socks.conf row and by pool slots so
+  # the two can never drift in how they quote a credential or pick a type.
+  _sb_outbound() { # tag type host port user pass
+    _o_host="$(jq -Rn --arg v "$3" '$v')"
+    if [ -n "$5" ]; then
+      _o_auth=",\"username\":$(jq -Rn --arg v "$5" '$v'),\"password\":$(jq -Rn --arg v "$6" '$v')"
+    else _o_auth=""; fi
+    # Both supported upstream types are TCP-only. UDP/QUIC is blocked so web
+    # clients fall back to TCP HTTP/HTTPS through the selected proxy.
+    if [ "$2" = "http" ]; then
+      printf '{"type":"http","tag":"%s","server":%s,"server_port":%s%s}' \
+        "$1" "$_o_host" "$4" "$_o_auth"
+    else
+      printf '{"type":"socks","tag":"%s","server":%s,"server_port":%s,"version":"5","network":"tcp"%s}' \
+        "$1" "$_o_host" "$4" "$_o_auth"
+    fi
+  }
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"; proxy_type="${12:-socks5}"
     tp="$(tproxy_port "$idx")"
+    # The per-SSID inbound stays even in pool mode: it carries DNS and every
+    # device that is not pinned to a slot yet.
     inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp}"
-    host_json="$(jq -Rn --arg v "$host" '$v')"
-    if [ -n "$user" ]; then
-      user_json="$(jq -Rn --arg v "$user" '$v')"; pass_json="$(jq -Rn --arg v "$pass" '$v')"
-      auth=",\"username\":$user_json,\"password\":$pass_json"
-    else auth=""; fi
-    # Both supported upstream types are TCP-only. UDP/QUIC is blocked so web
-    # clients fall back to TCP HTTP/HTTPS through the selected proxy.
-    if [ "$proxy_type" = "http" ]; then
-      outbounds="$outbounds$sep{\"type\":\"http\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port$auth}"
-    else
-      outbounds="$outbounds$sep{\"type\":\"socks\",\"tag\":\"out-w$idx\",\"server\":$host_json,\"server_port\":$port,\"version\":\"5\",\"network\":\"tcp\"$auth}"
-    fi
+    outbounds="$outbounds$sep$(_sb_outbound "out-w$idx" "$proxy_type" "$host" "$port" "$user" "$pass")"
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
     sep=","
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
     sep=","
+    # One tproxy port per pool proxy, so nftables can pin a device to a proxy
+    # by choosing a port — no sing-box reload when an assignment changes.
+    _sb_slot() { # slot type host port user pass label
+      _s_tag="w$idx-s$1"
+      inbounds="$inbounds,{\"type\":\"tproxy\",\"tag\":\"in-$_s_tag\",\"listen\":\"0.0.0.0\",\"listen_port\":$(pool_port "$idx" "$1")}"
+      outbounds="$outbounds,$(_sb_outbound "out-$_s_tag" "$2" "$3" "$4" "$5" "$6")"
+      rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
+      rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"outbound\":\"out-$_s_tag\"}"
+    }
+    for_each_pool "$idx" _sb_slot
   }
   for_each_ssid _sb_row
 

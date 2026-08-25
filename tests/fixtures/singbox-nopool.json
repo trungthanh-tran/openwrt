@@ -1,0 +1,28 @@
+{
+  "log": { "level": "warn", "timestamp": true },
+  "dns": {
+    "servers": [
+      { "type": "fakeip", "tag": "fakeip", "inet4_range": "198.18.0.0/15" },
+      { "type": "udp", "tag": "upstream", "server": "1.1.1.1" }
+    ],
+    "rules": [
+      { "query_type": ["HTTPS", "SVCB"], "action": "predefined", "rcode": "NOTIMP" },
+      { "query_type": ["A", "AAAA"], "action": "route", "server": "fakeip" }
+    ],
+    "final": "upstream",
+    "reverse_mapping": true
+  },
+  "inbounds": [ {"type":"tproxy","tag":"in-w1","listen":"0.0.0.0","listen_port":12001},{"type":"tproxy","tag":"in-w2","listen":"0.0.0.0","listen_port":12002},{"type":"tproxy","tag":"in-w3","listen":"0.0.0.0","listen_port":12003} ],
+  "outbounds": [
+    {"type":"socks","tag":"out-w1","server":"1.2.3.4","server_port":1080,"version":"5","network":"tcp","username":"user1","password":"pass1"},{"type":"http","tag":"out-w2","server":"5.6.7.8","server_port":8080,"username":"user2","password":"pass2"},{"type":"socks","tag":"out-w3","server":"9.9.9.9","server_port":1080,"version":"5","network":"tcp"},
+    { "type": "direct", "tag": "direct" }
+  ],
+  "route": {
+    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }, {"inbound":["in-w1"],"action":"sniff","timeout":"1s"},{"inbound":["in-w1"],"outbound":"out-w1"},{"inbound":["in-w2"],"action":"sniff","timeout":"1s"},{"inbound":["in-w2"],"outbound":"out-w2"},{"inbound":["in-w3"],"action":"sniff","timeout":"1s"},{"inbound":["in-w3"],"outbound":"out-w3"} ],
+    "default_domain_resolver": "upstream",
+    "final": "direct"
+  },
+  "experimental": {
+    "cache_file": { "enabled": true, "path": "/etc/sing-box/cache.db", "store_fakeip": true }
+  }
+}
