@@ -420,7 +420,7 @@ build_singbox() {
     { "type": "direct", "tag": "direct" }
   ],
   "route": {
-    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }, $rules ],
+    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }${rules:+,} $rules ],
     "default_domain_resolver": "upstream",
     "final": "direct"
   },

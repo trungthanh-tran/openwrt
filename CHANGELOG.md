@@ -5,6 +5,20 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Router chưa có `wifi-socks.conf` thì console tạo sẵn một file trống** kèm
+  nguyên phần chú thích các cột lấy từ `wifi-socks.conf.example` (chỉ dòng
+  comment, không lấy 3 SSID mẫu — chúng có mật khẩu mẫu và SOCKS giả). Nhờ vậy
+  `apply.sh` chạy được ngay trong lúc cài (đặt country code, dựng bảng nftables,
+  ghi cấu hình sing-box), và mở file lên là biết luôn từng cột nghĩa là gì. File
+  đã có sẵn thì không bao giờ bị ghi đè.
+
+### Fixed
+- **Cấu hình không có SSID nào sinh ra JSON sing-box hỏng.** `route.rules` thừa
+  một dấu phẩy khi danh sách rule rỗng, nên `sing-box check` từ chối và
+  `apply.sh` chết với "The sing-box configuration is invalid". Lỗi này xảy ra
+  với router vừa cài xong lẫn khi người dùng **xoá hết SSID rồi bấm Apply**.
+
 ## [0.4.8] - 2026-08-25
 
 ### Fixed

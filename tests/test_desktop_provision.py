@@ -50,6 +50,12 @@ class FakeRunner:
         for needle, result in self.results.items():
             if any(needle in part for part in argv):
                 return result
+        if "echo state=created" in command:      # the seeding command
+            if self.has_config or any(
+                    remote.endswith("config/wifi-socks.conf") for _local, remote in self.uploads):
+                return (0, "state=kept\n", "")
+            self.has_config = True
+            return (0, "state=created\n", "")
         if "wifi-socks.conf ] && echo have=1" in command:
             present = self.has_config or any(
                 remote.endswith("config/wifi-socks.conf") for _local, remote in self.uploads)
@@ -174,32 +180,54 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertTrue(ok)
         labels = [label for label, _function in provisioner.steps]
         skipped = {labels[index] for index, state, _detail in self.events if state == appmod.STEP_SKIPPED}
-        self.assertEqual(skipped, {"Đẩy cấu hình wifi-socks.conf",
-                                   "Chạy preflight và dry-run",
-                                   "Chạy apply.sh khởi tạo"})
+        # The configuration step seeds an empty file, so only apply is skipped.
+        self.assertEqual(skipped, {"Chạy apply.sh khởi tạo"})
         self.assertNotIn("sh scripts/apply.sh", " ".join(runner.remote_commands()).replace("DRYRUN=1 sh scripts/apply.sh", ""))
 
-    def test_a_router_without_a_configuration_still_finishes(self):
-        """apply.sh needs a wifi-socks.conf; starting without one is allowed.
+    def test_a_router_without_a_configuration_gets_an_empty_documented_one(self):
+        """Nothing ships wifi-socks.conf: the real file is never committed.
 
-        The Wi-Fi entries are added in the console afterwards, so the run must
-        reach the agent and the token instead of dying in the dry-run.
+        apply.sh refuses to run without it, so the router is given an empty one
+        carrying the example's column notes, and the run then applies normally.
         """
         self.settings.config_path = ""   # nothing to push, nothing on the router
         runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})
         ok, provisioner = self.run_full(runner)
         self.assertTrue(ok)
         remote = " ; ".join(runner.remote_commands())
-        self.assertIn("sh scripts/preflight.sh", remote)
-        self.assertNotIn("sh scripts/apply.sh", remote)   # neither the dry-run nor the real one
-        self.assertNotIn("DRYRUN=1", remote)
+        seeding = [command for command in runner.remote_commands()
+                   if "echo state=created" in command]
+        self.assertEqual(len(seeding), 1, seeding)
+        # Comments only: the example's sample SSIDs must not become real ones.
+        self.assertIn("grep '^#' config/wifi-socks.conf.example", seeding[0])
+        self.assertIn("chmod 600 config/wifi-socks.conf", seeding[0])
+        # Having a configuration, the run applies as usual.
+        self.assertIn("DRYRUN=1 sh scripts/apply.sh", remote)
+        self.assertIn("cd /root/sbproxy; sh scripts/apply.sh", remote)
         self.assertIn("sh agent/install-agent.sh", remote)
         self.assertEqual(self.saved, [("http://192.168.8.1", "0123456789abcdef0123")])
         labels = [label for label, _function in provisioner.steps]
-        details = {labels[index]: detail for index, state, detail in self.events
-                   if state == appmod.STEP_SKIPPED}
-        self.assertIn("bỏ qua dry-run", details["Chạy preflight và dry-run"])
-        self.assertIn("Đẩy cấu hình & Apply", details["Chạy apply.sh khởi tạo"])
+        details = {labels[index]: detail for index, state, detail in self.events}
+        self.assertIn("wifi-socks.conf trống", details["Đẩy cấu hình wifi-socks.conf"])
+
+    def test_a_configuration_already_on_the_router_is_never_replaced(self):
+        self.settings.config_path = ""
+        runner = self.installed_router()
+        ok, _provisioner = self.run_full(runner)
+        self.assertTrue(ok)
+        self.assertEqual([command for command in runner.remote_commands()
+                          if "echo state=created" in command], [])
+        self.assertEqual(runner.uploaded_to()[1:], [])
+
+    def test_apply_is_skipped_while_the_router_has_no_configuration(self):
+        """The guard stays useful if the file disappears between steps."""
+        runner = FakeRunner()
+        provisioner = self.build(runner)
+        with mock.patch.object(appmod.ProvisionRunner, "router_has_config", return_value=False):
+            detail = provisioner.step_apply()
+        self.assertIsInstance(detail, appmod.Skipped)
+        self.assertIn("Đẩy cấu hình & Apply", detail)
+        self.assertNotIn("sh scripts/apply.sh", " ".join(runner.remote_commands()))
 
     def test_a_pushed_configuration_is_applied_in_the_same_run(self):
         runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})

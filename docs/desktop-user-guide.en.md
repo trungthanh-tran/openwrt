@@ -47,10 +47,9 @@ already has (**read-only** — it changes nothing), and then:
 - **Agent and token already present** → it says no reinstall is needed; close
   the form and press **Connect**.
 
-> With no `wifi-socks.conf` yet, the checklist marks the dry-run and `apply.sh`
-> as *Skipped* — nothing to apply — but still installs the agent and fetches the
-> token. Add an SSID in the **Wi-Fi / SOCKS5** tab and press **Push
-> configuration & Apply** to finish the router off.
+> With no `wifi-socks.conf` yet, the console creates an empty one — column
+> notes included — and installs normally. Add an SSID in the **Wi-Fi / SOCKS5**
+> tab and press **Push configuration & Apply** to finish the router off.
 
 > The SSH password lives only in the running session: it is never written to a
 > configuration file, never appears on a command line, and is redacted in logs.

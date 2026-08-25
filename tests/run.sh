@@ -74,6 +74,33 @@ eq "radio_of 2g"    "$(radio_of 2g)"    "radio0"
 eq "radio_of 5g"    "$(radio_of 5g)"    "radio1"
 L="radio_of invalid band dies"; dies radio_of 6g
 
+echo "== empty configuration =="
+# A freshly provisioned router carries a comment-only wifi-socks.conf, and the
+# console can legitimately be left with zero SSIDs. Both must still produce
+# artifacts apply.sh accepts, or apply dies with "sing-box configuration is
+# invalid" and nothing explains why.
+EMPTY_CONF="$STUB/empty.conf"
+grep '^#' "$ROOT/config/wifi-socks.conf.example" > "$EMPTY_CONF"
+eq "the seeded file carries no SSID rows" \
+  "$(grep -vc '^[[:space:]]*\(#\|$\)' "$EMPTY_CONF" || true)" "0"
+( CONF="$EMPTY_CONF" validate_conf ) >/dev/null 2>&1 \
+  && ok "an empty configuration validates" || no "an empty configuration validates"
+if command -v jq >/dev/null 2>&1; then
+  ( CONF="$EMPTY_CONF" SINGBOX_CONF="$STUB/empty.json" NFT_FILE="$STUB/empty.nft" \
+      build_singbox ) >/dev/null 2>&1
+  if jq -e . "$STUB/empty.json" >/dev/null 2>&1; then ok "zero SSIDs give valid sing-box JSON"
+  else no "zero SSIDs give valid sing-box JSON"; fi
+  eq "no inbounds without SSIDs"  "$(jq '.inbounds|length' "$STUB/empty.json")" "0"
+  eq "direct outbound remains"    "$(jq '.outbounds|length' "$STUB/empty.json")" "1"
+  eq "only the base route rules"  "$(jq '.route.rules|length' "$STUB/empty.json")" "2"
+else
+  sk "zero SSIDs give valid sing-box JSON" "jq is not installed"
+fi
+( CONF="$EMPTY_CONF" NFT_FILE="$STUB/empty.nft" build_nft ) >/dev/null 2>&1 \
+  && ok "zero SSIDs still build an nftables ruleset" \
+  || no "zero SSIDs still build an nftables ruleset"
+match "the ruleset keeps its table" "$(cat "$STUB/empty.nft")" "table inet sbproxy"
+
 echo "== radio discovery =="
 radio_state() {  # write a fake UCI dump and point the stub at it
   UCI_STATE="$STUB/wireless.state"; export UCI_STATE

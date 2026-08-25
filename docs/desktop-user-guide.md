@@ -43,9 +43,9 @@ gì (thao tác **chỉ đọc**, không đổi gì trên router), rồi:
 - **Router đã có agent và token** → app báo không cần cài lại; đóng form và bấm
   **Kết nối**.
 
-> Chưa có `wifi-socks.conf` thì checklist **Bỏ qua** phần dry-run và `apply.sh`
-> (chưa có gì để áp) nhưng vẫn cài agent và lấy token. Vào tab **Wi-Fi / SOCKS5**
-> thêm SSID rồi bấm **Đẩy cấu hình & Apply** là router chạy đầy đủ.
+> Chưa có `wifi-socks.conf` thì console tạo giúp một file trống (kèm chú thích
+> từng cột) rồi cài bình thường. Vào tab **Wi-Fi / SOCKS5** thêm SSID rồi bấm
+> **Đẩy cấu hình & Apply** là router chạy đầy đủ.
 
 > Mật khẩu SSH chỉ nằm trong bộ nhớ của phiên làm việc: không ghi ra file cấu
 > hình, không xuất hiện trên dòng lệnh, và bị che trong log.

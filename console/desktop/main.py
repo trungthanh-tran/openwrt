@@ -1601,10 +1601,37 @@ class ProvisionRunner:
             self.upload(self.settings.settings_path, f"{remote}/config/settings.sh", "Đẩy settings.sh")
             pushed.append("settings.sh")
         if not pushed:
-            return ""
+            return self.seed_empty_config()
         self.ssh(f"chmod 600 {remote}/config/wifi-socks.conf 2>/dev/null; exit 0",
                  "Đặt quyền cấu hình", timeout=60)
         return " + ".join(pushed)
+
+    def seed_empty_config(self) -> str:
+        """Give the router an empty wifi-socks.conf carrying the column notes.
+
+        Nothing else creates this file: the real one is never committed, so a
+        package only ships `wifi-socks.conf.example`. Without it `apply.sh`
+        refuses to run, and the operator has nothing to read when they open the
+        file later. The comment header of the example is exactly that
+        documentation, so it is copied without the sample rows.
+        """
+        remote = self.settings.remote_dir
+        answer = self.ssh(
+            f"cd {remote} || exit 1; "
+            "if [ -s config/wifi-socks.conf ]; then echo state=kept; exit 0; fi; "
+            "mkdir -p config; "
+            "if [ -f config/wifi-socks.conf.example ]; then "
+            "grep '^#' config/wifi-socks.conf.example > config/wifi-socks.conf; "
+            "else { "
+            "echo '# wifi-socks.conf - one Wi-Fi per row, fields separated by |'; "
+            "echo '# name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc|mac_oui'; "
+            "} > config/wifi-socks.conf; fi; "
+            "chmod 600 config/wifi-socks.conf; echo state=created",
+            "Tạo wifi-socks.conf trống", timeout=90,
+        )
+        if "state=created" not in answer:
+            return ""  # the router already had one; nothing was written
+        return "wifi-socks.conf trống (kèm chú thích các cột)"
 
     def router_has_config(self) -> bool:
         """True when the router carries a non-empty wifi-socks.conf.
