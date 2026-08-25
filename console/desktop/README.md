@@ -36,10 +36,12 @@ with no Python and no repository checkout on the operator's machine.
 **Operations**
 
 - Internet Gateway card: actual route, interface/device, next hop, source IP,
-  link, DNS, and HTTP latency. Any uplink is accepted — wired WAN, PPPoE, LTE,
-  Wi-Fi as WAN — and it warns only when traffic leaves through a proxied SSID
-  bridge (a loop) or bypasses the interface pinned in
-  `GATEWAY_EXPECTED_INTERFACE`.
+  link, DNS, and HTTP latency, plus an **Egress** dropdown listing every
+  interface the router reports. It defaults to *Automatic*, which follows
+  whichever interface currently reaches the Internet; picking one pins it
+  through `set_gateway`. Any uplink is accepted — wired WAN, PPPoE, LTE, Wi-Fi
+  as WAN — and it warns only when traffic leaves through a proxied SSID bridge
+  (a loop) or bypasses a pinned interface. No interface name is built in.
 - Inspect backups, roll back, run health checks, and read the operation log.
 - Install or repair a router over SSH from the app — see
   [Post-flash setup](#post-flash-setup).

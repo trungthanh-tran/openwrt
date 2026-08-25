@@ -28,6 +28,7 @@ route_ok=false
 
 logical_interface=""
 actual_up=false
+interfaces=""
 if command -v ubus >/dev/null 2>&1; then
   dump="$(ubus call network.interface dump 2>/dev/null || true)"
   if [ -n "$dump" ] && [ -n "$device" ]; then
@@ -36,11 +37,29 @@ if command -v ubus >/dev/null 2>&1; then
     actual_up="$(printf '%s' "$dump" | jq -r --arg dev "$device" \
       '[.interface[]? | select((.l3_device // "") == $dev or (.device // "") == $dev)][0].up // false' 2>/dev/null)"
   fi
+    # Every logical interface the router knows, so a console can offer the choice
+  # instead of anyone hard-coding a name here. `current` marks the one carrying
+  # the traffic right now, which is what "automatic" resolves to.
+  interfaces="$(printf '%s' "$dump" | jq -c --arg current "$device" '
+    [ .interface[]?
+      | { name: (.interface // ""),
+          device: (.l3_device // .device // ""),
+          proto: (.proto // ""),
+          up: (.up // false),
+          ipv4: (((.["ipv4-address"] // [])[0] // {}).address // ""),
+          default_route: ([ (.route // [])[]
+                            | select(((.target // "") == "0.0.0.0") and ((.mask // 0) == 0)) ]
+                          | length > 0),
+          current: (((.l3_device // .device // "") == $current) and ($current != "")) }
+      | select(.name != "" and .name != "loopback")
+      | . + { proxied: (.device | startswith("br-w")) }
+    ]' 2>/dev/null || true)"
   expected_status="$(ubus call "network.interface.$EXPECTED_INTERFACE" status 2>/dev/null || true)"
   expected_device="$(printf '%s' "$expected_status" | jq -r '.l3_device // .device // empty' 2>/dev/null)"
 else
   expected_device=""
 fi
+printf '%s' "${interfaces:-}" | jq -e 'type == "array"' >/dev/null 2>&1 || interfaces='[]'
 [ -n "$logical_interface" ] || { [ -n "$device" ] && [ "$device" = "$expected_device" ] && logical_interface="$EXPECTED_INTERFACE"; }
 
 operstate=""
@@ -106,6 +125,7 @@ jq -n \
   --arg gateway "$gateway" --arg source_ip "$source_ip" --arg operstate "$operstate" \
   --arg route "$route_line" --arg probe_url "$PROBE_URL" \
   --arg egress_problem "$egress_problem" \
+  --argjson interfaces "$interfaces" \
   --argjson route_ok "$route_ok" --argjson link_ok "$link_ok" \
   --argjson expected_active "$expected_active" --argjson dns_checked "$dns_checked" \
   --argjson dns_ok "$dns_ok" --argjson http_ok "$http_ok" \
@@ -114,6 +134,6 @@ jq -n \
   '{ok:true,state:$state,expected_interface:$expected_interface,interface:$interface,
     device:$device,gateway:$gateway,source_ip:$source_ip,operstate:$operstate,
     route:$route,route_ok:$route_ok,link_ok:$link_ok,expected_active:$expected_active,
-    egress_problem:$egress_problem,
+    egress_problem:$egress_problem,interfaces:$interfaces,
     dns_checked:$dns_checked,dns_ok:$dns_ok,http_ok:$http_ok,http_code:$http_code,
     latency_ms:$latency_ms,probe_url:$probe_url,checked_at:$checked_at}'

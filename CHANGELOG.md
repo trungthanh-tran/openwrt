@@ -5,6 +5,20 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Chọn interface làm đường ra ngay trên console.** Khung Internet Gateway có
+  thêm ô **Đường ra** liệt kê mọi interface router báo về (tên, device, IP,
+  đang dùng / không hoạt động / SSID proxy). Mặc định là **Tự động** — bám theo
+  interface đang thật sự ra Internet — và chọn một tên là ghim lại. Danh sách
+  lấy từ router chứ không có tên nào viết sẵn trong code.
+- `gateway` trả thêm mảng `interfaces[]` (name, device, proto, ipv4, up,
+  default_route, current, proxied) và agent có endpoint mới
+  **POST `set_gateway`** `{interface}` (`""` = tự động) để lưu lựa chọn vào
+  `/etc/sbproxy/env`. Tên interface chỉ nhận `A-Za-z0-9._-` tối đa 32 ký tự vì
+  file đó được agent `.` source — mọi ký tự shell hiểu được đều bị từ chối.
+- `install-agent.sh` **giữ lại lựa chọn đường ra** khi cài lại agent (trước đây
+  file env bị ghi đè toàn bộ), và không còn ghi sẵn tên interface nào.
+
 ## [0.4.10] - 2026-08-25
 
 ### Fixed

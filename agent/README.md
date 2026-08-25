@@ -61,7 +61,8 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 | POST | `kick` / `ban` / `unban` | `{idx,mac}` | Đá client, thêm/bỏ MAC khỏi blocklist |
 | POST | `update` | package `.tar.gz` | `{ok,rc,log,from,to}`; `scripts/self-update.sh` giữ `wifi-socks.conf` + `settings.sh`, chặn hạ version trừ khi `force=1` |
 | GET | `health_now` | — | probe ngay 1 lần |
-| GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS và HTTP latency. Mặc định chấp nhận mọi uplink; `egress_problem` chỉ ra đường ra vòng qua SSID được proxy, hoặc lệch với `GATEWAY_EXPECTED_INTERFACE` nếu có ghim |
+| GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS, HTTP latency và `interfaces[]` — toàn bộ interface router đang có (name, device, proto, ipv4, up, default_route, current, proxied) để console cho chọn. Mặc định chấp nhận mọi uplink; `egress_problem` chỉ ra đường ra vòng qua SSID được proxy hoặc lệch interface đã ghim |
+| POST | `set_gateway` | `{interface}` | Chọn interface làm đường ra (`""` = tự động). Lưu vào `/etc/sbproxy/env`; tên chỉ nhận `A-Za-z0-9._-`, tối đa 32 ký tự vì file này được agent source |
 | GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |
 
 Test nhanh:

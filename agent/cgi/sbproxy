@@ -15,7 +15,8 @@
 # POST ?action=rollback      body=json {name?} -> rollback
 # POST ?action=uninstall     -> remove project-managed configuration
 # GET  ?action=health_now    -> run an immediate health probe
-# GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status
+# GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status + interface list
+# POST ?action=set_gateway   body json {interface} -> pin the expected uplink ("" = automatic)
 # GET  ?action=clients       -> {clients:[...]} devices per SSID (mac/ip/time/in-out/banned)
 # POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
 # POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
@@ -29,6 +30,7 @@ CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 TOKEN_FILE="${TOKEN_FILE:-/etc/sbproxy/token}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
 MAX_BODY_BYTES="${MAX_BODY_BYTES:-262144}"
+ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
 # Update packages are binary and larger than text/JSON bodies.
 MAX_UPDATE_BYTES="${MAX_UPDATE_BYTES:-8388608}"
 
@@ -362,6 +364,35 @@ case "$ACTION" in
     [ "$RC" -eq 0 ] || json_err "500 Internal Server Error" "kiểm tra gateway thất bại"
     printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 || json_err "500 Internal Server Error" "gateway trả dữ liệu không hợp lệ"
     json_ok "$OUT"
+    ;;
+
+  set_gateway)
+    # Which interface the gateway check treats as the uplink. Empty means
+    # automatic: whatever the default route uses is accepted. The value is
+    # written into a file the agent sources, so the name is restricted to
+    # characters that cannot mean anything to a shell.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '(has("interface") | not) or (.interface | type == "string")' \
+      "interface phải là chuỗi"
+    iface="$(trim_field "$(jq -r '.interface // ""' "$BODY_FILE")")"
+    case "$iface" in
+      "") : ;;
+      *[!A-Za-z0-9_.-]*) json_err "400 Bad Request" "tên interface chỉ được dùng chữ, số, . _ -" ;;
+    esac
+    [ "${#iface}" -le 32 ] || json_err "400 Bad Request" "tên interface dài quá 32 ký tự"
+    ENV_TMP="$ENV_FILE.$$"
+    mkdir -p "$(dirname "$ENV_FILE")" 2>/dev/null
+    {
+      [ -f "$ENV_FILE" ] && awk '!/^[[:space:]]*GATEWAY_EXPECTED_INTERFACE=/' "$ENV_FILE"
+      printf 'GATEWAY_EXPECTED_INTERFACE=%s\n' "$iface"
+    } > "$ENV_TMP" 2>/dev/null && cat "$ENV_TMP" > "$ENV_FILE" 2>/dev/null || {
+      rm -f "$ENV_TMP"
+      json_err "500 Internal Server Error" "không ghi được $ENV_FILE"
+    }
+    rm -f "$ENV_TMP"
+    json_ok "$(jq -n --arg interface "$iface" \
+      '{ok:true, interface:$interface, automatic:($interface == "")}')"
     ;;
 
   clients)

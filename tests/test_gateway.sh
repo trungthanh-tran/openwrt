@@ -113,6 +113,37 @@ eq "a routing loop is degraded"  "$(field "$out" .state)" "degraded"
 eq "the loop is named"           "$(field "$out" .egress_problem)" "proxied-bridge"
 eq "the egress is not accepted"  "$(field "$out" .expected_active)" "false"
 
+echo "== gateway: the interface list is what a console offers =="
+FULL_DUMP='{"interface":[
+  {"interface":"loopback","l3_device":"lo","proto":"static","up":true},
+  {"interface":"lan","l3_device":"br-lan","proto":"static","up":true,
+   "ipv4-address":[{"address":"192.168.1.1"}]},
+  {"interface":"wan","l3_device":"eth1","proto":"dhcp","up":true,
+   "ipv4-address":[{"address":"192.168.88.74"}],
+   "route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.168.88.1"}]},
+  {"interface":"wwan","l3_device":"phy0-sta0","proto":"dhcp","up":false},
+  {"interface":"w1","l3_device":"br-w1","proto":"static","up":true,
+   "ipv4-address":[{"address":"192.168.11.1"}]}]}'
+out="$(IP_ROUTE_LINE='1.1.1.1 via 192.168.88.1 dev eth1 src 192.168.88.74 uid 0' \
+       UBUS_DUMP="$FULL_DUMP" run_gateway)"
+eq "loopback is not offered"      "$(field "$out" '[.interfaces[].name] | index("loopback") // "no"')" "no"
+eq "every other interface is"     "$(field "$out" '.interfaces | length')" "4"
+eq "names are listed in order"    "$(field "$out" '[.interfaces[].name] | join(",")')" "lan,wan,wwan,w1"
+eq "the live uplink is marked"    "$(field "$out" '[.interfaces[] | select(.current)] | .[0].name')" "wan"
+eq "only one is current"          "$(field "$out" '[.interfaces[] | select(.current)] | length')" "1"
+eq "its device is carried"        "$(field "$out" '[.interfaces[] | select(.name=="wan")][0].device')" "eth1"
+eq "its address is carried"       "$(field "$out" '[.interfaces[] | select(.name=="wan")][0].ipv4')" "192.168.88.74"
+eq "its protocol is carried"      "$(field "$out" '[.interfaces[] | select(.name=="wan")][0].proto')" "dhcp"
+eq "a default route is flagged"   "$(field "$out" '[.interfaces[] | select(.name=="wan")][0].default_route')" "true"
+eq "a plain LAN has no default"   "$(field "$out" '[.interfaces[] | select(.name=="lan")][0].default_route')" "false"
+eq "a down interface is offered"  "$(field "$out" '[.interfaces[] | select(.name=="wwan")][0].up')" "false"
+eq "a proxied SSID is marked"     "$(field "$out" '[.interfaces[] | select(.name=="w1")][0].proxied')" "true"
+eq "a real uplink is not"         "$(field "$out" '[.interfaces[] | select(.name=="wan")][0].proxied')" "false"
+
+out="$(IP_ROUTE_LINE='1.1.1.1 via 192.168.88.1 dev eth1 src 192.168.88.74 uid 0' \
+       UBUS_DUMP='' run_gateway)"
+eq "an empty dump still answers" "$(field "$out" '.interfaces | length')" "0"
+
 echo "== gateway: failures still report =="
 out="$(IP_ROUTE_LINE='' UBUS_DUMP="$DUMP" run_gateway)"
 eq "no route means down"     "$(field "$out" .state)" "down"

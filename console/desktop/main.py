@@ -611,6 +611,10 @@ EN_TRANSLATIONS = {
     'CHƯA CẤU HÌNH ROUTER': 'ROUTER NOT CONFIGURED',
     'Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
     'Cài đặt sau khi flash…': 'Post-flash setup…',
+    'Đường ra': 'Egress',
+    'Đang đổi đường ra…': 'Changing the egress…',
+    'Đường ra: dùng {interface}': 'Egress: using {interface}',
+    'tự động': 'automatic',
     'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
     'Đang kiểm tra tình trạng router…': 'Checking the router status…',
 }
@@ -1753,7 +1757,7 @@ class ProvisionRunner:
 # anything to it.
 AUDITED_ACTIONS = frozenset({
     "save_conf", "apply", "set_sock", "rotate_mac", "backup", "rollback",
-    "update", "uninstall", "kick", "ban", "unban", "rotate_token",
+    "update", "uninstall", "kick", "ban", "unban", "rotate_token", "set_gateway",
 })
 
 
@@ -1841,6 +1845,10 @@ class AgentClient:
             "idx": record.idx, "host": record.host, "port": record.port,
             "user": record.user, "pass": record.socks_password,
         }, timeout=60)
+
+    def set_gateway(self, interface: str):
+        """Pin which interface counts as the uplink; "" means automatic."""
+        return self._request("set_gateway", "POST", {"interface": interface}, timeout=30)
 
     def clients(self):
         return self._request("clients", timeout=30)
@@ -2840,6 +2848,9 @@ class NativeApp:
         self.health = {}
         self.runtime_ssids = {}
         self.gateway_payload = {}
+        # Uplink choice: display label -> logical interface name ("" = automatic).
+        self.gateway_iface_choices = {}
+        self.gateway_syncing = False
         self.backup_names = []
         self.log_history = []
         self.loading_window: LoadingWindow | None = None
@@ -2854,6 +2865,7 @@ class NativeApp:
         self.token_var = tk.StringVar(value=token)
         self.status_var = tk.StringVar(value=self.t("Chưa kết nối"))
         self.lock_hint_var = tk.StringVar(value="")
+        self.gateway_iface_var = tk.StringVar(value="")
         self.setup_hint_var = tk.StringVar(value=self.t(
             "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
         ))
@@ -3129,6 +3141,12 @@ class NativeApp:
         self.gateway_state_label = ttk.Label(gateway_head, textvariable=self.gateway_state_var, style="MetricBlue.TLabel")
         self.gateway_state_label.pack(side="left")
         ttk.Button(gateway_head, text="Kiểm tra cổng ra", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
+        self.gateway_iface_combo = ttk.Combobox(
+            gateway_head, textvariable=self.gateway_iface_var, state="readonly", width=34,
+        )
+        self.gateway_iface_combo.pack(side="right", padx=(0, 8))
+        self.gateway_iface_combo.bind("<<ComboboxSelected>>", self._on_gateway_interface_changed)
+        ttk.Label(gateway_head, text="Đường ra", style="MetricBlue.TLabel").pack(side="right", padx=(0, 6))
         gateway_detail = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_detail.pack(fill="x", pady=(7, 0))
         ttk.Label(gateway_detail, textvariable=self.gateway_route_var, style="MetricBlue.TLabel").pack(side="left", padx=(0, 28))
@@ -3813,6 +3831,7 @@ class NativeApp:
     def render_gateway(self, payload):
         payload = payload if isinstance(payload, dict) else {}
         self.gateway_payload = payload
+        self.render_gateway_interfaces(payload)
         state = str(payload.get("state") or "unknown")
         labels = {
             "ok": ("● Internet hoạt động", "MetricGreen.TLabel"),
@@ -3866,6 +3885,85 @@ class NativeApp:
         else:
             error = str(payload.get("error") or ("unreachable" if self.language == "en" else "không truy cập được"))
             self.gateway_http_var.set(f"HTTP: {'ERROR' if self.language == 'en' else 'LỖI'} · {error}")
+
+    def render_gateway_interfaces(self, payload):
+        """Offer the router's own interfaces, with the live one as automatic.
+
+        Nothing here is hard-coded: the list comes from the router, and the
+        default choice follows whichever interface currently reaches the
+        Internet.
+        """
+        if not hasattr(self, "gateway_iface_combo") or not self.gateway_iface_combo.winfo_exists():
+            return
+        interfaces = payload.get("interfaces")
+        interfaces = interfaces if isinstance(interfaces, list) else []
+        current = ""
+        labels, mapping = [], {}
+        for entry in interfaces:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or "")
+            if not name:
+                continue
+            parts = [name]
+            device = str(entry.get("device") or "")
+            if device:
+                parts.append(f"({device})")
+            address = str(entry.get("ipv4") or "")
+            if address:
+                parts.append(f"· {address}")
+            if entry.get("current"):
+                current = name
+                parts.append("· đang dùng" if self.language != "en" else "· in use")
+            elif not entry.get("up"):
+                parts.append("· không hoạt động" if self.language != "en" else "· down")
+            if entry.get("proxied"):
+                parts.append("· SSID proxy" if self.language != "en" else "· proxied SSID")
+            label = " ".join(parts)
+            labels.append(label)
+            mapping[label] = name
+        automatic = (
+            f"Tự động ({current})" if current else "Tự động"
+        ) if self.language != "en" else (
+            f"Automatic ({current})" if current else "Automatic"
+        )
+        mapping[automatic] = ""
+        values = [automatic] + labels
+        expected = str(payload.get("expected_interface") or "")
+        selected = automatic
+        for label, name in mapping.items():
+            if expected and name == expected:
+                selected = label
+                break
+        self.gateway_iface_choices = mapping
+        self.gateway_syncing = True
+        try:
+            self.gateway_iface_combo.configure(values=values)
+            self.gateway_iface_var.set(selected)
+        finally:
+            self.gateway_syncing = False
+
+    def _on_gateway_interface_changed(self, _event=None):
+        """Persist the operator's uplink choice on the router."""
+        if self.gateway_syncing:
+            return
+        chosen = self.gateway_iface_var.get()
+        interface = self.gateway_iface_choices.get(chosen, "")
+        if interface == str(self.gateway_payload.get("expected_interface") or ""):
+            return  # nothing changed
+        if self.block_if_incompatible():
+            self.render_gateway_interfaces(self.gateway_payload)
+            return
+        client = self.require_client()
+        def work():
+            client.set_gateway(interface)
+            return client.gateway()
+        def done(payload):
+            self.append_log(self.t(
+                "Đường ra: dùng {interface}", interface=interface or self.t("tự động"),
+            ))
+            self.render_gateway(payload)
+        self.run_task("Đang đổi đường ra…", work, done)
 
     def refresh_gateway(self):
         try:

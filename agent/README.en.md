@@ -41,7 +41,8 @@ headers.
 | GET | `download_backup` | Download a snapshot |
 | POST | `rollback` | Restore a snapshot |
 | GET | `health_now` | Run a health probe immediately |
-| GET | `gateway` | Actual Internet route, interface/device, link, DNS, and direct HTTP latency. Any uplink the default route picks is accepted; `egress_problem` names a loop through a proxied SSID bridge, or a mismatch when `GATEWAY_EXPECTED_INTERFACE` pins one interface |
+| GET | `gateway` | Actual Internet route, interface/device, link, DNS, direct HTTP latency, and `interfaces[]` — every logical interface the router has (name, device, proto, ipv4, up, default_route, current, proxied) so a console can offer the choice. Any uplink the default route picks is accepted; `egress_problem` names a loop through a proxied SSID bridge, or a mismatch when an interface is pinned |
+| POST | `set_gateway` | Pin which interface counts as the uplink: `{"interface":"wan"}`, or `""` for automatic. Stored in `/etc/sbproxy/env`; the name is restricted to `A-Za-z0-9._-` (max 32) because that file is sourced by the agent |
 | GET | `clients` | Online clients and offline blocklist entries with band/RSSI/traffic |
 | POST | `kick`, `ban`, `unban` | Deauthenticate a client, or add/remove one MAC in the blocklist |
 | POST | `update` | Upload a `sbproxy-update-<version>.tar.gz`; `scripts/self-update.sh` keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades unless `force=1` |

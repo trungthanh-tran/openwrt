@@ -496,6 +496,53 @@ out="$(auth_run POST 'action=uninstall' '{}')"
 eq "uninstall succeeds" "$(json_value "$out" '.ok')" 'true'
 contains "uninstall invokes script" "$(cat "$CALLS")" 'uninstall'
 
+echo "== agent uplink selection =="
+GW_ENV="$TMP/set-gateway.env"
+set_gateway() { # json-body
+  printf '%s' "$1" | REQUEST_METHOD=POST QUERY_STRING='action=set_gateway' \
+    HTTP_AUTHORIZATION='Bearer agent-test-token' ENV_FILE="$GW_ENV" sh "$AGENT"
+}
+
+printf '%s\n' 'SB_ROOT=/root/sbproxy' 'GATEWAY_EXPECTED_INTERFACE=wwan' > "$GW_ENV"
+out="$(set_gateway '{"interface":"wan"}')"
+eq "set_gateway accepts a name" "$(json_value "$out" '.ok')" 'true'
+eq "the choice is echoed back" "$(json_value "$out" '.interface')" 'wan'
+eq "a pinned choice is not automatic" "$(json_value "$out" '.automatic')" 'false'
+eq "exactly one pin is written" "$(grep -c '^GATEWAY_EXPECTED_INTERFACE=' "$GW_ENV")" '1'
+contains "the new pin is stored" "$(cat "$GW_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wan'
+contains "other settings survive" "$(cat "$GW_ENV")" 'SB_ROOT=/root/sbproxy'
+
+out="$(set_gateway '{"interface":""}')"
+eq "an empty name means automatic" "$(json_value "$out" '.automatic')" 'true'
+contains "automatic is stored as empty" "$(cat "$GW_ENV")" 'GATEWAY_EXPECTED_INTERFACE='
+eq "still exactly one pin" "$(grep -c '^GATEWAY_EXPECTED_INTERFACE=' "$GW_ENV")" '1'
+
+out="$(set_gateway '{}')"
+eq "a missing field means automatic" "$(json_value "$out" '.automatic')" 'true'
+
+# The value lands in a file the agent sources, so anything a shell could read
+# as syntax has to be refused.
+for bad in 'wan; rm -rf /' 'wan$(id)' 'wan`id`' 'wan wwan' 'wan"x' "wan'x" 'wan
+lan'; do
+  out="$(set_gateway "$(jq -n --arg v "$bad" '{interface:$v}')")"
+  eq "refuses [$bad]" "$(json_value "$out" '.ok')" 'false'
+done
+contains "a refused name never reaches the file" "$(cat "$GW_ENV")" 'GATEWAY_EXPECTED_INTERFACE='
+not_contains "no shell metacharacter was written" "$(cat "$GW_ENV")" 'rm -rf'
+
+out="$(set_gateway "$(jq -n '{interface:"aaaaaaaaaabbbbbbbbbbccccccccccddddd"}')")"
+eq "refuses an over-long name" "$(json_value "$out" '.ok')" 'false'
+out="$(set_gateway '{"interface":123}')"
+eq "refuses a non-string" "$(json_value "$out" '.ok')" 'false'
+out="$(REQUEST_METHOD=GET QUERY_STRING='action=set_gateway' \
+  HTTP_AUTHORIZATION='Bearer agent-test-token' ENV_FILE="$GW_ENV" sh "$AGENT")"
+contains "set_gateway requires POST" "$out" 'Status: 405'
+
+rm -f "$GW_ENV"
+out="$(set_gateway '{"interface":"wan"}')"
+eq "a missing env file is created" "$(json_value "$out" '.ok')" 'true'
+contains "the pin is in the new file" "$(cat "$GW_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wan'
+
 echo "== agent self-update =="
 out="$(auth_run GET 'action=status')"
 eq "status reports unknown version without VERSION file" "$(json_value "$out" '.meta.version')" 'unknown'

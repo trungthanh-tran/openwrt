@@ -122,8 +122,9 @@ Or rotate only the token with `sh scripts/rotate-token.sh`.
 - Follow [ROLLBACK.en.md](ROLLBACK.en.md) when apply or firmware changes fail.
 - Run `sh scripts/verify.sh` for router-side acceptance, `sh scripts/doctor.sh` for a full status report, and `sh scripts/diagnose.sh` to collect troubleshooting evidence.
 - Run `sh scripts/gateway.sh` or call Agent action `gateway` to inspect the
-  actual default route, compare it with expected interface `wwan`, and verify
-  link, DNS, and direct HTTP latency.
+  actual default route, list every interface the router has, and verify link,
+  DNS, and direct HTTP latency. Any uplink is accepted unless one is pinned
+  with `set_gateway` (the console's **Egress** dropdown).
 
 ## Privacy checklist
 

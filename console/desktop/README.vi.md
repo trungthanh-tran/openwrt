@@ -36,9 +36,12 @@ không cần mã nguồn.
 **Vận hành**
 
 - Khung Internet Gateway: route thực tế, interface/device, next-hop, IP nguồn,
-  link, DNS và HTTP latency. Uplink nào cũng được chấp nhận — WAN dây, PPPoE,
-  LTE, Wi-Fi as WAN — chỉ cảnh báo khi đường ra vòng qua bridge của SSID được
-  proxy (loop) hoặc lệch interface đã ghim trong `GATEWAY_EXPECTED_INTERFACE`.
+  link, DNS, HTTP latency, kèm dropdown **Đường ra** liệt kê mọi interface router
+  báo về. Mặc định là *Tự động* — bám theo interface đang thật sự ra được
+  Internet; chọn một cái là ghim lại qua `set_gateway`. Uplink nào cũng được
+  chấp nhận (WAN dây, PPPoE, LTE, Wi-Fi as WAN), chỉ cảnh báo khi đường ra vòng
+  qua bridge của SSID được proxy (loop) hoặc lệch interface đã ghim. Không có
+  tên interface nào bị hardcode.
 - Xem backup, rollback, chạy health check và đọc log thao tác.
 - Cài hoặc sửa router qua SSH ngay trong app — xem
   [Cài đặt sau khi flash](#cài-đặt-sau-khi-flash).

@@ -189,7 +189,7 @@ Mở `http://<router>/sbproxy/` → **🔌 Kết nối router** → dán token. 
 | `SLOW_MS` | 800 | Ngưỡng coi là "chậm". |
 | `PROBE_URL` | gstatic /generate_204 | URL đo latency. |
 | `PROBE_TIMEOUT` | 8 | Timeout mỗi probe (giây). |
-| `GATEWAY_EXPECTED_INTERFACE` | `wwan` | Interface logic phải là đường Internet mặc định. |
+| `GATEWAY_EXPECTED_INTERFACE` | *(rỗng)* | Interface bắt buộc làm đường ra. Rỗng = tự động, chấp nhận uplink mà default route đang dùng. Console ghi giá trị này khi bạn chọn trong ô **Đường ra**. |
 | `GATEWAY_PROBE_URL` | gstatic `/generate_204` | URL kiểm tra HTTP trực tiếp qua device của default route. |
 | `GATEWAY_PROBE_TIMEOUT` | 8 | Timeout kiểm tra gateway (giây). |
 
@@ -337,7 +337,8 @@ Endpoint `/cgi-bin/sbproxy?action=…`, ưu tiên header `Authorization: Bearer 
 | POST | `rollback` | {name?} | {ok,rc,log} |
 | POST | `uninstall` | — | {ok,rc,log} |
 | GET | `health_now` | — | probe ngay 1 lần |
-| GET | `gateway` | — | Route/interface/device, link, DNS, HTTP code + latency; đối chiếu `wwan` |
+| GET | `gateway` | — | Route/interface/device, link, DNS, HTTP code + latency, kèm `interfaces[]` để chọn đường ra |
+| POST | `set_gateway` | {interface} | Ghim interface làm đường ra (`""` = tự động) |
 | GET | `clients` | — | Client online + blocklist offline, gồm band/online/RSSI/traffic |
 | POST | `kick` | {idx,mac} | {ok,rc,log} — deauth tạm |
 | POST | `ban` | {idx,mac} | {ok,rc,log} — chặn MAC lâu dài |

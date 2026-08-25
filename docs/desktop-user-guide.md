@@ -69,8 +69,15 @@ bên cạnh phiên bản app. Hai bản lệch nhau thì app xử lý luôn:
   hơn, tránh việc bản cũ ghi sai định dạng cấu hình.
 
 Khung **CỔNG RA INTERNET** cho biết đường ra thật của router (thiết bị, next-hop,
-IP nguồn), trạng thái link và độ trễ HTTP. Thấy vàng/đỏ hoặc báo không đi qua
-`wwan` thì bấm **Kiểm tra cổng ra** và báo quản trị viên trước khi Apply.
+IP nguồn), trạng thái link và độ trễ HTTP.
+
+Ô **Đường ra** liệt kê mọi interface router đang có (`wan`, `wwan`, `lan`, …).
+Mặc định là **Tự động** — app bám theo interface nào đang thật sự ra được
+Internet, nên không phải chỉnh gì. Muốn ép đúng một đường ra thì chọn tên
+interface trong danh sách; lựa chọn được lưu trên router, giữ nguyên cả khi cài
+lại agent. Chọn lại **Tự động** là bỏ ghim.
+
+Thấy vàng/đỏ thì bấm **Kiểm tra cổng ra** và báo quản trị viên trước khi Apply.
 
 ## 3 · Tab Wi-Fi / SOCKS5
 

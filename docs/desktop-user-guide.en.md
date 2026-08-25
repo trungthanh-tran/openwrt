@@ -74,9 +74,16 @@ agent version next to its own. A mismatch is handled for you:
   a newer build, so an old console cannot write a format it does not understand.
 
 The **INTERNET GATEWAY** card shows the router's real egress (device, next hop,
-source IP), link state, and HTTP latency. On yellow/red — or if it reports the
-traffic is not leaving through `wwan` — press **Check gateway** and talk to your
-administrator before applying anything else.
+source IP), link state, and HTTP latency.
+
+The **Egress** dropdown lists every interface the router has (`wan`, `wwan`,
+`lan`, …). It defaults to **Automatic**, which follows whichever interface is
+actually reaching the Internet, so there is nothing to set. To enforce one
+specific uplink, pick its name; the choice is stored on the router and survives
+an agent reinstall. Choosing **Automatic** again removes the pin.
+
+On yellow/red, press **Check gateway** and talk to your administrator before
+applying anything else.
 
 ## 3 · The Wi-Fi / SOCKS5 tab
 

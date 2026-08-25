@@ -89,6 +89,29 @@ class DesktopGuiSmokeTests(unittest.TestCase):
             self.app._on_theme_changed()
             save.assert_called_with("vi", "light")
 
+    def test_the_gateway_card_offers_the_router_interfaces(self):
+        payload = {
+            "state": "ok", "expected_interface": "", "interface": "wan",
+            "device": "eth1", "gateway": "192.168.88.1", "source_ip": "192.168.88.74",
+            "expected_active": True, "link_ok": True, "dns_checked": True,
+            "dns_ok": True, "http_ok": True, "http_code": 204, "latency_ms": 260,
+            "interfaces": [
+                {"name": "wan", "device": "eth1", "ipv4": "192.168.88.74",
+                 "up": True, "current": True, "proxied": False},
+                {"name": "wwan", "device": "phy0-sta0", "ipv4": "",
+                 "up": False, "current": False, "proxied": False},
+            ],
+        }
+        self.app.render_gateway(payload)
+        self.root.update_idletasks()
+        values = list(self.app.gateway_iface_combo.cget("values"))
+        self.assertEqual(len(values), 3)                 # automatic + two
+        self.assertIn("wan", values[1])
+        self.assertIn("wwan", values[2])
+        self.assertEqual(self.app.gateway_iface_var.get(), values[0])
+        # Read-only: an operator picks from the list instead of typing a name.
+        self.assertEqual(str(self.app.gateway_iface_combo.cget("state")), "readonly")
+
     def test_wifi_item_actions_use_context_menu(self):
         self.set_mode("en", "dark")
         self.assertEqual(set(self.app.wifi_edit_buttons), {"edit", "delete"})

@@ -40,6 +40,16 @@ class FakeLabel(FakeButton):
     pass
 
 
+class FakeCombo(FakeButton):
+    """A combobox that exists and remembers the values offered."""
+
+    def winfo_exists(self):
+        return True
+
+    def bind(self, *_args, **_kwargs):
+        pass
+
+
 class FakeRoot:
     def __init__(self, immediate=False):
         self.immediate = immediate
@@ -128,6 +138,7 @@ class FakeAgent:
     def __init__(self):
         self.calls = []
         self.dryrun_result = {"ok": True, "log": "dry ok"}
+        self.gateway_result = {"ok": True, "state": "ok", "interfaces": []}
         self.apply_result = {"ok": True, "log": "apply ok"}
         self.action_fail = set()
 
@@ -156,6 +167,14 @@ class FakeAgent:
     def rollback(self, name):
         self.calls.append(("rollback", name))
         return {"ok": True, "log": "rollback ok"}
+
+    def set_gateway(self, interface):
+        self.calls.append(("set_gateway", interface))
+        return {"ok": True, "interface": interface, "automatic": interface == ""}
+
+    def gateway(self):
+        self.calls.append(("gateway",))
+        return self.gateway_result
 
 
 def record(idx=1, name="test1"):
@@ -298,6 +317,13 @@ class GatewayWorkflowTests(unittest.TestCase):
         instance.gateway_http_var = FakeVar()
         instance.gateway_state_label = FakeLabel()
         instance.gateway_payload = {}
+        instance.gateway_iface_var = FakeVar("")
+        instance.gateway_iface_combo = FakeCombo()
+        instance.gateway_iface_choices = {}
+        instance.gateway_syncing = False
+        instance.client = FakeAgent()
+        instance.append_log = mock.Mock()
+        synchronous_run_task(instance)
         return instance
 
     def test_render_gateway_ok_with_expected_route(self):
@@ -377,6 +403,88 @@ class GatewayWorkflowTests(unittest.TestCase):
                     "http_code": 204, "latency_ms": 30,
                 })
                 self.assertIn(expected, instance.gateway_route_var.get())
+
+    GATEWAY_INTERFACES = [
+        {"name": "lan", "device": "br-lan", "ipv4": "192.168.1.1", "up": True,
+         "current": False, "default_route": False, "proxied": False},
+        {"name": "wan", "device": "eth1", "ipv4": "192.168.88.74", "up": True,
+         "current": True, "default_route": True, "proxied": False},
+        {"name": "wwan", "device": "phy0-sta0", "ipv4": "", "up": False,
+         "current": False, "default_route": False, "proxied": False},
+        {"name": "w1", "device": "br-w1", "ipv4": "192.168.11.1", "up": True,
+         "current": False, "default_route": False, "proxied": True},
+    ]
+
+    def gateway_payload(self, **changes):
+        payload = {
+            "state": "ok", "expected_interface": "", "interface": "wan",
+            "device": "eth1", "gateway": "192.168.88.1", "source_ip": "192.168.88.74",
+            "expected_active": True, "egress_problem": "", "link_ok": True,
+            "dns_checked": True, "dns_ok": True, "http_ok": True,
+            "http_code": 204, "latency_ms": 260,
+            "interfaces": [dict(entry) for entry in self.GATEWAY_INTERFACES],
+        }
+        payload.update(changes)
+        return payload
+
+    def test_the_uplink_list_comes_from_the_router(self):
+        """Nothing is hard-coded: the choices are what the router reported."""
+        instance = self.make_instance("vi")
+        instance.render_gateway(self.gateway_payload())
+        values = instance.gateway_iface_combo.options["values"]
+        self.assertEqual(len(values), 5)                      # automatic + four
+        self.assertTrue(values[0].startswith("Tự động (wan)"))  # the live uplink
+        self.assertIn("wan (eth1) · 192.168.88.74 · đang dùng", values)
+        self.assertIn("lan (br-lan) · 192.168.1.1", values)
+        self.assertIn("wwan (phy0-sta0) · không hoạt động", values)
+        self.assertIn("w1 (br-w1) · 192.168.11.1 · SSID proxy", values)
+
+    def test_automatic_is_selected_when_no_interface_is_pinned(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload())
+        self.assertEqual(instance.gateway_iface_var.get(), "Automatic (wan)")
+        self.assertEqual(instance.gateway_iface_choices[instance.gateway_iface_var.get()], "")
+
+    def test_a_pinned_interface_is_preselected(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload(expected_interface="wwan"))
+        selected = instance.gateway_iface_var.get()
+        self.assertTrue(selected.startswith("wwan"))
+        self.assertEqual(instance.gateway_iface_choices[selected], "wwan")
+
+    def test_choosing_an_interface_saves_it_and_reloads_the_card(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload())
+        # The router answers the follow-up read with the pin now in place.
+        instance.client.gateway_result = self.gateway_payload(expected_interface="wwan")
+        instance.gateway_iface_var.set("wwan (phy0-sta0) · down")
+        instance._on_gateway_interface_changed()
+        self.assertEqual(instance.client.calls, [("set_gateway", "wwan"), ("gateway",)])
+        self.assertEqual(instance.gateway_iface_choices[instance.gateway_iface_var.get()], "wwan")
+
+    def test_choosing_automatic_clears_the_pin(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload(expected_interface="wwan"))
+        instance.gateway_iface_var.set("Automatic (wan)")
+        instance._on_gateway_interface_changed()
+        self.assertEqual(instance.client.calls[0], ("set_gateway", ""))
+
+    def test_reselecting_the_same_interface_changes_nothing(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload(expected_interface="wwan"))
+        instance._on_gateway_interface_changed()
+        self.assertEqual(instance.client.calls, [])
+
+    def test_rendering_the_card_never_triggers_a_save(self):
+        instance = self.make_instance("en")
+        instance.render_gateway(self.gateway_payload())
+        instance.render_gateway(self.gateway_payload(expected_interface="wan"))
+        self.assertEqual(instance.client.calls, [])
+
+    def test_an_older_agent_without_the_list_still_renders(self):
+        instance = self.make_instance("en")
+        instance.render_gateway({"state": "ok", "interface": "wan", "device": "eth1"})
+        self.assertEqual(instance.gateway_iface_combo.options["values"], ["Automatic"])
 
     def test_an_enforced_interface_is_still_named_when_it_is_bypassed(self):
         instance = self.make_instance("en")

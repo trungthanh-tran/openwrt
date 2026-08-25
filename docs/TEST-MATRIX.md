@@ -43,7 +43,7 @@ Suite: `tests/test_desktop_workflows.py`
 |---|---|
 | Connection | URL scheme/token validation, required connection, runtime SSID parsing |
 | SSID selection | No selection, unknown selection, first free IDX, hard 200-SSID limit |
-| Gateway card | `ok`, `degraded`, `down`, unknown, non-`wwan`, DNS not checked, HTTP failure |
+| Gateway card | `ok`, `degraded`, `down`, unknown, unexpected egress, proxied-bridge loop, DNS not checked, HTTP failure, the interface list and choosing/clearing a pinned uplink |
 | Auto refresh | Cancel/reschedule, valid interval, malformed interval fallback, disabled state |
 | Device selection | Empty/single/multiple selection and enabled/disabled action buttons |
 | Background task runner | Success/error marshalling, loading state, callback, translated status |
@@ -150,6 +150,10 @@ Suite: `tests/test_gateway.sh`
   `egress_problem` verdict (`""`, `proxied-bridge`, `not-expected`).
 - Guards the rule that any uplink the default route picks is acceptable unless
   an interface is pinned.
+- Covers the `interfaces[]` inventory a console offers as choices: loopback
+  excluded, device/address/proto carried, the live uplink marked `current`, a
+  default route flagged, a down interface still listed, proxied SSID bridges
+  marked, and an empty ubus dump answered with an empty list.
 
 ## Web console translations
 

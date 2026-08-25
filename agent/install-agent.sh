@@ -22,6 +22,17 @@ done
 
 log "2) env agent -> /etc/sbproxy/env"
 mkdir -p /etc/sbproxy
+# The console stores the uplink choice here, and this file is rewritten whole,
+# so carry an existing choice across a reinstall. Anything that is not a plain
+# interface name is dropped rather than written back into a sourced file.
+KEEP_UPLINK=""
+if [ -f /etc/sbproxy/env ]; then
+  KEEP_UPLINK="$(sed -n 's/^[[:space:]]*GATEWAY_EXPECTED_INTERFACE=\(.*\)$/\1/p' \
+    /etc/sbproxy/env | tail -n 1)"
+  case "$KEEP_UPLINK" in
+    *[!A-Za-z0-9_.-]*) KEEP_UPLINK="" ;;
+  esac
+fi
 cat > /etc/sbproxy/env <<EOF
 SB_ROOT=$SB_ROOT
 CONF=$SB_ROOT/config/wifi-socks.conf
@@ -30,10 +41,11 @@ BACKUP_DIR=/root/sbproxy-backups
 PROBE_URL=https://www.gstatic.com/generate_204
 INTERVAL=15
 SLOW_MS=800
-# Leave unset: any uplink the default route picks is accepted, and only an
-# egress through a proxied SSID bridge is reported as wrong. Set it to a
-# logical interface name (wan, wwan, ...) to enforce one specific uplink.
-#GATEWAY_EXPECTED_INTERFACE=
+# Which interface the gateway check treats as the uplink. Empty means
+# automatic: whatever the default route uses is accepted, and only an egress
+# through a proxied SSID bridge is reported as wrong. The console writes this
+# when someone picks an interface; there is no built-in default name.
+GATEWAY_EXPECTED_INTERFACE=$KEEP_UPLINK
 GATEWAY_PROBE_URL=https://www.gstatic.com/generate_204
 GATEWAY_PROBE_TIMEOUT=8
 EOF
