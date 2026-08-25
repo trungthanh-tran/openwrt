@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.12] - 2026-08-25
+
 ### Fixed
 - **Nâng cấp agent từ console báo `package is not a .tar.gz or .zip file` dù gói
   hoàn toàn bình thường.** `self-update.sh` nhận diện gói **chỉ bằng `od`** —
