@@ -130,21 +130,42 @@ deploy "$SB_ROOT/agent/init.d/sbproxy-healthd" "$HEALTHD_INIT_DEST"
 
 # ---- migrate /etc/sbproxy/env ----
 # The agent sources this file before running any script, so a value left in it
-# overrides the shipped default forever. install-agent.sh used to pin the
-# uplink with GATEWAY_EXPECTED_INTERFACE=wwan, which now makes every wired-WAN
-# router report a degraded gateway; retire exactly that line so an in-place
-# update fixes the router instead of only the scripts. A different value is an
-# operator's own choice and is left alone.
+# overrides the shipped default forever. install-agent.sh used to write
+# GATEWAY_EXPECTED_INTERFACE=wwan into every install, which now makes a
+# wired-WAN router report a degraded gateway no matter how healthy it is.
+#
+# The line cannot be told apart from a deliberate choice, so it is judged by
+# what the router actually does: while the uplink really is wwan the pin costs
+# nothing and is kept, and it is only retired when it would otherwise keep
+# calling a working uplink degraded. Retiring it comments the line out with its
+# value intact, so enforcing wwan again is one edit away.
 ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
 if [ -f "$ENV_FILE" ] && grep -q '^GATEWAY_EXPECTED_INTERFACE=wwan$' "$ENV_FILE"; then
-  ENV_TMP="$ENV_FILE.$$"
-  if sed 's/^GATEWAY_EXPECTED_INTERFACE=wwan$/#GATEWAY_EXPECTED_INTERFACE=/' "$ENV_FILE" > "$ENV_TMP" \
-     && cat "$ENV_TMP" > "$ENV_FILE"; then
-    log "migrated $ENV_FILE: any uplink is accepted again"
-  else
-    log "warning: could not migrate $ENV_FILE; the gateway check may stay pinned to wwan"
+  actual_uplink=""
+  if [ -f "$SB_ROOT/scripts/gateway.sh" ]; then
+    actual_uplink="$(GATEWAY_EXPECTED_INTERFACE='' GATEWAY_PROBE_TIMEOUT=2 \
+      sh "$SB_ROOT/scripts/gateway.sh" 2>/dev/null | jq -r '.interface // ""' 2>/dev/null || true)"
   fi
-  rm -f "$ENV_TMP"
+  if [ "$actual_uplink" = "wwan" ]; then
+    log "kept GATEWAY_EXPECTED_INTERFACE=wwan in $ENV_FILE: this router does leave through wwan"
+  else
+    ENV_TMP="$ENV_FILE.$$"
+    if awk '
+        /^GATEWAY_EXPECTED_INTERFACE=wwan$/ {
+          print "# Commented out by sbproxy self-update: older installs wrote this line"
+          print "# automatically, and this router does not leave through wwan, so it"
+          print "# reported a healthy uplink as degraded. Uncomment to enforce it again."
+          print "#" $0
+          next
+        }
+        { print }
+      ' "$ENV_FILE" > "$ENV_TMP" && cat "$ENV_TMP" > "$ENV_FILE"; then
+      log "unpinned GATEWAY_EXPECTED_INTERFACE in $ENV_FILE (uplink is ${actual_uplink:-unknown}); any uplink is accepted again"
+    else
+      log "warning: could not migrate $ENV_FILE; the gateway check may stay pinned to wwan"
+    fi
+    rm -f "$ENV_TMP"
+  fi
 fi
 
 if [ "${SB_NO_SERVICE:-0}" != 1 ]; then

@@ -20,9 +20,12 @@ Ngày theo định dạng YYYY-MM-DD.
   `/etc/sbproxy/env`.** Agent nạp file env trước mọi script, nên giá trị nằm đó
   luôn thắng mặc định trong code: nếu chỉ thay `gateway.sh` thì router đã cài từ
   trước vẫn đọc `GATEWAY_EXPECTED_INTERFACE=wwan` và tiếp tục báo degraded.
-  `self-update.sh` (đường mà nút **Nâng cấp agent** dùng) giờ comment đúng dòng
-  ghim cũ đó ra — giá trị do người vận hành tự đặt thì không đụng tới, và các
-  biến khác trong file giữ nguyên.
+  `self-update.sh` (đường mà nút **Nâng cấp agent** dùng) giờ xử lý dòng đó theo
+  **thực tế của router**: còn đang đi ra bằng `wwan` thì giữ nguyên (ghim đó vô
+  hại, và có thể là lựa chọn cố ý); chỉ khi router đi đường khác — tức ghim đang
+  báo sai — mới comment dòng đó lại, **giữ nguyên giá trị** và ghi lý do ngay
+  bên cạnh để bật lại chỉ mất một lần sửa. Giá trị khác `wwan` không bao giờ bị
+  đụng tới, các biến còn lại trong file giữ nguyên.
 - Đường ra **vòng qua bridge của SSID được proxy** (`br-w<idx>`) — tức routing
   loop — giờ bị bắt và gọi đúng tên, đây mới là trường hợp luôn sai bất kể WAN
   dựng kiểu gì. `gateway` trả thêm trường `egress_problem`

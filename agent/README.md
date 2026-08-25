@@ -86,8 +86,10 @@ Trình duyệt **chặn** trang https gọi tới router http. Vì vậy:
 `GATEWAY_EXPECTED_INTERFACE` để trống nghĩa là chấp nhận mọi uplink; đặt tên một
 interface (`wan`, `wwan`, …) nếu muốn ép đúng một đường ra. File này được agent
 nạp trước mọi script nên **giá trị trong đó thắng mặc định trong code**;
-`self-update.sh` chỉ tự gỡ đúng dòng ghim `wwan` mà bản cũ ghi sẵn, không đụng
-vào lựa chọn do người vận hành đặt.
+`self-update.sh` chỉ động tới dòng ghim `wwan` mà bản cũ ghi sẵn, và chỉ khi
+router thực tế **không** đi ra bằng `wwan`; lúc đó dòng được comment lại (giữ
+nguyên giá trị, kèm lý do) để bật lại dễ dàng. Router đang dùng `wwan` thật thì
+ghim được giữ nguyên.
 Đổi xong: `/etc/init.d/sbproxy-healthd restart`.
 
 ## Gỡ agent

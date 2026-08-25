@@ -578,14 +578,36 @@ eq "status reports installed version" "$(json_value "$out" '.meta.version')" '0.
 
 # The agent sources /etc/sbproxy/env before every script, so a value left there
 # outlives the scripts. An update is the only chance to retire one.
+# The legacy pin is judged by what the router actually does, because it cannot
+# be told apart from a deliberate choice.
+fake_gateway() { # logical-interface
+  cat > "$SB2/scripts/gateway.sh" <<SH
+#!/bin/sh
+echo '{"ok":true,"interface":"$1"}'
+SH
+  chmod +x "$SB2/scripts/gateway.sh"
+}
+
+fake_gateway wan
 printf '%s\n' 'SB_ROOT=/root/sbproxy' 'GATEWAY_EXPECTED_INTERFACE=wwan' 'INTERVAL=15' > "$AGENT_ENV"
 make_pkg 0.6.0 "$TMP/pkg-0.6.0.tar.gz"
 out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.6.0.tar.gz")"
 eq "update succeeds with an env file present" "$(json_value "$out" '.ok')" 'true'
-not_contains "the retired uplink pin is gone" "$(cat "$AGENT_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wwan'
-contains "the pin stays commented for reference" "$(cat "$AGENT_ENV")" '#GATEWAY_EXPECTED_INTERFACE='
+not_contains "a wrong pin stops taking effect" "$(grep -v '^#' "$AGENT_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wwan'
+contains "the value is kept, commented out" "$(cat "$AGENT_ENV")" '#GATEWAY_EXPECTED_INTERFACE=wwan'
+contains "the reason is written next to it" "$(cat "$AGENT_ENV")" 'Uncomment to enforce it again'
 contains "unrelated env settings survive" "$(cat "$AGENT_ENV")" 'INTERVAL=15'
 contains "the install path survives" "$(cat "$AGENT_ENV")" 'SB_ROOT=/root/sbproxy'
+
+fake_gateway wwan
+printf '%s\n' 'GATEWAY_EXPECTED_INTERFACE=wwan' 'INTERVAL=15' > "$AGENT_ENV"
+make_pkg 0.6.1 "$TMP/pkg-0.6.1.tar.gz"
+out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.6.1.tar.gz")"
+eq "update succeeds on a wwan router" "$(json_value "$out" '.ok')" 'true'
+contains "a pin matching the real uplink is kept active" "$(grep -v '^#' "$AGENT_ENV")" 'GATEWAY_EXPECTED_INTERFACE=wwan'
+not_contains "the kept pin is not commented out" "$(cat "$AGENT_ENV")" '#GATEWAY_EXPECTED_INTERFACE'
+
+fake_gateway wan
 
 printf '%s\n' 'GATEWAY_EXPECTED_INTERFACE=wan' > "$AGENT_ENV"
 make_pkg 0.7.0 "$TMP/pkg-0.7.0.tar.gz"
