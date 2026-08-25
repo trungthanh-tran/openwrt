@@ -10,26 +10,43 @@
 #   scripts/rebalance.sh <idx> --macs AA:..:01,AA:..:02   # these devices
 #   scripts/rebalance.sh <idx> --online                   # everything connected now
 #   scripts/rebalance.sh <idx> --online --dry-run         # show the layout only
+#   scripts/rebalance.sh <idx> --macs ... --pool-file f   # replace the pool first
 #
-# POOL_SHUFFLE_SEED=<n> reproduces a previous layout; --dry-run prints the seed
-# it used so the same split can be committed afterwards.
+# --seed <n> (or POOL_SHUFFLE_SEED) reproduces a previous layout; --dry-run
+# prints the seed it used so the same split can be committed afterwards.
+#
+# Replacing the pool and dealing the devices happen in one run on purpose: two
+# separate calls would leave a window where the pool is new but every pin still
+# points at the old layout.
 set -e
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
 require_conf
 
-IDX=""; MACS=""; ONLINE=0; DRYRUN_ONLY=0
+IDX=""; MACS=""; ONLINE=0; DRYRUN_ONLY=0; POOL_FILE=""; SEED=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --macs) MACS="$(printf '%s' "${2:-}" | tr ',' ' ')"; shift 2 ;;
+    --pool-file) POOL_FILE="${2:-}"; shift 2 ;;
+    --seed) SEED="${2:-}"; shift 2 ;;
     --online) ONLINE=1; shift ;;
     --dry-run) DRYRUN_ONLY=1; shift ;;
-    -*) die "Usage: rebalance.sh <idx> [--macs a,b,c] [--online] [--dry-run]" ;;
+    -*) die "Usage: rebalance.sh <idx> [--macs a,b,c] [--pool-file f] [--seed n] [--online] [--dry-run]" ;;
     *) IDX="$1"; shift ;;
   esac
 done
+if [ -n "$SEED" ]; then
+  case "$SEED" in *[!0-9]*) die "--seed must be a non-negative integer" ;; esac
+  POOL_SHUFFLE_SEED="$SEED"
+fi
 [ -n "$IDX" ] || die "Usage: rebalance.sh <idx> [--macs a,b,c] [--online] [--dry-run]"
 case "$IDX" in *[!0-9]*) die "idx must be a positive integer" ;; esac
+
+if [ -n "$POOL_FILE" ]; then
+  [ -f "$POOL_FILE" ] || die "no such file: $POOL_FILE"
+  require_root
+  "$SB_ROOT/scripts/pool.sh" replace "$IDX" "$POOL_FILE"
+fi
 
 SLOTS="$(pool_count "$IDX")"
 [ "$SLOTS" -gt 0 ] || die "Wi-Fi idx=$IDX has no proxy pool (see config/proxy-pools.conf)"

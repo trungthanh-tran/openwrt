@@ -29,6 +29,9 @@ echo "===== Native desktop core/workflow suite ====="
 echo "===== Agent CGI integration suite ====="
 sh tests/test_agent.sh
 
+echo "===== Proxy pool agent suite ====="
+sh tests/test_pool_agent.sh
+
 echo "===== Agent health daemon integration suite ====="
 sh tests/test_healthd.sh
 
