@@ -31,6 +31,7 @@ ok()   { n_ok=$((n_ok + 1)); printf '  ok   %s\n' "$1"; }
 no()   { n_bad=$((n_bad + 1)); printf '  FAIL %s\n' "$1"; }
 eq()   { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi; }
 contains() { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
+match() { if printf '%s' "$2" | grep -Eq "$3"; then ok "$1"; else no "$1 — no /$3/"; fi; }
 
 # Write a pool fixture and point POOLS at it.
 mkpool() { printf '%s\n' "$1" > "$STUB/pool.conf"; POOLS="$STUB/pool.conf"; }
@@ -428,6 +429,158 @@ hygiene "the last valid slot is still accepted" \
   "192.168.11.23 : $(pool_port 1 1)" '1|aa:bb:cc:dd:ee:01|1|auto'
 hygiene "one past the last valid slot is not" "" '1|aa:bb:cc:dd:ee:01|2|auto'
 : > "$ASSIGN_FILE"; : > "$LEASES"
+
+echo "== writing the pin state =="
+ASSIGN_FILE="$STUB/assign"; LEASES="$STUB/leases"
+POOLS="$STUB/pin.conf"
+printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' \
+               '1|socks5|7.7.7.7|1080|||C' > "$POOLS"
+printf '%s\n' '2|socks5|6.6.6.6|1080|||D' >> "$POOLS"
+
+arun() { # label expected(ok|die) command...
+  _lbl="$1"; _want="$2"; shift 2
+  if ( "$@" ) >/dev/null 2>&1; then r=ok; else r=die; fi
+  if [ "$r" = "$_want" ]; then ok "$_lbl"; else no "$_lbl — got $r want $_want"; fi
+}
+
+: > "$ASSIGN_FILE"
+arun "pinning a device succeeds" ok assign_set 1 AA:BB:CC:DD:EE:01 0 manual
+eq "the row is written lowercase with its source" \
+  "$(cat "$ASSIGN_FILE")" "1|aa:bb:cc:dd:ee:01|0|manual"
+assign_set 1 aa:bb:cc:dd:ee:01 2 auto
+eq "re-pinning replaces rather than appends" \
+  "$(cat "$ASSIGN_FILE")" "1|aa:bb:cc:dd:ee:01|2|auto"
+eq "a device is pinned once per SSID" "$(wc -l < "$ASSIGN_FILE" | tr -d ' ')" "1"
+
+assign_set 2 aa:bb:cc:dd:ee:01 0 auto
+eq "the same device can be pinned on another SSID" \
+  "$(sort "$ASSIGN_FILE" | tr '\n' ' ')" \
+  "1|aa:bb:cc:dd:ee:01|2|auto 2|aa:bb:cc:dd:ee:01|0|auto "
+
+assign_clear 1 aa:bb:cc:dd:ee:01
+eq "clearing removes only that SSID's row" \
+  "$(cat "$ASSIGN_FILE")" "2|aa:bb:cc:dd:ee:01|0|auto"
+
+# Exit status alone cannot separate these: a bad value usually trips more than
+# one guard. Assert the message so each guard is pinned to its own case.
+amsg() { # label pattern command...
+  _lbl="$1"; _pat="$2"; shift 2
+  _out="$( "$@" 2>&1 )" || true
+  match "$_lbl" "$_out" "$_pat"
+}
+amsg "an SSID with no pool says exactly that" "has no proxy pool" \
+  assign_set 7 aa:bb:cc:dd:ee:02 0 auto
+amsg "a slot past the pool names the valid range" "slot 5 does not exist" \
+  assign_set 1 aa:bb:cc:dd:ee:02 5 auto
+amsg "an invalid MAC names the expected form" "expected AA:BB:CC:DD:EE:FF" \
+  assign_set 1 not-a-mac 0 auto
+amsg "a bogus source names the two it accepts" "must be auto or manual" \
+  assign_set 1 aa:bb:cc:dd:ee:02 0 whatever
+amsg "spreading onto an SSID with no pool says exactly that" "has no proxy pool" \
+  assign_spread 7 "aa:bb:cc:dd:ee:01"
+
+arun "an invalid MAC is refused"      die assign_set 1 not-a-mac 0 auto
+arun "a slot past the pool is refused" die assign_set 1 aa:bb:cc:dd:ee:02 9 auto
+arun "a non-numeric slot is refused"   die assign_set 1 aa:bb:cc:dd:ee:02 x auto
+arun "an SSID with no pool is refused" die assign_set 7 aa:bb:cc:dd:ee:02 0 auto
+arun "a bogus source is refused"       die assign_set 1 aa:bb:cc:dd:ee:02 0 whatever
+
+echo "== orphaned pins =="
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' '1|aa:bb:cc:dd:ee:02|2|manual' \
+               '2|aa:bb:cc:dd:ee:03|0|auto' > "$ASSIGN_FILE"
+# The pool shrinks to one proxy: slot 2 no longer exists.
+printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '2|socks5|6.6.6.6|1080|||D' > "$POOLS"
+out="$(assign_prune 2>&1)"
+eq "a pin into a vanished slot is reassigned, not dropped" \
+  "$(awk -F'|' '$2=="aa:bb:cc:dd:ee:02" {print $3}' "$ASSIGN_FILE")" "0"
+eq "reassignment is recorded as automatic" \
+  "$(awk -F'|' '$2=="aa:bb:cc:dd:ee:02" {print $4}' "$ASSIGN_FILE")" "auto"
+eq "a still-valid pin is untouched" \
+  "$(awk -F'|' '$2=="aa:bb:cc:dd:ee:01" {print $3}' "$ASSIGN_FILE")" "0"
+eq "another SSID is untouched" \
+  "$(awk -F'|' '$1==2 {print $3}' "$ASSIGN_FILE")" "0"
+match "pruning says what it changed" "$out" "aa:bb:cc:dd:ee:02"
+
+# An SSID that loses its pool entirely has nothing left to pin to.
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' '9|aa:bb:cc:dd:ee:04|0|auto' > "$ASSIGN_FILE"
+assign_prune >/dev/null 2>&1
+eq "pins for an SSID with no pool are removed" \
+  "$(grep -c '^9|' "$ASSIGN_FILE")" "0"
+
+echo "== spreading devices over a pool =="
+printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' \
+               '1|socks5|7.7.7.7|1080|||C' > "$POOLS"
+# Deterministic seed so the shuffle is reproducible inside the test.
+counts() { awk -F'|' -v i="$1" '$1==i {print $3}' "$ASSIGN_FILE" | sort | uniq -c | awk '{print $1}' | sort -u | tr '\n' ' '; }
+
+: > "$ASSIGN_FILE"
+POOL_SHUFFLE_SEED=1 assign_spread 1 "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02 aa:bb:cc:dd:ee:03 aa:bb:cc:dd:ee:04 aa:bb:cc:dd:ee:05 aa:bb:cc:dd:ee:06"
+eq "six devices over three proxies land two each" "$(counts 1)" "2 "
+eq "every device is pinned"        "$(grep -c '^1|' "$ASSIGN_FILE")" "6"
+eq "every slot is used"            "$(awk -F'|' '{print $3}' "$ASSIGN_FILE" | sort -u | tr '\n' ' ')" "0 1 2 "
+
+: > "$ASSIGN_FILE"
+POOL_SHUFFLE_SEED=1 assign_spread 1 "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02 aa:bb:cc:dd:ee:03 aa:bb:cc:dd:ee:04"
+eq "four devices over three proxies differ by at most one" "$(counts 1)" "1 2 "
+
+: > "$ASSIGN_FILE"
+POOL_SHUFFLE_SEED=1 assign_spread 1 "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02"
+eq "fewer devices than proxies means one each" "$(counts 1)" "1 "
+eq "spare proxies simply go unused" "$(grep -c '^1|' "$ASSIGN_FILE")" "2"
+
+: > "$ASSIGN_FILE"
+arun "spreading nothing is not an error" ok assign_spread 1 ""
+eq "spreading nothing writes nothing" "$(wc -c < "$ASSIGN_FILE" | tr -d ' ')" "0"
+arun "spreading onto an SSID with no pool is refused" die assign_spread 7 "aa:bb:cc:dd:ee:01"
+
+# The same seed must reproduce the same layout, or a preview shown to the
+# operator would not match what is then written.
+: > "$ASSIGN_FILE"
+POOL_SHUFFLE_SEED=42 assign_spread 1 "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02 aa:bb:cc:dd:ee:03"
+first="$(sort "$ASSIGN_FILE")"
+: > "$ASSIGN_FILE"
+POOL_SHUFFLE_SEED=42 assign_spread 1 "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02 aa:bb:cc:dd:ee:03"
+eq "the same seed reproduces the same layout" "$(sort "$ASSIGN_FILE")" "$first"
+
+# And the shuffle has to actually shuffle: across a handful of seeds the layout
+# must not always come out identical, or the deal would just follow MAC order.
+layouts=""
+for s in 1 2 3 4 5 6 7 8; do
+  : > "$ASSIGN_FILE"
+  POOL_SHUFFLE_SEED="$s" assign_spread 1     "aa:bb:cc:dd:ee:01 aa:bb:cc:dd:ee:02 aa:bb:cc:dd:ee:03 aa:bb:cc:dd:ee:04" >/dev/null 2>&1
+  layouts="$layouts$(sort "$ASSIGN_FILE" | tr -d '
+')
+"
+done
+eq "different seeds produce different layouts"   "$(printf '%s' "$layouts" | sort -u | wc -l | tr -d ' ' | awk '{print ($1 > 1) ? "yes" : "no"}')" "yes"
+
+echo "== choosing a slot automatically =="
+printf '%s
+' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B'                '1|socks5|7.7.7.7|1080|||C' > "$POOLS"
+: > "$ASSIGN_FILE"
+eq "an empty pool starts at slot 0" "$(assign_pick_slot 1)" "0"
+assign_set 1 aa:bb:cc:dd:ee:01 0 auto
+eq "the next device goes to an unused slot" "$(assign_pick_slot 1)" "1"
+assign_set 1 aa:bb:cc:dd:ee:02 1 auto
+eq "and then to the last unused one" "$(assign_pick_slot 1)" "2"
+assign_set 1 aa:bb:cc:dd:ee:03 2 auto
+assign_set 1 aa:bb:cc:dd:ee:04 1 auto
+eq "once every slot is used, the least loaded wins" "$(assign_pick_slot 1)" "0"
+# All three slots hold one device: a tie must resolve to the lowest slot, or
+# `auto` would not be reproducible.
+: > "$ASSIGN_FILE"
+assign_set 1 aa:bb:cc:dd:ee:01 0 auto
+assign_set 1 aa:bb:cc:dd:ee:02 1 auto
+assign_set 1 aa:bb:cc:dd:ee:03 2 auto
+eq "a tie goes to the lowest slot" "$(assign_pick_slot 1)" "0"
+: > "$ASSIGN_FILE"
+
+echo "== apply and preflight validate the pool =="
+match "apply.sh validates the pool file"    "$(cat "$ROOT/scripts/apply.sh")"    'validate_pools'
+match "apply.sh reassigns orphaned pins"    "$(cat "$ROOT/scripts/apply.sh")"    'assign_prune'
+match "preflight.sh validates the pool file" "$(cat "$ROOT/scripts/preflight.sh")" 'validate_pools'
+match "assign.sh exists and takes idx/mac/slot" "$(cat "$ROOT/scripts/assign.sh")" 'Usage: assign.sh'
+match "rebalance.sh exists"                  "$(cat "$ROOT/scripts/rebalance.sh")" 'Usage: rebalance.sh'
 
 echo
 echo "POOL TOTAL: pass=$n_ok fail=$n_bad"

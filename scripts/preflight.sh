@@ -45,7 +45,7 @@ for p in sing-box nftables kmod-nft-tproxy ip-full iw-full jq; do
 done
 
 echo; echo "==== 6. Config ===="
-if [ -f "$CONF" ]; then validate_settings; validate_conf; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
+if [ -f "$CONF" ]; then validate_settings; validate_conf; validate_pools; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
 else warn "$CONF does not exist — copy it from config/wifi-socks.conf.example"; fi
 
 echo; echo "Preflight complete. Review all [MISSING]/[WARN] items above before running apply.sh."

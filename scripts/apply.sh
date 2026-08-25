@@ -14,8 +14,12 @@ require_conf
 validate_platform
 validate_settings
 validate_conf
+validate_pools
 check_unique_idx
 check_bssid_limit
+# A pool that shrank leaves pins pointing at slots that no longer exist. Heal
+# them before generating, so the ruleset is built from a consistent state.
+assign_prune
 
 NO_BACKUP=0
 [ "$1" = "--no-backup" ] && NO_BACKUP=1

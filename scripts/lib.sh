@@ -369,6 +369,130 @@ assign_elements() {
   printf '%s' "$_ae_out"
 }
 
+# --- Writing the pin state --------------------------------------------------
+
+assign_valid_mac() {
+  case "$1" in
+    [0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]) return 0 ;;
+  esac
+  return 1
+}
+
+# Pin one device to one slot. Replaces any earlier pin for that device on that
+# SSID, so the file can never hold two answers for the same question.
+assign_set() { # idx mac slot source(auto|manual)
+  _as_idx="$1"
+  _as_mac="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
+  _as_slot="${3:-}"
+  _as_src="${4:-auto}"
+  case "$_as_idx" in *[!0-9]*|'') die "idx must be a positive integer" ;; esac
+  assign_valid_mac "$_as_mac" || die "invalid MAC address (expected AA:BB:CC:DD:EE:FF)"
+  case "$_as_slot" in *[!0-9]*|'') die "slot must be a non-negative integer" ;; esac
+  case "$_as_src" in auto|manual) : ;; *) die "source must be auto or manual" ;; esac
+  _as_slots="$(pool_count "$_as_idx")"
+  [ "$_as_slots" -gt 0 ] || die "Wi-Fi idx=$_as_idx has no proxy pool"
+  [ "$_as_slot" -lt "$_as_slots" ] || \
+    die "slot $_as_slot does not exist; idx=$_as_idx has $_as_slots proxies (0..$(( _as_slots - 1 )))"
+
+  _as_tmp="${TMPDIR:-/tmp}/sbproxy-assign-w.$$"
+  : > "$_as_tmp"
+  # grep -v exits 1 when it filters everything out, which would abort a caller
+  # running under `set -e`.
+  [ -f "${ASSIGN_FILE:-}" ] && { grep -v "^$_as_idx|$_as_mac|" "$ASSIGN_FILE" > "$_as_tmp" || true; }
+  printf '%s|%s|%s|%s\n' "$_as_idx" "$_as_mac" "$_as_slot" "$_as_src" >> "$_as_tmp"
+  mv "$_as_tmp" "$ASSIGN_FILE"
+}
+
+assign_clear() { # idx mac
+  [ -f "${ASSIGN_FILE:-}" ] || return 0
+  _ac_mac="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
+  _ac_tmp="${TMPDIR:-/tmp}/sbproxy-assign-c.$$"
+  grep -v "^$1|$_ac_mac|" "$ASSIGN_FILE" > "$_ac_tmp" || true
+  mv "$_ac_tmp" "$ASSIGN_FILE"
+}
+
+# Bring the state file back in line with the pools. A pin into a slot the pool
+# no longer has is moved rather than dropped: dropping it would silently push
+# that device onto the shared default proxy, which is the one outcome this
+# feature exists to prevent. Pins for an SSID that lost its pool entirely have
+# nowhere to go and are removed.
+assign_prune() {
+  [ -f "${ASSIGN_FILE:-}" ] || return 0
+  _ap_tmp="${TMPDIR:-/tmp}/sbproxy-assign-p.$$"
+  : > "$_ap_tmp"
+  while IFS='|' read -r _ap_idx _ap_mac _ap_slot _ap_src; do
+    case "$_ap_idx" in ''|\#*) continue ;; *[!0-9]*) continue ;; esac
+    assign_valid_mac "$_ap_mac" || continue
+    case "$_ap_slot" in *[!0-9]*|'') continue ;; esac
+    _ap_slots="$(pool_count "$_ap_idx")"
+    if [ "$_ap_slots" -le 0 ]; then
+      log "Dropping pin $_ap_mac on idx=$_ap_idx: that Wi-Fi no longer has a proxy pool"
+      continue
+    fi
+    if [ "$_ap_slot" -ge "$_ap_slots" ]; then
+      _ap_new=$(( _ap_slot % _ap_slots ))
+      log "Reassigning $_ap_mac on idx=$_ap_idx: slot $_ap_slot is gone, now slot $_ap_new"
+      _ap_slot="$_ap_new"; _ap_src=auto
+    fi
+    printf '%s|%s|%s|%s\n' "$_ap_idx" "$_ap_mac" "$_ap_slot" "${_ap_src:-auto}" >> "$_ap_tmp"
+  done < "$ASSIGN_FILE"
+  mv "$_ap_tmp" "$ASSIGN_FILE"
+}
+
+# Spread devices evenly over an SSID's pool: shuffle, then deal round-robin, so
+# the counts differ by at most one and the order is not predictable from the
+# MAC list. The seed is reported so a preview and the write that follows it
+# cannot disagree.
+assign_spread() { # idx "mac mac ..."
+  _sp_idx="$1"; _sp_macs="${2:-}"
+  _sp_n="$(pool_count "$_sp_idx")"
+  [ "$_sp_n" -gt 0 ] || die "Wi-Fi idx=$_sp_idx has no proxy pool"
+  [ -n "$_sp_macs" ] || return 0
+  _sp_seed="${POOL_SHUFFLE_SEED:-$(head -c 8 /dev/urandom | cksum | cut -d' ' -f1)}"
+  _sp_tmp="${TMPDIR:-/tmp}/sbproxy-spread.$$"
+  # shellcheck disable=SC2086  # the MAC list is intentionally word-split
+  printf '%s\n' $_sp_macs \
+    | awk -v seed="$_sp_seed" 'BEGIN { srand(seed) } NF { print rand() "\t" $0 }' \
+    | sort | cut -f2- > "$_sp_tmp"
+  _sp_j=0
+  while read -r _sp_mac; do
+    [ -n "$_sp_mac" ] || continue
+    assign_set "$_sp_idx" "$_sp_mac" "$(( _sp_j % _sp_n ))" manual
+    _sp_j=$(( _sp_j + 1 ))
+  done < "$_sp_tmp"
+  rm -f "$_sp_tmp"
+  log "Spread $_sp_j device(s) over $_sp_n proxies on idx=$_sp_idx (seed $_sp_seed)"
+}
+
+# Slot with the fewest devices currently pinned to it. Ties go to the lowest
+# slot, so `auto` is deterministic and a fresh pool fills up in order.
+assign_pick_slot() { # idx
+  _pk_idx="$1"
+  _pk_slots="$(pool_count "$_pk_idx")"
+  [ "$_pk_slots" -gt 0 ] || die "Wi-Fi idx=$_pk_idx has no proxy pool"
+  assign_rows "$_pk_idx" | awk -F'|' -v n="$_pk_slots" '
+    { used[$2]++ }
+    END {
+      best = 0; least = -1
+      for (s = 0; s < n; s++) {
+        c = (s in used) ? used[s] : 0
+        if (least < 0 || c < least) { least = c; best = s }
+      }
+      print best
+    }'
+}
+
+# Push one pin into the running ruleset. Cheap enough to do per device and it
+# never restarts anything; a failure only means the next apply will pick it up.
+assign_live_update() { # idx mac slot
+  command -v nft >/dev/null 2>&1 || return 0
+  _al_ip="$(lease_ip_of "$2")"
+  [ -n "$_al_ip" ] || return 0
+  nft delete element inet sbproxy "w$1map" "{ $_al_ip }" >/dev/null 2>&1 || true
+  nft add element inet sbproxy "w$1map" "{ $_al_ip : $(pool_port "$1" "$3") }" >/dev/null 2>&1 \
+    || warn "Could not update the live ruleset for $2; run scripts/apply.sh to resync."
+}
+
 validate_pools() {
   [ -f "${POOLS:-}" ] || return 0
   awk -F'|' -v cap="${POOL_SLOTS_PER_SSID_MAX:-256}" '
