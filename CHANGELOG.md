@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-08-25
+
 ### Fixed
 - **Cài đặt hỏng ở bước “Chạy preflight và dry-run” khi chưa có
   `wifi-socks.conf`** với lỗi `[sbproxy][ERR] Missing configuration:
