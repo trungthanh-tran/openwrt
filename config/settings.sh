@@ -26,6 +26,21 @@ BSSID_LIMIT=16
 NET_BASE=10
 # sing-box TPROXY port = TPROXY_PORT_BASE + idx.
 TPROXY_PORT_BASE=12000
+
+# --- Proxy pool -------------------------------------------------------------
+# An SSID may carry several proxies (config/proxy-pools.conf). Each one is a
+# "slot" with its own TPROXY port, so a device can be pinned to a single proxy
+# without regenerating any configuration:
+#   pool port = POOL_PORT_BASE + idx * POOL_PORT_STRIDE + slot
+# The whole block from POOL_PORT_BASE upwards is reserved; keep it clear of
+# TPROXY_PORT_BASE. Leaving proxy-pools.conf absent keeps every SSID on the
+# single proxy named in its wifi-socks.conf row, exactly as before.
+POOL_PORT_BASE=13000
+# Ports reserved per idx. Fixed on purpose: the port of an SSID must not move
+# when the pool grows or shrinks. Also the hard ceiling on slots per SSID.
+POOL_PORT_STRIDE=256
+# Per-SSID cap on proxies. Never larger than POOL_PORT_STRIDE.
+POOL_SLOTS_PER_SSID_MAX=256
 # Firewall mark and routing table used by TPROXY.
 TPROXY_MARK=1
 TPROXY_TABLE=100

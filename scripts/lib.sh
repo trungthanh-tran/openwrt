@@ -4,6 +4,7 @@
 # --- Resolve paths ----------------------------------------------------------
 SB_ROOT="${SB_ROOT:-$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
+POOLS="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
 SETTINGS="${SETTINGS:-$SB_ROOT/config/settings.sh}"
 
 # shellcheck source=/dev/null
@@ -50,6 +51,32 @@ validate_settings() {
   case "${DNS_UPSTREAM:-1.1.1.1}" in
     *[!A-Za-z0-9.:_-]*) die "DNS_UPSTREAM may only contain letters, digits, . : _ and -." ;;
   esac
+  validate_pool_settings
+}
+
+# The pool port block must be internally consistent and must not collide with
+# the legacy one-port-per-SSID range. The entire span from POOL_PORT_BASE is
+# treated as reserved, which is stricter than the formula strictly needs and
+# leaves no room for an off-by-one to become a silent port clash.
+validate_pool_settings() {
+  _base="${POOL_PORT_BASE:-13000}"
+  _stride="${POOL_PORT_STRIDE:-256}"
+  _cap="${POOL_SLOTS_PER_SSID_MAX:-256}"
+  _legacy="${TPROXY_PORT_BASE:-12000}"
+  case "$_base:$_stride:$_cap:$_legacy" in
+    *[!0-9:]*) die "POOL_PORT_BASE, POOL_PORT_STRIDE and POOL_SLOTS_PER_SSID_MAX must be integers." ;;
+  esac
+  [ "$_stride" -ge 1 ] || die "POOL_PORT_STRIDE must be at least 1."
+  [ "$_cap" -ge 1 ] || die "POOL_SLOTS_PER_SSID_MAX must be at least 1."
+  [ "$_cap" -le "$_stride" ] || \
+    die "POOL_SLOTS_PER_SSID_MAX ($_cap) must not exceed POOL_PORT_STRIDE ($_stride)."
+  # Highest port the formula can ever produce: idx=200, slot=stride-1.
+  _hi=$(( _base + 200 * _stride + _stride - 1 ))
+  [ "$_hi" -le 65535 ] || \
+    die "POOL_PORT_BASE=$_base with POOL_PORT_STRIDE=$_stride reaches port $_hi, past 65535."
+  if [ "$_base" -le $(( _legacy + 200 )) ] && [ $(( _legacy + 1 )) -le "$_hi" ]; then
+    die "The pool port block ($_base..$_hi) overlaps TPROXY_PORT_BASE ($(( _legacy + 1 ))..$(( _legacy + 200 )))."
+  fi
 }
 
 validate_conf() {
@@ -133,6 +160,8 @@ band_of_idx() {
 # --- Values derived from the Wi-Fi index -----------------------------------
 net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
+# TPROXY port of one pool slot: pool_port <idx> <slot>.
+pool_port()    { echo $(( ${POOL_PORT_BASE:-13000} + $1 * ${POOL_PORT_STRIDE:-256} + $2 )); }
 radio_of() { case "$1" in 2g) echo "$RADIO_2G";; 5g) echo "$RADIO_5G";; *) die "invalid band: $1";; esac; }
 
 # --- Radio discovery --------------------------------------------------------
@@ -223,6 +252,93 @@ for_each_ssid() {
     [ -n "$idx" ] || { warn "Skipping row with missing idx: $name"; continue; }
     "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui" "${proxy_type:-socks5}"
   done < "$CONF"
+}
+
+# --- Proxy pool -------------------------------------------------------------
+# config/proxy-pools.conf gives one SSID several proxies. Format, one per line:
+#   idx|proxy_type|host|port|user|pass|label      (label optional)
+# The slot number is the row's position within its idx, counted from zero, so
+# rows must never be reordered without also remapping /etc/sbproxy.assign.
+#
+# An absent file, or an idx with no rows, means that SSID keeps using the single
+# proxy from its wifi-socks.conf row. Every generator branches on pool_enabled.
+
+# Normalised rows of one idx: slot|type|host|port|user|pass|label
+pool_rows() {
+  [ -f "${POOLS:-}" ] || return 0
+  awk -F'|' -v want="$1" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF < 6 || NF > 7 { next }
+    trim($1) != want { next }
+    # User and password are passed through untrimmed: leading or trailing
+    # spaces are legal in a credential and are not ours to silently drop.
+    { printf "%d|%s|%s|%s|%s|%s|%s\n", n++, tolower(trim($2)), trim($3), trim($4),
+             $5, $6, (NF >= 7 ? trim($7) : "") }
+  ' "$POOLS"
+}
+
+pool_count() { pool_rows "$1" | awk 'END { print NR + 0 }'; }
+
+# True when idx has at least one pool proxy.
+pool_enabled() { [ "$(pool_count "$1")" -gt 0 ]; }
+
+# Iterate over one idx's slots and call:
+#   cb slot type host port user pass label
+# Reads from a temporary file rather than a pipe: a pipeline would run the loop
+# in a subshell and discard whatever the callback accumulates.
+for_each_pool() {
+  _pool_idx="$1"; _pool_cb="$2"
+  _pool_tmp="${TMPDIR:-/tmp}/sbproxy-pool.$$"
+  pool_rows "$_pool_idx" > "$_pool_tmp"
+  while IFS='|' read -r slot ptype phost pport puser ppass plabel; do
+    [ -n "$slot" ] || continue
+    "$_pool_cb" "$slot" "$ptype" "$phost" "$pport" "$puser" "$ppass" "$plabel"
+  done < "$_pool_tmp"
+  rm -f "$_pool_tmp"
+}
+
+# Every pool host, deduplicated — the nftables bypass needs all of them, not
+# just the hosts named in wifi-socks.conf.
+pool_hosts() {
+  [ -f "${POOLS:-}" ] || return 0
+  awk -F'|' '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF < 6 || NF > 7 { next }
+    { h = trim($3); if (h != "" && !seen[h]++) print h }
+  ' "$POOLS"
+}
+
+validate_pools() {
+  [ -f "${POOLS:-}" ] || return 0
+  awk -F'|' -v cap="${POOL_SLOTS_PER_SSID_MAX:-256}" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF != 6 && NF != 7 { printf "line %d: expected 6 or 7 columns, found %d\n", NR, NF; bad=1; next }
+    {
+      idx=trim($1); type=tolower(trim($2)); host=trim($3); port=trim($4)
+      label=(NF == 7) ? trim($7) : ""
+      # BusyBox awk compares trim() results as strings unless coerced, so "3"
+      # would sort above "200"; force both numeric before any bounds check.
+      idx_num=idx+0; port_num=port+0
+      if (idx !~ /^[1-9][0-9]*$/ || idx_num > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
+      if (type != "socks5" && type != "http") { printf "line %d: proxy_type must be socks5 or http\n", NR; bad=1 }
+      if (host == "") { printf "line %d: host is empty\n", NR; bad=1 }
+      else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "line %d: invalid host\n", NR; bad=1 }
+      if (port !~ /^[0-9]+$/ || port_num < 1 || port_num > 65535) { printf "line %d: invalid port\n", NR; bad=1 }
+      if (length($5) > 255 || length($6) > 255) { printf "line %d: proxy user/pass may be at most 255 bytes\n", NR; bad=1 }
+      if (length(label) > 64) { printf "line %d: label may be at most 64 bytes\n", NR; bad=1 }
+      if ($0 ~ /[[:cntrl:]]/) { printf "line %d: field contains a control character\n", NR; bad=1 }
+      if (idx ~ /^[1-9][0-9]*$/ && ++seen[idx_num] > cap) {
+        printf "line %d: idx %s has more than %d proxies\n", NR, idx, cap; bad=1
+      }
+    }
+    END { exit bad ? 1 : 0 }
+  ' "$POOLS" || die "proxy-pools.conf is invalid."
 }
 
 # --- Duplicate index validation --------------------------------------------

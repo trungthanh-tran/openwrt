@@ -20,6 +20,9 @@ fi
 echo "===== POSIX/OpenWrt generator suite ====="
 sh tests/run.sh
 
+echo "===== Proxy pool suite ====="
+sh tests/test_pool.sh
+
 echo "===== Native desktop core/workflow suite ====="
 "$PYTHON_CMD" -m unittest -v tests.test_desktop_core tests.test_desktop_workflows tests.test_desktop_provision tests.test_desktop_gui tests.test_dirty_data tests.test_web_console_i18n
 

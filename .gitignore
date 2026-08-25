@@ -1,6 +1,8 @@
 # ==== Bí mật — KHÔNG commit (tránh lộ) ====
 # Bản thật chứa user/pass SOCKS + Wi-Fi key.
 config/wifi-socks.conf
+# Pool proxy thật chứa user/pass của từng proxy.
+config/proxy-pools.conf
 # Token agent ở mọi thư mục.
 **/token
 # Bí mật cục bộ khác.
