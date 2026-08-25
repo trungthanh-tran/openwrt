@@ -222,6 +222,105 @@ else
   CONF="$ROOT/config/wifi-socks.conf.example"
 fi
 
+echo "== nftables structure =="
+NFT_FILE="$STUB/sbproxy.nft"
+TPROXY_MARK=1
+STUN_TCP_PORTS="3478, 3479, 5349, 5350"
+STUN_UDP_PORTS="3478, 3479, 5349, 5350, 19302-19309"
+CONF="$ROOT/config/wifi-socks.conf.example"
+
+nftgen() { # <pool file or -> [POOL_DIVERT value]
+  if [ "$1" = "-" ]; then POOLS="$STUB/no-such-pool.conf"; else POOLS="$1"; fi
+  POOL_DIVERT="${2:-off}"
+  build_nft >/dev/null 2>&1
+}
+# Body of one chain, without its type/policy line.
+chain_body() {
+  awk -v c="  chain $1 {" '$0==c {inside=1; next} inside && /^  }/ {exit} inside && !/type [a-z]+ hook/' "$NFT_FILE"
+}
+# Marker sequence of a chain, so order can be asserted without pinning wording.
+chain_shape() {
+  chain_body "$1" | awk '
+    /dport 53/            { print "dns" }
+    /127\.0\.0\.0\/8/       { print "localnet" }
+    /@proxy_hosts/        { print "hosts" }
+    /dport 443 drop/      { print "quic" }
+    /tproxy ip to :[0-9]+ meta mark set/ && !/dport 53/ { print "tproxy" }
+  ' | tr '\n' ' '
+}
+
+nftgen -
+eq "one chain per SSID" \
+  "$(grep -c '^  chain w[0-9]* {' "$NFT_FILE")" "3"
+eq "every SSID is dispatched from the verdict map" \
+  "$(grep -o 'iifname vmap { [^}]*}' "$NFT_FILE")" \
+  'iifname vmap { "br-w1" : jump w1, "br-w2" : jump w2, "br-w3" : jump w3 }'
+eq "prerouting no longer carries per-SSID rules" \
+  "$(chain_body prerouting | grep -c 'br-w')" "1"
+
+# Rule order inside an SSID chain must match the old flat chain's order.
+eq "chain w1 keeps the original rule order" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
+eq "chain w3 has the identical shape"       "$(chain_shape w3)" "dns localnet hosts quic tproxy "
+eq "an SSID chain is a constant number of rules" \
+  "$(chain_body w1 | grep -vc '^ *#')" "$(chain_body w3 | grep -vc '^ *#')"
+
+eq "DNS still goes to the SSID's own port" \
+  "$(chain_body w2 | grep 'dport 53' | grep -c ":$(tproxy_port 2)")" "1"
+eq "tcp and udp share one DNS rule now" \
+  "$(chain_body w2 | grep -c 'dport 53')" "1"
+eq "tcp and udp share one tproxy rule now" \
+  "$(chain_body w2 | grep -c 'meta l4proto { tcp, udp } tproxy')" "1"
+eq "the default tproxy target is the SSID port" \
+  "$(chain_body w2 | grep -c "tproxy ip to :$(tproxy_port 2) meta mark set 1 accept")" "2"
+
+# Proxy hosts move from one rule each into a single set.
+eq "numeric proxy hosts become set elements" \
+  "$(grep -o 'elements = { [^}]*}' "$NFT_FILE")" \
+  'elements = { 1.2.3.4, 5.6.7.8, 9.9.9.9 }'
+eq "the set is keyed by IPv4 address" \
+  "$(grep -c 'set proxy_hosts { type ipv4_addr' "$NFT_FILE")" "1"
+
+POOLHOSTS="$STUB/ph.conf"
+printf '%s\n' '1|socks5|203.0.113.7|1080|||' '1|socks5|1.2.3.4|1080|||' \
+               '1|socks5|proxy.example.com|1080|||' > "$POOLHOSTS"
+nftgen "$POOLHOSTS"
+eq "pool hosts are bypassed too, deduplicated, hostnames excluded" \
+  "$(grep -o 'elements = { [^}]*}' "$NFT_FILE")" \
+  'elements = { 1.2.3.4, 5.6.7.8, 9.9.9.9, 203.0.113.7 }'
+
+# WebRTC lives on the forward hook and must not move into the verdict map.
+nftgen -
+eq "the webrtc chain still hooks forward" \
+  "$(grep -c 'chain webrtc' "$NFT_FILE")" "1"
+eq "webrtc rules stay interface-matched, only for SSIDs that asked" \
+  "$(chain_body webrtc | grep -c 'br-w')" "4"
+eq "webrtc is untouched for the SSID with the flag off" \
+  "$(chain_body webrtc | grep -c 'br-w3')" "0"
+
+echo "== nftables divert rule =="
+nftgen - on
+eq "divert is the first rule in prerouting" \
+  "$(chain_body prerouting | grep -v '^ *#' | head -1)" \
+  "    meta l4proto tcp socket transparent 1 meta mark set 1 accept"
+eq "divert is tcp only" "$(chain_body prerouting | grep -c 'socket transparent 1')" "1"
+nftgen - off
+eq "divert can be turned off" "$(grep -c 'socket transparent' "$NFT_FILE")" "0"
+eq "the chains are otherwise unchanged without divert" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
+
+echo "== nftables edge cases =="
+: > "$STUB/empty.conf"; CONF="$STUB/empty.conf"; nftgen -
+eq "no SSIDs produces no empty verdict map" "$(grep -c 'iifname vmap' "$NFT_FILE")" "0"
+eq "no SSIDs still produces a table" "$(grep -c '^table inet sbproxy {' "$NFT_FILE")" "1"
+eq "no SSIDs produces no dangling chain" "$(grep -c '^  chain w[0-9]* {' "$NFT_FILE")" "0"
+
+NOIP="$STUB/noip.conf"
+printf '%s\n' 'Only|2g|1|password12|proxy.example.com|1080|||1|0||socks5' > "$NOIP"
+CONF="$NOIP"; nftgen -
+eq "an all-hostname config emits no empty element list" "$(grep -c 'elements = { }' "$NFT_FILE")" "0"
+eq "the bypass rule is still present for later additions" \
+  "$(chain_body w1 | grep -c '@proxy_hosts')" "1"
+CONF="$ROOT/config/wifi-socks.conf.example"
+
 echo
 echo "POOL TOTAL: pass=$n_ok fail=$n_bad"
 [ "$n_bad" -eq 0 ]

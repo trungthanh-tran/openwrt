@@ -41,6 +41,14 @@ POOL_PORT_BASE=13000
 POOL_PORT_STRIDE=256
 # Per-SSID cap on proxies. Never larger than POOL_PORT_STRIDE.
 POOL_SLOTS_PER_SSID_MAX=256
+
+# The kernel's TPROXY documentation describes a "divert" rule that short-cuts
+# any packet already belonging to an open transparent socket, so only the first
+# packet of a connection runs the classification rules. It needs the nftables
+# socket expression (kmod-nft-socket), which not every image carries.
+#   auto = use it when this router's nft accepts it (default)
+#   on   = always emit it; off = never
+POOL_DIVERT="auto"
 # Firewall mark and routing table used by TPROXY.
 TPROXY_MARK=1
 TPROXY_TABLE=100

@@ -397,14 +397,18 @@ mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|
 B|5g|2|password12|dns.example.com|1080|||1|0|'
 ( CONF="$STUB/c.conf" NFT_FILE="$STUB/x.nft" build_nft ) >/dev/null 2>&1
 nft="$(cat "$STUB/x.nft" 2>/dev/null)"
-match   "DNS hijack udp dport 53"     "$nft" 'iifname "br-w1" udp dport 53 tproxy ip to :12001'
-match   "DNS hijack tcp dport 53"     "$nft" 'iifname "br-w1" tcp dport 53 tproxy ip to :12001'
-match   "tcp tproxy rule"             "$nft" 'iifname "br-w1" meta l4proto tcp tproxy ip to :12001'
-match   "second SSID tproxy port"     "$nft" 'iifname "br-w2" meta l4proto udp tproxy ip to :12002'
-match   "block QUIC on first SSID"    "$nft" 'iifname "br-w1" udp dport 443 drop'
-match   "block QUIC on second SSID"   "$nft" 'iifname "br-w2" udp dport 443 drop'
-match   "bypass literal sock IP"      "$nft" 'ip daddr 1.2.3.4 return'
-nomatch "no hostname bypass"          "$nft" 'ip daddr dns.example.com'
+# Each SSID now has its own chain, entered from a verdict map, so the
+# interface is matched once instead of on every rule. Same behaviour, so these
+# assert the same facts against the new shape. tests/test_pool.sh checks the
+# structure itself, including that the rule order per SSID is unchanged.
+match   "every SSID is dispatched by verdict map" "$nft" 'iifname vmap [{] "br-w1" : jump w1, "br-w2" : jump w2 [}]'
+match   "DNS hijack covers tcp and udp"  "$nft" 'meta l4proto [{] tcp, udp [}] th dport 53 tproxy ip to :12001'
+match   "tproxy rule for the first SSID" "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12001'
+match   "second SSID tproxy port"        "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12002'
+match   "block QUIC"                     "$nft" 'udp dport 443 drop'
+match   "bypass proxy hosts by set"      "$nft" 'ip daddr @proxy_hosts return'
+match   "literal sock IP is a set element" "$nft" 'elements = [{] 1[.]2[.]3[.]4 [}]'
+nomatch "no hostname bypass"          "$nft" 'dns\.example\.com'
 match   "RFC1918 return"              "$nft" 'ip daddr \{ 127.0.0.0/8'
 match   "webrtc drop for webrtc=1"    "$nft" 'iifname "br-w1" udp dport \{ 3478'
 nomatch "no webrtc drop for webrtc=0" "$nft" 'iifname "br-w2" udp dport \{ 3478'
