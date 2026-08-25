@@ -63,8 +63,11 @@ Hàng trên cùng luôn có sẵn:
 Kết nối xong, thanh trạng thái báo sing-box đang chạy và app hiện phiên bản agent
 bên cạnh phiên bản app. Hai bản lệch nhau thì app xử lý luôn:
 
-- **Agent cũ hơn app** → app hỏi có nâng cấp không; đồng ý thì agent được nâng
-  cấp tại chỗ, **giữ nguyên cấu hình WiFi/SOCKS**.
+- **Agent cũ hơn app** → app hỏi có nâng cấp không; đồng ý thì hiện cửa sổ chạy
+  **từng bước có nhật ký** (chuẩn bị gói → kiểm tra phiên bản → đẩy gói → kiểm
+  tra lại agent), **giữ nguyên cấu hình WiFi/SOCKS**. Lỗi ở bước nào là dừng
+  ngay ở đó và nói rõ lý do; nếu vẫn không được thì cài lại agent bằng
+  **Cài đặt sau khi flash… → Cài lại agent dù đã có**.
 - **Agent mới hơn app** → app chuyển sang **chỉ đọc** và yêu cầu dùng bản app mới
   hơn, tránh việc bản cũ ghi sai định dạng cấu hình.
 

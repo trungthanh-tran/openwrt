@@ -615,6 +615,20 @@ EN_TRANSLATIONS = {
     'CHƯA CẤU HÌNH ROUTER': 'ROUTER NOT CONFIGURED',
     'Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
     'Cài đặt sau khi flash…': 'Post-flash setup…',
+    'Nâng cấp agent trên router': 'Upgrade the router agent',
+    'NÂNG CẤP AGENT TRÊN ROUTER': 'UPGRADE THE ROUTER AGENT',
+    'Đẩy gói của console lên agent. Cấu hình wifi-socks.conf và settings.sh được giữ nguyên.': "Upload this console's package to the agent. wifi-socks.conf and settings.sh are kept.",
+    'Đang chạy…': 'Running…',
+    'Nâng cấp xong': 'Upgrade complete',
+    'Nâng cấp thất bại': 'Upgrade failed',
+    'Nâng cấp xong — agent đã chạy bản mới.': 'Upgrade complete — the agent is on the new version.',
+    'Nâng cấp dừng lại ở bước lỗi. Sửa nguyên nhân rồi thử lại, hoặc cài lại agent qua SSH bằng Cài đặt sau khi flash → Cài lại agent dù đã có.': 'The upgrade stopped at the failed step. Fix the cause and try again, or reinstall the agent over SSH with Post-flash setup → Reinstall the agent even if it is present.',
+    'Chuẩn bị gói cập nhật': 'Prepare the update package',
+    'Kiểm tra phiên bản agent': 'Check the agent version',
+    'Đẩy gói lên agent': 'Upload the package to the agent',
+    'Kiểm tra agent sau nâng cấp': 'Verify the agent afterwards',
+    'Không tìm thấy gói cập nhật': 'No update package was found',
+    'Gói cập nhật rỗng': 'The update package is empty',
     'Đường ra': 'Egress',
     'Đang đổi đường ra…': 'Changing the egress…',
     'Đường ra: dùng {interface}': 'Egress: using {interface}',
@@ -2492,6 +2506,144 @@ def set_widget_tree_disabled(widget, disabled, remembered=None):
     return remembered
 
 
+class AgentUpdateError(RuntimeError):
+    """An agent upgrade step failed; the message is already operator-readable."""
+
+    def __init__(self, message, output=""):
+        super().__init__(message)
+        self.output = output
+
+
+def package_problem(path) -> str:
+    """Why this file cannot be an update package, or "" when it looks fine.
+
+    Checked before uploading so a broken bundle is named here instead of coming
+    back as the router's puzzling "package is not a .tar.gz or .zip file".
+    """
+    if not path:
+        return "Không tìm thấy gói cập nhật"
+    file = Path(path)
+    if not file.is_file():
+        return f"Không thấy file gói: {file}"
+    try:
+        size = file.stat().st_size
+        with open(file, "rb") as handle:
+            head = handle.read(4)
+    except OSError as exc:
+        return f"Không đọc được gói: {exc}"
+    if size == 0:
+        return "Gói cập nhật rỗng"
+    if head[:2] != b"\x1f\x8b" and head != b"PK\x03\x04":
+        return f"Gói không phải .tar.gz hoặc .zip (bắt đầu bằng {head.hex() or '?'})"
+    return ""
+
+
+class AgentUpdater:
+    """Push this console's package to the agent, one visible step at a time."""
+
+    def __init__(self, client, package="", emit=None, on_output=None, builder=None):
+        self.client = client
+        self.package = package
+        self.emit = emit or (lambda *_args: None)
+        self.on_output = on_output or (lambda _text: None)
+        self._build = builder or build_update_package
+        self.from_version = ""
+        self.to_version = ""
+        self.package_path = None
+        self.package_version = ""
+        self.steps = [
+            ("Chuẩn bị gói cập nhật", self.step_prepare),
+            ("Kiểm tra phiên bản agent", self.step_check_versions),
+            ("Đẩy gói lên agent", self.step_upload),
+            ("Kiểm tra agent sau nâng cấp", self.step_verify),
+        ]
+
+    # -- steps --------------------------------------------------------------
+
+    def step_prepare(self) -> str:
+        try:
+            package = self._build(self.package)
+        except Exception as exc:
+            raise AgentUpdateError(f"Không dựng được gói cập nhật: {exc}") from exc
+        problem = package_problem(package)
+        if problem:
+            raise AgentUpdateError(problem)
+        self.package_path = Path(package)
+        self.package_version = payload_version(self.package_path) or APP_VERSION
+        size = self.package_path.stat().st_size
+        return f"v{self.package_version} · {human_bytes(size)}"
+
+    def step_check_versions(self) -> str:
+        try:
+            status = self.client.status()
+        except AgentError as exc:
+            raise AgentUpdateError(f"Không đọc được trạng thái agent: {exc}") from exc
+        meta = status.get("meta") if isinstance(status, dict) else {}
+        self.from_version = clean_agent_version(meta if isinstance(meta, dict) else {})
+        order = compare_versions(self.package_version, self.from_version)
+        if order == -1:
+            raise AgentUpdateError(
+                f"Gói v{self.package_version} cũ hơn agent v{self.from_version} — "
+                "hãy dùng console mới hơn thay vì hạ cấp"
+            )
+        if order == 0:
+            return Skipped(f"Agent đã ở v{self.from_version}; vẫn cài lại để sửa file hỏng")
+        return f"v{self.from_version or '?'} → v{self.package_version}"
+
+    def step_upload(self) -> str:
+        try:
+            payload = self.package_path.read_bytes()
+        except OSError as exc:
+            raise AgentUpdateError(f"Không đọc được gói cập nhật: {exc}") from exc
+        try:
+            result = self.client.update(payload)
+        except AgentError as exc:
+            raise AgentUpdateError(f"Agent từ chối gói: {exc}") from exc
+        result = result if isinstance(result, dict) else {}
+        router_log = str(result.get("log") or "").strip()
+        if router_log:
+            self.on_output(router_log)
+        if result.get("ok") is False:
+            raise AgentUpdateError(
+                f"Agent không cài được gói: {failure_line(router_log) or 'không rõ lý do'}",
+                router_log,
+            )
+        self.to_version = str(result.get("to") or "")
+        return f"{human_bytes(len(payload))} · {result.get('from') or '?'} → {self.to_version or '?'}"
+
+    def step_verify(self) -> str:
+        try:
+            status = self.client.status()
+        except AgentError as exc:
+            raise AgentUpdateError(
+                f"Agent không trả lời sau khi nâng cấp: {exc}") from exc
+        meta = status.get("meta") if isinstance(status, dict) else {}
+        running = clean_agent_version(meta if isinstance(meta, dict) else {})
+        if running and self.package_version and running != self.package_version:
+            raise AgentUpdateError(
+                f"Agent vẫn báo version {running} thay vì {self.package_version} — "
+                "hãy cài lại agent qua SSH (Cài đặt sau khi flash → Cài lại agent)"
+            )
+        return f"agent v{running or '?'}"
+
+    def run(self) -> bool:
+        """Run every step in order; the first failure stops the run."""
+        for index, (label, function) in enumerate(self.steps):
+            self.emit(index, STEP_RUNNING, "")
+            try:
+                detail = function()
+            except AgentUpdateError as exc:
+                self.emit(index, STEP_FAILED, str(exc))
+                return False
+            except Exception as exc:  # never leave the window without a verdict
+                log.exception("agent update step failed: %s", label)
+                self.emit(index, STEP_FAILED, str(exc))
+                return False
+            skipped = isinstance(detail, Skipped) or not detail
+            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bỏ qua")
+        return True
+
+
 ROUTER_STATE_LABELS = {
     "ok": "Agent trả lời OK với token hiện tại",
     "unauthorized": "Agent đang chạy nhưng token sai hoặc thiếu",
@@ -2836,6 +2988,130 @@ class SetupWizard(tk.Toplevel):
         except tk.TclError:
             pass
         self.destroy()
+
+
+class AgentUpdateWindow(tk.Toplevel):
+    """Live checklist for an agent upgrade: every step, the router's own log."""
+
+    def __init__(self, parent, updater: AgentUpdater, language="en", palette=None, on_success=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.updater = updater
+        self.on_success = on_success
+        self.busy = True
+        self.title(self.t("Nâng cấp agent"))
+        self.configure(bg=self.palette["bg"])
+        self.transient(parent)
+        self.minsize(720, 460)
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=14)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="NÂNG CẤP AGENT TRÊN ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(
+            body,
+            text="Đẩy gói của console lên agent. Cấu hình wifi-socks.conf và settings.sh được giữ nguyên.",
+            style="Muted.TLabel", wraplength=660,
+        ).pack(anchor="w", pady=(3, 10))
+
+        self.state_var = tk.StringVar(value=self.t("Đang chạy…"))
+        self.progress = ttk.Progressbar(body, mode="determinate", maximum=len(updater.steps))
+        self.progress.pack(fill="x", pady=(0, 8))
+        self.steps_tree = ttk.Treeview(body, columns=("state", "step", "detail"), show="headings", height=5)
+        for column, title, width in (("state", "Trạng thái", 110), ("step", "Bước", 220), ("detail", "Chi tiết", 380)):
+            self.steps_tree.heading(column, text=title)
+            self.steps_tree.column(column, width=width, anchor="w")
+        self.steps_tree.pack(fill="x")
+        for index, (label, _function) in enumerate(updater.steps):
+            self.steps_tree.insert("", "end", iid=str(index), values=(
+                f"{STEP_ICONS[STEP_PENDING]} {self.t(STEP_STATE_LABELS[STEP_PENDING])}", self.t(label), ""))
+
+        ttk.Label(body, text="Nhật ký thao tác").pack(anchor="w", pady=(10, 3))
+        self.log_text = tk.Text(
+            body, height=9, wrap="word", state="disabled",
+            bg=self.palette["input"], fg=self.palette["log_text"], borderwidth=0,
+            highlightthickness=1, highlightbackground=self.palette["border"],
+            padx=10, pady=8, font=("Cascadia Mono", 9),
+        )
+        self.log_text.pack(fill="both", expand=True)
+
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.pack(fill="x", pady=(10, 0))
+        ttk.Label(actions, textvariable=self.state_var, style="Muted.TLabel").pack(side="left")
+        self.close_button = ttk.Button(actions, text="Đóng", command=self.close, state="disabled")
+        self.close_button.pack(side="right")
+        self.protocol("WM_DELETE_WINDOW", self.close)
+        localize_widget_tree(self, self.language)
+        self.after(120, self.start)
+
+    def append(self, text):
+        entry = redact(str(text).rstrip())
+        log.info("agent-update: %s", entry)
+        if not self.winfo_exists():
+            return
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", entry + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def set_step(self, index, state, detail):
+        if not self.winfo_exists() or index >= len(self.updater.steps):
+            return
+        label = self.updater.steps[index][0]
+        self.steps_tree.item(str(index), values=(
+            f"{STEP_ICONS.get(state, '○')} {self.t(STEP_STATE_LABELS.get(state, state))}",
+            self.t(label), self.t(detail) if detail else "",
+        ))
+        self.steps_tree.see(str(index))
+        done = index + (0 if state == STEP_RUNNING else 1)
+        self.progress.configure(value=done)
+        self.state_var.set(f"{done}/{len(self.updater.steps)} · {self.t(label)}")
+        if state == STEP_RUNNING:
+            self.append(f"→ {self.t(label)}")
+        elif detail:
+            self.append(f"   {STEP_ICONS.get(state, '')} {self.t(detail)}")
+
+    def start(self):
+        self.updater.emit = lambda index, state, detail: self.after(
+            0, lambda: self.set_step(index, state, detail))
+        self.updater.on_output = lambda text: self.after(0, lambda: self.append(text))
+
+        def worker():
+            try:
+                success = self.updater.run()
+            except Exception as exc:  # a crash must not leave the window hanging
+                log.exception("agent update crashed")
+                self.after(0, lambda: self.finish(False, str(exc)))
+                return
+            self.after(0, lambda: self.finish(success, ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def finish(self, success, error):
+        self.busy = False
+        if self.winfo_exists():
+            self.close_button.configure(state="normal")
+        if error:
+            self.append(f"✗ {self.t(error)}")
+        if success:
+            self.state_var.set(self.t("Nâng cấp xong"))
+            self.append(self.t("Nâng cấp xong — agent đã chạy bản mới."))
+            if self.on_success:
+                self.on_success(self.updater.to_version)
+            self.close()
+            return
+        self.state_var.set(self.t("Nâng cấp thất bại"))
+        self.append(self.t(
+            "Nâng cấp dừng lại ở bước lỗi. Sửa nguyên nhân rồi thử lại, hoặc cài lại agent"
+            " qua SSH bằng Cài đặt sau khi flash → Cài lại agent dù đã có."
+        ))
+
+    def close(self):
+        if self.busy:
+            return  # a step is still running; the Close button stays disabled
+        if self.winfo_exists():
+            self.destroy()
 
 
 class NativeApp:
@@ -3767,24 +4043,14 @@ class NativeApp:
                 agent=self.agent_version,
             ), parent=self.root)
             return
-        def work():
-            package = build_update_package()
-            version = payload_version(package) or APP_VERSION
-            if compare_versions(version, APP_VERSION) not in (0, None):
-                log.warning("update package v%s does not match console v%s", version, APP_VERSION)
-            return client.update(package.read_bytes())
-        def done(result):
-            from_version = str(result.get("from") or "?")
-            to_version = str(result.get("to") or "?")
-            self.append_log(self.t("Đã nâng cấp agent: {old} → {new}", old=from_version, new=to_version))
+        def done(to_version):
+            self.append_log(self.t("Đã nâng cấp agent: {old} → {new}",
+                                   old=self.agent_version or "?", new=to_version or "?"))
             self.agent_outdated = False
             self.upgrade_offered = False
             self.update_setup_banner()
-            messagebox.showinfo(APP_NAME, self.t(
-                "Đã nâng cấp agent: {old} → {new}", old=from_version, new=to_version,
-            ), parent=self.root)
             self.connect()
-        self.run_task("Đang nâng cấp agent…", work, done, show_loading=True, timeout_hint=300)
+        AgentUpdateWindow(self.root, AgentUpdater(client), self.language, self.palette, on_success=done)
 
     def adopt_router_settings(self, meta) -> None:
         """Take the router's own NET_BASE/TPROXY_PORT_BASE from status meta."""

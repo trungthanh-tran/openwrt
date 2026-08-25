@@ -131,7 +131,7 @@ chênh lệch:
 |---|---|
 | Cùng version | Kết nối bình thường. |
 | Chưa có agent | Thanh vàng mời chạy **Cài đặt sau khi flash…** để cài. |
-| Agent cũ hơn console | Hỏi có nâng cấp không; chọn **Có** thì console đẩy gói của chính nó lên `?action=update`. `scripts/self-update.sh` backup `pre-update`, **giữ nguyên `wifi-socks.conf` và `settings.sh`**, deploy lại CGI/UI/healthd và không đụng vào Wi-Fi. Từ chối thì thanh vàng giữ nút **Nâng cấp agent**. |
+| Agent cũ hơn console | Hỏi có nâng cấp không; chọn **Có** thì hiện cửa sổ chạy theo từng bước — chuẩn bị gói (kiểm tra tại chỗ kích thước và magic của archive), đối chiếu phiên bản, đẩy gói, kiểm tra lại agent — in kèm log của router và dừng ngay ở bước lỗi, kèm hướng cài lại qua SSH. Gói được đẩy lên `?action=update`. `scripts/self-update.sh` backup `pre-update`, **giữ nguyên `wifi-socks.conf` và `settings.sh`**, deploy lại CGI/UI/healthd và không đụng vào Wi-Fi. Từ chối thì thanh vàng giữ nút **Nâng cấp agent**. |
 | Agent mới hơn console | Không cho điều khiển: báo lỗi yêu cầu dùng bản console mới hơn và khoá mọi thao tác thay đổi (Apply, đổi SOCKS, random MAC, xoá SSID, kick/cấm/bỏ cấm, backup, rollback). Xem và kiểm tra trạng thái vẫn được. |
 
 **Cài đặt sau khi flash** áp dụng đúng luật đó qua SSH: đọc `VERSION` trên

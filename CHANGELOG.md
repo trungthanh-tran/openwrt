@@ -5,6 +5,27 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Nâng cấp agent từ console báo `package is not a .tar.gz or .zip file` dù gói
+  hoàn toàn bình thường.** `self-update.sh` nhận diện gói **chỉ bằng `od`** —
+  một applet BusyBox mà nhiều image không build vào. Thiếu `od` là chuỗi magic
+  rỗng và mọi gói đều bị từ chối. Giờ thử `od`, rồi `hexdump`, cuối cùng hỏi
+  thẳng `tar tzf` / `unzip -l`; câu từ chối cũng in kèm kích thước và 4 byte đầu
+  để lần sau biết ngay lý do.
+- `set -e` + `hexdump` không tồn tại từng làm `self-update.sh` chết ngang với
+  mã 127 mà không in gì (phép gán trong nhánh `||` mang mã lỗi 127).
+
+### Added
+- **Nâng cấp agent giờ chạy theo từng bước có checklist và nhật ký**, thay cho
+  một tác vụ đơn không rõ trạng thái: chuẩn bị gói → kiểm tra phiên bản → đẩy
+  gói → kiểm tra agent sau nâng cấp. Mỗi bước hiện trạng thái riêng, **toàn bộ
+  log của router** được in ra khung nhật ký, và **lỗi thì dừng ngay tại bước
+  hỏng** (không treo, không đóng cửa sổ giữa chừng) kèm gợi ý cài lại agent qua
+  SSH.
+- Console **kiểm tra gói trước khi đẩy lên**: thiếu file, rỗng, hoặc không phải
+  .tar.gz/.zip đều bị chặn tại chỗ với thông báo rõ ràng thay vì để router trả
+  về câu khó hiểu.
+
 ## [0.4.11] - 2026-08-25
 
 ### Added

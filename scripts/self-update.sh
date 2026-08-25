@@ -36,14 +36,30 @@ STAGE="$(mktemp -d "${TMPDIR:-/tmp}/sbproxy-selfupdate.XXXXXX")" \
 trap 'rm -rf "$STAGE"' EXIT
 trap 'exit 1' HUP INT TERM
 
-# ---- identify the package using magic bytes ----
+# ---- identify the package ----
+# Magic bytes first, but od is a BusyBox applet that some images leave out and
+# hexdump is not guaranteed either. When neither is there the extractors are
+# asked directly, so a perfectly good package is never rejected just because a
+# tool used to look at it is missing.
 magic="$(od -An -tx1 -N4 "$PKG" 2>/dev/null | tr -d ' \n')"
+# `|| true` inside the substitution: a missing hexdump exits 127, and under
+# `set -e` that status would end the script instead of falling through.
+[ -n "$magic" ] || magic="$(hexdump -v -n 4 -e '/1 "%02x"' "$PKG" 2>/dev/null || true)"
 KIND=""
 case "$magic" in
   1f8b*)     KIND=targz ;;
   504b0304*) KIND=zip ;;
-  *) die "package is not a .tar.gz or .zip file" ;;
 esac
+if [ -z "$KIND" ]; then
+  if tar tzf "$PKG" >/dev/null 2>&1; then
+    KIND=targz
+  elif command -v unzip >/dev/null 2>&1 && unzip -l "$PKG" >/dev/null 2>&1; then
+    KIND=zip
+  else
+    size="$(wc -c < "$PKG" 2>/dev/null | tr -d ' ')"
+    die "package is not a .tar.gz or .zip file (${size:-0} bytes, first bytes: ${magic:-unreadable})"
+  fi
+fi
 
 # ---- list entries and block path traversal BEFORE extraction ----
 if [ "$KIND" = targz ]; then

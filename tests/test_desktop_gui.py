@@ -299,6 +299,30 @@ class SetupWizardGuiTests(unittest.TestCase):
                 self.assertIn("OpenWrt 24.10", wizard.steps_tree.item("0", "values")[2])
                 wizard.close()
 
+    def test_the_agent_upgrade_window_shows_every_step(self):
+        updater = appmod.AgentUpdater(client=None)
+        window = appmod.AgentUpdateWindow(self.root, updater, "en", appmod.DARK_PALETTE)
+        try:
+            self.root.update_idletasks()
+            rows = [window.steps_tree.item(item, "values") for item in window.steps_tree.get_children()]
+            self.assertEqual(len(rows), len(updater.steps))
+            self.assertIn("Prepare the update package", [row[1] for row in rows])
+            self.assertIn("Verify the agent afterwards", [row[1] for row in rows])
+            # A run in flight cannot be closed away: the log has to stay visible.
+            self.assertEqual(str(window.close_button.cget("state")), "disabled")
+            window.close()
+            self.assertTrue(window.winfo_exists())
+            # A failure enables Close and names the way out.
+            window.finish(False, "Agent từ chối gói")
+            self.root.update_idletasks()
+            self.assertEqual(str(window.close_button.cget("state")), "normal")
+            written = window.log_text.get("1.0", "end")
+            self.assertIn("Agent từ chối gói", written)
+            self.assertIn("Post-flash setup", written)
+        finally:
+            window.busy = False
+            window.close()
+
     def test_a_finished_wizard_hands_the_token_to_the_app(self):
         app = self.build_app("")
         with mock.patch.object(appmod, "save_connection") as save,              mock.patch.object(appmod.NativeApp, "connect") as connect:

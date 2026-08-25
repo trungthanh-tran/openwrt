@@ -138,7 +138,7 @@ version. On every connection the console reads `meta.version` from
 |---|---|
 | Same version | Connects normally. |
 | No agent yet | The yellow bar offers **Post-flash setup…**, which installs it. |
-| Agent older than the console | Offers to upgrade it in place; on **Yes** it uploads its own package to `?action=update`. `scripts/self-update.sh` backs the router up as `pre-update`, **keeps `wifi-socks.conf` and `settings.sh`**, redeploys the CGI/UI/healthd, and never touches Wi-Fi. Declining leaves an **Upgrade the agent** button in the yellow bar. |
+| Agent older than the console | Offers to upgrade it in place; on **Yes** a window runs the upgrade step by step — prepare the package (checked locally for size and archive magic), compare versions, upload, verify the agent afterwards — showing the router's own log and stopping at the first failure with the SSH fallback spelled out. It uploads its own package to `?action=update`. `scripts/self-update.sh` backs the router up as `pre-update`, **keeps `wifi-socks.conf` and `settings.sh`**, redeploys the CGI/UI/healthd, and never touches Wi-Fi. Declining leaves an **Upgrade the agent** button in the yellow bar. |
 | Agent newer than the console | Refuses to drive it: an error explains that a newer console is required, and every mutating action (Apply, SOCKS change, MAC randomization, SSID delete, kick/ban/unban, backup, rollback) is blocked. Reading and status checks still work. |
 
 **Post-flash setup** enforces the same rule over SSH. It reads the router's

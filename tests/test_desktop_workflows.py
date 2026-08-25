@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -935,21 +936,23 @@ class AgentCompatibilityTests(unittest.TestCase):
         instance.require_client.assert_not_called()
         self.assertEqual(instance.records, [record()])
 
-    def test_upgrade_uploads_the_console_package_and_reconnects(self):
+    def test_upgrade_opens_the_step_by_step_window(self):
         instance = self.compat_app("0.3.0")
         # compat_app() stubs upgrade_agent; this test drives the real one.
         instance.upgrade_agent = appmod.NativeApp.upgrade_agent.__get__(instance)
         agent = mock.Mock()
-        agent.update.return_value = {"ok": True, "from": "0.3.0", "to": appmod.APP_VERSION}
         instance.require_client = lambda: agent
         instance.connect = mock.Mock()
-        synchronous_run_task(instance)
-        package = Path(tempfile.mkdtemp()) / f"sbproxy-update-{appmod.APP_VERSION}.tar.gz"
-        package.write_bytes(b"tarball")
-        with mock.patch.object(appmod, "build_update_package", return_value=package), \
-             mock.patch.object(appmod.messagebox, "showinfo"):
+        with mock.patch.object(appmod, "AgentUpdateWindow") as window:
             instance.upgrade_agent()
-        agent.update.assert_called_once_with(b"tarball")
+        window.assert_called_once()
+        updater = window.call_args[0][1]
+        self.assertIsInstance(updater, appmod.AgentUpdater)
+        self.assertIs(updater.client, agent)
+        # Nothing is uploaded until the window runs the steps.
+        agent.update.assert_not_called()
+        # Finishing clears the outdated state and reconnects on the new version.
+        window.call_args[1]["on_success"](appmod.APP_VERSION)
         instance.connect.assert_called_once()
         self.assertFalse(instance.agent_outdated)
 
@@ -962,6 +965,108 @@ class AgentCompatibilityTests(unittest.TestCase):
             instance.upgrade_agent()
         info.assert_called_once()
         agent.update.assert_not_called()
+
+
+class AgentUpdaterTests(unittest.TestCase):
+    """Every upgrade step reports, and the first failure stops the run."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.events = []
+        self.output = []
+
+    def package(self, name="sbproxy-update-9.9.9.tar.gz", data=None):
+        path = self.tmp / name
+        path.write_bytes(data if data is not None else gzip.compress(b"router package"))
+        return path
+
+    def updater(self, client, package=None):
+        return appmod.AgentUpdater(
+            client, builder=lambda _payload="": package or self.package(),
+            emit=lambda index, state, detail: self.events.append((index, state, detail)),
+            on_output=self.output.append,
+        )
+
+    def agent(self, version="0.3.0", update=None):
+        client = mock.Mock()
+        client.status.return_value = {"meta": {"version": version}}
+        client.update.return_value = update or {"ok": True, "from": version, "to": "9.9.9"}
+        return client
+
+    def failed_step(self):
+        return [(index, detail) for index, state, detail in self.events if state == appmod.STEP_FAILED]
+
+    def test_a_healthy_package_walks_every_step(self):
+        client = self.agent()
+        client.status.side_effect = [{"meta": {"version": "0.3.0"}}, {"meta": {"version": "9.9.9"}}]
+        updater = self.updater(client)
+        self.assertTrue(updater.run())
+        self.assertEqual(self.failed_step(), [])
+        states = [state for _index, state, _detail in self.events if state != appmod.STEP_RUNNING]
+        self.assertEqual(states, [appmod.STEP_OK] * 4)
+        client.update.assert_called_once()
+
+    def test_a_package_that_is_not_an_archive_is_caught_before_uploading(self):
+        """The router's own message for this is unhelpful; say it here instead."""
+        client = self.agent()
+        updater = self.updater(client, package=self.package(data=b"not an archive"))
+        self.assertFalse(updater.run())
+        index, detail = self.failed_step()[0]
+        self.assertEqual(index, 0)
+        self.assertIn("không phải .tar.gz", detail)
+        client.update.assert_not_called()
+
+    def test_an_empty_package_is_caught_too(self):
+        client = self.agent()
+        updater = self.updater(client, package=self.package(data=b""))
+        self.assertFalse(updater.run())
+        self.assertIn("rỗng", self.failed_step()[0][1])
+        client.update.assert_not_called()
+
+    def test_a_downgrade_is_refused(self):
+        client = self.agent(version="9.9.10")
+        updater = self.updater(client)
+        self.assertFalse(updater.run())
+        index, detail = self.failed_step()[0]
+        self.assertEqual(index, 1)
+        self.assertIn("cũ hơn agent", detail)
+        client.update.assert_not_called()
+
+    def test_the_same_version_is_reinstalled_and_reported_as_skipped(self):
+        client = self.agent(version="9.9.9")
+        updater = self.updater(client)
+        self.assertTrue(updater.run())
+        version_step = [detail for index, state, detail in self.events
+                        if index == 1 and state == appmod.STEP_SKIPPED]
+        self.assertTrue(version_step and "vẫn cài lại" in version_step[0])
+        client.update.assert_called_once()
+
+    def test_a_router_side_refusal_shows_its_own_log_and_stops(self):
+        router_log = "self-update: package is not a .tar.gz or .zip file (0 bytes, first bytes: unreadable)"
+        client = self.agent(update={"ok": False, "rc": 1, "log": router_log})
+        updater = self.updater(client)
+        self.assertFalse(updater.run())
+        index, detail = self.failed_step()[0]
+        self.assertEqual(index, 2)
+        self.assertIn("package is not a .tar.gz", detail)
+        self.assertIn(router_log, self.output)          # the whole log reaches the pane
+        self.assertEqual(len(self.events), 6)           # nothing ran after the failure
+
+    def test_an_unreachable_agent_stops_instead_of_hanging(self):
+        client = self.agent()
+        client.update.side_effect = appmod.AgentError("timeout")
+        updater = self.updater(client)
+        self.assertFalse(updater.run())
+        self.assertIn("timeout", self.failed_step()[0][1])
+
+    def test_an_agent_still_on_the_old_version_fails_with_the_ssh_way_out(self):
+        client = self.agent()
+        client.status.side_effect = [{"meta": {"version": "0.3.0"}}, {"meta": {"version": "0.3.0"}}]
+        updater = self.updater(client)
+        self.assertFalse(updater.run())
+        index, detail = self.failed_step()[0]
+        self.assertEqual(index, 3)
+        self.assertIn("Cài lại agent", detail)
 
 
 if __name__ == "__main__":

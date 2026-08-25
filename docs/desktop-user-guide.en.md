@@ -68,8 +68,12 @@ The top row is always available:
 Once connected, the status bar reports sing-box running and the app shows the
 agent version next to its own. A mismatch is handled for you:
 
-- **Agent older than the app** → you are asked whether to upgrade it; on yes the
-  agent is upgraded in place and **keeps its Wi-Fi/SOCKS configuration**.
+- **Agent older than the app** → you are asked whether to upgrade it; on yes a
+  window runs it **step by step with a log** (prepare the package, check the
+  version, upload, verify the agent), and the router **keeps its Wi-Fi/SOCKS
+  configuration**. Any failure stops right at that step and says why; if it
+  still will not go through, reinstall over SSH with **Post-flash setup… →
+  Reinstall the agent even if it is present**.
 - **Agent newer than the app** → the console drops to **read-only** and asks for
   a newer build, so an old console cannot write a format it does not understand.
 

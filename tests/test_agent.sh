@@ -685,6 +685,28 @@ make_pkg 0.8.0 "$TMP/pkg-0.8.0.tar.gz"
 out="$(run_agent_pkg 'action=update' "$TMP/pkg-0.8.0.tar.gz")"
 eq "update succeeds without any env file" "$(json_value "$out" '.ok')" 'true'
 
+echo "== agent update on a minimal image =="
+# BusyBox images can be built without the od and hexdump applets. Identifying
+# the package must not depend on them: this is exactly the failure that made a
+# healthy .tar.gz come back as "package is not a .tar.gz or .zip file".
+BLIND="$TMP/blind-bin"
+mkdir -p "$BLIND"
+for tool in od hexdump; do
+  printf '#!/bin/sh\nexit 127\n' > "$BLIND/$tool"
+  chmod +x "$BLIND/$tool"
+done
+
+printf '%s\n' '0.4.0' > "$SB2/VERSION"
+make_pkg 0.4.1 "$TMP/pkg-blind.tar.gz"
+out="$(PATH="$BLIND:$PATH" run_agent_pkg 'action=update' "$TMP/pkg-blind.tar.gz")"
+eq "a tar.gz is accepted without od" "$(json_value "$out" '.ok')" 'true'
+eq "it really applied" "$(json_value "$out" '.to')" '0.4.1'
+
+printf 'this is not an archive\n' > "$TMP/not-a-package.bin"
+out="$(run_agent_pkg 'action=update' "$TMP/not-a-package.bin")"
+eq "a real non-package is still refused" "$(json_value "$out" '.ok')" 'false'
+contains "the refusal reports what arrived" "$(json_value "$out" '.log')" 'bytes, first bytes:'
+
 echo ""
 printf 'AGENT TOTAL: pass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
