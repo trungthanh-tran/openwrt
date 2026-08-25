@@ -238,6 +238,8 @@ nftgen() { # <pool file or -> [POOL_DIVERT value]
 chain_body() {
   awk -v c="  chain $1 {" '$0==c {inside=1; next} inside && /^  }/ {exit} inside && !/type [a-z]+ hook/' "$NFT_FILE"
 }
+# Element list of one named map, or empty when it declares none.
+map_elements() { sed -n "s/.*map $1 {.*elements = { \\([^}]*\\) }.*/\\1/p" "$NFT_FILE"; }
 # Marker sequence of a chain, so order can be asserted without pinning wording.
 chain_shape() {
   chain_body "$1" | awk '
@@ -245,6 +247,7 @@ chain_shape() {
     /127\.0\.0\.0\/8/       { print "localnet" }
     /@proxy_hosts/        { print "hosts" }
     /dport 443 drop/      { print "quic" }
+    /tproxy ip to :ip saddr map/ { print "pin" }
     /tproxy ip to :[0-9]+ meta mark set/ && !/dport 53/ { print "tproxy" }
   ' | tr '\n' ' '
 }
@@ -320,6 +323,111 @@ eq "an all-hostname config emits no empty element list" "$(grep -c 'elements = {
 eq "the bypass rule is still present for later additions" \
   "$(chain_body w1 | grep -c '@proxy_hosts')" "1"
 CONF="$ROOT/config/wifi-socks.conf.example"
+
+echo "== nftables device pinning =="
+ASSIGN_FILE="$STUB/assign"; LEASES="$STUB/leases"
+: > "$ASSIGN_FILE"; : > "$LEASES"
+POOL_MAP_SIZE=512
+
+POOL1="$STUB/pin.conf"
+printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' > "$POOL1"
+
+# No pool anywhere: the map and the pin rule must not appear at all, so an
+# unchanged deployment keeps generating exactly what F3 generated.
+nftgen -
+eq "no pool means no map"      "$(grep -c 'map w[0-9]*map' "$NFT_FILE")" "0"
+eq "no pool means no pin rule" "$(grep -c 'ip saddr map' "$NFT_FILE")" "0"
+eq "no pool keeps the F3 chain shape" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
+
+nftgen "$POOL1"
+eq "a pooled SSID declares one map"  "$(grep -c 'map w1map' "$NFT_FILE")" "1"
+eq "only the pooled SSID gets a map" "$(grep -c 'map w2map\|map w3map' "$NFT_FILE")" "0"
+eq "the map is keyed by IPv4 and yields a port" \
+  "$(grep -o 'map w1map { type [a-z0-9_]* : [a-z_]*' "$NFT_FILE")" \
+  'map w1map { type ipv4_addr : inet_service'
+eq "the map declares a size, for the fixed-size hash backend" \
+  "$(grep -c 'map w1map {.*size 512' "$NFT_FILE")" "1"
+eq "the map declares no timeout, which would force the resizable backend" \
+  "$(grep -c 'map w1map {.*timeout' "$NFT_FILE")" "0"
+eq "the pin rule sits before the default tproxy rule" "$(chain_shape w1)" \
+  "dns localnet hosts quic pin tproxy "
+eq "an SSID without a pool keeps the plain shape" "$(chain_shape w2)" \
+  "dns localnet hosts quic tproxy "
+eq "the pin rule covers tcp and udp" \
+  "$(chain_body w1 | grep -c 'meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w1map meta mark set 1 accept')" "1"
+
+echo "== nftables map elements =="
+# The state file identifies a device by MAC; the map is keyed by the IP that
+# device currently holds, so the two are joined through the DHCP leases.
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' '1|aa:bb:cc:dd:ee:02|1|manual' > "$ASSIGN_FILE"
+printf '%s\n' '1700000000 aa:bb:cc:dd:ee:01 192.168.11.23 phone-a *' \
+               '1700000000 aa:bb:cc:dd:ee:02 192.168.11.24 phone-b *' > "$LEASES"
+nftgen "$POOL1"
+eq "each pinned device maps to its slot port" \
+  "$(map_elements w1map)" \
+  "192.168.11.23 : $(pool_port 1 0), 192.168.11.24 : $(pool_port 1 1)"
+
+# A device with no lease has no IP to key on. It must simply be absent, so it
+# falls through to the SSID default rather than breaking the ruleset.
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' '1|aa:bb:cc:dd:ee:99|1|auto' > "$ASSIGN_FILE"
+nftgen "$POOL1"
+eq "a device with no DHCP lease is left unpinned" \
+  "$(map_elements w1map)" \
+  "192.168.11.23 : $(pool_port 1 0)"
+
+# An empty map must still be declared: the rule references it either way.
+: > "$ASSIGN_FILE"; nftgen "$POOL1"
+eq "an empty map is still declared" "$(grep -c 'map w1map' "$NFT_FILE")" "1"
+eq "an empty map emits no element list" "$(grep -c 'elements = { }' "$NFT_FILE")" "0"
+eq "the pin rule survives an empty map" "$(chain_body w1 | grep -c '@w1map')" "1"
+
+echo "== nftables assignment hygiene =="
+# Every identity below owns a lease, including the malformed ones. That is the
+# point: if a guard is removed the row reaches the map and the elements change,
+# instead of being filtered out a second time by a missing lease.
+printf '%s\n' \
+  '1700000000 aa:bb:cc:dd:ee:01 192.168.11.23 phone-a *' \
+  '1700000000 aa:bb:cc:dd:ee:02 192.168.11.24 phone-b *' \
+  '1700000000 aa:bb:cc:dd:ee:0 192.168.11.25 short *' \
+  '1700000000 not-a-mac 192.168.11.26 bogus *' > "$LEASES"
+
+hygiene() { # label row... -> expected element list
+  _hy_lbl="$1"; _hy_want="$2"; shift 2
+  printf '%s\n' "$@" > "$ASSIGN_FILE"
+  nftgen "$POOL1"
+  # Scoped to the map line: the proxy_hosts set also has an `elements =` list.
+  eq "$_hy_lbl" "$(map_elements w1map)" "$_hy_want"
+}
+
+PIN0="192.168.11.23 : $(pool_port 1 0)"
+hygiene "a well-formed row is pinned" "$PIN0" '1|aa:bb:cc:dd:ee:01|0|auto'
+
+# Each of these differs from the row above in exactly one way.
+hygiene "a MAC of the wrong length is rejected" "" '1|aa:bb:cc:dd:ee:0|0|auto'
+hygiene "a MAC that is not hex is rejected"     "" '1|not-a-mac|0|auto'
+hygiene "an empty MAC is rejected"              "" '1||0|auto'
+hygiene "a non-numeric idx is rejected"         "" 'x|aa:bb:cc:dd:ee:01|0|auto'
+hygiene "a non-numeric slot is rejected"        "" '1|aa:bb:cc:dd:ee:01|0x1|auto'
+hygiene "a negative slot is rejected"           "" '1|aa:bb:cc:dd:ee:01|-1|auto'
+hygiene "a short row is rejected"               "" '1|aa:bb:cc:dd:ee:01'
+hygiene "a comment is not a row"                "" '# 1|aa:bb:cc:dd:ee:01|0|auto'
+hygiene "a slot past the end of the pool is dropped" "" '1|aa:bb:cc:dd:ee:01|5|auto'
+
+# The idx filter: two SSIDs, both with a lease, only one has a pool.
+hygiene "a row for another SSID does not leak into this map" "$PIN0" \
+  '1|aa:bb:cc:dd:ee:01|0|auto' '2|aa:bb:cc:dd:ee:02|1|auto'
+
+# The duplicate guard: an nft map cannot hold one key twice, so a second row
+# for the same device must never be emitted.
+hygiene "a device pinned twice keeps its first pin" "$PIN0" \
+  '1|aa:bb:cc:dd:ee:01|0|auto' '1|aa:bb:cc:dd:ee:01|1|auto'
+
+# The slot bound is what stops a stale pin from inventing a port that no
+# sing-box inbound is listening on.
+hygiene "the last valid slot is still accepted" \
+  "192.168.11.23 : $(pool_port 1 1)" '1|aa:bb:cc:dd:ee:01|1|auto'
+hygiene "one past the last valid slot is not" "" '1|aa:bb:cc:dd:ee:01|2|auto'
+: > "$ASSIGN_FILE"; : > "$LEASES"
 
 echo
 echo "POOL TOTAL: pass=$n_ok fail=$n_bad"

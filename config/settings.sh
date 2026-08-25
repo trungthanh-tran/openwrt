@@ -49,6 +49,14 @@ POOL_SLOTS_PER_SSID_MAX=256
 #   auto = use it when this router's nft accepts it (default)
 #   on   = always emit it; off = never
 POOL_DIVERT="auto"
+# Which device is pinned to which slot. Runtime state, like BANS_FILE, and the
+# source of truth that build_nft bakes into the generated ruleset.
+# Lines: idx|mac|slot|source   (source is auto or manual)
+ASSIGN_FILE="/etc/sbproxy.assign"
+# Capacity of each SSID's pin map. nftables picks a fixed-size hash only when a
+# size is declared; without one it falls back to the slower resizable table.
+# The map does not grow past this, so keep it well above the DHCP pool.
+POOL_MAP_SIZE=512
 # Firewall mark and routing table used by TPROXY.
 TPROXY_MARK=1
 TPROXY_TABLE=100
