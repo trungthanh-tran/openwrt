@@ -42,6 +42,7 @@ viết lại so với bản plan đầu.
 | D7 | Failover dùng outbound **`urltest`** của sing-box | Cơ chế native, khỏi tự viết logic dò sống-chết | ✅ tài liệu |
 | D8 | **Không** dùng `selector` + Clash API | Việc nó giải quyết thì map nft đã làm miễn phí; việc nó không giải quyết thì vẫn phải restart | ✅ tài liệu, [B.4](#b4-đã-cân-nhắc-và-loại-selector--clash-api) |
 | **D10** | GL‑MT6000 có **profile limit chuẩn**; model OpenWrt khác dùng profile riêng hoặc fallback bảo thủ | Limit chính xác cần benchmark theo CPU/RAM/sing-box, nhưng vẫn phải co lại theo RAM/overlay khả dụng tại thời điểm apply | ⚠️ phải đo ở P1; xem [3.5](#35-tự-tính-ram-bộ-nhớ-và-trần-pool) |
+| **D12** | Chưa có profile khớp thì `POOL_TOTAL_SLOTS_MAX="auto"` **hạ trần xuống 32**, không từ chối chạy. Trần thấp đi; **danh sách proxy không bao giờ bị cắt** | Router lạ vẫn dùng được ngay mà không phải hiệu chuẩn trước; 32 là mức đã qua soak test ở mọi cấu hình. Việc "vượt trần" vẫn do `apply.sh` chặn nên không có đường nào âm thầm mất proxy | — |
 | **D11** | Thiết bị chưa gán/proxy chết có policy rõ: `auto`, `block` hoặc `default`; triển khai phone-farm mặc định `auto`, **không fail-open cả nhóm vào một IP** | Fallback im lặng sang proxy mặc định có thể liên kết hàng loạt tài khoản — đúng failure mode sản phẩm này phải ngăn | — |
 
 ## 3. Kiến trúc
@@ -246,6 +247,20 @@ fallback_total_slots = min(32, slots_by_ports, slots_by_fd)
 và vẫn bắt buộc kiểm tra reserve RAM/overlay; nếu không đủ cho 32 thì giảm tiếp hoặc
 fail. Cảnh báo hướng dẫn chạy `scripts/calibrate-pool.sh` để tạo profile cục bộ. Script
 hiệu chuẩn là thao tác chủ động của admin, không tự restart sing-box trên router production.
+
+**Fallback hạ trần, không cắt pool (D12).** Hai việc này phải tách bạch, vì gộp lại là
+đúng kiểu lỗi mà [mục 7](#7-việc-dễ-quên-đã-có-tiền-lệ-đau) dặn tránh:
+
+1. Không có profile khớp → `auto` trả về `fallback_total_slots` (tối đa 32) và đặt
+   `limiting_factor=UNPROFILED`. Đây là **trần**, không phải một thao tác lên pool.
+2. Pool đang cấu hình vượt trần đó → `apply.sh` **fail trước mọi thay đổi**, nêu rõ số
+   slot đang yêu cầu, trần 32, lý do `UNPROFILED`, và hai lối ra: chạy
+   `calibrate-pool.sh` để có profile thật, hoặc đặt tay một số cho
+   `POOL_TOTAL_SLOTS_MAX` và tự chịu trách nhiệm.
+
+Nói cách khác: router lạ vẫn chạy được ngay với ≤32 proxy mà không phải hiệu chuẩn
+trước, còn ai muốn vượt 32 thì phải nói rõ ý định. **Không có đường nào khiến một
+proxy trong `proxy-pools.conf` biến mất mà người dùng không được báo.**
 
 #### Công thức và hành vi
 
@@ -685,6 +700,8 @@ nft --handle list table inet sbproxy | grep -c '^\s*iifname'   # đếm luật
 
 ## 10. Lộ trình
 
+### 10.1 Phase và rủi ro
+
 | Phase | Nội dung | Rủi ro |
 |---|---|---|
 | **P0** | `settings.sh`, `proxy-pools.conf`, schema `resource-profiles.conf`, parse + validate trong `lib.sh`, test | thấp |
@@ -697,6 +714,55 @@ nft --handle list table inet sbproxy | grep -c '^\s*iifname'   # đếm luật
 **Làm spike D2 trước tiên, nửa ngày trên router.** Trình tự thử: map → nếu hỏng thì
 set theo slot (D2a) → nếu `ether saddr` hỏng thì đổi khoá sang IP (D2b). P2–P4 không
 đổi hình dạng trong cả ba nhánh.
+
+### 10.2 Trình tự commit
+
+Mỗi bước là **một commit**: viết test trước, code sau, và **chỉ chạy test của bước đó**.
+Toàn bộ suite (`sh tests/run-all.sh`) chạy **một lần duy nhất ở bước cuối**, không chạy
+lại sau mỗi commit.
+
+| Bước | Nội dung | Chạm vào | Test chạy | Phase |
+|---|---|---|---|---|
+| F1 | Lớp config pool: `pool_port`, `pool_rows`, `pool_count`, `pool_enabled`, `for_each_pool`, `pool_hosts`, `validate_pools`, `validate_pool_settings` | `settings.sh`, `lib.sh` | `sh tests/test_pool.sh` | P0 |
+| F2 | sing-box sinh inbound/outbound/route theo slot | `lib.sh:build_singbox` | `sh tests/test_pool.sh` | P1 |
+| F3 | nft **tái cấu trúc, giữ nguyên hành vi**: `vmap` + chain riêng mỗi SSID + luật divert + gộp tcp/udp + `@proxy_hosts` | `lib.sh:build_nft` | `sh tests/test_pool.sh` + `sh tests/run.sh` | P1 |
+| F4 | nft định tuyến pool: map có `size`, elements nướng sẵn, luật ghim trước luật mặc định | `lib.sh:build_nft` | `sh tests/test_pool.sh` | P1 |
+| F5 | State ghim `/etc/sbproxy.assign`, gán lại slot mồ côi, `assign.sh`, `rebalance.sh`, nạp state khi apply | `lib.sh`, `assign.sh`, `rebalance.sh`, `apply.sh` | `sh tests/test_pool.sh` | P2 |
+| F6 | Parser danh sách dán + hàm chia đều (hàm thuần) | `console/desktop/main.py` | `python -m unittest tests.test_pool_console` | P4 |
+| F7 | Agent API: `get_pool`, `save_pool`, `assign_proxy`, `rebalance`, `capacity`, `pool_health`, `probe_pool` | `agent/cgi/sbproxy` | `sh tests/test_pool_agent.sh` | P3 |
+| F8 | Console desktop: khu Pool proxy, cột Proxy, hộp thoại đổi hàng loạt có xem trước | `console/desktop/main.py` | `python -m unittest tests.test_pool_console tests.test_desktop_workflows` | P4 |
+| F9 | `sbproxy-assignd` + móc DHCP + init.d + `install-deps.sh` cài `nft_socket` | `agent/`, `etc/init.d/`, `install-deps.sh` | `sh tests/test_assignd.sh` | P2 |
+| F10 | Tài liệu và CHANGELOG (cả bản `.en`) | `docs/`, `README*`, `CHANGELOG.md` | `sh tests/run-all.sh` | P5 |
+
+Bất biến phải giữ ở **mọi** bước: SSID không có pool thì `config.json` và `sbproxy.nft`
+sinh ra **giống hệt hôm nay, từng byte**. F3 là bước duy nhất được phép đổi output của
+cấu hình không-pool, và chỉ theo nghĩa tương đương ngữ nghĩa — test phải chứng minh.
+
+### 10.3 F5b — bộ tính trần theo RAM
+
+Khối này tách riêng vì toàn bộ giá trị của nó nằm ở **hệ số đo được từ phần cứng thật**.
+Làm bộ tính trước khi có số đo chỉ tạo ra một hàm in hằng số 32.
+
+| Bước | Nội dung | Test chạy |
+|---|---|---|
+| F5b.6 | `calibrate-pool.sh` — đo trên router, sinh `resource-profiles.conf` | `sh tests/test_pool_capacity.sh` (phần số học: median, độ dốc, headroom) |
+| F5b.1 | Đọc số liệu: `MemAvailable`, `smaps_rollup`, `df -Pk`, FD, cổng | ↑ |
+| F5b.2 | Schema và tra profile theo board + kiến trúc + major.minor sing-box + `POOL_FAILOVER` | ↑ |
+| F5b.3 | Bộ tính: năm trần + `limiting_factor` | ↑ |
+| F5b.4 | `pool-capacity.sh` xuất JSON theo khuôn `gateway.sh`, preflight gọi read-only | ↑ |
+| F5b.5 | Cổng chặn ở `apply.sh` + guard 30 giây sau apply + rollback | ↑ + `sh tests/test_pool.sh` |
+
+**F5b.6 chạy ngay sau spike D2/D9 ở P1**, khi đã có router trong tay; F5b.1–5 làm sau đó
+với hệ số thật. Ba điểm kỹ thuật phải chốt trong F5b.3:
+
+- POSIX sh không có số thực: `×1.25` viết là `* 5 / 4`, `20%` là `* 20 / 100`; tính toàn
+  bộ bằng KiB, chỉ đổi ra MiB khi in.
+- **Chặn chia cho 0**: chưa có profile thì `slot_ram_kib = 0`, phải rẽ sang fallback
+  trước phép chia chứ không để nó xảy ra.
+- sing-box chưa chạy thì `current_singbox_rss = 0` và `predicted_base_rss` lấy từ profile.
+
+**Xung đột cần biết:** F5b.5 và F5 cùng sửa `apply.sh`. F5 phải xong trước, hoặc gộp hai
+phần sửa `apply.sh` vào một commit.
 
 ## 11. Rủi ro còn mở
 
