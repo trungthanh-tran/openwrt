@@ -659,6 +659,8 @@ EN_TRANSLATIONS = {
     'Đang kiểm tra tình trạng router…': 'Checking the router status…',
     'Pool proxy…': 'Proxy pool…',
     'Pool proxy': 'Proxy pool',
+    'Số proxy': 'Proxy count',
+    'Device kết nối': 'Connected devices',
     'Đổi proxy cho thiết bị đã chọn…': 'Change the proxy of the selected devices…',
     'Đổi proxy…': 'Change proxy…',
     'Thêm proxy…': 'Add proxies…',
@@ -2533,7 +2535,7 @@ def client_sort_key(item, column):
     return str(item.get(column) or "").casefold()
 
 
-def wifi_sort_key(record, column, health=None, runtime=None):
+def wifi_sort_key(record, column, health=None, runtime=None, proxy_count=None, device_count=None):
     """Return a stable, naturally ordered key for every Wi-Fi table column."""
     health = health if isinstance(health, dict) else {}
     runtime = runtime if isinstance(runtime, dict) else {}
@@ -2554,6 +2556,10 @@ def wifi_sort_key(record, column, health=None, runtime=None):
         host = str(getattr(record, "host", "") or "").casefold()
         port = _nonnegative_int(getattr(record, "port", 0))
         return (host, port)
+    if column == "proxy_count":
+        return _nonnegative_int(proxy_count)
+    if column == "devices":
+        return _nonnegative_int(device_count)
     if column == "isolate":
         return int(bool(getattr(record, "isolate", False)))
     if column == "webrtc":
@@ -3797,6 +3803,7 @@ class NativeApp:
         self.clients_data = []
         self.visible_clients = []
         self.pool_cache = {}
+        self.pool_counts = {}
         self.client_rows = {}
         self.health = {}
         self.runtime_ssids = {}
@@ -4224,9 +4231,9 @@ class NativeApp:
             ("Đẩy cấu hình & Apply", self.save_apply, "Success.TButton"),
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
-        columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "socks": "Proxy", "isolate": "Isolate", "webrtc": "WebRTC", "health": "Health"}
+        columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "proxy_count": "Số proxy", "devices": "Device kết nối", "isolate": "Isolate", "webrtc": "WebRTC"}
         self.wifi_column_titles = columns.copy()
-        self.wifi_tree = self._tree(tab, columns, {"idx": 50, "name": 150, "band": 55, "subnet": 130, "mac": 220, "socks": 195, "isolate": 70, "webrtc": 75, "health": 100})
+        self.wifi_tree = self._tree(tab, columns, {"idx": 50, "name": 150, "band": 55, "subnet": 130, "mac": 220, "proxy_count": 90, "devices": 115, "isolate": 70, "webrtc": 75})
         for column, title in columns.items():
             self.wifi_tree.heading(column, text=title, command=lambda selected=column: self.sort_wifi(selected))
         self.wifi_tree.tag_configure("healthy", foreground=self.palette["good_text"])
@@ -4540,6 +4547,7 @@ class NativeApp:
                     suffix += " (≠ app)" if self.language == "en" else " (khác app)"
                 self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
+            self.refresh_pool_counts()
             self.refresh_clients()
             self.refresh_backups()
             self.evaluate_agent_compatibility()
@@ -4839,6 +4847,7 @@ class NativeApp:
                     suffix += " (≠ app)" if self.language == "en" else " (khác app)"
                 self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
+            self.refresh_pool_counts()
         self.run_task("Đang làm mới…", work, done)
 
     def render_gateway(self, payload):
@@ -5340,6 +5349,21 @@ class NativeApp:
         self.render_wifi()
 
     def render_wifi(self):
+        def connected_count(idx):
+            return sum(
+                1 for item in self.clients_data
+                if isinstance(item, dict) and bool(item.get("online", True))
+                and str(item.get("idx")) == str(idx)
+            )
+
+        def proxy_count(idx):
+            if idx in self.pool_counts:
+                return self.pool_counts[idx]
+            cached = self.pool_cache.get(idx)
+            if isinstance(cached, dict):
+                return len(cached.get("proxies") or [])
+            return None
+
         records = sorted(
             self.records,
             key=lambda record: wifi_sort_key(
@@ -5347,6 +5371,8 @@ class NativeApp:
                 self.wifi_sort_column,
                 self.health.get(str(record.idx), self.health.get(record.idx, {})),
                 self.runtime_ssids.get(record.idx),
+                proxy_count(record.idx),
+                connected_count(record.idx),
             ),
             reverse=self.wifi_sort_reverse,
         )
@@ -5359,26 +5385,14 @@ class NativeApp:
             )
         self.wifi_tree.delete(*self.wifi_tree.get_children())
         for pos, record in enumerate(records):
-            probe = self.health.get(str(record.idx), self.health.get(record.idx, {})) or {}
-            state = probe.get("state", "—")
-            latency = probe.get("latency_ms")
-            health = f"{state} {latency}ms" if latency is not None else state
             runtime = self.runtime_ssids.get(record.idx) or {}
             mac = runtime.get("macaddr") or "—"
             provider = self.t(vendor_label(record.mac_oui)).split(" · ", 1)[0]
             mac_display = f"{mac} · {provider}"
-            normalized = str(state).casefold()
-            tag = ""
-            if any(word in normalized for word in ("ok", "up", "healthy")):
-                tag = "healthy"
-            elif any(word in normalized for word in ("slow", "warn")):
-                tag = "warning"
-            elif state not in ("", "—", None):
-                tag = "error"
             row_tag = "row_even" if pos % 2 == 0 else "row_odd"
-            tags = (row_tag, tag) if tag else (row_tag,)
-            proxy_display = f"{record.proxy_type.upper()} · {record.host}:{record.port}"
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
+            count = proxy_count(record.idx)
+            proxy_display = str(count) if count is not None else "—"
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=(row_tag,), values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, connected_count(record.idx), self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép")))
         self.update_client_filter_options()
         self.update_wifi_editor()
 
@@ -5511,6 +5525,28 @@ class NativeApp:
     def toggle_client_auto_refresh(self):
         self.schedule_client_refresh()
 
+    def refresh_pool_counts(self):
+        if not self.client or not self.records:
+            return
+        client = self.client
+        indices = [record.idx for record in self.records]
+
+        def work():
+            counts = {}
+            for idx in indices:
+                try:
+                    pool = client.get_pool(idx)
+                except AgentError:
+                    continue
+                counts[idx] = len((pool or {}).get("proxies") or [])
+            return counts
+
+        def done(counts):
+            self.pool_counts.update(counts)
+            self.render_wifi()
+
+        self.run_task("Đang đọc số lượng proxy…", work, done)
+
     def refresh_clients(self, auto=False):
         if self.client_refreshing:
             return
@@ -5529,6 +5565,7 @@ class NativeApp:
             self.update_client_filter_options()
             self.update_client_summary()
             self.render_clients()
+            self.render_wifi()
             self.schedule_client_refresh()
         if auto:
             def auto_worker():
@@ -5587,8 +5624,11 @@ class NativeApp:
     def pool_for_idx(self, idx, refresh=False):
         """One Wi-Fi's pool, cached because it changes far less often than the
         device list that is drawn from it."""
+        if not hasattr(self, "pool_counts"):
+            self.pool_counts = {}
         if refresh or idx not in self.pool_cache:
             self.pool_cache[idx] = self.require_client().get_pool(idx)
+            self.pool_counts[idx] = len((self.pool_cache[idx] or {}).get("proxies") or [])
         return self.pool_cache[idx]
 
     def has_online_devices(self, idx):
@@ -5675,6 +5715,9 @@ class NativeApp:
 
         def done(response):
             self.pool_cache.pop(idx, None)
+            if not hasattr(self, "pool_counts"):
+                self.pool_counts = {}
+            self.pool_counts[idx] = 0
             self.append_log(response.get("log") or self.t("Hoàn tất"))
             self.refresh_clients()
 
@@ -5737,6 +5780,9 @@ class NativeApp:
             return
         def done(response):
             self.pool_cache.pop(idx, None)
+            if not hasattr(self, "pool_counts"):
+                self.pool_counts = {}
+            self.pool_counts[idx] = len(rows)
             self.append_log(response.get("log") or self.t("Hoàn tất"))
             self.refresh_clients()
         self.run_task("Đang ghi pool proxy…", lambda: client.save_pool(idx, rows), done)
@@ -5798,6 +5844,9 @@ class NativeApp:
 
         def done(response):
             self.pool_cache.pop(idx, None)
+            if not hasattr(self, "pool_counts"):
+                self.pool_counts = {}
+            self.pool_counts[idx] = len(merged)
             self.append_log(response.get("log") or self.t("Hoàn tất"))
             self.refresh_clients()
 
