@@ -57,6 +57,18 @@ ASSIGN_FILE="/etc/sbproxy.assign"
 # size is declared; without one it falls back to the slower resizable table.
 # The map does not grow past this, so keep it well above the DHCP pool.
 POOL_MAP_SIZE=512
+
+# Which slot a device that has just appeared gets:
+#   random       bốc ngẫu nhiên rồi dính luôn (mặc định)
+#   round-robin  quay vòng theo số máy đã ghim
+#   least-loaded slot ít máy nhất
+#   sticky-hash  băm MAC; cùng máy luôn ra cùng proxy kể cả sau khi xoá state
+POOL_ASSIGN_POLICY="random"
+# 1 = bốc proxy mới mỗi lần thiết bị vào lại, thay vì giữ nguyên. Ghim tay
+# không bao giờ bị đổi, kể cả khi bật.
+POOL_ROTATE_ON_RECONNECT=0
+# Nhịp quét lưới an toàn của sbproxy-assignd, giây.
+POOL_SCAN_INTERVAL=3
 # Firewall mark and routing table used by TPROXY.
 TPROXY_MARK=1
 TPROXY_TABLE=100

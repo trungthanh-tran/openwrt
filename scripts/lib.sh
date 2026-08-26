@@ -588,6 +588,108 @@ assign_pick_slot() { # idx
     }'
 }
 
+# A random integer in [0, n).
+#
+# Seeded from /dev/urandom through cksum on purpose: `hexdump` and `od` are the
+# applets that broke self-update in 0.4.10 because many OpenWrt images do not
+# build them in, so nothing here may depend on either.
+pool_random() { # n
+  awk -v n="$1" -v seed="$(head -c 8 /dev/urandom | cksum | cut -d' ' -f1)" \
+    'BEGIN { srand(seed); print int(rand() * n) % n }'
+}
+
+# The slot a MAC always hashes to. Same device, same proxy, even after the
+# state file has been thrown away -- which is the only reason to prefer this
+# over `random`.
+assign_hash_slot() { # mac n
+  printf '%s' "$1" | cksum | awk -v n="$2" '{ print $1 % n }'
+}
+
+# The next slot in rotation, derived from how many devices this SSID already
+# has pinned rather than from a saved cursor, so it stays right across a
+# restart and after the state file is rebuilt.
+assign_next_slot() { # idx n
+  assign_rows "$1" | awk -v n="$2" 'END { print NR % n }'
+}
+
+# Which slot a device that has just appeared should get.
+#
+# `random` is the default because a phone farm wants two devices to look
+# unrelated; the other policies exist for operators who need a layout they can
+# predict or reproduce.
+assign_policy_slot() { # idx mac
+  _ps_idx="$1"
+  _ps_mac="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
+  _ps_n="$(pool_count "$_ps_idx")"
+  [ "$_ps_n" -gt 0 ] || die "Wi-Fi idx=$_ps_idx has no proxy pool"
+  case "${POOL_ASSIGN_POLICY:-random}" in
+    random)       pool_random "$_ps_n" ;;
+    least-loaded) assign_pick_slot "$_ps_idx" ;;
+    sticky-hash)  assign_hash_slot "$_ps_mac" "$_ps_n" ;;
+    round-robin)  assign_next_slot "$_ps_idx" "$_ps_n" ;;
+    *) die "POOL_ASSIGN_POLICY must be random, round-robin, least-loaded or sticky-hash" ;;
+  esac
+}
+
+# Pin a device unless it already has a pin, and print the slot it ended up on.
+#
+# $3=1 marks a genuine (re)connection, which is the only thing
+# POOL_ROTATE_ON_RECONNECT acts on: the safety-net sweep runs every few seconds
+# and would otherwise move a device to a new proxy continuously.
+#
+# A pin the operator made by hand is never rotated away.
+assign_ensure() { # idx mac [reconnect]
+  _ae3_idx="$1"
+  _ae3_mac="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
+  case "$_ae3_idx" in *[!0-9]*|'') return 0 ;; esac
+  assign_valid_mac "$_ae3_mac" || return 0
+  pool_enabled "$_ae3_idx" || return 0
+  _ae3_have="$(assign_rows "$_ae3_idx" | awk -F'|' -v m="$_ae3_mac" '$1 == m { print $2; exit }')"
+  if [ -n "$_ae3_have" ]; then
+    _ae3_src="$(awk -F'|' -v i="$_ae3_idx" -v m="$_ae3_mac" \
+                  '$1 == i && tolower($2) == m { print $4; exit }' "$ASSIGN_FILE")"
+    if [ "${3:-0}" != "1" ] || [ "${POOL_ROTATE_ON_RECONNECT:-0}" != "1" ] \
+       || [ "$_ae3_src" = "manual" ]; then
+      printf '%s' "$_ae3_have"
+      return 0
+    fi
+  fi
+  _ae3_slot="$(assign_policy_slot "$_ae3_idx" "$_ae3_mac")"
+  assign_set "$_ae3_idx" "$_ae3_mac" "$_ae3_slot" auto
+  assign_live_update "$_ae3_idx" "$_ae3_mac" "$_ae3_slot"
+  printf '%s' "$_ae3_slot"
+}
+
+# How many pins the live map holds. nft prints them as `ip : port` pairs and
+# wraps them over several lines, so count the pairs rather than the lines. The
+# map's own `type ipv4_addr : inet_service` line sits before the element block
+# and is outside the range.
+assign_map_size() { # idx
+  nft list map inet sbproxy "w$1map" 2>/dev/null \
+    | awk '/elements = \{/, /\}/' | tr ',' '\n' | grep -c ':' || true
+}
+
+# Put one SSID's map back in line with the state file when it has drifted.
+#
+# Restarting sbproxy flushes the whole table, so an `add element` that races a
+# restart simply disappears. Rather than lock against that, notice the drift and
+# reload. Extra elements count as drift too: a device left in the map after its
+# pin was cleared keeps using a proxy nobody assigned it.
+assign_sync_map() { # idx
+  command -v nft >/dev/null 2>&1 || return 0
+  case "$1" in *[!0-9]*|'') return 0 ;; esac
+  if ! pool_enabled "$1"; then return 0; fi
+  _sm_want="$(assign_elements "$1")"
+  _sm_n=0
+  [ -z "$_sm_want" ] || _sm_n="$(printf '%s' "$_sm_want" | tr ',' '\n' | grep -c ':')"
+  _sm_have="$(assign_map_size "$1")"
+  if [ "${_sm_have:-0}" -eq "$_sm_n" ]; then return 0; fi
+  log "Map w$1map holds ${_sm_have:-0} pins but the state file has $_sm_n; reloading it"
+  nft flush map inet sbproxy "w$1map" >/dev/null 2>&1 || true
+  [ -z "$_sm_want" ] || nft add element inet sbproxy "w$1map" "{ $_sm_want }" >/dev/null 2>&1 \
+    || warn "Could not reload the map for idx=$1; run scripts/apply.sh to resync."
+}
+
 # Push one pin into the running ruleset. Cheap enough to do per device and it
 # never restarts anything; a failure only means the next apply will pick it up.
 assign_live_update() { # idx mac slot
