@@ -700,7 +700,23 @@ Theo khuôn `tests/test_agent.sh`. Với **mỗi** action mới:
 > **Sửa so với [6.1](#61-agent-api):** `capacity` thuộc F5b và `pool_health`/`probe_pool`
 > thuộc F9, không phải F7 — chúng cần bộ tính và daemon tồn tại trước.
 
-#### F8 — console desktop
+#### F8a — `clients` báo pin
+
+- Bốn trạng thái phải phân biệt được, không phải hai: SSID **chưa có pool**, máy
+  **chưa ghim**, pin **giải được**, và pin **trỏ quá cuối pool** sau khi pool bị rút
+  ngắn. Trạng thái cuối là trạng thái cần người vào sửa, nên không được đọc giống
+  "chưa ghim".
+- `has("slot")` cũng phải kiểm, không chỉ giá trị: thiếu khoá và khoá bằng `null`
+  đọc qua `.slot` là như nhau, mà chỉ một trong hai là hợp đồng.
+- **User và pass của proxy không bao giờ đi kèm danh sách thiết bị** — chỉ nhãn và
+  `host:port`.
+
+> **Sửa so với [F7](#f7--agent-api):** phần `clients` có thêm `slot`/`proxy_label`/
+> `proxy_host`/`proxy_state` được tách ra thành **F8a** và thêm `pool_size`. Để trong
+> F7 thì console vẫn phải gọi `get_pool` cho **từng** SSID mỗi lần làm mới danh sách
+> thiết bị; gộp vào `clients` thì chỉ còn một lượt đi về.
+
+#### F8b — console desktop
 
 - Khu Pool proxy: bảng slot hiện đúng thứ tự, kèm **số thiết bị đang dùng mỗi slot**.
 - Hộp thoại đổi hàng loạt: **từ chối khi chưa chọn máy** và **khi pool rỗng**; bảng xem
@@ -708,7 +724,14 @@ Theo khuôn `tests/test_agent.sh`. Với **mỗi** action mới:
 - Cột Proxy hiện nhãn hoặc `host:port`, và trạng thái "chưa ghim" cho máy chưa có pin.
 - Chuột phải gán một máy → gửi `assign_proxy` đúng MAC và slot.
 - i18n: mọi chuỗi tiếng Việt mới đều có bản dịch EN, theo cách `test_web_console_i18n.py`
-  đang kiểm cho console web.
+  đang kiểm cho console web. Thêm khoá vào `EN_TRANSLATIONS` phải kiểm **trùng khoá**:
+  một khoá đã có bị khai lại thì bản dịch cũ biến mất mà không có lỗi nào.
+
+> **Quyết định khi code F8b:** hộp thoại đổi hàng loạt **chia trên pool đang có** và gửi
+> `assign_proxy` với đúng những dòng vừa hiện, chứ không gọi `rebalance`. `rebalance`
+> xáo bằng RNG của shell trên router, nên bảng xem trước tính bằng Python sẽ **không**
+> bằng thứ được ghi — đúng cái bất biến mà mục này đòi. Việc thay pool thuộc về khu
+> Pool proxy ở tab Wi‑Fi; `rebalance` vẫn giữ cho CLI và agent.
 
 #### F9 — daemon và móc DHCP
 
@@ -752,7 +775,8 @@ Mỗi bước phải liệt kê trước các guard sẽ bị phá, rồi chứn
 | F5 | thay-vs-thêm dòng, chặn slot, gán lại vs xoá khi mồ côi, phép chia bài `% N`, tính lặp lại của seed |
 | F6 | quy tắc tách `@` cuối và `:` đầu, khử trùng lặp, thông báo khi vượt trần, phép chia bài |
 | F7 | kiểm token, kiểm method, tính nguyên tử của `save_pool`, chặn dải slot |
-| F8 | điều kiện chặn nút, việc dùng chung seed giữa xem trước và lần gửi |
+| F8a | bậc thang bốn trạng thái, tra pool, việc không lộ credential |
+| F8b | điều kiện chặn nút, việc dùng chung seed giữa xem trước và lần gửi |
 | F9 | điều kiện "đã ghim", từng nhánh policy, điều kiện tự chữa lành |
 | F5b | từng phép `min` trong công thức, nhánh fallback, chặn chia 0 |
 
@@ -873,7 +897,8 @@ lại sau mỗi commit.
 | F5 | State ghim `/etc/sbproxy.assign`, gán lại slot mồ côi, `assign.sh`, `rebalance.sh`, nạp state khi apply | `lib.sh`, `assign.sh`, `rebalance.sh`, `apply.sh` | `sh tests/test_pool.sh` | P2 |
 | F6 | Parser danh sách dán + hàm chia đều (hàm thuần) | `console/desktop/main.py` | `python -m unittest tests.test_pool_console` | P4 |
 | F7 | Agent API: `get_pool`, `save_pool`, `assign_proxy`, `rebalance`, `capacity`, `pool_health`, `probe_pool` | `agent/cgi/sbproxy` | `sh tests/test_pool_agent.sh` | P3 |
-| F8 | Console desktop: khu Pool proxy, cột Proxy, hộp thoại đổi hàng loạt có xem trước | `console/desktop/main.py` | `python -m unittest tests.test_pool_console tests.test_desktop_workflows` | P4 |
+| F8a | `clients` báo pin của từng máy: `slot`, `proxy_label`, `proxy_host`, `proxy_state`, `pool_size` | `scripts/clients.sh` | `sh tests/run.sh` | P4 |
+| F8b | Console desktop: khu Pool proxy, cột Proxy, hộp thoại đổi hàng loạt có xem trước | `console/desktop/main.py` | `python -m unittest tests.test_pool_console tests.test_desktop_workflows tests.test_desktop_gui` | P4 |
 | F9 | `sbproxy-assignd` + móc DHCP + init.d + `install-deps.sh` cài `nft_socket` | `agent/`, `etc/init.d/`, `install-deps.sh` | `sh tests/test_assignd.sh` | P2 |
 | F10 | Tài liệu và CHANGELOG (cả bản `.en`) | `docs/`, `README*`, `CHANGELOG.md` | `sh tests/run-all.sh` | P5 |
 
