@@ -4457,7 +4457,6 @@ class NativeApp:
             ("kick", "Kick", lambda: self.client_action("kick"), "Warning.TButton"),
             ("ban", "Cấm", lambda: self.client_action("ban"), "Danger.TButton"),
             ("unban", "Bỏ cấm", lambda: self.client_action("unban"), "Success.TButton"),
-            ("proxy", "Đổi proxy…", self.bulk_assign_proxy, "Primary.TButton"),
             ("add_proxy", "Thêm proxy…", self.add_proxy_to_selected, "Success.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
@@ -4475,8 +4474,6 @@ class NativeApp:
             borderwidth=1,
         )
         self.client_context_menu.add_command(label=self.t("Gán proxy…"), command=self.assign_one_proxy)
-        self.client_context_menu.add_command(label=self.t("Đổi proxy cho thiết bị đã chọn…"),
-                                             command=self.bulk_assign_proxy)
         self.client_context_menu.add_command(label=self.t("Thêm proxy…"),
                                              command=self.add_proxy_to_selected)
 
@@ -5718,9 +5715,7 @@ class NativeApp:
                 "kick": "normal" if any(item.get("online", True) for item in items) else "disabled",
                 "ban": "normal" if any(not item.get("banned") for item in items) else "disabled",
                 "unban": "normal" if any(item.get("banned") for item in items) else "disabled",
-                # One split cannot span two Wi-Fis, so a mixed selection has the
-                # button greyed out rather than failing once it is pressed.
-                "proxy": "normal" if len({item.get("idx") for item in items}) == 1 else "disabled",
+                "add_proxy": "normal" if len({item.get("idx") for item in items}) == 1 else "disabled",
             }
         for key, button in self.client_edit_buttons.items():
             button.configure(state=states.get(key, "disabled"))
@@ -6004,7 +5999,7 @@ class NativeApp:
         for mac, new_slot in plan.items():
             slot = new_slots[new_slot]
             row = merged[slot]
-            preview.append((mac, slot, row[5] or f"{row[1]}:{row[2]}"))
+            preview.append((mac, slot, f"{row[0]}:{row[1]}:{row[2]}"))
         ask = ask or self._ask_bulk_proxy
         if not ask(preview):
             return

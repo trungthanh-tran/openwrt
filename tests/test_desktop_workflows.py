@@ -1416,12 +1416,12 @@ VIETNAMESE_ONLY = set("ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậ�
 
 
 class ProxyButtonStateTests(unittest.TestCase):
-    """The Đổi proxy button greys itself out instead of failing when pressed."""
+    """The add-proxy action follows the current device selection."""
 
     def instance(self, items):
         app_instance = bare_app("vi")
         app_instance.client_edit_buttons = {
-            key: FakeButton() for key in ("details", "copy", "kick", "ban", "unban", "proxy")}
+            key: FakeButton() for key in ("details", "copy", "kick", "ban", "unban", "add_proxy")}
         app_instance.client_selection_var = FakeVar()
         app_instance.selected_client_items = lambda: list(items)
         return app_instance
@@ -1433,7 +1433,7 @@ class ProxyButtonStateTests(unittest.TestCase):
     def state(self, items):
         app_instance = self.instance(items)
         app_instance.update_client_editor()
-        return app_instance.client_edit_buttons["proxy"].options.get("state")
+        return app_instance.client_edit_buttons["add_proxy"].options.get("state")
 
     def test_one_wifi_enables_it(self):
         self.assertEqual(self.state([self.device("aa:bb:cc:dd:ee:01"),
@@ -1453,7 +1453,6 @@ class ProxyPoolTranslationTests(unittest.TestCase):
 
     NEW_STRINGS = (
         "Pool proxy…",
-        "Đổi proxy cho thiết bị đã chọn…",
         "Gán proxy…",
         "Hãy chọn thiết bị trong bảng trước",
         "Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi",
