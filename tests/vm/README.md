@@ -29,6 +29,36 @@ Nhưng phần lớn rủi ro của thiết kế không nằm ở radio.
 Nói gọn: **D2 và D9 — hai thứ plan đánh dấu phải spike — kiểm được hết trên máy ảo.**
 Chỉ D10 là không.
 
+## Đã chạy: nhân WSL2 6.18, 2026-08-26
+
+| | |
+|---|---|
+| **D2** — `tproxy ip to :ip saddr map @m` | **đạt** |
+| **D2a** — một set mỗi slot | đạt |
+| **D3** — `iifname vmap` + chain riêng mỗi SSID | đạt |
+| **D4** — map có `size` và `elements` nướng sẵn | đạt |
+| `add` / `list` / `delete element` lúc chạy | đạt |
+| 32 SSID nạp cùng lúc | đạt |
+| **D9** — `socket transparent 1` | *bỏ qua* — nhân WSL không có `nft_socket` |
+
+**D2 đạt trên nhân thật.** Đó là câu hỏi lớn nhất còn treo: F2, F3, F4 đều dựng
+trên nó, và D2a giờ chỉ còn là phương án lui trên giấy.
+
+Nhân WSL2 không phải nhân OpenWrt trên MT7986, nên đây là bằng chứng mạnh chứ
+chưa phải kết luận cuối. Nhưng nếu D2 hỏng ở tầng biểu thức nftables thì nó đã
+hỏng ở đây rồi.
+
+**D9 chưa trả lời được ở đâu ngoài OpenWrt**: WSL không build `nft_socket`, nft
+báo `No such file or directory`. Spike phân biệt trường hợp này với việc nhân
+*hiểu* biểu thức rồi từ chối — cái đầu là thiếu module, cái sau mới là lỗi thiết
+kế. Trên router: `opkg install kmod-nft-socket`; nếu image không có thì
+`POOL_DIVERT=off`.
+
+Lần chạy này cũng lộ ra hai lỗi của chính spike: `chain w1 { … accept }` một
+dòng thiếu dấu `;` trước `}`, nên nft báo lỗi cú pháp dây chuyền qua cả chục
+dòng sau và đọc y như nhân từ chối thiết kế; và D9 báo *trượt* trong khi lẽ ra
+phải báo *bỏ qua*. Cả hai đã sửa.
+
 ## WSL: đường tắt cho D2 và D9, không phải máy ảo router
 
 **WSL không chạy được OpenWrt theo cách có ích ở đây.** WSL2 dùng nhân của

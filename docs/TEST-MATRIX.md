@@ -209,6 +209,11 @@ lookup, the divert rule, per-SSID chains behind a verdict map, and live
 `add`/`delete element`. It runs on an OpenWrt VM or on the router itself. See
 [../tests/vm/README.md](../tests/vm/README.md).
 
+Run once on a WSL2 6.18 kernel (2026-08-26): everything passed except the
+divert rule, which that kernel cannot answer because it has no `nft_socket`.
+That covers D2 -- the map-keyed `tproxy` lookup F2-F4 are built on -- on a real
+kernel for the first time. D9 and D10 still need the router.
+
 ## Real-router acceptance tests
 
 Automation cannot faithfully emulate radio firmware, MediaTek drivers,

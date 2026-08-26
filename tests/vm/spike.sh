@@ -91,20 +91,33 @@ if [ -d /sys/module/nft_socket ] || grep -q nft_socket /proc/modules 2>/dev/null
 else
   skip "nft_socket is loaded" "not in /proc/modules; the load below is the real test"
 fi
-try_load "socket transparent 1 is accepted by the kernel" \
-"table inet $TABLE {
+divert_rules="table inet $TABLE {
   chain pre {
     type filter hook prerouting priority 1000; policy accept;
     ip saddr $NEVER meta l4proto tcp socket transparent 1 accept
   }
 }"
+cleanup
+divert_err="$(printf '%s\n' "$divert_rules" | nft -f - 2>&1)" && divert_rc=0 || divert_rc=$?
+cleanup
+if [ "$divert_rc" = "0" ]; then
+  ok "socket transparent 1 is accepted by the kernel"
+elif printf '%s' "$divert_err" | grep -q "No such file or directory"; then
+  skip "socket transparent 1 is accepted by the kernel" \
+       "this kernel has no nft_socket: install kmod-nft-socket, or set POOL_DIVERT=off"
+else
+  printf '  ----- nft said -----\n' >&2
+  printf '%s\n' "$divert_err" | sed 's/^/  /' >&2
+  printf '  --------------------\n' >&2
+  no "socket transparent 1 is accepted by the kernel"
+fi
 
 echo
 echo "== D3: one chain per SSID, entered through a verdict map =="
 try_load "iifname vmap dispatches into per-SSID chains" \
 "table inet $TABLE {
-  chain w1 { ip saddr $NEVER accept }
-  chain w2 { ip saddr $NEVER accept }
+  chain w1 { ip saddr $NEVER accept; }
+  chain w2 { ip saddr $NEVER accept; }
   chain pre {
     type filter hook prerouting priority 1000; policy accept;
     ip saddr $NEVER iifname vmap { \"br-w1\" : jump w1, \"br-w2\" : jump w2 }
@@ -163,7 +176,7 @@ i=1
 while [ "$i" -le 32 ]; do
   rules="$rules
   map w${i}map { type ipv4_addr : inet_service; size 512; }
-  chain w$i { ip saddr $NEVER meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w${i}map accept }"
+  chain w$i { ip saddr $NEVER meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w${i}map accept; }"
   i=$((i + 1))
 done
 rules="$rules
