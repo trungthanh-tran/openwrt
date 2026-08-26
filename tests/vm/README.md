@@ -29,6 +29,66 @@ Nhưng phần lớn rủi ro của thiết kế không nằm ở radio.
 Nói gọn: **D2 và D9 — hai thứ plan đánh dấu phải spike — kiểm được hết trên máy ảo.**
 Chỉ D10 là không.
 
+## WSL: đường tắt cho D2 và D9, không phải máy ảo router
+
+**WSL không chạy được OpenWrt theo cách có ích ở đây.** WSL2 dùng nhân của
+Microsoft chứ không phải nhân OpenWrt. Có thể import rootfs OpenWrt thành một
+distro, nhưng sẽ không có **procd** — nên `uci`, `ubus` và mọi `/etc/init.d/*`
+đều không chạy. `apply.sh`, `install-agent.sh`, dnsmasq và `dhcpscript` đều nằm
+ngoài tầm.
+
+Nhưng WSL2 có **nhân Linux thật**. Nếu nhân đó có `nft_tproxy` và `nft_socket`
+thì `spike.sh` chạy thẳng trong WSL và trả lời **D2 với D9** — hai câu hỏi rủi ro
+nhất — mà không cần dựng máy ảo nào.
+
+### Cài
+
+Chạy PowerShell **với quyền admin**:
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Khởi động lại máy khi được hỏi. Lần đầu mở Ubuntu sẽ hỏi tên người dùng và mật
+khẩu.
+
+### Kiểm nhân có đủ không
+
+```bash
+sudo apt update && sudo apt install -y nftables
+sudo modprobe nft_tproxy nft_socket && lsmod | grep -E 'nft_tproxy|nft_socket'
+```
+
+- **Ra hai dòng** → chạy được spike. Sang bước dưới.
+- **`modprobe: FATAL: Module ... not found`** → nhân WSL không build hai module
+  đó. WSL hết đường; dùng QEMU (xem phần dưới), hoặc chạy QEMU *bên trong* WSL
+  nếu máy bật được ảo hoá lồng.
+
+### Chạy spike
+
+```bash
+cd /mnt/d/working/gitlab.vgplay.vn/research/openwrt-multiwifi-socks5
+sudo sh tests/vm/spike.sh
+```
+
+Spike nạp luật vào bảng riêng trong namespace mạng của WSL rồi xoá đi; không
+đụng gì tới Windows.
+
+**Kết quả nghĩa là gì.** Nhân WSL không phải nhân OpenWrt trên MT7986, nên
+*đạt* ở đây là dấu hiệu tốt chứ chưa phải kết luận. Nhưng *trượt* ở đây là cảnh
+báo mạnh, và biết sớm thì rẻ hơn nhiều: D2 là nền của F2, F3 và F4.
+
+### Chạy luôn bộ test workstation dưới shell thật
+
+Tiện thể, WSL cho chạy suite dưới `dash`/BusyBox — gần với `ash` của router hơn
+git-bash trên Windows:
+
+```bash
+sudo apt install -y busybox shellcheck jq
+cd /mnt/d/working/gitlab.vgplay.vn/research/openwrt-multiwifi-socks5
+sh tests/run-all.sh
+```
+
 ## Dựng máy ảo
 
 ### Trên Windows, bằng QEMU
