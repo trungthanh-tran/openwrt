@@ -514,16 +514,25 @@ out="$(auth_run GET 'action=status')"
 eq "status carries NET_BASE" "$(json_value "$out" '.meta.net_base')" '10'
 eq "status carries TPROXY_PORT_BASE" "$(json_value "$out" '.meta.tproxy_port_base')" '12000'
 eq "status carries BSSID_LIMIT" "$(json_value "$out" '.meta.bssid_limit')" '16'
+# The console must not hardcode where the pool ports live, for the same reason
+# it does not hardcode net_base.
+eq "status carries POOL_PORT_BASE" "$(json_value "$out" '.meta.pool_port_base')" '13000'
+eq "status carries POOL_PORT_STRIDE" "$(json_value "$out" '.meta.pool_port_stride')" '256'
 
-printf '%s\n' 'NET_BASE=40' 'TPROXY_PORT_BASE=21000' 'BSSID_LIMIT=8' > "$TMP/router/config/settings.sh"
+printf '%s\n' 'NET_BASE=40' 'TPROXY_PORT_BASE=21000' 'BSSID_LIMIT=8' \
+  'POOL_PORT_BASE=30000' 'POOL_PORT_STRIDE=64' > "$TMP/router/config/settings.sh"
 out="$(auth_run GET 'action=status')"
 eq "an edited NET_BASE is reported" "$(json_value "$out" '.meta.net_base')" '40'
 eq "an edited port base is reported" "$(json_value "$out" '.meta.tproxy_port_base')" '21000'
 eq "an edited BSSID limit is reported" "$(json_value "$out" '.meta.bssid_limit')" '8'
+eq "an edited pool base is reported" "$(json_value "$out" '.meta.pool_port_base')" '30000'
+eq "an edited pool stride is reported" "$(json_value "$out" '.meta.pool_port_stride')" '64'
 
 printf '%s\n' 'NET_BASE=not-a-number' > "$TMP/router/config/settings.sh"
 out="$(auth_run GET 'action=status')"
 eq "a broken value falls back" "$(json_value "$out" '.meta.net_base')" '10'
+eq "and so does the pool base" "$(json_value "$out" '.meta.pool_port_base')" '13000'
+eq "and the pool stride" "$(json_value "$out" '.meta.pool_port_stride')" '256'
 eq "status still answers" "$(json_value "$out" '.ok')" 'true'
 rm -f "$TMP/router/config/settings.sh"
 

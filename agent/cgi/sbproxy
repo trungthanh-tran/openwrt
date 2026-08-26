@@ -57,7 +57,8 @@ have() { command -v "$1" >/dev/null 2>&1; }
 settings_numbers() {
   (
     [ -f "$SB_ROOT/config/settings.sh" ] && . "$SB_ROOT/config/settings.sh" 2>/dev/null
-    printf '%s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" "${BSSID_LIMIT:-16}"
+    printf '%s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
+      "${BSSID_LIMIT:-16}" "${POOL_PORT_BASE:-13000}" "${POOL_PORT_STRIDE:-256}"
   ) 2>/dev/null
 }
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
@@ -225,17 +226,24 @@ case "$ACTION" in
     # shellcheck disable=SC2046  # three plain integers, deliberately split
     set -- $(settings_numbers)
     net_base="${1:-10}"; tproxy_base="${2:-12000}"; bssid_limit="${3:-16}"
-    case "$net_base$tproxy_base$bssid_limit" in
-      ''|*[!0-9]*) net_base=10; tproxy_base=12000; bssid_limit=16 ;;
+    pool_base="${4:-13000}"; pool_stride="${5:-256}"
+    case "$net_base$tproxy_base$bssid_limit$pool_base$pool_stride" in
+      ''|*[!0-9]*)
+        net_base=10; tproxy_base=12000; bssid_limit=16
+        pool_base=13000; pool_stride=256
+        ;;
     esac
     json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
                      --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
                      --argjson net_base "$net_base" --argjson tproxy_port_base "$tproxy_base" \
                      --argjson bssid_limit "$bssid_limit" \
+                     --argjson pool_port_base "$pool_base" \
+                     --argjson pool_port_stride "$pool_stride" \
       '{ok:true, ssids:$ssids, health:$health,
         meta:{singbox_running:$running, applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
-              bssid_limit:$bssid_limit}}')"
+              bssid_limit:$bssid_limit,
+              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}')"
     ;;
 
   get_conf)

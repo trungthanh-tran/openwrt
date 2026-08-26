@@ -5,7 +5,10 @@ set -u
 warn=0
 report() { printf '[%s] %s\n' "$1" "$2"; }
 
-for file in /etc/sbproxy/token /root/sbproxy/config/wifi-socks.conf /etc/sing-box/config.json; do
+# proxy-pools.conf holds the credentials of every proxy in every pool, so it
+# belongs on this list as much as wifi-socks.conf does.
+for file in /etc/sbproxy/token /root/sbproxy/config/wifi-socks.conf \
+            /root/sbproxy/config/proxy-pools.conf /etc/sing-box/config.json; do
   [ -e "$file" ] || continue
   mode="$(stat -c '%a' "$file" 2>/dev/null || echo unknown)"
   case "$mode" in 600|400) report OK "$file permissions: $mode" ;; *) report WARN "$file permissions: $mode (expected 600 or 400)"; warn=$((warn + 1)) ;; esac

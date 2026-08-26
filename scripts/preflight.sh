@@ -44,7 +44,25 @@ for p in sing-box nftables kmod-nft-tproxy ip-full iw-full jq; do
   if [ -n "$installed" ]; then echo "  [OK] $p"; else echo "  [MISSING] $p"; fi
 done
 
-echo; echo "==== 6. DHCP hook ===="
+echo; echo "==== 6. Proxy pool ===="
+if validate_pool_settings 2>/dev/null; then
+  echo "  [OK] Pool ports $(pool_port 1 0)..$(pool_port 200 $(( ${POOL_SLOTS_PER_SSID_MAX:-256} - 1 ))) fit and stay clear of the per-SSID ports."
+else
+  warn "The POOL_PORT_* settings do not fit in the port range — see config/settings.sh."
+fi
+# nft is the one thing here that cannot be checked by reading a file: the map
+# and vmap syntax the generator relies on has to be parsed by the local binary.
+if command -v nft >/dev/null 2>&1; then
+  if use_divert; then
+    echo "  [OK] nft understands 'socket transparent', so pool lookups happen once per connection."
+  else
+    warn "nft does not accept 'socket transparent' — install kmod-nft-socket, or every packet will be looked up."
+  fi
+else
+  warn "'nft' is missing — the pool ruleset cannot be checked."
+fi
+
+echo; echo "==== 7. DHCP hook ===="
 _dhcpscript="$(uci -q get dhcp.@dnsmasq[0].dhcpscript || true)"
 case "$(dhcp_hook_state "$_dhcpscript")" in
   ours)  echo "  [OK] dnsmasq calls $DHCP_HOOK, so devices are pinned as their lease is handed out." ;;
@@ -56,7 +74,7 @@ case "$(dhcp_hook_state "$_dhcpscript")" in
     ;;
 esac
 
-echo; echo "==== 7. Config ===="
+echo; echo "==== 8. Config ===="
 if [ -f "$CONF" ]; then validate_settings; validate_conf; validate_pools; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
 else warn "$CONF does not exist — copy it from config/wifi-socks.conf.example"; fi
 

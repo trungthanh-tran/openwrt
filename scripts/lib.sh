@@ -629,6 +629,38 @@ assign_pick_slot() { # idx
     }'
 }
 
+# "<name inside the snapshot>|<live path>" for everything a snapshot carries
+# beyond /etc/config and /etc/sing-box.
+#
+# The pool and the pins live outside /etc/config, and pool.sh takes a snapshot
+# immediately before replacing a pool -- so leaving them out would make that
+# snapshot the one thing incapable of undoing the operation it was taken for.
+#
+# wifi-socks.conf and sbproxy.nft keep the names older snapshots used, so those
+# snapshots stay restorable.
+backup_paths() {
+  printf 'wifi-socks.conf|%s\n' "$CONF"
+  [ -z "${POOLS:-}" ]       || printf 'proxy-pools.conf|%s\n' "$POOLS"
+  [ -z "${ASSIGN_FILE:-}" ] || printf 'sbproxy.assign|%s\n' "$ASSIGN_FILE"
+  [ -z "${NFT_FILE:-}" ]    || printf 'sbproxy.nft|%s\n' "$NFT_FILE"
+  [ -z "${BANS_FILE:-}" ]   || printf 'sbproxy.bans|%s\n' "$BANS_FILE"
+}
+
+backup_snapshot_files() { # destination directory
+  backup_paths | while IFS='|' read -r _bs_name _bs_path; do
+    [ -f "$_bs_path" ] || continue
+    cp "$_bs_path" "$1/$_bs_name" 2>/dev/null || warn "Could not back up $_bs_path"
+  done
+}
+
+restore_snapshot_files() { # snapshot directory
+  backup_paths | while IFS='|' read -r _rs_name _rs_path; do
+    [ -f "$1/$_rs_name" ] || continue
+    mkdir -p "$(dirname "$_rs_path")" 2>/dev/null || true
+    cp "$1/$_rs_name" "$_rs_path" && log "Restored $_rs_path"
+  done
+}
+
 # A random integer in [0, n).
 #
 # Seeded from /dev/urandom through cksum on purpose: `hexdump` and `od` are the

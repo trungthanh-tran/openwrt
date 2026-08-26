@@ -515,6 +515,81 @@ else
   sk "clients.sh proxy pin" "no jq"
 fi
 
+echo "== what a snapshot carries =="
+snapdir="$STUB/snap"; mkdir -p "$snapdir"
+mkdir -p "$STUB/live"
+printf 'conf\n'   > "$STUB/live/wifi-socks.conf"
+printf 'pool\n'   > "$STUB/live/proxy-pools.conf"
+printf 'assign\n' > "$STUB/live/sbproxy.assign"
+printf 'nft\n'    > "$STUB/live/sbproxy.nft"
+printf 'bans\n'   > "$STUB/live/sbproxy.bans"
+snap_env() {
+  CONF="$STUB/live/wifi-socks.conf" POOLS="$STUB/live/proxy-pools.conf" \
+  ASSIGN_FILE="$STUB/live/sbproxy.assign" NFT_FILE="$STUB/live/sbproxy.nft" \
+  BANS_FILE="$STUB/live/sbproxy.bans" "$@"
+}
+
+names="$(snap_env backup_paths | cut -d'|' -f1 | tr '\n' ' ')"
+# pool.sh takes a snapshot immediately before replacing a pool, so a snapshot
+# without the pool and the pins is the one thing that cannot undo that.
+contains "a snapshot carries the pool"  "$names" "proxy-pools.conf"
+contains "and the device pins"          "$names" "sbproxy.assign"
+contains "and the SSID configuration"   "$names" "wifi-socks.conf"
+contains "and the generated ruleset"    "$names" "sbproxy.nft"
+contains "and the blocklist"            "$names" "sbproxy.bans"
+
+# Old snapshots must stay restorable, so the two names that already existed
+# keep the spelling they had.
+eq "the config keeps its old snapshot name" \
+   "$(snap_env backup_paths | awk -F'|' '$1=="wifi-socks.conf" { print $2 }')" \
+   "$STUB/live/wifi-socks.conf"
+eq "so does the ruleset" \
+   "$(snap_env backup_paths | awk -F'|' '$1=="sbproxy.nft" { print $2 }')" \
+   "$STUB/live/sbproxy.nft"
+
+eq "a path that is not configured is left out" \
+   "$(CONF="$STUB/live/wifi-socks.conf" POOLS="" ASSIGN_FILE="" NFT_FILE="" BANS_FILE="" \
+      backup_paths | wc -l | tr -d ' ')" "1"
+
+snap_env backup_snapshot_files "$snapdir"
+eq "the pool reaches the snapshot" "$(cat "$snapdir/proxy-pools.conf" 2>/dev/null)" "pool"
+eq "the pins reach it too"         "$(cat "$snapdir/sbproxy.assign" 2>/dev/null)" "assign"
+
+printf 'clobbered\n' > "$STUB/live/proxy-pools.conf"
+rm -f "$STUB/live/sbproxy.assign"
+snap_env restore_snapshot_files "$snapdir"
+eq "restoring puts the pool back"  "$(cat "$STUB/live/proxy-pools.conf")" "pool"
+eq "and the pins, even when deleted" "$(cat "$STUB/live/sbproxy.assign")" "assign"
+
+# A file the snapshot never held must not be invented on restore.
+rm -f "$snapdir/sbproxy.bans" "$STUB/live/sbproxy.bans"
+snap_env restore_snapshot_files "$snapdir"
+eq "a file absent from the snapshot is not created" \
+   "$([ -f "$STUB/live/sbproxy.bans" ] && echo yes || echo no)" "no"
+
+# A live file that has gone missing must not stop the rest of the snapshot.
+rm -f "$STUB/live/wifi-socks.conf"
+rm -rf "$snapdir"; mkdir -p "$snapdir"
+snap_env backup_snapshot_files "$snapdir" 2>/dev/null
+# The restore above put "pool" back, so that is what a fresh snapshot holds.
+eq "a missing live file does not stop the snapshot" \
+   "$(cat "$snapdir/proxy-pools.conf" 2>/dev/null)" "pool"
+
+contains "backup.sh goes through the shared list" \
+   "$(cat "$ROOT/scripts/backup.sh")" "backup_snapshot_files"
+contains "and so does rollback.sh" \
+   "$(cat "$ROOT/scripts/rollback.sh")" "restore_snapshot_files"
+
+echo "== the pool file counts as a secret =="
+contains "security-audit checks the pool file's permissions" \
+   "$(cat "$ROOT/scripts/security-audit.sh")" "proxy-pools.conf"
+
+echo "== preflight checks the pool's own preconditions =="
+pre="$(cat "$ROOT/scripts/preflight.sh")"
+contains "preflight validates the pool port arithmetic" "$pre" "validate_pool_settings"
+contains "preflight asks nft whether it understands the syntax" "$pre" "use_divert"
+contains "preflight checks dnsmasq's dhcpscript" "$pre" "dhcpscript"
+
 echo "== pc update package manifest =="
 match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts'
 nomatch "update.sh drops old ui path" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'scripts tools ui'
