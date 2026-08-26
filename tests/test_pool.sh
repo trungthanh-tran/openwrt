@@ -667,6 +667,55 @@ pool_replace 5 "$STUB/new.conf" >/dev/null 2>&1
 eq "an empty list clears the pool"   "$(pool_count 5)" "0"
 eq "and removes the pins that had nowhere to go" "$(grep -c '^5|' "$ASSIGN_FILE")" "0"
 
+echo "== the generated ruleset parses =="
+# Every assertion above reads the file as text. None of them can tell whether
+# nft will take it, and the answer was no: a one-line block needs a separator
+# before its closing brace, and without one nft rejects the whole file. It went
+# unnoticed because no test ever handed the output to nft.
+#
+# `nft -c` parses without loading, so this is safe to run anywhere nft exists
+# and self-skips where it does not (Windows, and routers are not the point).
+nft_parses() { # label
+  if ! command -v nft >/dev/null 2>&1; then
+    printf '  skip %s (nft is not installed)\n' "$1"
+    return 0
+  fi
+  _nft_out="$(nft -c -f "$NFT_FILE" 2>&1)"
+  if [ -z "$_nft_out" ]; then
+    ok "$1"
+  elif printf '%s' "$_nft_out" | grep -q 'No such file or directory'; then
+    printf '  skip %s (this kernel lacks a module the rule needs)\n' "$1"
+  else
+    no "$1 — $(printf '%s' "$_nft_out" | head -2 | tr '\n' ' ')"
+  fi
+}
+
+: > "$ASSIGN_FILE"; : > "$LEASES"
+nftgen "$POOL1"
+nft_parses "a pooled ruleset with no pins yet parses"
+
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' > "$ASSIGN_FILE"
+printf '%s\n' '1700000000 aa:bb:cc:dd:ee:01 192.168.11.23 phone-a *' > "$LEASES"
+nftgen "$POOL1"
+nft_parses "a pooled ruleset with pins parses"
+
+nftgen "$POOL1" on
+nft_parses "the same ruleset with the divert rule parses"
+
+nftgen -
+nft_parses "an unpooled ruleset parses"
+
+# The two forms of the map line differ only in whether elements follow, and the
+# empty form was the broken one, so assert the separator on both.
+: > "$ASSIGN_FILE"; nftgen "$POOL1"
+match "an empty map declaration is terminated" \
+  "$(grep 'map w1map' "$NFT_FILE")" 'size [0-9]+; \}'
+printf '%s\n' '1|aa:bb:cc:dd:ee:01|0|auto' > "$ASSIGN_FILE"
+printf '%s\n' '1700000000 aa:bb:cc:dd:ee:01 192.168.11.23 phone-a *' > "$LEASES"
+nftgen "$POOL1"
+match "a populated map declaration is terminated" \
+  "$(grep 'map w1map' "$NFT_FILE")" 'elements = \{[^}]*\}; \}'
+
 echo "== apply and preflight validate the pool =="
 match "apply.sh validates the pool file"    "$(cat "$ROOT/scripts/apply.sh")"    'validate_pools'
 match "apply.sh reassigns orphaned pins"    "$(cat "$ROOT/scripts/apply.sh")"    'assign_prune'

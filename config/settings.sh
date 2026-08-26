@@ -6,7 +6,11 @@
 # Refuse to run on anything other than the boards this project is tested on.
 # Set to 1 to downgrade that to a warning when trying another device; nothing
 # else changes, and the scripts are still only verified on the GL-MT6000.
-ALLOW_UNSUPPORTED_BOARD=0
+# lib.sh sources this file after the environment is already in place, so this
+# has to let an exported value stand -- otherwise `ALLOW_UNSUPPORTED_BOARD=1 sh
+# scripts/apply.sh`, which is what the VM guide tells people to run, is silently
+# overwritten back to 0 here.
+ALLOW_UNSUPPORTED_BOARD="${ALLOW_UNSUPPORTED_BOARD:-0}"
 
 # --- Radio-to-band mapping --------------------------------------------------
 # OpenWrt does not guarantee radio0=2.4G. preflight.sh lists the radios this

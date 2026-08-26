@@ -1127,7 +1127,7 @@ build_nft() {
     # rule below and uses the wifi-socks.conf proxy until it is pinned.
     if pool_enabled "$_r_idx"; then
       _nft_elements_w="$(assign_elements "$_r_idx")"
-      _nft_maps="$_nft_maps  map w${_r_idx}map { type ipv4_addr : inet_service; size ${POOL_MAP_SIZE:-512}${_nft_elements_w:+; elements = { $_nft_elements_w \}} }\n"
+      _nft_maps="$_nft_maps  map w${_r_idx}map { type ipv4_addr : inet_service; size ${POOL_MAP_SIZE:-512}${_nft_elements_w:+; elements = { $_nft_elements_w \}}; }\n"
       _nft_chains="$_nft_chains    # Devices pinned to a pool proxy go to that proxy's port.\n"
       _nft_chains="$_nft_chains    meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
     fi

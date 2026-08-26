@@ -211,6 +211,18 @@ contains "a band the board lacks warns without a suggestion" \
   "$(check_radio_mapping 6g "" RADIO_6G 2>&1)" "RADIO_6G is not set in config/settings.sh"
 unset UCI_STATE
 
+# setup-vm.sh and the VM guide both tell the operator to run
+# `ALLOW_UNSUPPORTED_BOARD=1 sh scripts/apply.sh`. That only works if settings.sh
+# lets an already-set value stand: lib.sh sources settings.sh *after* the
+# environment is in place, so a plain assignment there overwrites what the
+# operator asked for and the die message sends them to edit a tracked file.
+eq "ALLOW_UNSUPPORTED_BOARD from the environment survives settings.sh" \
+  "$(ALLOW_UNSUPPORTED_BOARD=1 sh -c '. "$1/config/settings.sh"; echo "$ALLOW_UNSUPPORTED_BOARD"' _ "$ROOT")" \
+  "1"
+eq "ALLOW_UNSUPPORTED_BOARD still defaults to 0" \
+  "$(sh -c 'unset ALLOW_UNSUPPORTED_BOARD; . "$1/config/settings.sh"; echo "$ALLOW_UNSUPPORTED_BOARD"' _ "$ROOT")" \
+  "0"
+
 echo "== uci_dquote =="
 eq "escape double-quote" "$(uci_dquote 'a"b')" 'a\"b'
 eq "escape backslash"    "$(uci_dquote 'a\b')" 'a\\b'
