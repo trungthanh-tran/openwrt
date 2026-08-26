@@ -1362,6 +1362,20 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         self.assertNotIn(1, instance.pool_cache)
         instance.refresh_clients.assert_called_once()
 
+    def test_clear_pool_is_refused_while_a_device_is_online(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", online=True)])
+        with mock.patch.object(appmod.messagebox, "showwarning") as warning:
+            instance.clear_pool(1)
+        instance.client.save_pool.assert_not_called()
+        warning.assert_called_once()
+
+    def test_empty_pool_text_is_also_refused_while_a_device_is_online(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", online=True)])
+        with mock.patch.object(appmod.messagebox, "showwarning") as warning:
+            instance.apply_pool_text(1, "")
+        instance.client.save_pool.assert_not_called()
+        warning.assert_called_once()
+
     def test_replacing_a_pool_asks_before_touching_the_router(self):
         instance = self.make_instance([])
         instance.confirm_important.return_value = False

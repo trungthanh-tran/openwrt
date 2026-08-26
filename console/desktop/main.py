@@ -2788,7 +2788,8 @@ class ManualBanDialog(tk.Toplevel):
 class PoolDialog(tk.Toplevel):
     """Show one Wi-Fi's proxy pool, and take a replacement list for it."""
 
-    def __init__(self, parent, record, proxies, usage, language="en", palette=None):
+    def __init__(self, parent, record, proxies, usage, language="en", palette=None,
+                 online_devices=False):
         super().__init__(parent)
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
@@ -2835,7 +2836,10 @@ class PoolDialog(tk.Toplevel):
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
         ttk.Button(actions, text="Xóa toàn bộ proxy", command=self._clear_pool,
-                   style="Danger.TButton").pack(side="left")
+                   style="Danger.TButton", state="disabled" if online_devices else "normal").pack(side="left")
+        if online_devices:
+            ttk.Label(actions, text="Không thể xóa khi có device đang kết nối",
+                      style="Muted.TLabel").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Ghi pool", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
@@ -5579,6 +5583,16 @@ class NativeApp:
             self.pool_cache[idx] = self.require_client().get_pool(idx)
         return self.pool_cache[idx]
 
+    def has_online_devices(self, idx):
+        for item in getattr(self, "clients_data", []) or []:
+            try:
+                same_idx = int(item.get("idx")) == int(idx)
+            except (AttributeError, TypeError, ValueError):
+                same_idx = False
+            if same_idx and bool(item.get("online", True)):
+                return True
+        return False
+
     def _pool_or_complaint(self, idx):
         """The proxies of one Wi-Fi, or None having already said why not."""
         try:
@@ -5609,7 +5623,10 @@ class NativeApp:
             return
         proxies = pool.get("proxies") or []
         usage = pool_slot_usage(self.clients_data, record.idx, len(proxies))
-        dialog = PoolDialog(self.root, record, proxies, usage, self.language, self.palette)
+        dialog = PoolDialog(
+            self.root, record, proxies, usage, self.language, self.palette,
+            online_devices=self.has_online_devices(record.idx),
+        )
         self.root.wait_window(dialog)
         if dialog.result is None:
             return
@@ -5619,6 +5636,13 @@ class NativeApp:
         self.apply_pool_text(record.idx, dialog.result)
 
     def clear_pool(self, idx):
+        if self.has_online_devices(idx):
+            messagebox.showwarning(
+                APP_NAME,
+                self.t("Không thể xóa toàn bộ proxy khi SSID còn device đang kết nối"),
+                parent=self.root,
+            )
+            return
         try:
             client = self.require_client()
         except AgentError as exc:
@@ -5645,6 +5669,13 @@ class NativeApp:
             # Every line was unusable. Saving now would clear the pool because of
             # a typo, so treat it as nothing having been asked for.
             messagebox.showinfo(APP_NAME, self.t("Không có dòng nào dùng được"), parent=self.root)
+            return
+        if not rows and not text.strip() and self.has_online_devices(idx):
+            messagebox.showwarning(
+                APP_NAME,
+                self.t("Không thể xóa toàn bộ proxy khi SSID còn device đang kết nối"),
+                parent=self.root,
+            )
             return
         action = (f"Replace the proxy pool of Wi-Fi {idx} with {len(rows)} proxies."
                   if self.language == "en" else
