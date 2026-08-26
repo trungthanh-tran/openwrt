@@ -332,6 +332,65 @@ class AgentClientRequestTests(unittest.TestCase):
 
 
 class WifiRecordTests(unittest.TestCase):
+    def test_proxy_line_accepts_supported_schemes_and_normalizes_type(self):
+        cases = (
+            ("SOCKS5://u:p@proxy.example:1080", "socks5"),
+            ("socks5h://proxy.example:1080", "socks5"),
+            ("socks://proxy.example:1080", "socks5"),
+            ("HTTP://u:p@proxy.example:8080", "http"),
+        )
+        for line, expected_type in cases:
+            with self.subTest(line=line):
+                self.assertEqual(app.parse_proxy_line(line)[0], expected_type)
+
+    def test_proxy_line_rejects_bad_scheme_host_and_port(self):
+        cases = (
+            "ftp://proxy.example:1080",
+            "proxy example:1080",
+            "proxy|example:1080",
+            "proxy.example:not-a-port",
+            "proxy.example:0",
+            "proxy.example:65536",
+            ":1080",
+            "proxy.example",
+        )
+        for line in cases:
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                app.parse_proxy_line(line)
+
+    def test_proxy_credentials_reject_control_delimiters_and_oversize(self):
+        bad_lines = (
+            "user:pa|ss@proxy.example:1080",
+            "user:pa\x7fss@proxy.example:1080",
+            f"{'u' * 256}:pass@proxy.example:1080",
+            f"user:{'p' * 256}@proxy.example:1080",
+        )
+        for line in bad_lines:
+            with self.subTest(line=repr(line)), self.assertRaises(ValueError):
+                app.parse_proxy_line(line)
+
+    def test_compact_proxy_rejects_non_string_and_bad_host_or_credentials(self):
+        cases = (
+            None,
+            "bad host:1080:user:pass",
+            "bad|host:1080:user:pass",
+            "host:1080:user|name:pass",
+            f"host:1080:{'u' * 256}:pass",
+            f"host:1080:user:{'p' * 256}",
+        )
+        for value in cases:
+            with self.subTest(value=repr(value)), self.assertRaises(ValueError):
+                app.parse_proxy_compact(value)
+
+    def test_proxy_list_reports_malformed_and_empty_lines_without_saving_them(self):
+        rows, dropped = app.parse_proxy_list(
+            "\n# comment\nproxy.example:1080\nftp://proxy.example:1080\n"
+            "proxy.example:1080:user:pass\n"
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row[1:3] for row in rows], [("proxy.example", 1080), ("proxy.example", 1080)])
+        self.assertEqual([item[0] for item in dropped], [4])
+
     def test_parse_compact_proxy(self):
         parsed = app.parse_proxy_compact(
             " 81.22.139.101:12323:14a24cde3eaec:51dd401c3f\t "

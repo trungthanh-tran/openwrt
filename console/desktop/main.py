@@ -960,6 +960,14 @@ def _proxy_host(value: str) -> str:
     return value
 
 
+def _proxy_credential(value: str, field: str) -> str:
+    if "|" in value or any(unicodedata.category(char) == "Cc" for char in value):
+        raise ValueError(f"invalid proxy {field}")
+    if len(value.encode("utf-8")) > 255:
+        raise ValueError(f"proxy {field} is too long")
+    return value
+
+
 def parse_proxy_line(line: str) -> tuple:
     """One pasted line -> (type, host, port, user, password, label).
 
@@ -997,7 +1005,7 @@ def parse_proxy_line(line: str) -> tuple:
         raise ValueError("thiếu cổng" if len(parts) == 1 else "không nhận ra định dạng")
 
     return (proxy_type, _proxy_host(host.strip()), _proxy_port(port.strip()),
-            user, password, "")
+            _proxy_credential(user, "user"), _proxy_credential(password, "password"), "")
 
 
 def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
@@ -2181,6 +2189,9 @@ def parse_proxy_compact(value: str) -> tuple[str, int, str, str]:
     if len(parts) != 4:
         raise ValueError("Nhập proxy theo dạng host:port:user:password")
     host, port_text, user, password = (part.strip() for part in parts)
+    host = _proxy_host(host)
+    user = _proxy_credential(user, "user")
+    password = _proxy_credential(password, "password")
     if not host:
         raise ValueError("Thiếu địa chỉ SOCKS5")
     try:
