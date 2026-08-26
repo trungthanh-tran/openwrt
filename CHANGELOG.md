@@ -41,6 +41,12 @@ Ngày theo định dạng YYYY-MM-DD.
   trên router. Xem [tests/vm/README.md](tests/vm/README.md).
 
 ### Fixed
+- **Cập nhật ghi đè pool của router bằng pool của người đóng gói.**
+  `make-package.sh` đóng cả thư mục `config/`, còn `self-update.sh` chỉ giữ lại
+  `wifi-socks.conf` và `settings.sh`. Người build package thường chính là người
+  chạy router, nên `proxy-pools.conf` của họ đi theo gói và thay thế file trên
+  router — mọi SSID có pool bị trỏ sang proxy khác, còn số slot trong
+  `/etc/sbproxy.assign` vẫn ghim thiết bị vào những dòng giờ mang nghĩa khác.
 - **Ruleset pool sinh ra không nạp được.** SSID có pool nhưng chưa ghim thiết bị
   nào sinh ra `map w1map { … size 512 }` — thiếu dấu `;` trước `}`, và nft từ
   chối *cả file*. Mọi pool đều bắt đầu ở đúng trạng thái đó, nên `apply.sh` sẽ

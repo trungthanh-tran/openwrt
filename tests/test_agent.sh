@@ -594,6 +594,7 @@ mkdir -p "$SB2/config" "$SB2/scripts" "$TMP/deploy"
 printf '%s\n' '0.4.0' > "$SB2/VERSION"
 printf '%s\n' 'Alpha|2g|1|alpha-password|proxy1.example|1080|||1|0|50:C7:BF' > "$SB2/config/wifi-socks.conf"
 printf '%s\n' 'ROUTER_SETTING=1' > "$SB2/config/settings.sh"
+printf '%s\n' '1|socks5|10.9.9.9|1080|live|livepass|LIVE-SLOT' > "$SB2/config/proxy-pools.conf"
 cp "$ROOT/scripts/self-update.sh" "$SB2/scripts/self-update.sh"
 cat > "$SB2/scripts/backup.sh" <<'SH'
 #!/bin/sh
@@ -614,6 +615,10 @@ make_pkg() { # version dest-file
   printf '#!/bin/sh\n' > "$pkgsrc/agent/init.d/sbproxy-healthd"
   printf '<html>new-ui</html>\n' > "$pkgsrc/console/web/control-panel.html"
   printf 'PACKAGED|conf|must|not|survive\n' > "$pkgsrc/config/wifi-socks.conf"
+  # make-package.sh ships the whole config/ directory, so whatever pool file the
+  # person building the package happens to have goes into it -- and that person
+  # is usually the one running the router.
+  printf '%s\n' '1|socks5|203.0.113.1|1080|pkg|pkgpass|PACKAGED-SLOT' > "$pkgsrc/config/proxy-pools.conf"
   tar czf "$2" -C "$pkgsrc" VERSION scripts agent console config
 }
 
@@ -647,6 +652,11 @@ contains "update replaces code" "$(cat "$SB2/scripts/apply.sh")" 'new-apply'
 contains "update preserves live wifi config" "$(cat "$SB2/config/wifi-socks.conf")" 'Alpha|2g|1|'
 not_contains "update never installs packaged config" "$(cat "$SB2/config/wifi-socks.conf")" 'PACKAGED'
 contains "update preserves live settings" "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=1'
+# Overwriting this one silently repoints every pooled SSID at someone else's
+# proxies, and leaves the slot numbers in /etc/sbproxy.assign pinning devices to
+# rows that now mean something entirely different.
+contains "update preserves the live proxy pool" "$(cat "$SB2/config/proxy-pools.conf")" 'LIVE-SLOT'
+not_contains "update never installs a packaged pool" "$(cat "$SB2/config/proxy-pools.conf")" 'PACKAGED-SLOT'
 contains "update deploys refreshed CGI" "$(cat "$TMP/deploy/sbproxy")" 'new-cgi'
 contains "update deploys refreshed web UI" "$(cat "$TMP/deploy/index.html")" 'new-ui'
 

@@ -12,7 +12,8 @@
 #   - Reject entries with absolute paths or ".." components (path traversal).
 #   - Reject version downgrades unless --force is specified.
 #   - Create a backup (scripts/backup.sh pre-update) before overwriting files.
-#   - Preserve the active config/wifi-socks.conf and config/settings.sh files.
+#   - Preserve the active config/wifi-socks.conf, config/proxy-pools.conf and
+#     config/settings.sh files.
 #   - Redeploy CGI/UI/healthd and reload services (skip components that are absent).
 #
 # Environment overrides (for tests/development machines): SB_ROOT, CGI_DEST, UI_DEST,
@@ -114,7 +115,12 @@ else
 fi
 
 # ---- preserve the active configuration ----
-for keep in wifi-socks.conf settings.sh; do
+# make-package.sh ships the whole config/ directory, so a package built on a
+# machine that has real config files carries them. proxy-pools.conf belongs here
+# for the same reason wifi-socks.conf does, and more sharply: replacing it
+# repoints every pooled SSID at the packager's proxies, and the slot numbers in
+# /etc/sbproxy.assign go on pinning devices to rows that now mean something else.
+for keep in wifi-socks.conf proxy-pools.conf settings.sh; do
   if [ -f "$SB_ROOT/config/$keep" ]; then
     mkdir -p "$NEW_ROOT/config"
     cp "$SB_ROOT/config/$keep" "$NEW_ROOT/config/$keep"

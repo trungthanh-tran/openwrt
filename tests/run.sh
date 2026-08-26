@@ -668,7 +668,7 @@ selfupdate="$(cat "$ROOT/scripts/self-update.sh")"
 match "self-update blocks path traversal" "$selfupdate" 'unsafe path \(absolute or containing \.\.\)'
 match "self-update guards downgrades" "$selfupdate" 'use --force to downgrade'
 match "self-update backs up before overwrite" "$selfupdate" 'backup\.sh pre-update'
-match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf settings\.sh'
+match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf proxy-pools\.conf settings\.sh'
 match "self-update validates package contents" "$selfupdate" 'scripts/apply\.sh scripts/lib\.sh agent/cgi/sbproxy'
 match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
 web_console="$(cat "$ROOT/console/web/control-panel.html")"
