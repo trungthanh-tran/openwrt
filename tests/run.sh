@@ -465,6 +465,56 @@ else
   sk "clients.sh integration" "no jq"
 fi
 
+echo "== clients.sh proxy pin (integration) =="
+if command -v jq >/dev/null 2>&1; then
+  # Two SSIDs: w1 has a pool of two proxies, w3 has none. Four devices between
+  # them cover every state a pin can be in.
+  printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"phy0-ap0"},{"section":"w3","ifname":"phy0-ap2"}]}}\n' > "$STUB/wifi2.json"
+  mkdir -p "$STUB/iwd2"
+  printf 'Station aa:bb:cc:dd:ee:01 (on phy0-ap0)\n\tsignal:  \t-40 dBm\nStation aa:bb:cc:dd:ee:02 (on phy0-ap0)\n\tsignal:  \t-41 dBm\nStation aa:bb:cc:dd:ee:03 (on phy0-ap0)\n\tsignal:  \t-42 dBm\nStation aa:bb:cc:dd:ee:05 (on phy0-ap0)\n\tsignal:  \t-44 dBm\n' > "$STUB/iwd2/phy0-ap0.txt"
+  printf 'Station aa:bb:cc:dd:ee:04 (on phy0-ap2)\n\tsignal:  \t-43 dBm\n' > "$STUB/iwd2/phy0-ap2.txt"
+  : > "$STUB/leases2"
+  : > "$STUB/bans3"
+  printf 'wireless.w1.ssid=Alpha\nwireless.w3.ssid=Charlie\n' > "$STUB/uci_ssid2"
+  printf '1|socks5|1.2.3.4|1080|user1|hunter2secret|alpha\n1|http|5.6.7.8|8080|||\n' > "$STUB/pools2"
+  # ee:01 pinned to a live slot, ee:02 pinned past the end of the pool,
+  # ee:03 not pinned at all, ee:04 on an SSID with no pool.
+  printf '1|aa:bb:cc:dd:ee:01|0|manual\n1|aa:bb:cc:dd:ee:02|7|manual\n1|aa:bb:cc:dd:ee:05|1|auto\n' > "$STUB/assign2"
+  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans3"\nASSIGN_FILE="%s/assign2"\n' \
+    "$ROOT" "$STUB" "$STUB" > "$STUB/settings2.sh"
+  out2="$(UBUS_WIFI_JSON="$STUB/wifi2.json" IW_DUMP_DIR="$STUB/iwd2" LEASES="$STUB/leases2" \
+          SETTINGS="$STUB/settings2.sh" UCI_STATE="$STUB/uci_ssid2" POOLS="$STUB/pools2" \
+          sh "$ROOT/scripts/clients.sh" 2>/dev/null)"
+  pin() { printf '%s' "$out2" | jq -r --arg m "$1" '.clients[]|select(.mac==$m)|'"$2"; }
+  eq "five devices listed"     "$(printf '%s' "$out2" | jq -r '.clients|length')" "5"
+  eq "pinned slot"             "$(pin aa:bb:cc:dd:ee:01 .slot)"         "0"
+  eq "pinned host:port"        "$(pin aa:bb:cc:dd:ee:01 .proxy_host)"   "1.2.3.4:1080"
+  eq "pinned label"            "$(pin aa:bb:cc:dd:ee:01 .proxy_label)"  "alpha"
+  eq "pinned state"            "$(pin aa:bb:cc:dd:ee:01 .proxy_state)"  "pinned"
+  eq "pool size reported"      "$(pin aa:bb:cc:dd:ee:01 .pool_size)"    "2"
+  # The second proxy carries no label, so the console has to fall back to
+  # host:port rather than print an empty cell.
+  eq "unlabelled slot has an empty label" "$(pin aa:bb:cc:dd:ee:05 .proxy_label)" ""
+  eq "unlabelled slot still has a host"   "$(pin aa:bb:cc:dd:ee:05 .proxy_host)" "5.6.7.8:8080"
+  # A pin left behind by a shrunken pool must be visible as broken, not silently
+  # reported as if the device still had a proxy.
+  eq "stale pin keeps its slot"  "$(pin aa:bb:cc:dd:ee:02 .slot)"        "7"
+  eq "stale pin has no host"     "$(pin aa:bb:cc:dd:ee:02 .proxy_host)"  ""
+  eq "stale pin state"           "$(pin aa:bb:cc:dd:ee:02 .proxy_state)" "stale"
+  # has("slot") as well as its value: a missing key and a null one read the
+  # same through `.slot`, and only one of them is the contract.
+  eq "unpinned row still carries the key" "$(pin aa:bb:cc:dd:ee:03 'has("slot")')" "true"
+  eq "unpinned slot is null"     "$(pin aa:bb:cc:dd:ee:03 '.slot|type')" "null"
+  eq "unpinned state"            "$(pin aa:bb:cc:dd:ee:03 .proxy_state)" "unpinned"
+  eq "unpinned still knows the pool" "$(pin aa:bb:cc:dd:ee:03 .pool_size)" "2"
+  eq "no pool at all"            "$(pin aa:bb:cc:dd:ee:04 .proxy_state)" "none"
+  eq "no pool means size zero"   "$(pin aa:bb:cc:dd:ee:04 .pool_size)"   "0"
+  nomatch "the proxy password never reaches the client list" "$out2" 'hunter2secret'
+  nomatch "the proxy username never reaches it either"       "$out2" 'user1'
+else
+  sk "clients.sh proxy pin" "no jq"
+fi
+
 echo "== pc update package manifest =="
 match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts'
 nomatch "update.sh drops old ui path" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'scripts tools ui'
