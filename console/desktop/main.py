@@ -1179,7 +1179,9 @@ def client_proxy_text(item, language: str = "vi") -> str:
     """
     state = str((item or {}).get("proxy_state") or "")
     if state == "pinned":
-        return str(item.get("proxy_label") or "").strip() or str(item.get("proxy_host") or "")
+        host = str(item.get("proxy_host") or "").strip()
+        proxy_type = str(item.get("proxy_type") or DEFAULT_PROXY_TYPE).strip().lower()
+        return f"{proxy_type}:{host}" if host else "—"
     if state == "unpinned":
         return translate("chưa ghim", language)
     if state == "stale":

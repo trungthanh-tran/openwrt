@@ -281,15 +281,15 @@ class ClientProxyTextTests(unittest.TestCase):
     def text(self, language="vi", **item):
         return app.client_proxy_text(item, language)
 
-    def test_pinned_shows_the_label(self):
+    def test_pinned_shows_type_and_endpoint(self):
         self.assertEqual(
-            self.text(proxy_state="pinned", proxy_label="Hà Nội 1", proxy_host="1.2.3.4:1080"),
-            "Hà Nội 1")
+            self.text(proxy_state="pinned", proxy_label="Hà Nội 1", proxy_type="http",
+                      proxy_host="1.2.3.4:1080"), "http:1.2.3.4:1080")
 
     def test_pinned_without_a_label_shows_the_endpoint(self):
         self.assertEqual(
             self.text(proxy_state="pinned", proxy_label="", proxy_host="1.2.3.4:1080"),
-            "1.2.3.4:1080")
+            "socks5:1.2.3.4:1080")
 
     def test_unpinned_says_so_rather_than_looking_empty(self):
         self.assertEqual(self.text(proxy_state="unpinned", slot=None), "chưa ghim")

@@ -2,7 +2,7 @@
 # clients.sh — list online Wi-Fi clients plus offline entries from the managed
 # blocklist. Output: {ok:true, clients:[{idx,ssid,band,ifname,mac,ip,host,
 #   signal_dbm,connected_s,rx_bytes,tx_bytes,banned,online,
-#   slot,proxy_label,proxy_host,proxy_state,pool_size}]}
+#   slot,proxy_label,proxy_host,proxy_type,proxy_state,pool_size}]}
 #
 # The proxy fields carry the pool slot a device is pinned to. Only the label and
 # host:port of that slot are reported: the credentials sit in the same row of
@@ -35,6 +35,7 @@ build_pool_index() {
       if (NF < 6 || NF > 7) next
       i = trim($1); s = count[i]++
       host[i "|" s] = trim($3) ":" trim($4)
+      type[i "|" s] = trim($2)
       label[i "|" s] = (NF >= 7 ? trim($7) : "")
       next
     }
@@ -42,20 +43,23 @@ build_pool_index() {
     {
       i = trim($1); k = i "|" trim($3)
       print i "|" tolower(trim($2)) "\t" trim($3) "\t" \
-            (k in label ? label[k] : "") "\t" (k in host ? host[k] : "") > pins
+            (k in label ? label[k] : "") "\t" (k in host ? host[k] : "") "\t" \
+            (k in type ? type[k] : "socks5") > pins
     }
     END { for (i in count) print i "\t" count[i] > sizes }
   ' "$_pools" "$_assign" 2>/dev/null || :
 }
 build_pool_index
 
-# Sets P_SLOT / P_LABEL / P_HOST / P_STATE / P_SIZE for one device.
+# Sets P_SLOT / P_LABEL / P_HOST / P_TYPE / P_STATE / P_SIZE for one device.
 proxy_fields() {
   P_SIZE="$(awk -F'\t' -v i="$1" '$1==i { print $2; exit }' "$POOL_SIZES")"
   P_SIZE="${P_SIZE:-0}"
   _row="$(awk -F'\t' -v k="$1|$2" '$1==k { print $2 "\t" $3 "\t" $4; exit }' "$PIN_INDEX")"
   P_SLOT="${_row%%	*}"
-  _rest="${_row#*	}"; P_LABEL="${_rest%%	*}"; P_HOST="${_rest##*	}"
+  _rest="${_row#*	}"; P_LABEL="${_rest%%	*}"; _rest="${_rest#*	}"
+  P_HOST="${_rest%%	*}"; P_TYPE="${_rest##*	}"
+  P_TYPE="${P_TYPE:-socks5}"
   if [ "$P_SIZE" -eq 0 ]; then P_STATE="none"
   elif [ -z "$P_SLOT" ]; then P_STATE="unpinned"
   # A pin the pool no longer has a row for has to read as broken, not as a
@@ -98,7 +102,7 @@ emit_live() {
             --arg sig "${sig:-}" --arg conn "${conn:-0}" \
             --arg rx "${rx:-0}" --arg tx "${tx:-0}" --argjson banned "$banned" \
             --arg slot "$P_SLOT" --arg plabel "$P_LABEL" --arg phost "$P_HOST" \
-            --arg pstate "$P_STATE" --arg psize "$P_SIZE" \
+            --arg ptype "$P_TYPE" --arg pstate "$P_STATE" --arg psize "$P_SIZE" \
         '{idx:$idx,ssid:$ssid,band:$band,ifname:$ifname,mac:$mac,ip:$ip,host:$host,
           signal_dbm:($sig|try tonumber catch null),
           connected_s:($conn|try tonumber catch 0),
@@ -106,7 +110,7 @@ emit_live() {
           tx_bytes:($tx|try tonumber catch 0),
           banned:$banned,online:true,
           slot:($slot|try tonumber catch null),
-          proxy_label:$plabel,proxy_host:$phost,proxy_state:$pstate,
+          proxy_label:$plabel,proxy_host:$phost,proxy_type:$ptype,proxy_state:$pstate,
           pool_size:($psize|try tonumber catch 0)}'
     done
   done
@@ -128,11 +132,11 @@ emit_blocked_offline() {
     jq -n --argjson idx "$idx" --arg ssid "$ssid" --arg band "$band" \
           --arg ifname "$ifname" --arg mac "$lmac" --arg ip "$ip" --arg host "$host" \
           --arg slot "$P_SLOT" --arg plabel "$P_LABEL" --arg phost "$P_HOST" \
-          --arg pstate "$P_STATE" --arg psize "$P_SIZE" \
+          --arg ptype "$P_TYPE" --arg pstate "$P_STATE" --arg psize "$P_SIZE" \
       '{idx:$idx,ssid:$ssid,band:$band,ifname:$ifname,mac:$mac,ip:$ip,host:$host,
         signal_dbm:null,connected_s:0,rx_bytes:0,tx_bytes:0,banned:true,online:false,
         slot:($slot|try tonumber catch null),
-        proxy_label:$plabel,proxy_host:$phost,proxy_state:$pstate,
+        proxy_label:$plabel,proxy_host:$phost,proxy_type:$ptype,proxy_state:$pstate,
         pool_size:($psize|try tonumber catch 0)}'
   done
 }
