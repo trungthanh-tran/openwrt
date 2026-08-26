@@ -44,6 +44,7 @@ uci commit 2>/dev/null || true
 /etc/init.d/sbproxy restart 2>/dev/null || true
 /etc/init.d/sing-box restart 2>/dev/null || true
 wifi reload || true
+recover_wifi_networks
 
 log "ROLLBACK COMPLETE. Check network connectivity."
 log "If serious problems remain, restore the sysupgrade backup ($SRC/sysupgrade-backup.tar.gz) through LuCI"

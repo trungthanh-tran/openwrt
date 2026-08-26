@@ -104,6 +104,7 @@ run "/etc/init.d/firewall reload"
 run "/etc/init.d/sbproxy restart"
 run "/etc/init.d/sing-box restart"
 run "wifi reload"
+recover_wifi_networks
 
 log "APPLY COMPLETE. Run the test scripts described in docs/TESTING.md."
 log "If networking is lost or an error occurs: scripts/rollback.sh (see docs/ROLLBACK.md)"

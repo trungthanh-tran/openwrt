@@ -40,4 +40,5 @@ if [ -n "$radio" ]; then
 else
   run "wifi reload"
 fi
+recover_wifi_networks
 log "Unblocked $MAC on idx=$IDX"

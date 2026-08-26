@@ -43,4 +43,5 @@ if [ -n "$radio" ]; then
 else
   run "wifi reload"
 fi
+recover_wifi_networks
 log "Blocked $MAC on idx=$IDX (reloaded the ${band:-?} band SSID)"

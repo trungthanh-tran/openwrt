@@ -69,4 +69,5 @@ uci commit wireless
 
 RADIO="$(radio_of "$BAND")"
 wifi reload "$RADIO" >/dev/null 2>&1 || wifi reload
+recover_wifi_networks
 log "Rotated BSSID w$IDX: ${OLD:-not set} -> $NEW (OUI=${OUI:-02 local}, radio=$RADIO)"

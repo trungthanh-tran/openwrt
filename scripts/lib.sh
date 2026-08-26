@@ -128,6 +128,24 @@ ifname_of_idx() {
   wifi_ifaces | awk -v s="w$1" '$1==s { print $2; exit }'
 }
 
+# `wifi reload` can race the MediaTek driver on the GL-MT6000: hostapd may
+# return before the BSS is attached to its bridge, leaving the SSID invisible
+# and dnsmasq unable to receive DHCPDISCOVER.  Re-assert the L3 interface,
+# bridge and BSS after the reload.  All operations are best-effort so a radio
+# that is genuinely unavailable does not make ban/unban/apply fail halfway.
+recover_wifi_networks() {
+  sleep "${WIFI_RECOVER_WAIT:-2}"
+  for _rw_idx in $(desired_idx); do
+    ifup "w$_rw_idx" >/dev/null 2>&1 || true
+    _rw_if="$(ifname_of_idx "$_rw_idx")"
+    if [ -n "$_rw_if" ]; then
+      ip link set "$_rw_if" up >/dev/null 2>&1 || true
+      ubus call "hostapd.$_rw_if" reload >/dev/null 2>&1 || true
+    fi
+    ip link set "br-w$_rw_idx" up >/dev/null 2>&1 || true
+  done
+}
+
 # Space-separated banned MACs for one idx from BANS_FILE (lines: idx|mac).
 bans_for_idx() {
   f="${BANS_FILE:-/etc/sbproxy.bans}"
