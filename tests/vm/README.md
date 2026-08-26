@@ -31,9 +31,49 @@ Chỉ D10 là không.
 
 ## Dựng máy ảo
 
-Lấy image x86-64 của OpenWrt (`openwrt-x86-64-generic-ext4-combined-efi.img.gz`),
-giải nén, rồi khởi động dưới QEMU, Hyper-V hoặc VirtualBox với **hai** NIC — một
-cho WAN, một cho LAN quản lý. Bật SSH, đặt IP LAN, rồi cài phụ thuộc:
+### Trên Windows, bằng QEMU
+
+QEMU chưa có sẵn trên máy này. Cài trước:
+
+```powershell
+winget install --id SoftwareFreedomConservancy.QEMU
+```
+
+Mở lại terminal, rồi:
+
+```powershell
+.\tests\vm\qemu-win.ps1 -Fetch    # tải và giải nén image, chỉ một lần
+.\tests\vm\qemu-win.ps1           # khởi động
+```
+
+Trong console của VM, đặt mật khẩu root rồi thoát bằng `Ctrl-A X` khi cần:
+
+```sh
+passwd
+```
+
+Từ terminal khác:
+
+```powershell
+ssh -p 2222 root@127.0.0.1
+```
+
+> `qemu-win.ps1` **chưa từng chạy thử** — máy viết ra nó không có hypervisor nào.
+> Coi lần chạy đầu là bring-up, không phải đường đã kiểm chứng.
+
+### Bằng tay, hoặc trên Hyper-V / VirtualBox
+
+Lấy image x86-64 của bản ổn định hiện tại (25.12.5 tại thời điểm viết):
+
+```
+https://downloads.openwrt.org/releases/25.12.5/targets/x86/64/openwrt-25.12.5-x86-64-generic-ext4-combined-efi.img.gz
+```
+
+Giải nén, nới đĩa lên ~2 GB (image gốc rất nhỏ, `opkg install sing-box` sẽ hết
+chỗ), rồi khởi động với **hai** NIC — NIC thứ nhất thành `br-lan`, NIC thứ hai
+thành WAN.
+
+### Cài phụ thuộc trong VM
 
 ```sh
 opkg update
@@ -43,8 +83,16 @@ opkg install nftables kmod-nft-tproxy kmod-nft-core kmod-nft-socket ip-full jq s
 `kmod-nft-socket` là phụ thuộc mới duy nhất của cả plan (D9). Nếu image không có
 gói đó thì `spike.sh` sẽ nói rõ, và luật divert phải tắt bằng `POOL_DIVERT=off`.
 
-Đẩy code lên bằng đúng đường cài đặt vẫn dùng: `console/desktop` hoặc
-`agent/install-agent.sh` qua SSH.
+### Đẩy code lên
+
+Dùng đúng đường cài đặt vẫn dùng cho router thật:
+
+```sh
+scp -P 2222 -r . root@127.0.0.1:/root/sbproxy
+ssh -p 2222 root@127.0.0.1 'cd /root/sbproxy && sh agent/install-agent.sh'
+```
+
+Hoặc mở console desktop và trỏ nó vào `http://127.0.0.1:2222`.
 
 ## Dựng phần Wi-Fi giả
 

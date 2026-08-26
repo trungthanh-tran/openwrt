@@ -21,7 +21,7 @@ fi
 log "$PKG_MANAGER update..."
 pkg_update
 
-PKGS="nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full jq sing-box"
+PKGS="nftables kmod-nft-tproxy kmod-nft-core kmod-nft-socket ip-full iw-full jq sing-box"
 for p in $PKGS; do
   if pkg_installed "$p"; then
     log "[installed] $p"

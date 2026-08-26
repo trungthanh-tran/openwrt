@@ -78,8 +78,16 @@ chmod +x /etc/init.d/sbproxy-healthd
 /etc/init.d/sbproxy-healthd enable
 /etc/init.d/sbproxy-healthd restart
 
+cp "$AGENT/sbproxy-assignd" /usr/sbin/sbproxy-assignd
+chmod +x /usr/sbin/sbproxy-assignd
+cp "$AGENT/init.d/sbproxy-assignd" /etc/init.d/sbproxy-assignd
+chmod +x /etc/init.d/sbproxy-assignd
+/etc/init.d/sbproxy-assignd enable
+/etc/init.d/sbproxy-assignd restart
+
 # Preserve agent files across standard OpenWrt backups and upgrades.
-for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd /usr/libexec/sbproxy-dhcp-assign; do
+for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd \
+         /usr/sbin/sbproxy-assignd /etc/init.d/sbproxy-assignd /usr/libexec/sbproxy-dhcp-assign; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 

@@ -321,6 +321,20 @@ pool_rows() {
   ' "$POOLS"
 }
 
+# Every idx that has at least one proxy, in numeric order and without repeats.
+# Read from the pool file rather than from wifi-socks.conf: an SSID with no pool
+# has nothing for the assignment machinery to do.
+pooled_idxs() {
+  [ -f "${POOLS:-}" ] || return 0
+  awk -F'|' '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF < 6 || NF > 7 { next }
+    { i = trim($1); if (i ~ /^[1-9][0-9]*$/ && !(i in seen)) { seen[i] = 1; print i } }
+  ' "$POOLS" | sort -n
+}
+
 pool_count() { pool_rows "$1" | awk 'END { print NR + 0 }'; }
 
 # True when idx has at least one pool proxy.

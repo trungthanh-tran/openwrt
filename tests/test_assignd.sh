@@ -387,5 +387,201 @@ not_contains "a foreign hook is never overwritten" "$(cat "$UCI_LOG")" "set dhcp
 eq "and the value is left as it was" "$(cat "$UCI_VALUE")" "/usr/bin/their-script"
 contains "and the operator is told why" "$out" "sbproxy-assignd"
 
+echo "== the safety-net daemon =="
+DAEMON="$ROOT/agent/sbproxy-assignd"
+eq "the daemon exists and is a script" "$([ -f "$DAEMON" ] && head -1 "$DAEMON")" "#!/bin/sh"
+
+# The daemon is what pins a device that never asked for DHCP, so the test has to
+# make one appear the way `iw dev … station dump` would.
+mkdir -p "$STUB/iwd3"
+cat > "$STUB/bin/iw" <<'IW'
+#!/bin/sh
+[ "${1:-}" = "dev" ] && [ "${3:-}" = "station" ] && [ "${4:-}" = "dump" ] \
+  && { cat "$IW_DUMP_DIR/${2:-}" 2>/dev/null; exit 0; }
+exit 0
+IW
+cat > "$STUB/bin/ubus" <<'UBUS'
+#!/bin/sh
+[ "${1:-}" = "call" ] && [ "${2:-}" = "network.wireless" ] && [ "${3:-}" = "status" ] \
+  && { cat "$UBUS_WIFI_JSON" 2>/dev/null; exit 0; }
+exit 0
+UBUS
+chmod +x "$STUB/bin/iw" "$STUB/bin/ubus"
+IW_DUMP_DIR="$STUB/iwd3"; export IW_DUMP_DIR
+UBUS_WIFI_JSON="$STUB/wireless.json"; export UBUS_WIFI_JSON
+printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"br-w1"},{"section":"w9","ifname":"br-w9"}]}}\n' \
+  > "$UBUS_WIFI_JSON"
+
+station() { # file, macs...
+  : > "$1"
+  for _m in $2; do printf 'Station %s (on br-w1)\n\tsignal:  \t-40 dBm\n' "$_m" >> "$1"; done
+}
+
+printf '. "%s/config/settings.sh"\nNET_BASE=10\nASSIGN_FILE="%s"\nLEASES="%s"\n' \
+  "$ROOT" "$ASSIGN_FILE" "$LEASES" > "$STUB/daemon-settings.sh"
+daemon() { # extra settings lines
+  { printf '. "%s/config/settings.sh"\n' "$ROOT"
+    printf 'NET_BASE=10\nASSIGN_FILE="%s"\nLEASES="%s"\n' "$ASSIGN_FILE" "$LEASES"
+    [ "$#" -eq 0 ] || printf '%s\n' "$@"
+  } > "$STUB/daemon-settings.sh"
+  SB_ROOT="$ROOT" SETTINGS="$STUB/daemon-settings.sh" POOLS="$POOLS" \
+    IW_DUMP_DIR="$IW_DUMP_DIR" UBUS_WIFI_JSON="$UBUS_WIFI_JSON" \
+    NFT_LOG="$STUB/nft.log" NFT_MAP="$STUB/nft.map" PATH="$STUB/bin:$PATH" \
+    POOL_SCAN_STATE_DIR="$STUB/assignd" \
+    sh "$DAEMON" --once 2>/dev/null
+}
+# The sweep counter persists, so a case that cares which sweep it is has to
+# start from a known one.
+forget_sweeps() { rm -rf "$STUB/assignd"; }
+
+printf '111 aa:bb:cc:dd:ee:21 192.168.11.21 s1 *\n222 aa:bb:cc:dd:ee:22 192.168.11.22 s2 *\n' > "$LEASES"
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21 aa:bb:cc:dd:ee:22"
+
+reset_state
+daemon
+eq "a device that never asked for DHCP is pinned" "$(rows_for 1)" "2"
+eq "and marked automatic"                         "$(source_of 1 aa:bb:cc:dd:ee:21)" "auto"
+
+# The sweep runs every few seconds. Pinning again on each pass would move a
+# device to a new proxy continuously.
+slot21="$(slot_of 1 aa:bb:cc:dd:ee:21)"
+daemon 'POOL_ASSIGN_POLICY=round-robin'
+daemon 'POOL_ASSIGN_POLICY=round-robin'
+eq "a device already pinned is left alone" "$(rows_for 1)" "2"
+eq "and keeps its slot across sweeps"      "$(slot_of 1 aa:bb:cc:dd:ee:21)" "$slot21"
+
+# Rotation belongs to a genuine reconnection, which only the DHCP hook sees.
+#
+# Both devices are put on slot 0 deliberately: round-robin picks
+# (number of pinned rows) % 4 == 2, so if the sweep did rotate, the slot would
+# have to move. Leaving the slots wherever the previous case left them let the
+# assertion pass by coincidence.
+reset_state
+assign_set 1 aa:bb:cc:dd:ee:21 0 auto
+assign_set 1 aa:bb:cc:dd:ee:22 0 auto
+daemon 'POOL_ROTATE_ON_RECONNECT=1' 'POOL_ASSIGN_POLICY=round-robin'
+eq "the sweep never rotates, even with rotation on" "$(slot_of 1 aa:bb:cc:dd:ee:21)" "0"
+eq "and neither device moves"                       "$(slot_of 1 aa:bb:cc:dd:ee:22)" "0"
+
+# A device that appears later must be picked up on the next pass.
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21 aa:bb:cc:dd:ee:22 aa:bb:cc:dd:ee:23"
+printf '333 aa:bb:cc:dd:ee:23 192.168.11.23 s3 *\n' >> "$LEASES"
+daemon
+eq "a device that joins later is picked up" "$(rows_for 1)" "3"
+
+# A device that leaves keeps its pin: it will be back, and re-picking every time
+# would hand it a different exit IP each morning.
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21"
+daemon
+eq "a device that left keeps its pin" "$(rows_for 1)" "3"
+
+# An SSID with no pool has nothing to assign and must not error.
+reset_state
+station "$STUB/iwd3/br-w9" "aa:bb:cc:dd:ee:31"
+eq "an SSID with no pool is skipped without error" \
+   "$(daemon >/dev/null 2>&1 && echo ok)" "ok"
+eq "and nothing is written for it" "$(rows_for 9)" "0"
+
+# idx 2 has a pool but its radio is down, so ifname_of_idx finds nothing. There
+# are no clients to pin and nothing can have changed, so its map must be left
+# untouched rather than read on every sweep.
+forget_sweeps
+: > "$STUB/nft.log"
+daemon
+not_contains "an SSID whose interface is down is not swept" "$(cat "$STUB/nft.log")" "w2map"
+contains "while one that is up still is" "$(cat "$STUB/nft.log")" "w1map"
+
+reset_state
+station "$STUB/iwd3/br-w1" ""
+eq "an SSID with no devices is not an error" "$(daemon >/dev/null 2>&1 && echo ok)" "ok"
+
+# A device with no DHCP lease has no address, so there is nothing to put in the
+# map -- but the pin is still recorded, ready for when a lease appears.
+reset_state
+: > "$LEASES"
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:41"
+daemon
+eq "a device with no lease is still pinned" "$(rows_for 1)" "1"
+
+echo "== the daemon heals the map =="
+printf '111 aa:bb:cc:dd:ee:21 192.168.11.21 s1 *\n' > "$LEASES"
+reset_state
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21"
+daemon
+map_with '192.168.11.21 : 13256'
+: > "$STUB/nft.log"
+daemon
+not_contains "a map that agrees with the state is left alone" "$(cat "$STUB/nft.log")" "flush map"
+map_with ''
+: > "$STUB/nft.log"
+daemon 'POOL_SYNC_EVERY=1'
+contains "a map that has drifted is reloaded" "$(cat "$STUB/nft.log")" "flush map inet sbproxy w1map"
+
+# Checking every map on every sweep would be dozens of `nft list map` calls a
+# second. A map is checked when the device list moved, and otherwise only every
+# POOL_SYNC_EVERY sweeps -- so a sweep that changes nothing must stay quiet even
+# when the map has drifted.
+forget_sweeps
+daemon                       # sweep 0 always checks, and records who is here
+map_with ''
+: > "$STUB/nft.log"
+daemon                       # sweep 1, same devices, default POOL_SYNC_EVERY
+not_contains "an unchanged sweep does not re-read the map" \
+   "$(cat "$STUB/nft.log")" "list map"
+
+# ...but a device arriving is exactly the event that should re-check it.
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21 aa:bb:cc:dd:ee:22"
+printf '222 aa:bb:cc:dd:ee:22 192.168.11.22 s2 *\n' >> "$LEASES"
+: > "$STUB/nft.log"
+daemon
+contains "a device arriving re-checks the map" "$(cat "$STUB/nft.log")" "flush map inet sbproxy w1map"
+station "$STUB/iwd3/br-w1" "aa:bb:cc:dd:ee:21"
+
+# A nonsense interval must fall back, not divide by zero or check every sweep.
+forget_sweeps
+daemon 'POOL_SYNC_EVERY=nonsense'
+map_with ''
+: > "$STUB/nft.log"
+out="$(daemon 'POOL_SYNC_EVERY=nonsense' 2>&1)"
+not_contains "a nonsense POOL_SYNC_EVERY falls back to the default" \
+   "$(cat "$STUB/nft.log")" "list map"
+not_contains "and does not divide by zero" "$out" "division by zero"
+
+echo "== which SSIDs the sweep visits =="
+mkpool '1|socks5|1.0.0.1|1080|||a
+1|socks5|1.0.0.2|1080|||b
+1|socks5|1.0.0.3|1080|||c
+1|socks5|1.0.0.4|1080|||d
+2|http|2.0.0.1|8080|||
+# a comment
+
+3|socks5|3.0.0.1|1080|too|many|fields|here
+x|socks5|4.0.0.1|1080|||
+0|socks5|5.0.0.1|1080|||
+2|socks5|2.0.0.2|1080|||'
+eq "every pooled idx, once, in order" "$(pooled_idxs | tr '\n' ' ')" "1 2 "
+eq "a row with the wrong column count is not an SSID" "$(pooled_idxs | grep -c '^3$')" "0"
+eq "a non-numeric idx is not an SSID"                 "$(pooled_idxs | grep -c '^x$')" "0"
+eq "idx 0 does not exist"                             "$(pooled_idxs | grep -c '^0$')" "0"
+eq "no pool file means no SSIDs" "$(POOLS="$STUB/nope.conf" pooled_idxs | wc -l | tr -d ' ')" "0"
+
+echo "== how the daemon is packaged =="
+contains "install-agent installs the daemon" \
+   "$(cat "$ROOT/agent/install-agent.sh")" "sbproxy-assignd"
+contains "and removes it on uninstall" \
+   "$(sed -n '/^for p in/,/done/p' "$ROOT/agent/install-agent.sh")" "sbproxy-assignd"
+eq "there is a procd init script" \
+   "$([ -f "$ROOT/agent/init.d/sbproxy-assignd" ] && echo yes)" "yes"
+contains "which runs under procd" \
+   "$(cat "$ROOT/agent/init.d/sbproxy-assignd" 2>/dev/null)" "USE_PROCD=1"
+contains "and calls the daemon" \
+   "$(cat "$ROOT/agent/init.d/sbproxy-assignd" 2>/dev/null)" "/usr/sbin/sbproxy-assignd"
+
+# kmod-nft-socket is the only new dependency the whole plan introduces (D9).
+contains "install-deps installs kmod-nft-socket" \
+   "$(cat "$ROOT/scripts/install-deps.sh")" "kmod-nft-socket"
+contains "and preflight reports whether the kernel took it" \
+   "$(cat "$ROOT/scripts/preflight.sh")" "kmod-nft-socket"
+
 printf '\nASSIGND TOTAL: pass=%s fail=%s\n' "$n_ok" "$n_bad"
 [ "$n_bad" -eq 0 ]
