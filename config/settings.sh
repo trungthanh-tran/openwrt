@@ -6,7 +6,11 @@
 # Refuse to run on anything other than the boards this project is tested on.
 # Set to 1 to downgrade that to a warning when trying another device; nothing
 # else changes, and the scripts are still only verified on the GL-MT6000.
-ALLOW_UNSUPPORTED_BOARD=0
+# lib.sh sources this file after the environment is already in place, so this
+# has to let an exported value stand -- otherwise `ALLOW_UNSUPPORTED_BOARD=1 sh
+# scripts/apply.sh`, which is what the VM guide tells people to run, is silently
+# overwritten back to 0 here.
+ALLOW_UNSUPPORTED_BOARD="${ALLOW_UNSUPPORTED_BOARD:-0}"
 
 # --- Radio-to-band mapping --------------------------------------------------
 # OpenWrt does not guarantee radio0=2.4G. preflight.sh lists the radios this
@@ -26,6 +30,49 @@ BSSID_LIMIT=16
 NET_BASE=10
 # sing-box TPROXY port = TPROXY_PORT_BASE + idx.
 TPROXY_PORT_BASE=12000
+
+# --- Proxy pool -------------------------------------------------------------
+# An SSID may carry several proxies (config/proxy-pools.conf). Each one is a
+# "slot" with its own TPROXY port, so a device can be pinned to a single proxy
+# without regenerating any configuration:
+#   pool port = POOL_PORT_BASE + idx * POOL_PORT_STRIDE + slot
+# The whole block from POOL_PORT_BASE upwards is reserved; keep it clear of
+# TPROXY_PORT_BASE. Leaving proxy-pools.conf absent keeps every SSID on the
+# single proxy named in its wifi-socks.conf row, exactly as before.
+POOL_PORT_BASE=13000
+# Ports reserved per idx. Fixed on purpose: the port of an SSID must not move
+# when the pool grows or shrinks. Also the hard ceiling on slots per SSID.
+POOL_PORT_STRIDE=256
+# Per-SSID cap on proxies. Never larger than POOL_PORT_STRIDE.
+POOL_SLOTS_PER_SSID_MAX=256
+
+# The kernel's TPROXY documentation describes a "divert" rule that short-cuts
+# any packet already belonging to an open transparent socket, so only the first
+# packet of a connection runs the classification rules. It needs the nftables
+# socket expression (kmod-nft-socket), which not every image carries.
+#   auto = use it when this router's nft accepts it (default)
+#   on   = always emit it; off = never
+POOL_DIVERT="auto"
+# Which device is pinned to which slot. Runtime state, like BANS_FILE, and the
+# source of truth that build_nft bakes into the generated ruleset.
+# Lines: idx|mac|slot|source   (source is auto or manual)
+ASSIGN_FILE="/etc/sbproxy.assign"
+# Capacity of each SSID's pin map. nftables picks a fixed-size hash only when a
+# size is declared; without one it falls back to the slower resizable table.
+# The map does not grow past this, so keep it well above the DHCP pool.
+POOL_MAP_SIZE=512
+
+# Which slot a device that has just appeared gets:
+#   random       bốc ngẫu nhiên rồi dính luôn (mặc định)
+#   round-robin  quay vòng theo số máy đã ghim
+#   least-loaded slot ít máy nhất
+#   sticky-hash  băm MAC; cùng máy luôn ra cùng proxy kể cả sau khi xoá state
+POOL_ASSIGN_POLICY="random"
+# 1 = bốc proxy mới mỗi lần thiết bị vào lại, thay vì giữ nguyên. Ghim tay
+# không bao giờ bị đổi, kể cả khi bật.
+POOL_ROTATE_ON_RECONNECT=0
+# Nhịp quét lưới an toàn của sbproxy-assignd, giây.
+POOL_SCAN_INTERVAL=3
 # Firewall mark and routing table used by TPROXY.
 TPROXY_MARK=1
 TPROXY_TABLE=100

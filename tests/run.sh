@@ -211,6 +211,35 @@ contains "a band the board lacks warns without a suggestion" \
   "$(check_radio_mapping 6g "" RADIO_6G 2>&1)" "RADIO_6G is not set in config/settings.sh"
 unset UCI_STATE
 
+# setup-vm.sh and the VM guide both tell the operator to run
+# `ALLOW_UNSUPPORTED_BOARD=1 sh scripts/apply.sh`. That only works if settings.sh
+# lets an already-set value stand: lib.sh sources settings.sh *after* the
+# environment is in place, so a plain assignment there overwrites what the
+# operator asked for and the die message sends them to edit a tracked file.
+eq "ALLOW_UNSUPPORTED_BOARD from the environment survives settings.sh" \
+  "$(ALLOW_UNSUPPORTED_BOARD=1 sh -c '. "$1/config/settings.sh"; echo "$ALLOW_UNSUPPORTED_BOARD"' _ "$ROOT")" \
+  "1"
+eq "ALLOW_UNSUPPORTED_BOARD still defaults to 0" \
+  "$(sh -c 'unset ALLOW_UNSUPPORTED_BOARD; . "$1/config/settings.sh"; echo "$ALLOW_UNSUPPORTED_BOARD"' _ "$ROOT")" \
+  "0"
+
+# br_netfilter sends bridged frames through the IP hooks a second time, and a
+# TPROXY verdict taken there never reaches the local socket. The rule counts the
+# packet, nothing is dropped, no counter anywhere moves -- the connection simply
+# hangs. Confirmed on a real kernel: the identical ruleset works with it off and
+# times out with it on. OpenWrt does not ship kmod-br-netfilter by default, so
+# this only bites where something else pulled it in, and that is exactly the
+# case nobody would think to look for.
+BRNF="$STUB/brnf"
+eq "bridge_nf_ok is quiet when br_netfilter is absent" \
+  "$(BRNF_PATH="$STUB/nonexistent" bridge_nf_ok; echo $?)" "0"
+echo 0 > "$BRNF"
+eq "bridge_nf_ok accepts br_netfilter turned off" \
+  "$(BRNF_PATH="$BRNF" bridge_nf_ok; echo $?)" "0"
+echo 1 > "$BRNF"
+eq "bridge_nf_ok rejects br_netfilter turned on" \
+  "$(BRNF_PATH="$BRNF" bridge_nf_ok; echo $?)" "1"
+
 echo "== uci_dquote =="
 eq "escape double-quote" "$(uci_dquote 'a"b')" 'a\"b'
 eq "escape backslash"    "$(uci_dquote 'a\b')" 'a\\b'
@@ -258,6 +287,16 @@ echo "== conf helpers =="
 mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
 B|5g|1|password12|5.6.7.8|1080|||1|0'
 eq "desired_idx sorted"  "$(CONF="$STUB/c.conf" desired_idx | tr '\n' ' ')" "1 3 "
+# validate_conf accepts 10, 11 or 12 columns. An SSID that names its proxy_type
+# has 12, and desired_idx feeds emit_stale_uci -- so a row it cannot see is an
+# SSID that apply.sh tears down as if it had been removed.
+mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
+B|5g|1|password12|5.6.7.8|1080|||1|0|aa:bb:cc
+C|2g|7|password12|9.9.9.9|8080|||1|0|aa:bb:cc|http'
+eq "desired_idx sees every column count validate_conf allows" \
+   "$(CONF="$STUB/c.conf" desired_idx | tr '\n' ' ')" "1 3 7 "
+mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
+B|5g|1|password12|5.6.7.8|1080|||1|0'
 eq "band_of_idx 3 -> 2g" "$(CONF="$STUB/c.conf" band_of_idx 3)" "2g"
 eq "band_of_idx 1 -> 5g" "$(CONF="$STUB/c.conf" band_of_idx 1)" "5g"
 eq "band_of_idx missing -> empty" "$(CONF="$STUB/c.conf" band_of_idx 9)" ""
@@ -397,14 +436,18 @@ mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|
 B|5g|2|password12|dns.example.com|1080|||1|0|'
 ( CONF="$STUB/c.conf" NFT_FILE="$STUB/x.nft" build_nft ) >/dev/null 2>&1
 nft="$(cat "$STUB/x.nft" 2>/dev/null)"
-match   "DNS hijack udp dport 53"     "$nft" 'iifname "br-w1" udp dport 53 tproxy ip to :12001'
-match   "DNS hijack tcp dport 53"     "$nft" 'iifname "br-w1" tcp dport 53 tproxy ip to :12001'
-match   "tcp tproxy rule"             "$nft" 'iifname "br-w1" meta l4proto tcp tproxy ip to :12001'
-match   "second SSID tproxy port"     "$nft" 'iifname "br-w2" meta l4proto udp tproxy ip to :12002'
-match   "block QUIC on first SSID"    "$nft" 'iifname "br-w1" udp dport 443 drop'
-match   "block QUIC on second SSID"   "$nft" 'iifname "br-w2" udp dport 443 drop'
-match   "bypass literal sock IP"      "$nft" 'ip daddr 1.2.3.4 return'
-nomatch "no hostname bypass"          "$nft" 'ip daddr dns.example.com'
+# Each SSID now has its own chain, entered from a verdict map, so the
+# interface is matched once instead of on every rule. Same behaviour, so these
+# assert the same facts against the new shape. tests/test_pool.sh checks the
+# structure itself, including that the rule order per SSID is unchanged.
+match   "every SSID is dispatched by verdict map" "$nft" 'iifname vmap [{] "br-w1" : jump w1, "br-w2" : jump w2 [}]'
+match   "DNS hijack covers tcp and udp"  "$nft" 'meta l4proto [{] tcp, udp [}] th dport 53 tproxy ip to :12001'
+match   "tproxy rule for the first SSID" "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12001'
+match   "second SSID tproxy port"        "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12002'
+match   "block QUIC"                     "$nft" 'udp dport 443 drop'
+match   "bypass proxy hosts by set"      "$nft" 'ip daddr @proxy_hosts return'
+match   "literal sock IP is a set element" "$nft" 'elements = [{] 1[.]2[.]3[.]4 [}]'
+nomatch "no hostname bypass"          "$nft" 'dns\.example\.com'
 match   "RFC1918 return"              "$nft" 'ip daddr \{ 127.0.0.0/8'
 match   "webrtc drop for webrtc=1"    "$nft" 'iifname "br-w1" udp dport \{ 3478'
 nomatch "no webrtc drop for webrtc=0" "$nft" 'iifname "br-w2" udp dport \{ 3478'
@@ -461,6 +504,131 @@ else
   sk "clients.sh integration" "no jq"
 fi
 
+echo "== clients.sh proxy pin (integration) =="
+if command -v jq >/dev/null 2>&1; then
+  # Two SSIDs: w1 has a pool of two proxies, w3 has none. Four devices between
+  # them cover every state a pin can be in.
+  printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"phy0-ap0"},{"section":"w3","ifname":"phy0-ap2"}]}}\n' > "$STUB/wifi2.json"
+  mkdir -p "$STUB/iwd2"
+  printf 'Station aa:bb:cc:dd:ee:01 (on phy0-ap0)\n\tsignal:  \t-40 dBm\nStation aa:bb:cc:dd:ee:02 (on phy0-ap0)\n\tsignal:  \t-41 dBm\nStation aa:bb:cc:dd:ee:03 (on phy0-ap0)\n\tsignal:  \t-42 dBm\nStation aa:bb:cc:dd:ee:05 (on phy0-ap0)\n\tsignal:  \t-44 dBm\n' > "$STUB/iwd2/phy0-ap0.txt"
+  printf 'Station aa:bb:cc:dd:ee:04 (on phy0-ap2)\n\tsignal:  \t-43 dBm\n' > "$STUB/iwd2/phy0-ap2.txt"
+  : > "$STUB/leases2"
+  : > "$STUB/bans3"
+  printf 'wireless.w1.ssid=Alpha\nwireless.w3.ssid=Charlie\n' > "$STUB/uci_ssid2"
+  printf '1|socks5|1.2.3.4|1080|user1|hunter2secret|alpha\n1|http|5.6.7.8|8080|||\n' > "$STUB/pools2"
+  # ee:01 pinned to a live slot, ee:02 pinned past the end of the pool,
+  # ee:03 not pinned at all, ee:04 on an SSID with no pool.
+  printf '1|aa:bb:cc:dd:ee:01|0|manual\n1|aa:bb:cc:dd:ee:02|7|manual\n1|aa:bb:cc:dd:ee:05|1|auto\n' > "$STUB/assign2"
+  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans3"\nASSIGN_FILE="%s/assign2"\n' \
+    "$ROOT" "$STUB" "$STUB" > "$STUB/settings2.sh"
+  out2="$(UBUS_WIFI_JSON="$STUB/wifi2.json" IW_DUMP_DIR="$STUB/iwd2" LEASES="$STUB/leases2" \
+          SETTINGS="$STUB/settings2.sh" UCI_STATE="$STUB/uci_ssid2" POOLS="$STUB/pools2" \
+          sh "$ROOT/scripts/clients.sh" 2>/dev/null)"
+  pin() { printf '%s' "$out2" | jq -r --arg m "$1" '.clients[]|select(.mac==$m)|'"$2"; }
+  eq "five devices listed"     "$(printf '%s' "$out2" | jq -r '.clients|length')" "5"
+  eq "pinned slot"             "$(pin aa:bb:cc:dd:ee:01 .slot)"         "0"
+  eq "pinned host:port"        "$(pin aa:bb:cc:dd:ee:01 .proxy_host)"   "1.2.3.4:1080"
+  eq "pinned label"            "$(pin aa:bb:cc:dd:ee:01 .proxy_label)"  "alpha"
+  eq "pinned state"            "$(pin aa:bb:cc:dd:ee:01 .proxy_state)"  "pinned"
+  eq "pool size reported"      "$(pin aa:bb:cc:dd:ee:01 .pool_size)"    "2"
+  # The second proxy carries no label, so the console has to fall back to
+  # host:port rather than print an empty cell.
+  eq "unlabelled slot has an empty label" "$(pin aa:bb:cc:dd:ee:05 .proxy_label)" ""
+  eq "unlabelled slot still has a host"   "$(pin aa:bb:cc:dd:ee:05 .proxy_host)" "5.6.7.8:8080"
+  # A pin left behind by a shrunken pool must be visible as broken, not silently
+  # reported as if the device still had a proxy.
+  eq "stale pin keeps its slot"  "$(pin aa:bb:cc:dd:ee:02 .slot)"        "7"
+  eq "stale pin has no host"     "$(pin aa:bb:cc:dd:ee:02 .proxy_host)"  ""
+  eq "stale pin state"           "$(pin aa:bb:cc:dd:ee:02 .proxy_state)" "stale"
+  # has("slot") as well as its value: a missing key and a null one read the
+  # same through `.slot`, and only one of them is the contract.
+  eq "unpinned row still carries the key" "$(pin aa:bb:cc:dd:ee:03 'has("slot")')" "true"
+  eq "unpinned slot is null"     "$(pin aa:bb:cc:dd:ee:03 '.slot|type')" "null"
+  eq "unpinned state"            "$(pin aa:bb:cc:dd:ee:03 .proxy_state)" "unpinned"
+  eq "unpinned still knows the pool" "$(pin aa:bb:cc:dd:ee:03 .pool_size)" "2"
+  eq "no pool at all"            "$(pin aa:bb:cc:dd:ee:04 .proxy_state)" "none"
+  eq "no pool means size zero"   "$(pin aa:bb:cc:dd:ee:04 .pool_size)"   "0"
+  nomatch "the proxy password never reaches the client list" "$out2" 'hunter2secret'
+  nomatch "the proxy username never reaches it either"       "$out2" 'user1'
+else
+  sk "clients.sh proxy pin" "no jq"
+fi
+
+echo "== what a snapshot carries =="
+snapdir="$STUB/snap"; mkdir -p "$snapdir"
+mkdir -p "$STUB/live"
+printf 'conf\n'   > "$STUB/live/wifi-socks.conf"
+printf 'pool\n'   > "$STUB/live/proxy-pools.conf"
+printf 'assign\n' > "$STUB/live/sbproxy.assign"
+printf 'nft\n'    > "$STUB/live/sbproxy.nft"
+printf 'bans\n'   > "$STUB/live/sbproxy.bans"
+snap_env() {
+  CONF="$STUB/live/wifi-socks.conf" POOLS="$STUB/live/proxy-pools.conf" \
+  ASSIGN_FILE="$STUB/live/sbproxy.assign" NFT_FILE="$STUB/live/sbproxy.nft" \
+  BANS_FILE="$STUB/live/sbproxy.bans" "$@"
+}
+
+names="$(snap_env backup_paths | cut -d'|' -f1 | tr '\n' ' ')"
+# pool.sh takes a snapshot immediately before replacing a pool, so a snapshot
+# without the pool and the pins is the one thing that cannot undo that.
+contains "a snapshot carries the pool"  "$names" "proxy-pools.conf"
+contains "and the device pins"          "$names" "sbproxy.assign"
+contains "and the SSID configuration"   "$names" "wifi-socks.conf"
+contains "and the generated ruleset"    "$names" "sbproxy.nft"
+contains "and the blocklist"            "$names" "sbproxy.bans"
+
+# Old snapshots must stay restorable, so the two names that already existed
+# keep the spelling they had.
+eq "the config keeps its old snapshot name" \
+   "$(snap_env backup_paths | awk -F'|' '$1=="wifi-socks.conf" { print $2 }')" \
+   "$STUB/live/wifi-socks.conf"
+eq "so does the ruleset" \
+   "$(snap_env backup_paths | awk -F'|' '$1=="sbproxy.nft" { print $2 }')" \
+   "$STUB/live/sbproxy.nft"
+
+eq "a path that is not configured is left out" \
+   "$(CONF="$STUB/live/wifi-socks.conf" POOLS="" ASSIGN_FILE="" NFT_FILE="" BANS_FILE="" \
+      backup_paths | wc -l | tr -d ' ')" "1"
+
+snap_env backup_snapshot_files "$snapdir"
+eq "the pool reaches the snapshot" "$(cat "$snapdir/proxy-pools.conf" 2>/dev/null)" "pool"
+eq "the pins reach it too"         "$(cat "$snapdir/sbproxy.assign" 2>/dev/null)" "assign"
+
+printf 'clobbered\n' > "$STUB/live/proxy-pools.conf"
+rm -f "$STUB/live/sbproxy.assign"
+snap_env restore_snapshot_files "$snapdir"
+eq "restoring puts the pool back"  "$(cat "$STUB/live/proxy-pools.conf")" "pool"
+eq "and the pins, even when deleted" "$(cat "$STUB/live/sbproxy.assign")" "assign"
+
+# A file the snapshot never held must not be invented on restore.
+rm -f "$snapdir/sbproxy.bans" "$STUB/live/sbproxy.bans"
+snap_env restore_snapshot_files "$snapdir"
+eq "a file absent from the snapshot is not created" \
+   "$([ -f "$STUB/live/sbproxy.bans" ] && echo yes || echo no)" "no"
+
+# A live file that has gone missing must not stop the rest of the snapshot.
+rm -f "$STUB/live/wifi-socks.conf"
+rm -rf "$snapdir"; mkdir -p "$snapdir"
+snap_env backup_snapshot_files "$snapdir" 2>/dev/null
+# The restore above put "pool" back, so that is what a fresh snapshot holds.
+eq "a missing live file does not stop the snapshot" \
+   "$(cat "$snapdir/proxy-pools.conf" 2>/dev/null)" "pool"
+
+contains "backup.sh goes through the shared list" \
+   "$(cat "$ROOT/scripts/backup.sh")" "backup_snapshot_files"
+contains "and so does rollback.sh" \
+   "$(cat "$ROOT/scripts/rollback.sh")" "restore_snapshot_files"
+
+echo "== the pool file counts as a secret =="
+contains "security-audit checks the pool file's permissions" \
+   "$(cat "$ROOT/scripts/security-audit.sh")" "proxy-pools.conf"
+
+echo "== preflight checks the pool's own preconditions =="
+pre="$(cat "$ROOT/scripts/preflight.sh")"
+contains "preflight validates the pool port arithmetic" "$pre" "validate_pool_settings"
+contains "preflight asks nft whether it understands the syntax" "$pre" "use_divert"
+contains "preflight checks dnsmasq's dhcpscript" "$pre" "dhcpscript"
+
 echo "== pc update package manifest =="
 match   "update.sh packages console" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'README.md VERSION agent config console docs etc scripts'
 nomatch "update.sh drops old ui path" "$(sed -n '/tar czf/,/^$/p' "$ROOT/pc/update.sh")" 'scripts tools ui'
@@ -500,8 +668,66 @@ selfupdate="$(cat "$ROOT/scripts/self-update.sh")"
 match "self-update blocks path traversal" "$selfupdate" 'unsafe path \(absolute or containing \.\.\)'
 match "self-update guards downgrades" "$selfupdate" 'use --force to downgrade'
 match "self-update backs up before overwrite" "$selfupdate" 'backup\.sh pre-update'
-match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf settings\.sh'
+match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf proxy-pools\.conf settings\.sh'
 match "self-update validates package contents" "$selfupdate" 'scripts/apply\.sh scripts/lib\.sh agent/cgi/sbproxy'
+
+echo "== self-update merges newly shipped settings =="
+# An update keeps the router's settings.sh, which is right -- it holds choices
+# nobody wants overwritten. The cost is that a key introduced by a new version
+# never arrives, so the code falls back to whatever default it hardcodes, and
+# the file stops describing what the router is doing. Merging closes that
+# without touching a single value the operator set.
+SU="$ROOT/scripts/self-update.sh"
+mrg() { # packaged-content current-content -> prints added keys; file left in $STUB/cur.sh
+  printf '%s\n' "$1" > "$STUB/pkg.sh"
+  printf '%s\n' "$2" > "$STUB/cur.sh"
+  sh "$SU" --merge-settings "$STUB/pkg.sh" "$STUB/cur.sh"
+}
+
+eq "a key the router has never seen is added" \
+  "$(mrg 'OLD=1
+NEW_KEY=7' 'OLD=9')" "NEW_KEY"
+contains "the added key arrives with its shipped value" "$(cat "$STUB/cur.sh")" 'NEW_KEY=7'
+contains "and the router's own value is untouched" "$(cat "$STUB/cur.sh")" 'OLD=9'
+not_contains "the packaged value never replaces it" "$(cat "$STUB/cur.sh")" 'OLD=1'
+
+eq "nothing new means nothing to say" "$(mrg 'A=1
+B=2' 'A=9
+B=8')" ""
+eq "and the file is left exactly as it was" "$(cat "$STUB/cur.sh")" "A=9
+B=8"
+
+# A setting is worth little without the paragraph that explains it, and that
+# paragraph is the reason settings.sh is readable at all.
+mrg '# What this does.
+# Second line.
+DOCUMENTED=3' 'OTHER=1' >/dev/null
+contains "the comment block above a new key comes with it" "$(cat "$STUB/cur.sh")" '# What this does.'
+contains "including the rest of the block" "$(cat "$STUB/cur.sh")" '# Second line.'
+
+# Commented out is not set: the code is running on its hardcoded default, so
+# the shipped one should arrive and say so.
+eq "a key commented out in the router file counts as absent" \
+  "$(mrg 'PORT=13000' '#PORT=1')" "PORT"
+
+eq "a key shipped twice is added once" \
+  "$(mrg 'DUP=1
+DUP=2' 'X=1')" "DUP"
+eq "and only the first of them is written" \
+  "$(grep -c '^DUP=' "$STUB/cur.sh")" "1"
+
+# Copying one line out of a multi-line value would append an unterminated
+# string and every later `. settings.sh` would fail -- a broken router, from a
+# cosmetic feature.
+eq "a value with an unbalanced quote is skipped, not half-copied" \
+  "$(mrg 'SAFE=1
+BROKEN="start
+end"' 'X=1')" "SAFE"
+not_contains "the half of it that would break sourcing is not there" "$(cat "$STUB/cur.sh")" 'BROKEN='
+eq "the merged file still sources cleanly" \
+  "$(sh -c '. "$1" && echo sourced' _ "$STUB/cur.sh" 2>&1)" "sourced"
+
+eq "a missing packaged file is not an error" "$(sh "$SU" --merge-settings "$STUB/nope.sh" "$STUB/cur.sh"; echo $?)" "0"
 match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
 web_console="$(cat "$ROOT/console/web/control-panel.html")"
 match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'

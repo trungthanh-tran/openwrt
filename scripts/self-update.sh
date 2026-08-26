@@ -12,7 +12,9 @@
 #   - Reject entries with absolute paths or ".." components (path traversal).
 #   - Reject version downgrades unless --force is specified.
 #   - Create a backup (scripts/backup.sh pre-update) before overwriting files.
-#   - Preserve the active config/wifi-socks.conf and config/settings.sh files.
+#   - Preserve the active config/wifi-socks.conf, config/proxy-pools.conf and
+#     config/settings.sh files, appending only settings.sh keys this version
+#     introduced that the router has never had.
 #   - Redeploy CGI/UI/healthd and reload services (skip components that are absent).
 #
 # Environment overrides (for tests/development machines): SB_ROOT, CGI_DEST, UI_DEST,
@@ -21,6 +23,64 @@ set -eu
 
 die() { echo "self-update: $*" >&2; exit 1; }
 log() { echo "self-update: $*"; }
+
+# Append the assignments a new version ships that this router has never had,
+# leaving every value it already sets exactly alone. Prints the keys it added.
+#
+# Keeping settings.sh across updates is right -- it holds the operator's
+# choices -- but it means a key introduced later never arrives, the code silently
+# runs on whatever default it hardcodes, and the file stops describing the
+# router. This closes that gap without ever rewriting a line someone chose.
+#
+# Deliberately line-based and conservative: only plain `KEY=value` assignments,
+# only when their quotes balance on that one line. A value continued across
+# lines is skipped rather than half-copied, because half of one would leave an
+# unterminated string and every later `. settings.sh` would fail.
+merge_settings_keys() { # packaged current  -> prints added keys
+  _ms_pkg="$1"; _ms_cur="$2"
+  [ -f "$_ms_pkg" ] && [ -f "$_ms_cur" ] || return 0
+  _ms_add="$_ms_cur.newkeys.$$"
+  : > "$_ms_add"
+  _ms_keys="$(awk -v out="$_ms_add" -v sq="'" '
+    NR == FNR {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*=/) { k = line; sub(/=.*/, "", k); have[k] = 1 }
+      next
+    }
+    /^[[:space:]]*#/ { blk = blk $0 "\n"; next }
+    /^[[:space:]]*$/ { blk = ""; next }
+    {
+      if ($0 !~ /^[A-Za-z_][A-Za-z0-9_]*=/) { blk = ""; next }
+      k = $0; sub(/=.*/, "", k)
+      if (k in have || k in seen) { blk = ""; next }
+      d = $0; nd = gsub(/"/, "", d)
+      s = $0; ns = gsub(sq, "", s)
+      if (nd % 2 == 1 || ns % 2 == 1) { blk = ""; next }
+      seen[k] = 1
+      printf "%s%s\n", blk, $0 >> out
+      printf "%s ", k
+      blk = ""
+    }
+  ' "$_ms_cur" "$_ms_pkg")"
+  if [ -s "$_ms_add" ]; then
+    {
+      echo
+      echo "# --- added by self-update: settings this version introduced ---"
+      cat "$_ms_add"
+    } >> "$_ms_cur"
+  fi
+  rm -f "$_ms_add"
+  printf '%s' "$_ms_keys" | sed 's/[[:space:]]*$//'
+}
+
+# A hidden entry point so the merge can be tested on its own. It has to sit
+# above the argument handling below, and it exits rather than falling through
+# into an update with no package.
+if [ "${1:-}" = "--merge-settings" ]; then
+  merge_settings_keys "${2:-}" "${3:-}"
+  exit 0
+fi
 
 PKG="${1:-}"
 FORCE=0
@@ -114,12 +174,26 @@ else
 fi
 
 # ---- preserve the active configuration ----
-for keep in wifi-socks.conf settings.sh; do
+# make-package.sh ships the whole config/ directory, so a package built on a
+# machine that has real config files carries them. proxy-pools.conf belongs here
+# for the same reason wifi-socks.conf does, and more sharply: replacing it
+# repoints every pooled SSID at the packager's proxies, and the slot numbers in
+# /etc/sbproxy.assign go on pinning devices to rows that now mean something else.
+PKG_SETTINGS=""
+if [ -f "$NEW_ROOT/config/settings.sh" ] && [ -f "$SB_ROOT/config/settings.sh" ]; then
+  PKG_SETTINGS="$STAGE/packaged-settings.sh"
+  cp "$NEW_ROOT/config/settings.sh" "$PKG_SETTINGS"
+fi
+for keep in wifi-socks.conf proxy-pools.conf settings.sh; do
   if [ -f "$SB_ROOT/config/$keep" ]; then
     mkdir -p "$NEW_ROOT/config"
     cp "$SB_ROOT/config/$keep" "$NEW_ROOT/config/$keep"
   fi
 done
+if [ -n "$PKG_SETTINGS" ]; then
+  new_keys="$(merge_settings_keys "$PKG_SETTINGS" "$NEW_ROOT/config/settings.sh")"
+  [ -n "$new_keys" ] && log "settings.sh: added settings new in this version: $new_keys"
+fi
 
 # ---- overwrite SB_ROOT ----
 cp -r "$NEW_ROOT"/. "$SB_ROOT"/ || die "failed to copy files into $SB_ROOT"

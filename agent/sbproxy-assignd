@@ -1,0 +1,89 @@
+#!/bin/sh
+# sbproxy-assignd — the safety net behind the DHCP hook.
+#
+#   sbproxy-assignd          # sweep every POOL_SCAN_INTERVAL seconds, under procd
+#   sbproxy-assignd --once   # one sweep and exit
+#
+# The hook at /usr/libexec/sbproxy-dhcp-assign is the fast path: it fires as a
+# lease is handed out, before the device sends anything. Three cases never reach
+# it, and this is why the daemon exists:
+#
+#   1. A device with a static address never asks for DHCP. Without a pin it
+#      falls through to the SSID's default rule and shares one proxy with every
+#      other unpinned device -- the exact outcome the pool exists to prevent.
+#   2. `option dhcpscript` may already belong to another script. apply.sh
+#      deliberately does not take it over, so on those routers there is no fast
+#      path at all.
+#   3. Restarting sbproxy flushes the whole nftables table. An `nft add element`
+#      that races the restart disappears, leaving the state file claiming a pin
+#      the kernel does not have.
+#
+# The sweep never rotates a device: POOL_ROTATE_ON_RECONNECT is about a genuine
+# reconnection, which only the DHCP hook can see. A device that leaves keeps its
+# pin, because it will be back.
+set -u
+[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+SB_ROOT="${SB_ROOT:-/root/sbproxy}"
+[ -f "$SB_ROOT/scripts/lib.sh" ] || { echo "assignd: cannot find $SB_ROOT/scripts/lib.sh" >&2; exit 1; }
+# shellcheck source=/dev/null
+. "$SB_ROOT/scripts/lib.sh"
+
+INTERVAL="${POOL_SCAN_INTERVAL:-3}"
+case "$INTERVAL" in ''|*[!0-9]*) INTERVAL=3 ;; esac
+[ "$INTERVAL" -ge 1 ] || INTERVAL=1
+
+# Checking every map on every sweep would be 32 `nft list map` calls every few
+# seconds. Drift only happens when the table is reloaded, so a map whose device
+# list has not changed is checked once every POOL_SYNC_EVERY sweeps instead.
+SYNC_EVERY="${POOL_SYNC_EVERY:-20}"
+case "$SYNC_EVERY" in ''|*[!0-9]*) SYNC_EVERY=20 ;; esac
+[ "$SYNC_EVERY" -ge 1 ] || SYNC_EVERY=1
+
+STATE_DIR="${POOL_SCAN_STATE_DIR:-/tmp/sbproxy-assignd}"
+mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+# The counter persists, so `--once` from cron behaves like a running daemon.
+# Keeping it in memory meant every --once run was sweep 0, and 0 % SYNC_EVERY
+# is 0, so the periodic check fired every single time and the "only when the
+# device list changed" rule never applied.
+SWEEP="$(cat "$STATE_DIR/sweep" 2>/dev/null || echo 0)"
+case "$SWEEP" in ''|*[!0-9]*) SWEEP=0 ;; esac
+
+sweep_one() { # idx
+  _sw_idx="$1"
+  _sw_if="$(ifname_of_idx "$_sw_idx")"
+  [ -n "$_sw_if" ] || return 0
+  _sw_macs="$(iw dev "$_sw_if" station dump 2>/dev/null \
+              | awk '/^Station/ { print tolower($2) }' | sort)"
+  for _sw_mac in $_sw_macs; do
+    # Third argument 0: a sweep is not a reconnection.
+    assign_ensure "$_sw_idx" "$_sw_mac" 0 >/dev/null 2>&1 || true
+  done
+
+  # Sync the map when the device list moved, and otherwise only now and then.
+  _sw_seen="$STATE_DIR/seen.$_sw_idx"
+  _sw_prev="$(cat "$_sw_seen" 2>/dev/null || true)"
+  if [ "$_sw_prev" != "$_sw_macs" ] || [ $(( SWEEP % SYNC_EVERY )) -eq 0 ]; then
+    printf '%s' "$_sw_macs" > "$_sw_seen" 2>/dev/null || true
+    assign_sync_map "$_sw_idx" || true
+  fi
+}
+
+sweep() {
+  for _s_idx in $(pooled_idxs); do
+    sweep_one "$_s_idx"
+  done
+  SWEEP=$(( SWEEP + 1 ))
+  printf '%s' "$SWEEP" > "$STATE_DIR/sweep" 2>/dev/null || true
+}
+
+if [ "${1:-}" = "--once" ]; then
+  sweep
+  exit 0
+fi
+
+log "assignd: sweeping every ${INTERVAL}s, checking each map every ${SYNC_EVERY} sweeps"
+while :; do
+  sweep
+  sleep "$INTERVAL"
+done

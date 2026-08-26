@@ -211,12 +211,22 @@ cat > "$CONF.dirty" <<'EOF'
 Valid|2g|1|valid-password|proxy.example|1080|alice|hidden-secret|1|1|
 BadIdx|2g|not-a-number|password12|proxy.example|1080|||1|1|
 TooHigh|2g|201|password12|proxy.example|1080|||1|1|
-Extra|2g|2|password12|proxy.example|1080|||1|1||surplus
+Extra|2g|2|password12|proxy.example|1080|||1|1||socks5|surplus
 EOF
 mv "$CONF" "$CONF.clean"
 mv "$CONF.dirty" "$CONF"
 out="$(auth_run GET 'action=status')"
 eq "status skips corrupt config rows" "$(json_value "$out" '.ssids | map(.idx) | join(",")')" '1'
+# The 12th column became proxy_type, so "too many columns" now means 13. A row
+# naming a proxy type nobody supports is still shown, falling back to socks5:
+# status reports the file as it is, and validate_conf is what refuses to apply it.
+cat > "$CONF" <<'EOF'
+Valid|2g|1|valid-password|proxy.example|1080|alice|hidden-secret|1|1||socks5
+Odd|2g|3|password12|proxy.example|1080|||1|1||nonesuch
+EOF
+out="$(auth_run GET 'action=status')"
+eq "an unknown proxy type falls back rather than vanishing"   "$(json_value "$out" '.ssids | map(.idx) | join(",")')" '1,3'
+eq "and it is reported as socks5" "$(json_value "$out" '.ssids[1].proxy_type')" 'socks5'
 not_contains "status never leaks secrets from mixed config" "$out" 'hidden-secret'
 mv "$CONF" "$CONF.dirty"
 mv "$CONF.clean" "$CONF"
@@ -504,16 +514,25 @@ out="$(auth_run GET 'action=status')"
 eq "status carries NET_BASE" "$(json_value "$out" '.meta.net_base')" '10'
 eq "status carries TPROXY_PORT_BASE" "$(json_value "$out" '.meta.tproxy_port_base')" '12000'
 eq "status carries BSSID_LIMIT" "$(json_value "$out" '.meta.bssid_limit')" '16'
+# The console must not hardcode where the pool ports live, for the same reason
+# it does not hardcode net_base.
+eq "status carries POOL_PORT_BASE" "$(json_value "$out" '.meta.pool_port_base')" '13000'
+eq "status carries POOL_PORT_STRIDE" "$(json_value "$out" '.meta.pool_port_stride')" '256'
 
-printf '%s\n' 'NET_BASE=40' 'TPROXY_PORT_BASE=21000' 'BSSID_LIMIT=8' > "$TMP/router/config/settings.sh"
+printf '%s\n' 'NET_BASE=40' 'TPROXY_PORT_BASE=21000' 'BSSID_LIMIT=8' \
+  'POOL_PORT_BASE=30000' 'POOL_PORT_STRIDE=64' > "$TMP/router/config/settings.sh"
 out="$(auth_run GET 'action=status')"
 eq "an edited NET_BASE is reported" "$(json_value "$out" '.meta.net_base')" '40'
 eq "an edited port base is reported" "$(json_value "$out" '.meta.tproxy_port_base')" '21000'
 eq "an edited BSSID limit is reported" "$(json_value "$out" '.meta.bssid_limit')" '8'
+eq "an edited pool base is reported" "$(json_value "$out" '.meta.pool_port_base')" '30000'
+eq "an edited pool stride is reported" "$(json_value "$out" '.meta.pool_port_stride')" '64'
 
 printf '%s\n' 'NET_BASE=not-a-number' > "$TMP/router/config/settings.sh"
 out="$(auth_run GET 'action=status')"
 eq "a broken value falls back" "$(json_value "$out" '.meta.net_base')" '10'
+eq "and so does the pool base" "$(json_value "$out" '.meta.pool_port_base')" '13000'
+eq "and the pool stride" "$(json_value "$out" '.meta.pool_port_stride')" '256'
 eq "status still answers" "$(json_value "$out" '.ok')" 'true'
 rm -f "$TMP/router/config/settings.sh"
 
@@ -575,6 +594,7 @@ mkdir -p "$SB2/config" "$SB2/scripts" "$TMP/deploy"
 printf '%s\n' '0.4.0' > "$SB2/VERSION"
 printf '%s\n' 'Alpha|2g|1|alpha-password|proxy1.example|1080|||1|0|50:C7:BF' > "$SB2/config/wifi-socks.conf"
 printf '%s\n' 'ROUTER_SETTING=1' > "$SB2/config/settings.sh"
+printf '%s\n' '1|socks5|10.9.9.9|1080|live|livepass|LIVE-SLOT' > "$SB2/config/proxy-pools.conf"
 cp "$ROOT/scripts/self-update.sh" "$SB2/scripts/self-update.sh"
 cat > "$SB2/scripts/backup.sh" <<'SH'
 #!/bin/sh
@@ -595,6 +615,12 @@ make_pkg() { # version dest-file
   printf '#!/bin/sh\n' > "$pkgsrc/agent/init.d/sbproxy-healthd"
   printf '<html>new-ui</html>\n' > "$pkgsrc/console/web/control-panel.html"
   printf 'PACKAGED|conf|must|not|survive\n' > "$pkgsrc/config/wifi-socks.conf"
+  # make-package.sh ships the whole config/ directory, so whatever pool file the
+  # person building the package happens to have goes into it -- and that person
+  # is usually the one running the router.
+  printf '%s\n' '1|socks5|203.0.113.1|1080|pkg|pkgpass|PACKAGED-SLOT' > "$pkgsrc/config/proxy-pools.conf"
+  printf '%s\n' 'ROUTER_SETTING=0' '# What the new one is for.' 'SHIPPED_IN_THIS_VERSION=42' \
+    > "$pkgsrc/config/settings.sh"
   tar czf "$2" -C "$pkgsrc" VERSION scripts agent console config
 }
 
@@ -628,6 +654,23 @@ contains "update replaces code" "$(cat "$SB2/scripts/apply.sh")" 'new-apply'
 contains "update preserves live wifi config" "$(cat "$SB2/config/wifi-socks.conf")" 'Alpha|2g|1|'
 not_contains "update never installs packaged config" "$(cat "$SB2/config/wifi-socks.conf")" 'PACKAGED'
 contains "update preserves live settings" "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=1'
+not_contains "update never lowers a setting to the packaged value" \
+  "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=0'
+# Keeping the file wholesale used to mean a setting introduced later never
+# reached the router at all: the code ran on its hardcoded default and the file
+# no longer described the machine.
+contains "update brings over a setting new in this version" \
+  "$(cat "$SB2/config/settings.sh")" 'SHIPPED_IN_THIS_VERSION=42'
+contains "and the paragraph that explains it" \
+  "$(cat "$SB2/config/settings.sh")" '# What the new one is for.'
+contains "update says which settings it added" "$(json_value "$out" '.log')" 'SHIPPED_IN_THIS_VERSION'
+eq "the merged settings file still sources cleanly" \
+  "$(sh -c '. "$1" && echo sourced' _ "$SB2/config/settings.sh" 2>&1)" 'sourced'
+# Overwriting this one silently repoints every pooled SSID at someone else's
+# proxies, and leaves the slot numbers in /etc/sbproxy.assign pinning devices to
+# rows that now mean something entirely different.
+contains "update preserves the live proxy pool" "$(cat "$SB2/config/proxy-pools.conf")" 'LIVE-SLOT'
+not_contains "update never installs a packaged pool" "$(cat "$SB2/config/proxy-pools.conf")" 'PACKAGED-SLOT'
 contains "update deploys refreshed CGI" "$(cat "$TMP/deploy/sbproxy")" 'new-cgi'
 contains "update deploys refreshed web UI" "$(cat "$TMP/deploy/index.html")" 'new-ui'
 

@@ -20,11 +20,20 @@ fi
 echo "===== POSIX/OpenWrt generator suite ====="
 sh tests/run.sh
 
+echo "===== Proxy pool suite ====="
+sh tests/test_pool.sh
+
+echo "===== Proxy pool auto-assign suite ====="
+sh tests/test_assignd.sh
+
 echo "===== Native desktop core/workflow suite ====="
-"$PYTHON_CMD" -m unittest -v tests.test_desktop_core tests.test_desktop_workflows tests.test_desktop_provision tests.test_desktop_gui tests.test_dirty_data tests.test_web_console_i18n
+"$PYTHON_CMD" -m unittest -v tests.test_pool_console tests.test_desktop_core tests.test_desktop_workflows tests.test_desktop_provision tests.test_desktop_gui tests.test_dirty_data tests.test_web_console_i18n
 
 echo "===== Agent CGI integration suite ====="
 sh tests/test_agent.sh
+
+echo "===== Proxy pool agent suite ====="
+sh tests/test_pool_agent.sh
 
 echo "===== Agent health daemon integration suite ====="
 sh tests/test_healthd.sh

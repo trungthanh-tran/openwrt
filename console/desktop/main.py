@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import ipaddress
 import json
 import logging
+import random
 from logging.handlers import TimedRotatingFileHandler
 import getpass
 import math
@@ -656,6 +657,28 @@ EN_TRANSLATIONS = {
     'tự động': 'automatic',
     'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
     'Đang kiểm tra tình trạng router…': 'Checking the router status…',
+    'Pool proxy…': 'Proxy pool…',
+    'Pool proxy': 'Proxy pool',
+    'Đổi proxy cho thiết bị đã chọn…': 'Change the proxy of the selected devices…',
+    'Đổi proxy…': 'Change proxy…',
+    'Gán proxy…': 'Assign a proxy…',
+    'Hãy chọn thiết bị trong bảng trước': 'Select devices in the table first',
+    'Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi':
+        'Devices must be on the same Wi-Fi to share one split',
+    'Wi‑Fi này chưa có proxy nào trong pool': 'This Wi-Fi has no proxy in its pool yet',
+    'Hãy chọn đúng một thiết bị': 'Select exactly one device',
+    'chưa ghim': 'not pinned',
+    'slot {slot} đã biến mất': 'slot {slot} no longer exists',
+    'Không ghim proxy': 'Do not pin a proxy',
+    'Máy': 'Devices',
+    'Dán danh sách proxy (mỗi dòng một proxy)': 'Paste a proxy list, one per line',
+    'Ghi pool': 'Save the pool',
+    'Đang ghi pool proxy…': 'Saving the proxy pool…',
+    'Đang đổi proxy cho thiết bị…': 'Changing the proxy of the devices…',
+    'Xem trước cách chia proxy': 'Preview of the split',
+    'Áp dụng': 'Apply',
+    'Những dòng bị bỏ qua': 'Lines that were left out',
+    'Không có dòng nào dùng được': 'No usable line in what was pasted',
 }
 
 
@@ -906,6 +929,190 @@ def save_preferences(language: str, theme: str) -> None:
     payload["language"] = language if language in ("en", "vi") else "en"
     payload["theme"] = theme if theme in PALETTES else "dark"
     _write_config_payload(payload)
+
+
+# --- Proxy pool ------------------------------------------------------------
+# A slot is a row's position in the pool, so identity here must match the one
+# lib.sh uses when it carries pins across a replacement: the endpoint and its
+# credentials, never the label.
+PROXY_SCHEMES = {"socks5": "socks5", "socks5h": "socks5", "socks": "socks5", "http": "http"}
+DEFAULT_PROXY_TYPE = "socks5"
+
+
+def _proxy_port(value: str) -> int:
+    """Port as an int, or ValueError with a message the operator can act on."""
+    if not value.isdigit():
+        raise ValueError("cổng phải là số")
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise ValueError("cổng phải trong khoảng 1..65535")
+    return port
+
+
+def _proxy_host(value: str) -> str:
+    if not value:
+        raise ValueError("thiếu host")
+    if len(value) > 253 or any(c.isspace() for c in value):
+        raise ValueError("host không hợp lệ")
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:-_")
+    if set(value) - allowed:
+        raise ValueError("host không hợp lệ")
+    return value
+
+
+def parse_proxy_line(line: str) -> tuple:
+    """One pasted line -> (type, host, port, user, password, label).
+
+    Accepted, in the order they are tried:
+        scheme://user:pass@host:port
+        scheme://host:port
+        user:pass@host:port
+        host:port:user:pass
+        host:port
+    """
+    text = line.strip()
+    proxy_type = DEFAULT_PROXY_TYPE
+    if "://" in text:
+        scheme, _, text = text.partition("://")
+        scheme = scheme.strip().lower()
+        if scheme not in PROXY_SCHEMES:
+            raise ValueError(f"loại proxy không hỗ trợ: {scheme}")
+        proxy_type = PROXY_SCHEMES[scheme]
+
+    user = password = ""
+    if "@" in text:
+        # Split on the LAST @: a password is allowed to contain one, and
+        # splitting on the first would read the host out of the password.
+        credentials, _, text = text.rpartition("@")
+        # Split credentials on the FIRST colon, for the same reason.
+        user, _, password = credentials.partition(":")
+
+    parts = text.split(":")
+    if len(parts) == 4 and not user:
+        # host:port:user:pass -- only meaningful when no @ supplied credentials.
+        host, port, user, password = parts
+    elif len(parts) == 2:
+        host, port = parts
+    else:
+        raise ValueError("thiếu cổng" if len(parts) == 1 else "không nhận ra định dạng")
+
+    return (proxy_type, _proxy_host(host.strip()), _proxy_port(port.strip()),
+            user, password, "")
+
+
+def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
+    """Parse a pasted list into (rows, dropped).
+
+    `dropped` carries (line number, original text, reason) for every line left
+    out, so the console can say what happened instead of quietly shortening the
+    list -- including when the cap is reached.
+    """
+    rows: list = []
+    dropped: list = []
+    seen: set = set()
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "|" in line:
+            dropped.append((number, line, "chứa ký tự | vốn là dấu phân cách của cấu hình"))
+            continue
+        if any(ord(c) < 32 or ord(c) == 127 for c in line):
+            dropped.append((number, line, "chứa ký tự điều khiển"))
+            continue
+        try:
+            row = parse_proxy_line(line)
+        except ValueError as exc:
+            dropped.append((number, line, str(exc)))
+            continue
+        identity = row[:5]
+        if identity in seen:
+            dropped.append((number, line, "trùng với một proxy đã có ở trên"))
+            continue
+        if limit is not None and len(rows) >= limit:
+            dropped.append((number, line, f"vượt quá giới hạn {limit} proxy cho một Wi-Fi"))
+            continue
+        seen.add(identity)
+        rows.append(row)
+    return rows, dropped
+
+
+def split_devices_evenly(devices, slots: int, seed=None) -> dict:
+    """Deal devices over slots: shuffle, then round-robin.
+
+    The counts differ by at most one, and the layout is reproducible from the
+    seed -- which is what lets the preview and the request that follows it agree
+    instead of shuffling twice.
+    """
+    if slots <= 0:
+        raise ValueError("Wi-Fi này chưa có proxy nào trong pool")
+    unique: list = []
+    for mac in devices:
+        mac = str(mac).strip().lower()
+        if mac and mac not in unique:
+            unique.append(mac)
+    if not unique:
+        return {}
+    order = list(unique)
+    random.Random(seed).shuffle(order)
+    return {mac: index % slots for index, mac in enumerate(order)}
+
+
+POOL_SLOTS_PER_SSID_MAX = 256
+
+
+def proxy_display(row) -> str:
+    """One pool row as the operator named it, or as its endpoint.
+
+    Credentials are deliberately absent: this string ends up in tables, logs and
+    screenshots, and the label is what an operator recognises anyway.
+    """
+    if not isinstance(row, dict):
+        return ""
+    label = str(row.get("label") or "").strip()
+    if label:
+        return label
+    host = str(row.get("host") or "").strip()
+    port = row.get("port")
+    return f"{host}:{port}" if host and port else host
+
+
+def client_proxy_text(item, language: str = "vi") -> str:
+    """The Proxy column for one device.
+
+    Four states, not two: an SSID with no pool, a device nobody pinned, a pin
+    that resolves, and a pin left pointing past the end of a shortened pool.
+    That last one has to stand out, because it is the one that needs fixing.
+    """
+    state = str((item or {}).get("proxy_state") or "")
+    if state == "pinned":
+        return str(item.get("proxy_label") or "").strip() or str(item.get("proxy_host") or "")
+    if state == "unpinned":
+        return translate("chưa ghim", language)
+    if state == "stale":
+        return translate("slot {slot} đã biến mất", language, slot=item.get("slot"))
+    return "—"
+
+
+def pool_slot_usage(clients, idx, slots: int) -> list:
+    """How many devices sit on each slot of one Wi-Fi's pool.
+
+    A pin past the end of the pool is left out rather than wrapped: crediting it
+    to `slot % len(pool)` would blame an unrelated proxy for the load.
+    """
+    counts = [0] * max(0, int(slots))
+    for item in clients or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            if int(item.get("idx")) != int(idx):
+                continue
+            slot = int(item.get("slot"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= slot < len(counts):
+            counts[slot] += 1
+    return counts
 
 
 def parse_version(value) -> tuple | None:
@@ -1806,6 +2013,7 @@ class ProvisionRunner:
 AUDITED_ACTIONS = frozenset({
     "save_conf", "apply", "set_sock", "rotate_mac", "backup", "rollback",
     "update", "uninstall", "kick", "ban", "unban", "rotate_token", "set_gateway",
+    "save_pool", "assign_proxy", "rebalance",
 })
 
 
@@ -1920,6 +2128,33 @@ class AgentClient:
         if oui is not None:
             body["oui"] = oui
         return self._request("rotate_mac", "POST", body, timeout=120)
+
+    def get_pool(self, idx: int):
+        return self._request("get_pool", query={"idx": str(idx)}, timeout=20)
+
+    @staticmethod
+    def _pool_objects(rows) -> list:
+        """Parser tuples -> the object shape the agent's jq schema validates."""
+        return [{"type": row[0], "host": row[1], "port": row[2],
+                 "user": row[3], "pass": row[4], "label": row[5]} for row in rows]
+
+    def save_pool(self, idx: int, rows):
+        return self._request("save_pool", "POST",
+                             body={"idx": idx, "proxies": self._pool_objects(rows)},
+                             timeout=120)
+
+    def assign_proxy(self, idx: int, assignments):
+        return self._request("assign_proxy", "POST",
+                             body={"idx": idx, "assignments": list(assignments)},
+                             timeout=120)
+
+    def rebalance(self, idx: int, macs, proxies=None, seed=None):
+        body = {"idx": idx, "macs": list(macs)}
+        if proxies is not None:
+            body["proxies"] = self._pool_objects(proxies)
+        if seed is not None:
+            body["seed"] = seed
+        return self._request("rebalance", "POST", body=body, timeout=180)
 
     def backups(self):
         return self._request("backups", timeout=30)
@@ -2499,6 +2734,154 @@ class ManualBanDialog(tk.Toplevel):
             messagebox.showerror(self.t("Thiếu SSID"), self.t("Hãy chọn SSID cần chặn"), parent=self)
             return
         self.result = idx, mac
+        self.destroy()
+
+
+class PoolDialog(tk.Toplevel):
+    """Show one Wi-Fi's proxy pool, and take a replacement list for it."""
+
+    def __init__(self, parent, record, proxies, usage, language="en", palette=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.title(f"{self.t('Pool proxy')} · {record.name}")
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=self.palette["bg"])
+        self.result = None
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=18)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text=f"SSID: {record.name}  ·  IDX {record.idx}",
+                  style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
+
+        columns = ("slot", "proxy", "type", "devices")
+        titles = (self.t("Slot"), self.t("Proxy"), "Type", self.t("Máy"))
+        table = ttk.Treeview(body, columns=columns, show="headings", height=8)
+        for column, title, width in zip(columns, titles, (50, 260, 70, 70)):
+            table.heading(column, text=title)
+            table.column(column, width=width, anchor="w")
+        for position, row in enumerate(proxies):
+            count = usage[position] if position < len(usage) else 0
+            table.insert("", "end", values=(position, proxy_display(row),
+                                            row.get("type", ""), count))
+        table.pack(fill="both", expand=True, pady=(0, 10))
+
+        ttk.Label(body, text="Dán danh sách proxy (mỗi dòng một proxy)",
+                  style="Muted.TLabel").pack(anchor="w")
+        self.text = tk.Text(body, height=8, width=64, background=self.palette["card"],
+                            foreground=self.palette["text"], insertbackground=self.palette["text"],
+                            relief="flat", borderwidth=1)
+        self.text.pack(fill="both", expand=True, pady=(4, 4))
+        ttk.Label(
+            body,
+            text=("Replacing keeps every device on the proxy it is using, as long as that "
+                  "proxy is still in the list. Wi-Fi is not interrupted."
+                  if language == "en" else
+                  "Thay pool vẫn giữ mỗi máy ở đúng proxy nó đang dùng, miễn là proxy đó còn "
+                  "trong danh sách. Wi‑Fi không bị ngắt."),
+            style="Muted.TLabel", wraplength=460, justify="left",
+        ).pack(anchor="w", pady=(0, 12))
+
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.pack(fill="x")
+        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Ghi pool", command=self._submit,
+                   style="Warning.TButton").pack(side="right", padx=(0, 8))
+        self.bind("<Escape>", lambda _event: self.destroy())
+        self.text.focus_set()
+        localize_widget_tree(self, self.language)
+        center_dialog(self)
+
+    def _submit(self):
+        self.result = self.text.get("1.0", "end")
+        self.destroy()
+
+
+class BulkProxyDialog(tk.Toplevel):
+    """The split the operator is about to commit, device by device."""
+
+    def __init__(self, parent, rows, language="en", palette=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.title(self.t("Xem trước cách chia proxy"))
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=self.palette["bg"])
+        self.result = False
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=18)
+        body.pack(fill="both", expand=True)
+        summary = (f"{len(rows)} devices over {len({slot for _mac, slot, _label in rows})} proxies"
+                   if language == "en" else
+                   f"{len(rows)} thiết bị chia cho {len({slot for _mac, slot, _label in rows})} proxy")
+        ttk.Label(body, text=summary, style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
+
+        columns = ("mac", "slot", "proxy")
+        table = ttk.Treeview(body, columns=columns, show="headings", height=12)
+        for column, title, width in zip(columns, ("MAC", self.t("Slot"), self.t("Proxy")),
+                                        (150, 50, 260)):
+            table.heading(column, text=title)
+            table.column(column, width=width, anchor="w")
+        for mac, slot, label in rows:
+            table.insert("", "end", values=(mac, slot, label))
+        table.pack(fill="both", expand=True, pady=(0, 12))
+
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.pack(fill="x")
+        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Áp dụng", command=self._submit,
+                   style="Warning.TButton").pack(side="right", padx=(0, 8))
+        self.bind("<Escape>", lambda _event: self.destroy())
+        localize_widget_tree(self, self.language)
+        center_dialog(self)
+
+    def _submit(self):
+        self.result = True
+        self.destroy()
+
+
+class SlotChoiceDialog(tk.Toplevel):
+    """Pick the pool slot one device should be pinned to, or unpin it."""
+
+    def __init__(self, parent, proxies, current, language="en", palette=None):
+        super().__init__(parent)
+        self.language = language
+        self.t = lambda text, **values: translate(text, self.language, **values)
+        self.palette = palette or DARK_PALETTE
+        self.title(self.t("Gán proxy…"))
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=self.palette["bg"])
+        self.result = None
+        self._choices = {self.t("Không ghim proxy"): "none"}
+        for position, row in enumerate(proxies):
+            self._choices[f"{position} · {proxy_display(row)}"] = position
+        preselect = next((text for text, value in self._choices.items() if value == current),
+                         next(iter(self._choices)))
+        self.choice_var = tk.StringVar(value=preselect)
+
+        body = ttk.Frame(self, style="Card.TFrame", padding=18)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Proxy").pack(anchor="w", pady=(0, 6))
+        ttk.Combobox(body, textvariable=self.choice_var, values=list(self._choices),
+                     state="readonly", width=46).pack(fill="x", pady=(0, 14))
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.pack(fill="x")
+        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Áp dụng", command=self._submit,
+                   style="Warning.TButton").pack(side="right", padx=(0, 8))
+        self.bind("<Return>", lambda _event: self._submit())
+        self.bind("<Escape>", lambda _event: self.destroy())
+        localize_widget_tree(self, self.language)
+        center_dialog(self)
+
+    def _submit(self):
+        self.result = self._choices.get(self.choice_var.get())
         self.destroy()
 
 
@@ -3293,6 +3676,7 @@ class NativeApp:
         self.records: list[WifiRecord] = []
         self.clients_data = []
         self.visible_clients = []
+        self.pool_cache = {}
         self.client_rows = {}
         self.health = {}
         self.runtime_ssids = {}
@@ -3716,6 +4100,7 @@ class NativeApp:
         bar.pack(fill="x", pady=(0, 10))
         for text, command, button_style in [
             ("＋ Thêm SSID", self.add_wifi, "Success.TButton"),
+            ("Pool proxy…", self.open_pool_editor, "TButton"),
             ("Đẩy cấu hình & Apply", self.save_apply, "Success.TButton"),
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
@@ -3745,6 +4130,7 @@ class NativeApp:
         for key, text, command in (
             ("edit", "Sửa cấu hình", self.edit_wifi),
             ("sock", "Đổi SOCKS", self.quick_sock),
+            ("pool", "Pool proxy…", self.open_pool_editor),
             ("mac", "Random MAC", self.rotate_wifi_mac),
         ):
             self.wifi_context_menu.add_command(label=self.t(text), command=command)
@@ -3813,9 +4199,9 @@ class NativeApp:
         ):
             ttk.Label(summary, textvariable=variable, style=label_style).pack(side="left", padx=(4, 24))
 
-        columns = {"ssid": "SSID", "band": "Band", "ip": "IP", "host": "Tên máy", "mac": "MAC", "time": "Kết nối", "rx": "RX", "tx": "TX", "signal": "Signal", "status": "Trạng thái"}
+        columns = {"ssid": "SSID", "band": "Band", "ip": "IP", "host": "Tên máy", "mac": "MAC", "proxy": "Proxy", "time": "Kết nối", "rx": "RX", "tx": "TX", "signal": "Signal", "status": "Trạng thái"}
         self.client_column_titles = columns.copy()
-        self.client_tree = self._tree(tab, columns, {"ssid": 125, "band": 60, "ip": 115, "host": 145, "mac": 140, "time": 85, "rx": 85, "tx": 85, "signal": 70, "status": 120}, selectmode="extended")
+        self.client_tree = self._tree(tab, columns, {"ssid": 125, "band": 60, "ip": 115, "host": 145, "mac": 140, "proxy": 150, "time": 85, "rx": 85, "tx": 85, "signal": 70, "status": 120}, selectmode="extended")
         for column, title in columns.items():
             self.client_tree.heading(column, text=title, command=lambda selected=column: self.sort_clients(selected))
         self.client_tree.tag_configure("banned", foreground=self.palette["bad_text"])
@@ -3823,6 +4209,7 @@ class NativeApp:
         self.client_tree.tag_configure("weak", foreground=self.palette["warn_text"])
         self.client_tree.tag_configure("strong", foreground=self.palette["good_text"])
         self.client_tree.bind("<Double-1>", self.show_client_details)
+        self.client_tree.bind("<Button-3>", self.show_client_context_menu)
         self.client_tree.bind("<<TreeviewSelect>>", self.update_client_editor)
         self.client_tree.bind("<Control-c>", lambda _event: self.copy_selected_clients())
         self.client_tree.bind("<Control-a>", self.select_all_clients)
@@ -3837,10 +4224,25 @@ class NativeApp:
             ("kick", "Kick", lambda: self.client_action("kick"), "Warning.TButton"),
             ("ban", "Cấm", lambda: self.client_action("ban"), "Danger.TButton"),
             ("unban", "Bỏ cấm", lambda: self.client_action("unban"), "Success.TButton"),
+            ("proxy", "Đổi proxy…", self.bulk_assign_proxy, "Primary.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
             button.pack(side="left", padx=(7, 0))
             self.client_edit_buttons[key] = button
+
+        self.client_context_menu = tk.Menu(
+            self.root,
+            tearoff=False,
+            background=self.palette["card"],
+            foreground=self.palette["text"],
+            activebackground=self.palette["primary"],
+            activeforeground=self.palette["selection_text"],
+            relief="flat",
+            borderwidth=1,
+        )
+        self.client_context_menu.add_command(label=self.t("Gán proxy…"), command=self.assign_one_proxy)
+        self.client_context_menu.add_command(label=self.t("Đổi proxy cho thiết bị đã chọn…"),
+                                             command=self.bulk_assign_proxy)
 
     def _build_backup_tab(self):
         tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)
@@ -4954,7 +5356,8 @@ class NativeApp:
                 "", "end", iid=iid, tags=tags,
                 values=(
                     item.get("ssid", ""), band, item.get("ip", ""), item.get("host", ""),
-                    item.get("mac", ""), human_time(item.get("connected_s")) if online else "—",
+                    item.get("mac", ""), client_proxy_text(item, self.language),
+                    human_time(item.get("connected_s")) if online else "—",
                     human_bytes(item.get("rx_bytes")), human_bytes(item.get("tx_bytes")),
                     f"{signal} dBm" if signal is not None else "—", status,
                 ),
@@ -5048,9 +5451,178 @@ class NativeApp:
                 "kick": "normal" if any(item.get("online", True) for item in items) else "disabled",
                 "ban": "normal" if any(not item.get("banned") for item in items) else "disabled",
                 "unban": "normal" if any(item.get("banned") for item in items) else "disabled",
+                # One split cannot span two Wi-Fis, so a mixed selection has the
+                # button greyed out rather than failing once it is pressed.
+                "proxy": "normal" if len({item.get("idx") for item in items}) == 1 else "disabled",
             }
         for key, button in self.client_edit_buttons.items():
             button.configure(state=states.get(key, "disabled"))
+
+    # --- proxy pool ------------------------------------------------------
+
+    def pool_for_idx(self, idx, refresh=False):
+        """One Wi-Fi's pool, cached because it changes far less often than the
+        device list that is drawn from it."""
+        if refresh or idx not in self.pool_cache:
+            self.pool_cache[idx] = self.require_client().get_pool(idx)
+        return self.pool_cache[idx]
+
+    def _pool_or_complaint(self, idx):
+        """The proxies of one Wi-Fi, or None having already said why not."""
+        try:
+            self.require_client()
+            pool = self.pool_for_idx(idx, refresh=True)
+        except AgentError as exc:
+            self._task_error(exc)
+            return None
+        proxies = pool.get("proxies") or []
+        if not proxies:
+            messagebox.showinfo(APP_NAME, self.t("Wi‑Fi này chưa có proxy nào trong pool"),
+                                parent=self.root)
+            return None
+        return proxies
+
+    def open_pool_editor(self):
+        if self.block_if_incompatible():
+            return
+        record = self.selected_wifi()
+        if not record:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
+            return
+        try:
+            self.require_client()
+            pool = self.pool_for_idx(record.idx, refresh=True)
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        proxies = pool.get("proxies") or []
+        usage = pool_slot_usage(self.clients_data, record.idx, len(proxies))
+        dialog = PoolDialog(self.root, record, proxies, usage, self.language, self.palette)
+        self.root.wait_window(dialog)
+        if dialog.result is None:
+            return
+        self.apply_pool_text(record.idx, dialog.result)
+
+    def apply_pool_text(self, idx, text):
+        """Parse a pasted list and replace one Wi-Fi's pool with it."""
+        rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX)
+        if dropped:
+            detail = "\n".join(f"{number}: {line} — {reason}" for number, line, reason in dropped[:25])
+            if len(dropped) > 25:
+                detail += f"\n… {len(dropped) - 25}"
+            messagebox.showwarning(APP_NAME, f"{self.t('Những dòng bị bỏ qua')}:\n{detail}",
+                                   parent=self.root)
+        if not rows and text.strip():
+            # Every line was unusable. Saving now would clear the pool because of
+            # a typo, so treat it as nothing having been asked for.
+            messagebox.showinfo(APP_NAME, self.t("Không có dòng nào dùng được"), parent=self.root)
+            return
+        action = (f"Replace the proxy pool of Wi-Fi {idx} with {len(rows)} proxies."
+                  if self.language == "en" else
+                  f"Thay pool proxy của Wi‑Fi {idx} bằng {len(rows)} proxy.")
+        impact = ("Devices keep the proxy they are on if it is still in the list; the others "
+                  "are moved. Wi-Fi is not reloaded, but sing-box restarts."
+                  if self.language == "en" else
+                  "Máy nào còn proxy cũ trong danh sách thì giữ nguyên, còn lại bị chuyển. "
+                  "Wi‑Fi không bị reload, nhưng sing-box khởi động lại.")
+        if not self.confirm_important("Pool proxy", action, impact):
+            return
+        try:
+            client = self.require_client()
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        def done(response):
+            self.pool_cache.pop(idx, None)
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+        self.run_task("Đang ghi pool proxy…", lambda: client.save_pool(idx, rows), done)
+
+    def bulk_assign_proxy(self, ask=None):
+        """Deal the selected devices evenly over their Wi-Fi's pool."""
+        if self.block_if_incompatible():
+            return
+        items = self.selected_client_items()
+        if not items:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn thiết bị trong bảng trước"),
+                                parent=self.root)
+            return
+        indices = {item.get("idx") for item in items}
+        if len(indices) != 1:
+            # Slots are numbered per Wi-Fi, so one split cannot span two of them.
+            messagebox.showinfo(APP_NAME,
+                                self.t("Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi"),
+                                parent=self.root)
+            return
+        idx = indices.pop()
+        proxies = self._pool_or_complaint(idx)
+        if proxies is None:
+            return
+        macs = [str(item.get("mac") or "").strip().lower() for item in items]
+        plan = split_devices_evenly(macs, len(proxies), random.randrange(2 ** 32))
+        preview = [(mac, slot, proxy_display(proxies[slot])) for mac, slot in plan.items()]
+        ask = ask or self._ask_bulk_proxy
+        if not ask(preview):
+            return
+        # The rows the operator just approved are the rows that get sent. Dealing
+        # again here would shuffle a second time and commit a different layout
+        # than the one on screen.
+        assignments = [{"mac": mac, "slot": slot} for mac, slot, _label in preview]
+        client = self.require_client()
+        def done(response):
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+        self.run_task("Đang đổi proxy cho thiết bị…",
+                      lambda: client.assign_proxy(idx, assignments), done)
+
+    def _ask_bulk_proxy(self, rows) -> bool:
+        dialog = BulkProxyDialog(self.root, rows, self.language, self.palette)
+        self.root.wait_window(dialog)
+        return bool(dialog.result)
+
+    def assign_one_proxy(self, ask=None):
+        """Pin one device to a chosen slot, or unpin it."""
+        if self.block_if_incompatible():
+            return
+        items = self.selected_client_items()
+        if len(items) != 1:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn đúng một thiết bị"), parent=self.root)
+            return
+        item = items[0]
+        idx = item.get("idx")
+        proxies = self._pool_or_complaint(idx)
+        if proxies is None:
+            return
+        choice = (ask or self._ask_slot)(proxies, item.get("slot"))
+        if choice is None:
+            return
+        mac = str(item.get("mac") or "").strip().lower()
+        client = self.require_client()
+        def done(response):
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+        self.run_task("Đang đổi proxy cho thiết bị…",
+                      lambda: client.assign_proxy(idx, [{"mac": mac, "slot": choice}]), done)
+
+    def _ask_slot(self, proxies, current):
+        dialog = SlotChoiceDialog(self.root, proxies, current, self.language, self.palette)
+        self.root.wait_window(dialog)
+        return dialog.result
+
+    def show_client_context_menu(self, event):
+        """Select the row under the pointer, then open the device action menu."""
+        row = self.client_tree.identify_row(event.y)
+        if not row:
+            return None
+        if row not in self.client_tree.selection():
+            self.client_tree.selection_set(row)
+        self.client_tree.focus(row)
+        self.update_client_editor()
+        try:
+            self.client_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.client_context_menu.grab_release()
+        return "break"
 
     def select_all_clients(self, _event=None):
         self.client_tree.selection_set(self.client_tree.get_children())

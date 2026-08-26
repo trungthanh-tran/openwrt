@@ -60,7 +60,7 @@ Run router scripts from `/root/sbproxy`. Inventory and audit helpers intentional
     `sh scripts/gateway.sh` reports the actual default route, link, DNS, and direct HTTP health. It accepts whatever uplink the default route uses; set `GATEWAY_EXPECTED_INTERFACE` in `/etc/sbproxy/env` to enforce one.
 14. **Use the LAN API:** `agent/cgi/sbproxy` implements the API and is not run directly. Test it with `TOKEN=$(cat /etc/sbproxy/token); curl -H "Authorization: Bearer $TOKEN" 'http://127.0.0.1/cgi-bin/sbproxy?action=status'`. Device management: `scripts/clients.sh` lists online clients and offline blocklist entries; `scripts/{kick,ban,unban}.sh <idx> <mac>` deauth/ban/unban a device.
 15. **Audit security:** run `sh scripts/security-audit.sh`; a nonzero exit indicates findings that require review. It does not rewrite SSH or firewall policy.
-16. **Update through the console:** build `dist/sbproxy-update-<version>.tar.gz` with `make package` (or `pc/make-package.sh` / `pc\make-package.ps1`), then upload it from the web console's **⬆ Cập nhật** dialog (`POST ?action=update[&force=1]`, 8 MB default cap via `MAX_UPDATE_BYTES`). `scripts/self-update.sh` rejects path traversal and downgrades (unless forced), backs up as `pre-update`, preserves the live `wifi-socks.conf` and `settings.sh`, redeploys the CGI/UI/healthd, and never reloads Wi-Fi by itself. The running version is shown in the console header (`meta.version` from `?action=status`).
+16. **Update through the console:** build `dist/sbproxy-update-<version>.tar.gz` with `make package` (or `pc/make-package.sh` / `pc\make-package.ps1`), then upload it from the web console's **⬆ Cập nhật** dialog (`POST ?action=update[&force=1]`, 8 MB default cap via `MAX_UPDATE_BYTES`). `scripts/self-update.sh` rejects path traversal and downgrades (unless forced), backs up as `pre-update`, preserves the live `wifi-socks.conf`, `proxy-pools.conf` and `settings.sh` -- appending to the last only the keys this version introduced that the router never had, with their comment blocks, changing no value already set and naming what it added in the update log -- redeploys the CGI/UI/healthd, and never reloads Wi-Fi by itself. The running version is shown in the console header (`meta.version` from `?action=status`).
 
 **Console builds.** Two independent frontends share the Agent API: the
 router-hosted **web** UI and the native Tkinter **desktop** console.
@@ -113,6 +113,54 @@ sh agent/install-agent.sh
 ```
 
 Or rotate only the token with `sh scripts/rotate-token.sh`.
+
+## Proxy pools
+
+By default each Wi-Fi uses one proxy, declared in `wifi-socks.conf`. To give one
+Wi-Fi several proxies and spread devices across them, add
+`config/proxy-pools.conf`:
+
+```
+idx|proxy_type|host|port|user|pass|label
+1|socks5|1.2.3.4|1080|user1|pass1|VN-01
+1|http|5.6.7.8|8080|||US-02
+```
+
+An SSID with no row here behaves exactly as before -- byte for byte the same
+generated configuration.
+
+A device is pinned to one slot and **keeps that proxy across reconnections**: an
+exit IP that moves around breaks logged-in sessions. Pins live in
+`/etc/sbproxy.assign` and are baked into the generated nft file, so a restart
+does not lose them.
+
+Which slot a new device gets is `POOL_ASSIGN_POLICY`: `random` (default),
+`round-robin`, `least-loaded`, or `sticky-hash`. See the settings table in
+[admin-guide.md](admin-guide.md) for the full list of `POOL_*` tunables.
+
+Pinning happens the moment dnsmasq hands out a lease, through
+`/usr/libexec/sbproxy-dhcp-assign`. `apply.sh` points `dhcpscript` at it but
+**never takes over** a `dhcpscript` that belongs to something else. The
+`sbproxy-assignd` daemon is the safety net for devices with static addresses,
+for routers where `dhcpscript` is already taken, and for a map that drifted from
+the state file after a restart.
+
+```sh
+sh scripts/pool.sh list 1
+sh scripts/pool.sh replace 1 /tmp/new.txt
+sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 3
+sh scripts/rebalance.sh 1 --online --dry-run
+```
+
+> `sock_bypass` is global, not per-SSID. The router must reach a proxy host
+> directly or TPROXY would loop it back, and that bypass list is shared, so a
+> proxy added to SSID 1's pool is also reachable directly by SSID 2's clients.
+> This predates pools; pools just make it visible.
+
+`kmod-nft-socket` is the only new dependency: it enables the divert rule, which
+turns a per-packet map lookup into a per-connection one. Without it
+`POOL_DIVERT="auto"` simply switches divert off and everything still works,
+more slowly.
 
 ## Operations and recovery
 

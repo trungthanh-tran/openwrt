@@ -33,8 +33,7 @@ fi
 
 # 1) Restore configuration files.
 [ -f "$SRC/etc-config.tar.gz" ] && tar xzf "$SRC/etc-config.tar.gz" -C / && log "Restored /etc/config and /etc/sing-box"
-[ -f "$SRC/sbproxy.nft" ] && cp "$SRC/sbproxy.nft" "$NFT_FILE" && log "Restored $NFT_FILE"
-[ -f "$SRC/wifi-socks.conf" ] && cp "$SRC/wifi-socks.conf" "$CONF" && log "Restored wifi-socks.conf"
+restore_snapshot_files "$SRC"
 
 # 2) Reload all affected services.
 log "Reloading services..."

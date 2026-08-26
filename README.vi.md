@@ -24,6 +24,20 @@ WiFi ...   ─(br-wN, ...)─────────────┘        │ 
 ```
 Mỗi WiFi = 1 bridge + subnet + DHCP + firewall zone riêng. nftables bắt traffic theo `iifname` đẩy vào cổng TPROXY tương ứng của sing-box; sing-box route sang đúng outbound SOCKS5.
 
+Một WiFi cũng có thể mang **nhiều proxy**. Mỗi proxy thành một *slot* với cổng
+TPROXY và outbound riêng, và một map nftables đưa từng thiết bị tới đúng slot của
+nó theo địa chỉ nguồn:
+
+```
+                                  ┌─> :13256 -> out-w1s0 -> SOCKS A
+WiFi Alpha ─> map theo IP nguồn ──┼─> :13257 -> out-w1s1 -> SOCKS B
+                                  └─> :13258 -> out-w1s2 -> SOCKS C
+```
+
+Thiết bị **giữ nguyên proxy** qua các lần vào lại, và chuyển một máy sang proxy
+khác chỉ là một lệnh `nft add element` — không sinh lại cấu hình, không restart,
+không ngắt WiFi. Xem [Pool proxy](docs/admin-guide.md#71-pool-proxy--một-ssid-nhiều-proxy).
+
 ## Cấu trúc
 ```
 config/

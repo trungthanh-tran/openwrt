@@ -20,8 +20,7 @@ log "Backup -> $DEST"
 # Layer 1: archive project-related configuration files.
 tar czf "$DEST/etc-config.tar.gz" \
   -C / etc/config etc/sing-box 2>/dev/null || warn "Some paths do not exist yet (normal on the first run)."
-[ -f "$NFT_FILE" ] && cp "$NFT_FILE" "$DEST/sbproxy.nft" 2>/dev/null || true
-[ -f "$CONF" ] && cp "$CONF" "$DEST/wifi-socks.conf" 2>/dev/null || true
+backup_snapshot_files "$DEST"
 
 # Layer 2: standard sysupgrade backup.
 if command -v sysupgrade >/dev/null 2>&1; then

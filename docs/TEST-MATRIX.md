@@ -178,6 +178,57 @@ Suite: `tests/run.sh`
 - Client inventory integration and offline blocklist entries.
 - PC update package manifests and Agent installer security/deployment checks.
 
+## Proxy pool
+
+Suites: `tests/test_pool.sh`, `tests/test_assignd.sh`, `tests/test_pool_agent.sh`,
+`tests/test_pool_console.py`
+
+| Area | Normal cases | Edge and failure cases |
+|---|---|---|
+| Pool file | Column counts, comments, per-idx counts, port arithmetic | Wrong column count, invalid idx/port/type, host charset, over the per-SSID cap |
+| Generated config | One inbound, outbound and route rule per slot; nft map with a declared size and inline elements | An SSID with no pool generates byte-identical output to before the feature |
+| Pin state | Write, replace, clear, prune; orphaned pins reassigned rather than dropped | Duplicate rows, malformed MAC, slot past the end of the pool, empty replacement list |
+| Replacing a pool | Pins follow proxy identity, not slot position | Reordered list must not move any device; label changes must not either |
+| Assignment policies | random in range, round-robin wraps, least-loaded, sticky-hash stable across a wiped state file | Unknown policy refused; no dependency on `hexdump`/`od` |
+| Pinning once | A new device is pinned; an already-pinned one is not re-pinned | Rotation only on a real reconnection, never on a sweep; a manual pin is never rotated away |
+| Self-healing map | Drift in either direction reloads the whole map | A map that agrees is left alone; an SSID whose radio is down is not read |
+| DHCP hook | `add` pins and may rotate, `old` never rotates, `del` keeps the pin and drops only the element | Address outside every managed subnet, malformed MAC, SSID with no pool, unknown action |
+| dhcpscript wiring | Unset is claimed and committed | A foreign hook is never overwritten, and the operator is told why |
+| Agent actions | `get_pool`, `save_pool`, `assign_proxy`, `rebalance` | Token and method checks, slot range, empty MAC list, credentials never in `status` or `clients` |
+| Console | Pasted-list parsing in five formats, even dealing, Proxy column states | Preview and commit share one shuffle; blocked when nothing is selected or the pool is empty |
+
+## Kernel-level spike
+
+Script: `tests/vm/spike.sh`
+
+The suites above check the *text* the generator produces. They cannot check
+whether the kernel loads it: `nft -c` parses against the local nft binary, but
+expression support lives in the kernel modules. `spike.sh` loads real rules into
+a table of its own and reports what the kernel took -- the `tproxy … map`
+lookup, the divert rule, per-SSID chains behind a verdict map, and live
+`add`/`delete element`. It runs on an OpenWrt VM or on the router itself. See
+[../tests/vm/README.md](../tests/vm/README.md).
+
+Run once on a WSL2 6.18 kernel (2026-08-26): everything passed except the
+divert rule, which that kernel cannot answer because it has no `nft_socket`.
+That covers D2 -- the map-keyed `tproxy` lookup F2-F4 are built on -- on a real
+kernel for the first time. D9 and D10 still need the router.
+
+## End-to-end data path
+
+Script: `tests/vm/datapath.sh`
+
+The spike proves a kernel will load the rules. This proves the rules do what
+they are for: it stands up the production ruleset, the production sing-box
+config, and the production policy routing, puts two clients on the SSID bridge
+in network namespaces, and gives each slot a SOCKS5 server that names itself
+down the connection. A client reading back `SLOT0` went through slot 0; there
+is no way to fake that. It also drives `assign_live_update` rather than `nft`
+directly, so re-pinning a device that already has a map element is covered.
+
+It replaces `inet sbproxy`, so it is for a VM, not a serving router -- it
+refuses to start if that table exists. 10/10 on a WSL2 6.18 kernel, 2026-08-26.
+
 ## Real-router acceptance tests
 
 Automation cannot faithfully emulate radio firmware, MediaTek drivers,

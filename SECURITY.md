@@ -11,7 +11,8 @@ WiFi, tài khoản SOCKS). Nguyên tắc:
 - **Fail-closed:** zone khách `forward=REJECT` — proxy chết thì client mất mạng,
   không đi thẳng ra WAN.
 - **Không commit bí mật** vào git (xem `.gitignore`): `wifi-socks.conf` thật,
-  token, backup.
+  `proxy-pools.conf` thật (chứa credential của **mọi** proxy trong pool),
+  token, backup. `scripts/security-audit.sh` kiểm quyền của cả hai file.
 
 ## Báo cáo lỗ hổng
 Không mở issue công khai cho lỗ hổng bảo mật. Liên hệ maintainer nội bộ

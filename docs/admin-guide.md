@@ -161,6 +161,79 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `WIFI_ENCRYPTION` | `psk2` (WPA2) · `sae`/`sae-mixed` (WPA3). |
 | `STUN_*_PORTS` | Cổng STUN/TURN bị chặn khi WebRTC bật. |
 
+### 7.1 Pool proxy — một SSID, nhiều proxy
+
+Mặc định mỗi Wi-Fi dùng đúng một proxy, khai trong `wifi-socks.conf`. Muốn một
+Wi-Fi mang nhiều proxy và chia thiết bị ra thì thêm `config/proxy-pools.conf`:
+
+```
+idx|proxy_type|host|port|user|pass|label
+1|socks5|1.2.3.4|1080|user1|pass1|VN-01
+1|http|5.6.7.8|8080|||US-02
+```
+
+`label` không bắt buộc và **không tính là danh tính proxy** — đổi nhãn không làm
+máy nào đổi proxy. *Slot* là vị trí của dòng trong pool của chính `idx` đó, đánh
+số từ 0.
+
+SSID nào không có dòng nào trong file này thì hành xử **y hệt như trước**: cấu
+hình sinh ra giống từng byte.
+
+**Thiết bị được gán proxy thế nào.** Máy vào mạng nhận một slot và **giữ nguyên
+proxy đó qua các lần vào lại** — IP ra ngoài nhảy liên tục sẽ làm hỏng phiên đăng
+nhập. Ghim lưu ở `/etc/sbproxy.assign` (`idx|mac|slot|nguồn`), và được nướng thẳng
+vào file nft sinh ra, nên restart không mất.
+
+| Biến trong `settings.sh` | Mặc định | Ý nghĩa |
+|---|---|---|
+| `POOL_PORT_BASE` | `13000` | Đầu dải cổng TPROXY của pool. |
+| `POOL_PORT_STRIDE` | `256` | Khoảng cổng dành cho mỗi SSID. |
+| `POOL_SLOTS_PER_SSID_MAX` | `256` | Trần số proxy mỗi Wi-Fi. Không bao giờ lớn hơn `POOL_PORT_STRIDE`. |
+| `POOL_MAP_SIZE` | `512` | Kích thước map nft. Đặt rộng hơn dải DHCP. |
+| `POOL_ASSIGN_POLICY` | `random` | `random` · `round-robin` · `least-loaded` · `sticky-hash`. |
+| `POOL_ROTATE_ON_RECONNECT` | `0` | `1` = bốc proxy mới mỗi lần máy vào lại. Ghim tay không bao giờ bị đổi. |
+| `POOL_SCAN_INTERVAL` | `3` | Nhịp quét của `sbproxy-assignd`, giây. |
+| `POOL_SYNC_EVERY` | `20` | Số vòng quét giữa hai lần kiểm map khi danh sách máy không đổi. |
+| `POOL_DIVERT` | `auto` | Luật *divert*. `auto` = dùng nếu nhân nhận. |
+
+**Lệnh CLI:**
+
+```sh
+sh scripts/pool.sh list 1                  # xem pool của Wi-Fi idx=1
+sh scripts/pool.sh replace 1 /tmp/new.txt  # thay cả pool, giữ pin theo proxy
+sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 3 # ghim một máy vào slot 3
+sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 none
+sh scripts/rebalance.sh 1 --online --dry-run   # xem cách chia trước
+sh scripts/rebalance.sh 1 --online              # chia đều máy đang online
+```
+
+`rebalance.sh --dry-run` in ra seed nó dùng; chạy lại với
+`POOL_SHUFFLE_SEED=<seed>` để ghi đúng cách chia vừa xem.
+
+> **`sock_bypass` là toàn cục, không theo SSID.** Router phải đi thẳng tới host
+> của proxy, không qua TPROXY, nếu không sẽ thành vòng lặp. Danh sách bypass gộp
+> chung cho cả router — nên thêm một proxy vào pool của SSID 1 thì client của
+> SSID 2 cũng đi thẳng tới IP đó. Hành vi này đã có từ trước với proxy đơn; pool
+> chỉ làm nó lộ rõ hơn.
+
+### 7.2 Ghim thiết bị: hai đường
+
+**Móc DHCP** là đường chính. dnsmasq gọi `/usr/libexec/sbproxy-dhcp-assign` ngay
+khi cấp lease, tức **trước mọi lưu lượng ứng dụng**, nên khe hở gần như bằng 0.
+`apply.sh` tự trỏ `dhcpscript` vào đó — nhưng **không bao giờ chiếm**
+`dhcpscript` đang thuộc về script khác, vì làm vậy sẽ khiến script kia lặng lẽ
+ngừng chạy. `preflight.sh` nói rõ bạn đang ở trường hợp nào.
+
+**Daemon `sbproxy-assignd`** là lưới an toàn cho ba trường hợp móc DHCP không bắt
+được: máy đặt IP tĩnh không hề xin DHCP, `dhcpscript` đã có chủ, và bảng nftables
+bị xoá do restart trong khi file state vẫn ghi là đã ghim.
+
+```sh
+/etc/init.d/sbproxy-assignd status
+sbproxy-assignd --once     # chạy tay một vòng quét
+logread -e assignd
+```
+
 ## Bước 8 — Áp dụng
 > **Script tương ứng (router):** `DRYRUN=1 sh scripts/apply.sh` để xem trước, `sh scripts/apply.sh` để áp thật và tự backup, `sh scripts/uninstall.sh` để gỡ phần cấu hình do project quản lý.
 
@@ -231,7 +304,7 @@ Hai frontend độc lập dùng chung Agent API:
   - Hai bản build tách theo nền tảng (PyInstaller không cross-compile): Windows `cd console/desktop; .\build.ps1` → `dist/sbproxy-console.exe`, chạy `.\sbproxy-console.exe`; Linux/macOS `sh console/desktop/build.sh` → `dist/sbproxy-console`, chạy `./sbproxy-console`. Mỗi file tự chứa đủ mọi thứ, copy sang máy quản trị là chạy được.
   - Token lưu bằng DPAPI trên Windows, `chmod 600` trên Linux/macOS. Config/log/cache/runtime nằm dưới **một home riêng** (`SBPROXY_HOME` → thư mục `data/` cạnh file exe cho bản portable → `%LOCALAPPDATA%\sbproxy-console-native`); xem bằng `sbproxy-console --where`.
   - Cả hai script build nhúng sẵn gói `sbproxy-update-<version>.tar.gz` nên chạy được **Cài đặt sau khi flash** trên máy không có mã nguồn.
-  - Console đối chiếu version với agent: agent cũ hơn thì hỏi và nâng cấp tại chỗ (giữ nguyên `wifi-socks.conf` + `settings.sh`), agent mới hơn thì console chuyển sang chỉ đọc cho tới khi được cập nhật.
+  - Console đối chiếu version với agent: agent cũ hơn thì hỏi và nâng cấp tại chỗ (giữ nguyên `wifi-socks.conf`, `proxy-pools.conf` và các giá trị trong `settings.sh`), agent mới hơn thì console chuyển sang chỉ đọc cho tới khi được cập nhật.
   - Debug hiện trường: lấy `logs/console.log` qua nút **Thư mục log**, hoặc chạy lại với `--verbose`.
   - `logs/audit.log` ghi riêng: mỗi lần kết nối (router, version agent, sing-box) và mọi thay đổi đẩy xuống router (apply, đổi SOCKS, random MAC, kick/cấm/bỏ cấm, backup, rollback, cập nhật agent) kèm user hệ điều hành và kết quả.
   - Cả hai file xoay vòng **mỗi nửa đêm**, **giữ 7 ngày**, token/mật khẩu đã bị che; file cũ hơn bị xoá ở lần chạy kế tiếp.
@@ -345,9 +418,13 @@ Endpoint `/cgi-bin/sbproxy?action=…`, ưu tiên header `Authorization: Bearer 
 | POST | `kick` | {idx,mac} | {ok,rc,log} — deauth tạm |
 | POST | `ban` | {idx,mac} | {ok,rc,log} — chặn MAC lâu dài |
 | POST | `unban` | {idx,mac} | {ok,rc,log} |
+| GET | `get_pool` | ?idx= | {proxies[],assignments[]} — pool và pin của một Wi-Fi |
+| POST | `save_pool` | {idx,proxies[]} | Thay cả pool, giữ pin theo danh tính proxy, không reload Wi-Fi |
+| POST | `assign_proxy` | {idx,assignments[{mac,slot}]} | Ghim một/vài máy, **chỉ cập nhật map nft** |
+| POST | `rebalance` | {idx,macs[],proxies?,seed?} | Thay pool rồi chia đều, trong **một** lần chạy |
 | POST | `update[&force=1]` | binary `.tar.gz`/`.zip` | {ok,rc,log,from,to} — self-update code sbproxy |
 
-**Cập nhật agent qua giao diện (self-update):** tạo package trên máy quản trị bằng `make package` (hoặc `sh pc/make-package.sh` / `pc\make-package.ps1`) → `dist/sbproxy-update-<version>.tar.gz`, rồi trên web console bấm **⬆ Cập nhật** và chọn file. Router chạy `scripts/self-update.sh`: chặn path traversal trong package, từ chối hạ version (tick "force" nếu cố ý), tự backup `pre-update`, **giữ nguyên** `config/wifi-socks.conf` + `config/settings.sh` đang dùng, deploy lại CGI/UI/healthd và reload uhttpd. Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bấm "Đẩy & Áp" sau đó. Version đang chạy hiển thị ở header console (`meta.version` của `?action=status`); giới hạn upload mặc định 8 MB (`MAX_UPDATE_BYTES` trong `/etc/sbproxy/env`).
+**Cập nhật agent qua giao diện (self-update):** tạo package trên máy quản trị bằng `make package` (hoặc `sh pc/make-package.sh` / `pc\make-package.ps1`) → `dist/sbproxy-update-<version>.tar.gz`, rồi trên web console bấm **⬆ Cập nhật** và chọn file. Router chạy `scripts/self-update.sh`: chặn path traversal trong package, từ chối hạ version (tick "force" nếu cố ý), tự backup `pre-update`, **giữ nguyên** `config/wifi-socks.conf`, `config/proxy-pools.conf` và `config/settings.sh` đang dùng — riêng `settings.sh` được **bổ sung thêm những khoá mà bản mới giới thiệu và router chưa từng có**, kèm đoạn chú thích của khoá đó; không giá trị nào đang đặt bị sửa, và log của lần cập nhật liệt kê đúng những khoá đã thêm, deploy lại CGI/UI/healthd và reload uhttpd. Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bấm "Đẩy & Áp" sau đó. Version đang chạy hiển thị ở header console (`meta.version` của `?action=status`); giới hạn upload mặc định 8 MB (`MAX_UPDATE_BYTES` trong `/etc/sbproxy/env`).
 
 **Quản lý thiết bị:** app native lọc theo SSID, band, online/offline, blocklist, RSSI, traffic và thời gian; hỗ trợ chọn nhiều, sort, auto-refresh, chi tiết và CSV. **Kick** deauth tạm (thiết bị có thể nối lại). **Cấm** ghi MAC vào `/etc/sbproxy.bans` + đặt `macfilter=deny` cho SSID đó rồi reload băng tần tương ứng; ban được `apply.sh` áp lại mỗi lần chạy nên không mất khi cấu hình lại. Blocklist offline vẫn hiện để bỏ cấm. Router-side: `sh scripts/clients.sh`, `sh scripts/{kick,ban,unban}.sh <idx> <mac>`.
 

@@ -116,8 +116,8 @@ class DesktopGuiSmokeTests(unittest.TestCase):
         self.set_mode("en", "dark")
         self.assertEqual(set(self.app.wifi_edit_buttons), {"edit", "delete"})
         self.assertEqual(
-            [self.app.wifi_context_menu.entrycget(index, "label") for index in (0, 1, 2, 4)],
-            ["Edit configuration", "Change SOCKS", "Random MAC", "Delete SSID"],
+            [self.app.wifi_context_menu.entrycget(index, "label") for index in (0, 1, 2, 3, 5)],
+            ["Edit configuration", "Change SOCKS", "Proxy pool…", "Random MAC", "Delete SSID"],
         )
 
     def test_tabs_use_chrome_style_rounded_surfaces(self):

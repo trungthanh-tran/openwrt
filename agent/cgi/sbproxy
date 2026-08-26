@@ -18,6 +18,10 @@
 # GET  ?action=health_now    -> run an immediate health probe
 # GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status + interface list
 # POST ?action=set_gateway   body json {interface} -> pin the expected uplink ("" = automatic)
+# GET  ?action=get_pool&idx=N -> {proxies:[...], assignments:[...]} pool of one Wi-Fi
+# POST ?action=save_pool     body json {idx,proxies:[...]} -> replace that Wi-Fi's pool
+# POST ?action=assign_proxy  body json {idx,assignments:[{mac,slot}]} -> pin devices, no reload
+# POST ?action=rebalance     body json {idx,macs:[...],proxies?,seed?} -> spread devices evenly
 # GET  ?action=clients       -> {clients:[...]} devices per SSID (mac/ip/time/in-out/banned)
 # POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
 # POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
@@ -53,10 +57,49 @@ have() { command -v "$1" >/dev/null 2>&1; }
 settings_numbers() {
   (
     [ -f "$SB_ROOT/config/settings.sh" ] && . "$SB_ROOT/config/settings.sh" 2>/dev/null
-    printf '%s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" "${BSSID_LIMIT:-16}"
+    printf '%s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
+      "${BSSID_LIMIT:-16}" "${POOL_PORT_BASE:-13000}" "${POOL_PORT_STRIDE:-256}"
   ) 2>/dev/null
 }
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+# Some jq builds emit CRLF. Anything parsed back out of jq gets the CR removed,
+# or a MAC arrives as "aa:...:01\r" and is rejected as malformed.
+jq_r() { jq -r "$@" | tr -d '\r'; }
+query_field() { echo "$QUERY_STRING" | sed -n "s/.*\\(^\\|&\\)$1=\\([^&]*\\).*/\\2/p"; }
+# A MAC as the rest of the project spells it: lowercase, colon separated.
+normalise_mac() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
+valid_mac() {
+  case "$1" in
+    [0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]) return 0 ;;
+  esac
+  return 1
+}
+# Rows the pool scripts accept, from a JSON array of proxy objects. jq has
+# already rejected control characters and pipes, so splitting on | stays safe.
+pool_rows_from_body() { # jq-path -> writes rows, one per line
+  jq_r "$1"'[] | [.type, .host, (.port|tostring), (.user // ""), (.pass // ""), (.label // "")] | join("|")' \
+    "$BODY_FILE"
+}
+# Shape check shared by save_pool and rebalance. $1 is the jq path of the array.
+POOL_ARRAY_SHAPE='
+  def integer: if type == "number" then floor == . else false end;
+  def clean: if type != "string" then false
+             else all(explode[]; . >= 32 and (. < 127 or . > 159)) and (index("|") | null == .) end;
+  type == "array" and all(.[];
+    (.type == "socks5" or .type == "http") and
+    (.host | clean) and (.host | length > 0) and (.host | length <= 253) and
+    (.port | integer) and .port >= 1 and .port <= 65535 and
+    ((has("user") | not) or ((.user | clean) and (.user | length <= 255))) and
+    ((has("pass") | not) or ((.pass | clean) and (.pass | length <= 255))) and
+    ((has("label") | not) or ((.label | clean) and (.label | length <= 64))))
+'
+# The one thing jq cannot express without test(): the host character set.
+check_pool_hosts() { # rows-file
+  while IFS='|' read -r _pt _ph _pp _pu _ppw _pl; do
+    [ -n "$_ph" ] || json_err "400 Bad Request" "host trống"
+    case "$_ph" in *[!A-Za-z0-9._:-]*) json_err "400 Bad Request" "host chứa ký tự không hợp lệ: $_ph" ;; esac
+  done < "$1"
+}
 body_has_nul() {
   if have od; then
     od -An -tu1 "$BODY_FILE" 2>/dev/null \
@@ -183,17 +226,24 @@ case "$ACTION" in
     # shellcheck disable=SC2046  # three plain integers, deliberately split
     set -- $(settings_numbers)
     net_base="${1:-10}"; tproxy_base="${2:-12000}"; bssid_limit="${3:-16}"
-    case "$net_base$tproxy_base$bssid_limit" in
-      ''|*[!0-9]*) net_base=10; tproxy_base=12000; bssid_limit=16 ;;
+    pool_base="${4:-13000}"; pool_stride="${5:-256}"
+    case "$net_base$tproxy_base$bssid_limit$pool_base$pool_stride" in
+      ''|*[!0-9]*)
+        net_base=10; tproxy_base=12000; bssid_limit=16
+        pool_base=13000; pool_stride=256
+        ;;
     esac
     json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
                      --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
                      --argjson net_base "$net_base" --argjson tproxy_port_base "$tproxy_base" \
                      --argjson bssid_limit "$bssid_limit" \
+                     --argjson pool_port_base "$pool_base" \
+                     --argjson pool_port_stride "$pool_stride" \
       '{ok:true, ssids:$ssids, health:$health,
         meta:{singbox_running:$running, applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
-              bssid_limit:$bssid_limit}}')"
+              bssid_limit:$bssid_limit,
+              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}')"
     ;;
 
   get_conf)
@@ -418,6 +468,120 @@ case "$ACTION" in
     rm -f "$ENV_TMP"
     json_ok "$(jq -n --arg interface "$iface" \
       '{ok:true, interface:$interface, automatic:($interface == "")}')"
+    ;;
+
+  get_pool)
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    idx="$(query_field idx)"
+    require_valid_idx "$idx"
+    POOLS_FILE="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
+    ASSIGN="${ASSIGN_FILE:-/etc/sbproxy.assign}"
+    proxies="$(awk -F'|' -v want="$idx" '
+        function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+        { sub(/\r$/, "") }
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF < 6 || NF > 7 { next }
+        trim($1) != want { next }
+        { printf "%d\t%s\t%s\t%s\t%s\t%s\t%s\n", n++, tolower(trim($2)), trim($3), trim($4),
+                 $5, $6, (NF >= 7 ? trim($7) : "") }
+      ' "$POOLS_FILE" 2>/dev/null \
+      | jq -R -s 'split("\n") | map(select(length > 0) | split("\t"))
+                  | map({slot:(.[0]|tonumber), type:.[1], host:.[2], port:(.[3]|tonumber),
+                         user:.[4], pass:.[5], label:.[6]})')"
+    assignments="$(awk -F'|' -v want="$idx" '
+        { sub(/\r$/, "") }
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF < 3 { next }
+        $1 != want { next }
+        { printf "%s\t%s\t%s\n", tolower($2), $3, ($4 == "" ? "auto" : $4) }
+      ' "$ASSIGN" 2>/dev/null \
+      | jq -R -s 'split("\n") | map(select(length > 0) | split("\t"))
+                  | map({mac:.[0], slot:(.[1]|tonumber), source:.[2]})')"
+    json_ok "$(jq -n --argjson idx "$idx" --argjson p "${proxies:-[]}" --argjson a "${assignments:-[]}" \
+      '{ok:true, idx:$idx, proxies:$p, assignments:$a}')"
+    ;;
+
+  save_pool)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      (.idx | integer) and (.proxies | '"$POOL_ARRAY_SHAPE"')
+    ' "idx/proxies sai kiểu, thiếu trường, hoặc chứa ký tự không hợp lệ"
+    idx="$(jq_r '.idx' "$BODY_FILE")"
+    require_valid_idx "$idx"
+    TMP_POOL="$(mktemp "${TMPDIR:-/tmp}/sbproxy-pool.XXXXXX")" \
+      || json_err "500 Internal Server Error" "không tạo được file tạm"
+    pool_rows_from_body '.proxies' > "$TMP_POOL"
+    check_pool_hosts "$TMP_POOL"
+    OUT="$(cd "$SB_ROOT" && sh scripts/pool.sh replace "$idx" "$TMP_POOL" 2>&1)"; RC=$?
+    rm -f "$TMP_POOL"
+    json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
+    ;;
+
+  assign_proxy)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      (.idx | integer) and (.assignments | type == "array") and (.assignments | length > 0) and
+      all(.assignments[];
+        (.mac | type == "string") and
+        (((.slot | integer) and .slot >= 0) or .slot == "none"))
+    ' "idx/assignments sai kiểu hoặc rỗng"
+    idx="$(jq_r '.idx' "$BODY_FILE")"
+    require_valid_idx "$idx"
+    # Validate every MAC before running anything: a half-applied batch would
+    # leave the operator guessing which devices moved.
+    for mac in $(jq_r '.assignments[].mac' "$BODY_FILE"); do
+      valid_mac "$(normalise_mac "$mac")" || json_err "400 Bad Request" "MAC không hợp lệ: $mac"
+    done
+    RESULTS="[]"
+    jq_r '.assignments[] | "\(.mac)\t\(.slot)"' "$BODY_FILE" > "${TMPDIR:-/tmp}/sbproxy-assign.$$"
+    while IFS="$(printf '\t')" read -r mac slot; do
+      [ -n "$mac" ] || continue
+      mac="$(normalise_mac "$mac")"
+      OUT="$(cd "$SB_ROOT" && sh scripts/assign.sh "$idx" "$mac" "$slot" 2>&1)"; RC=$?
+      RESULTS="$(printf '%s' "$RESULTS" | jq --arg m "$mac" --arg s "$slot" --arg log "$OUT" \
+        --argjson rc "$RC" '. + [{mac:$m, slot:$s, ok:($rc==0), rc:$rc, log:$log}]')"
+    done < "${TMPDIR:-/tmp}/sbproxy-assign.$$"
+    rm -f "${TMPDIR:-/tmp}/sbproxy-assign.$$"
+    json_ok "$(jq -n --argjson r "$RESULTS" '{ok:($r | all(.ok)), results:$r}')"
+    ;;
+
+  rebalance)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      (.idx | integer) and (.macs | type == "array") and (.macs | length > 0) and
+      all(.macs[]; type == "string") and
+      ((has("seed") | not) or ((.seed | integer) and .seed >= 0)) and
+      ((has("proxies") | not) or (.proxies | '"$POOL_ARRAY_SHAPE"'))
+    ' "idx/macs/proxies/seed sai kiểu hoặc rỗng"
+    idx="$(jq_r '.idx' "$BODY_FILE")"
+    require_valid_idx "$idx"
+    MACS=""
+    for mac in $(jq_r '.macs[]' "$BODY_FILE"); do
+      mac="$(normalise_mac "$mac")"
+      valid_mac "$mac" || json_err "400 Bad Request" "MAC không hợp lệ: $mac"
+      MACS="$MACS${MACS:+,}$mac"
+    done
+    set -- "$idx" --macs "$MACS"
+    TMP_POOL=""
+    if jq -e 'has("proxies")' "$BODY_FILE" >/dev/null 2>&1; then
+      TMP_POOL="$(mktemp "${TMPDIR:-/tmp}/sbproxy-pool.XXXXXX")" \
+        || json_err "500 Internal Server Error" "không tạo được file tạm"
+      pool_rows_from_body '.proxies' > "$TMP_POOL"
+      check_pool_hosts "$TMP_POOL"
+      set -- "$@" --pool-file "$TMP_POOL"
+    fi
+    if jq -e 'has("seed")' "$BODY_FILE" >/dev/null 2>&1; then
+      set -- "$@" --seed "$(jq_r '.seed' "$BODY_FILE")"
+    fi
+    OUT="$(cd "$SB_ROOT" && sh scripts/rebalance.sh "$@" 2>&1)"; RC=$?
+    [ -z "$TMP_POOL" ] || rm -f "$TMP_POOL"
+    json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
     ;;
 
   clients)

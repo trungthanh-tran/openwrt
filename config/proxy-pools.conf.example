@@ -1,0 +1,32 @@
+# proxy-pools.conf — extra proxies for an SSID, one per row, separated by `|`.
+# Copy to config/proxy-pools.conf. Do not add spaces around separators.
+# Empty rows and rows beginning with `#` are ignored.
+#
+# This file is OPTIONAL. Without it — or for an idx with no row here — the SSID
+# keeps using the single proxy from its wifi-socks.conf row, exactly as before.
+# With rows here, a device is pinned to one of them and keeps it; the proxy in
+# wifi-socks.conf stays as the default for devices not yet pinned.
+#
+# Columns:
+#   idx        : Wi-Fi index from wifi-socks.conf. Rows for the same idx form
+#                that SSID's pool.
+#   proxy_type : socks5 or http.
+#   host       : Proxy IP address or hostname.
+#   port       : Proxy port, 1..65535.
+#   user       : Proxy username; leave empty when authentication is disabled.
+#   pass       : Proxy password; leave empty when authentication is disabled.
+#   label      : OPTIONAL 7th column. Free text shown in the Console, at most
+#                64 bytes. Purely cosmetic.
+#
+# The SLOT NUMBER is a row's position within its own idx, counted from zero.
+# Slots decide TPROXY ports and are what /etc/sbproxy.assign pins devices to, so
+# reordering or deleting a row remaps every device pinned after it. Add new
+# proxies at the end of an idx's block whenever you can.
+#
+# Never commit the real proxy-pools.conf: it holds proxy passwords.
+#
+# idx|proxy_type|host|port|user|pass|label
+1|socks5|1.2.3.4|1080|user1|pass1|VN-01
+1|socks5|1.2.3.5|1080|user1|pass1|VN-02
+1|http|5.6.7.8|8080|||US-01
+3|socks5|proxy.example.com|1080|user3|pass3|SG-01

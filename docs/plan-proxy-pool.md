@@ -42,6 +42,7 @@ viết lại so với bản plan đầu.
 | D7 | Failover dùng outbound **`urltest`** của sing-box | Cơ chế native, khỏi tự viết logic dò sống-chết | ✅ tài liệu |
 | D8 | **Không** dùng `selector` + Clash API | Việc nó giải quyết thì map nft đã làm miễn phí; việc nó không giải quyết thì vẫn phải restart | ✅ tài liệu, [B.4](#b4-đã-cân-nhắc-và-loại-selector--clash-api) |
 | **D10** | GL‑MT6000 có **profile limit chuẩn**; model OpenWrt khác dùng profile riêng hoặc fallback bảo thủ | Limit chính xác cần benchmark theo CPU/RAM/sing-box, nhưng vẫn phải co lại theo RAM/overlay khả dụng tại thời điểm apply | ⚠️ phải đo ở P1; xem [3.5](#35-tự-tính-ram-bộ-nhớ-và-trần-pool) |
+| **D12** | Chưa có profile khớp thì `POOL_TOTAL_SLOTS_MAX="auto"` **hạ trần xuống 32**, không từ chối chạy. Trần thấp đi; **danh sách proxy không bao giờ bị cắt** | Router lạ vẫn dùng được ngay mà không phải hiệu chuẩn trước; 32 là mức đã qua soak test ở mọi cấu hình. Việc "vượt trần" vẫn do `apply.sh` chặn nên không có đường nào âm thầm mất proxy | — |
 | **D11** | Thiết bị chưa gán/proxy chết có policy rõ: `auto`, `block` hoặc `default`; triển khai phone-farm mặc định `auto`, **không fail-open cả nhóm vào một IP** | Fallback im lặng sang proxy mặc định có thể liên kết hàng loạt tài khoản — đúng failure mode sản phẩm này phải ngăn | — |
 
 ## 3. Kiến trúc
@@ -131,6 +132,13 @@ POOL_PORT_STRIDE=256
 POOL_TOTAL_SLOTS_MAX="auto"
 # Trần riêng của một SSID, luôn không lớn hơn POOL_PORT_STRIDE.
 POOL_SLOTS_PER_SSID_MAX=256
+# Luật divert (D9). auto = dùng khi nft của router này chấp nhận; on | off.
+POOL_DIVERT="auto"
+# Trạng thái ghim: idx|mac|slot|source. Runtime state, cùng loại với BANS_FILE.
+ASSIGN_FILE="/etc/sbproxy.assign"
+# Sức chứa map ghim của mỗi SSID. Phải khai báo size thì nftables mới chọn bảng
+# băm cố định; map không tự lớn quá số này nên đặt rộng hơn dải DHCP.
+POOL_MAP_SIZE=512
 # Giữ lại ít nhất max(64 MiB, 20% MemTotal) cho kernel, Wi-Fi và tiến trình khác.
 POOL_RAM_RESERVE_MIB=64
 POOL_RAM_RESERVE_PERCENT=20
@@ -152,6 +160,10 @@ POOL_HEALTH_FAILURE_THRESHOLD=3
 ```
 
 `pool_port(idx, slot) = POOL_PORT_BASE + idx * POOL_PORT_STRIDE + slot`
+
+`POOL_SHUFFLE_SEED` **không phải một thiết lập** và không nằm trong `settings.sh`: nó
+là biến môi trường để bảng xem trước và lần ghi ngay sau đó dùng chung một phép xáo,
+và để test lặp lại được kết quả. Bỏ trống thì seed lấy từ `/dev/urandom`.
 
 Tách `POOL_PORT_STRIDE` khỏi trần tự động là bắt buộc: lượng RAM rảnh thay đổi giữa hai
 lần apply không được làm đổi cổng của mọi idx. Với idx ≤ 200 và stride 256, cổng lớn nhất
@@ -246,6 +258,20 @@ fallback_total_slots = min(32, slots_by_ports, slots_by_fd)
 và vẫn bắt buộc kiểm tra reserve RAM/overlay; nếu không đủ cho 32 thì giảm tiếp hoặc
 fail. Cảnh báo hướng dẫn chạy `scripts/calibrate-pool.sh` để tạo profile cục bộ. Script
 hiệu chuẩn là thao tác chủ động của admin, không tự restart sing-box trên router production.
+
+**Fallback hạ trần, không cắt pool (D12).** Hai việc này phải tách bạch, vì gộp lại là
+đúng kiểu lỗi mà [mục 7](#7-việc-dễ-quên-đã-có-tiền-lệ-đau) dặn tránh:
+
+1. Không có profile khớp → `auto` trả về `fallback_total_slots` (tối đa 32) và đặt
+   `limiting_factor=UNPROFILED`. Đây là **trần**, không phải một thao tác lên pool.
+2. Pool đang cấu hình vượt trần đó → `apply.sh` **fail trước mọi thay đổi**, nêu rõ số
+   slot đang yêu cầu, trần 32, lý do `UNPROFILED`, và hai lối ra: chạy
+   `calibrate-pool.sh` để có profile thật, hoặc đặt tay một số cho
+   `POOL_TOTAL_SLOTS_MAX` và tự chịu trách nhiệm.
+
+Nói cách khác: router lạ vẫn chạy được ngay với ≤32 proxy mà không phải hiệu chuẩn
+trước, còn ai muốn vượt 32 thì phải nói rõ ý định. **Không có đường nào khiến một
+proxy trong `proxy-pools.conf` biến mất mà người dùng không được báo.**
 
 #### Công thức và hành vi
 
@@ -603,18 +629,174 @@ thiếu chuỗi dịch.
 
 ## 8. Test
 
-| Bộ | Thêm gì |
+### 8.1 Nguyên tắc
+
+1. **Viết test trước, code sau**, và test phải **đỏ vì đúng lý do** — không phải đỏ
+   vì hàm chưa tồn tại.
+2. **Chỉ chạy suite của bước đang làm.** Full suite chạy một lần ở F10.
+3. **Mutation test là cổng, không phải tuỳ chọn.** Mỗi bước phá có chủ đích từng
+   guard trong code vừa viết; guard nào sống sót thì test của nó vô giá trị. Ba lần
+   đầu áp dụng đã bắt được ba lỗi thật, xem [8.5](#85-hai-kiểu-test-rỗng-đã-gặp).
+4. **Bất biến tương thích ngược có golden file**: `tests/fixtures/singbox-nopool.json`
+   sinh từ code trước F2 và so từng byte. Fixture đó **không được refresh cho khớp**
+   khi test gãy — gãy nghĩa là thay đổi đã phá tương thích ngược.
+
+### 8.2 Suite theo bước
+
+| Bước | Suite | Lệnh chạy |
+|---|---|---|
+| F1–F5 | `tests/test_pool.sh` | `sh tests/test_pool.sh` |
+| F3 | thêm `tests/run.sh` (có assertion trên text nft) | `sh tests/run.sh` |
+| F6, F8 | `tests/test_pool_console.py` | `python -m unittest tests.test_pool_console` |
+| F7 | `tests/test_pool_agent.sh` | `sh tests/test_pool_agent.sh` |
+| F9 | `tests/test_assignd.sh` | `sh tests/test_assignd.sh` |
+| F5b | `tests/test_pool_capacity.sh` | `sh tests/test_pool_capacity.sh` |
+| F10 | tất cả | `sh tests/run-all.sh` |
+
+### 8.3 Kế hoạch từng bước còn lại
+
+#### F5 — ghi trạng thái ghim
+
+- `assign_set`: ghi thường hoá chữ thường; ghim lại thì **thay chứ không thêm dòng**;
+  cùng một máy ghim được trên hai SSID khác nhau; `assign_clear` chỉ xoá đúng SSID đó.
+- Từ chối: MAC sai, slot không phải số, slot vượt pool, SSID không có pool, `source`
+  lạ. Mỗi ca **một khuyết điểm duy nhất**.
+- `assign_prune`: slot biến mất thì **gán lại** (`slot % số_slot_mới`, đánh dấu `auto`)
+  chứ không xoá; SSID mất sạch pool thì mới bỏ; SSID khác không bị đụng; log nói rõ
+  đã đổi gì.
+- `assign_spread`: ma trận M × N với M = 0, 1, 2, 4, 6, 300 và N = 1, 3, 8, 32, 300.
+  Khẳng định số thiết bị mỗi proxy **chênh nhau tối đa 1**, mọi thiết bị được ghim
+  đúng một lần, và khi N ≥ M thì mỗi máy một slot riêng.
+- **Cùng seed cho cùng kết quả** — nếu không, bảng xem trước và lần ghi sau đó có thể
+  lệch nhau.
+- `apply.sh` gọi `validate_pools` và `assign_prune`; `preflight.sh` gọi `validate_pools`.
+
+#### F6 — parser danh sách dán và hàm chia đều
+
+- Năm định dạng ở [6.3](#63-console-desktop), scheme không phân biệt hoa thường.
+- **Quy tắc tách phải có test riêng**: cắt tại dấu `@` **cuối cùng** (mật khẩu có thể
+  chứa `@`), rồi tách `user:pass` tại dấu `:` **đầu tiên** (mật khẩu có thể chứa `:`).
+  `a:b:c:d` không có `@` thì đọc là `host:port:user:pass`.
+- Từ chối: ký tự `|`, ký tự điều khiển, host rỗng, port ngoài 1..65535, port không phải số.
+- Khử trùng lặp **giữ lần xuất hiện đầu**, vì slot bám theo thứ tự.
+- Vượt `POOL_SLOTS_PER_SSID_MAX`: **báo đã bỏ bao nhiêu dòng**, không cắt im lặng.
+- Chia đều: cùng ma trận M × N như F5, chạy ở phía Python để hai bên không lệch nhau.
+
+#### F7 — agent API
+
+Theo khuôn `tests/test_agent.sh`. Với **mỗi** action mới:
+
+- Thiếu token → 401; sai method (GET vào action POST và ngược lại) → 405; body vượt
+  giới hạn → 413; body chứa NUL → 400.
+- `get_pool`: idx lạ → 400; trả slot đúng thứ tự; kèm danh sách ghim hiện tại.
+- `save_pool`: hàng hỏng → 400 **và file trên đĩa không đổi** (kiểm nội dung trước/sau);
+  vượt trần → 400; hợp lệ → ghi, dựng lại, trả ok.
+- `assign_proxy`: **không restart gì cả** (khẳng định bằng dấu vết lệnh); MAC lạ → 400;
+  slot ngoài dải → 400.
+- `rebalance`: thay pool rồi chia đều trong **một thao tác**; danh sách MAC rỗng → 400;
+  pool rỗng → 400; trả về đúng ánh xạ đã ghi.
+- `clients` có thêm `slot`, `proxy_label`, `proxy_host`, `proxy_state`.
+
+> **Sửa so với [6.1](#61-agent-api):** `capacity` thuộc F5b và `pool_health`/`probe_pool`
+> thuộc F9, không phải F7 — chúng cần bộ tính và daemon tồn tại trước.
+
+#### F8a — `clients` báo pin
+
+- Bốn trạng thái phải phân biệt được, không phải hai: SSID **chưa có pool**, máy
+  **chưa ghim**, pin **giải được**, và pin **trỏ quá cuối pool** sau khi pool bị rút
+  ngắn. Trạng thái cuối là trạng thái cần người vào sửa, nên không được đọc giống
+  "chưa ghim".
+- `has("slot")` cũng phải kiểm, không chỉ giá trị: thiếu khoá và khoá bằng `null`
+  đọc qua `.slot` là như nhau, mà chỉ một trong hai là hợp đồng.
+- **User và pass của proxy không bao giờ đi kèm danh sách thiết bị** — chỉ nhãn và
+  `host:port`.
+
+> **Sửa so với [F7](#f7--agent-api):** phần `clients` có thêm `slot`/`proxy_label`/
+> `proxy_host`/`proxy_state` được tách ra thành **F8a** và thêm `pool_size`. Để trong
+> F7 thì console vẫn phải gọi `get_pool` cho **từng** SSID mỗi lần làm mới danh sách
+> thiết bị; gộp vào `clients` thì chỉ còn một lượt đi về.
+
+#### F8b — console desktop
+
+- Khu Pool proxy: bảng slot hiện đúng thứ tự, kèm **số thiết bị đang dùng mỗi slot**.
+- Hộp thoại đổi hàng loạt: **từ chối khi chưa chọn máy** và **khi pool rỗng**; bảng xem
+  trước phải bằng đúng ánh xạ được gửi đi — cùng một hàm, cùng một seed, không tính hai lần.
+- Cột Proxy hiện nhãn hoặc `host:port`, và trạng thái "chưa ghim" cho máy chưa có pin.
+- Chuột phải gán một máy → gửi `assign_proxy` đúng MAC và slot.
+- i18n: mọi chuỗi tiếng Việt mới đều có bản dịch EN, theo cách `test_web_console_i18n.py`
+  đang kiểm cho console web. Thêm khoá vào `EN_TRANSLATIONS` phải kiểm **trùng khoá**:
+  một khoá đã có bị khai lại thì bản dịch cũ biến mất mà không có lỗi nào.
+
+> **Quyết định khi code F8b:** hộp thoại đổi hàng loạt **chia trên pool đang có** và gửi
+> `assign_proxy` với đúng những dòng vừa hiện, chứ không gọi `rebalance`. `rebalance`
+> xáo bằng RNG của shell trên router, nên bảng xem trước tính bằng Python sẽ **không**
+> bằng thứ được ghi — đúng cái bất biến mà mục này đòi. Việc thay pool thuộc về khu
+> Pool proxy ở tab Wi‑Fi; `rebalance` vẫn giữ cho CLI và agent.
+
+#### F9 — daemon và móc DHCP
+
+- Máy mới xuất hiện trong `station dump` được ghim **đúng một lần**; máy đã ghim không
+  bị ghim lại.
+- Từng policy: `random` cho slot trong dải, `round-robin` quay vòng, `least-loaded` chọn
+  slot ít máy nhất, `sticky-hash` cho cùng kết quả sau khi xoá state.
+- `POOL_ROTATE_ON_RECONNECT=1` thì bốc lại khi máy vào lại.
+- **Tự chữa lành**: `nft add element` thất bại, hoặc số phần tử trong map khác file
+  state, thì nạp lại toàn bộ map.
+- Pool rỗng → không làm gì và không lỗi.
+- Móc DHCP: `add`/`old` thì ghim; `del` **giữ nguyên pin** và chỉ gỡ element, vì thiết
+  bị sẽ quay lại; hook không ghi ra ngoài `ASSIGN_FILE`.
+- Nguồn ngẫu nhiên **không dùng `hexdump`/`od`** — có test khẳng định, vì đó chính là
+  applet đã làm hỏng self-update ở 0.4.10.
+
+#### F5b — bộ tính trần
+
+- Fixture cho `/proc/meminfo` **có và không có** `MemAvailable`; `smaps_rollup` có và
+  không có (rơi về `VmRSS`); `df -Pk` bình thường và không có `/overlay`.
+- Profile khớp/không khớp trên **từng** trường trong bốn trường khoá; không khớp thì
+  không được dùng nhầm profile khác.
+- `UNPROFILED` → trần 32 (D12); pool vượt trần → `apply.sh` fail **trước mọi thay đổi**,
+  và thông báo nêu đủ: số slot đang yêu cầu, trần, lý do, hai lối ra.
+- Số học: không có số thực; `×1.25` là `* 5 / 4`; **chặn chia cho 0** khi chưa có
+  profile; không tràn với giá trị lớn.
+- `limiting_factor` đúng với từng tài nguyên đang chặn.
+
+#### F10 — tài liệu
+
+- Không có CRLF, không có link gãy, mọi thiết lập `POOL_*` mới đều được nói tới trong
+  văn xuôi, cả bản `.md` và `.en.md` đều cập nhật, TEST-MATRIX và CHANGELOG có mục mới.
+- Chạy `sh tests/run-all.sh` **một lần**.
+
+### 8.4 Đích đột biến theo bước
+
+Mỗi bước phải liệt kê trước các guard sẽ bị phá, rồi chứng minh suite bắt được hết:
+
+| Bước | Guard phải bắt được |
 |---|---|
-| `tests/run.sh` | parse + validate pool; công thức cổng và chứng minh hai dải không chồng; JSON sing-box hợp lệ với 0/1/N proxy (qua `jq`); text nft có luật divert, `vmap`, chain riêng, map **có `size` và không có `timeout`**, elements, set `@proxy_hosts`; toán chia đều kể cả N ≥ M; round-trip file assign; gán lại slot mồ côi khi pool co |
-| `tests/test_pool_capacity.sh` (mới) | fixture `/proc/meminfo`, `status`/`smaps_rollup`, `df -Pk`, FD và profile; nhận đúng board Flint 2; sai model/version/failover → local profile hoặc fallback 32; dùng max(idle, loaded)+25%; min theo RAM/overlay/cổng/FD/profile max; vượt trần phải fail trước mutation; chống chia 0/overflow |
-| Test trên GL‑MT6000 | ma trận 32/64/128/256/300, nhiều cách chia SSID, firmware OpenWrt thuần và GL.iNet; idle + tải thật + reconnect burst; xác nhận dự đoán không thấp hơn RSS thực; thử thiếu overlay/RAM, post-apply rollback, reboot và soak 24 giờ |
-| Test model OpenWrt khác | `ALLOW_UNSUPPORTED_BOARD=0` từ chối như hiện tại; bật override + chưa profile → fallback ≤32; local calibration hợp lệ → dùng limit profile nhưng vẫn co theo tài nguyên thực |
-| `tests/test_agent.sh` | 4 action mới, cả đường xấu: `\|` trong field, ký tự điều khiển, slot ngoài dải, MAC lạ, idx không tồn tại → 400 chứ không 500 |
-| `tests/test_assignd.sh` (mới) | daemon gán máy mới, không gán lại máy cũ, chỉ chọn slot healthy, tôn trọng `auto/block/default`, không fail-open chung IP, tự chữa lành sau khi bảng bị xoá, sống sót khi pool rỗng |
-| `tests/test_pool_health.sh` (mới) | threshold success/failure, chống flapping, redact lỗi, proxy dead không nhận assignment mới, strict identity block thay vì failover, chuyển hàng loạt có preview |
-| `tests/test_desktop_core.py` | bảng test cho parser dán (kể cả `socks5://user:pass@host:port`) và hàm chia đều |
-| `tests/test_desktop_workflows.py` | luồng hộp thoại rebalance, đúng nội dung xem trước, từ chối khi chưa chọn máy / pool rỗng |
-| `tests/test_dirty_data.py` | dữ liệu dán bẩn |
+| F5 | thay-vs-thêm dòng, chặn slot, gán lại vs xoá khi mồ côi, phép chia bài `% N`, tính lặp lại của seed |
+| F6 | quy tắc tách `@` cuối và `:` đầu, khử trùng lặp, thông báo khi vượt trần, phép chia bài |
+| F7 | kiểm token, kiểm method, tính nguyên tử của `save_pool`, chặn dải slot |
+| F8a | bậc thang bốn trạng thái, tra pool, việc không lộ credential |
+| F8b | điều kiện chặn nút, việc dùng chung seed giữa xem trước và lần gửi |
+| F9 | điều kiện "đã ghim", từng nhánh policy, điều kiện tự chữa lành |
+| F5b | từng phép `min` trong công thức, nhánh fallback, chặn chia 0 |
+
+### 8.5 Hai kiểu test rỗng đã gặp
+
+Ghi lại vì cả hai đều **xanh trong khi không kiểm gì cả**, và cả hai chỉ lộ ra nhờ
+mutation test:
+
+1. **Assertion bọc trong `( )`.** Biến đếm tăng trong subshell rồi mất, nên mọi ca
+   trong nhóm đều pass bất kể kết quả. Xảy ra ở nhóm kiểm `validate_pool_settings`.
+   Cách tránh: chỉ chạy *đối tượng kiểm* trong subshell, còn assertion ở lại shell cha.
+2. **Các guard che nhau.** Một fixture gom nhiều khuyết điểm vào cùng một dòng dữ liệu:
+   MAC sai cũng là MAC không có lease, slot sai cũng là dòng trùng. Bỏ một guard đi thì
+   guard khác vẫn chặn, nên test không đổi màu. Xảy ra ở nhóm kiểm assignment của F4,
+   làm sáu đột biến sống sót. Cách tránh: **mỗi ca đúng một khuyết điểm**, mọi thứ khác
+   hợp lệ.
+
+Hệ quả phụ đáng giữ: cả hai lần, thứ bị phát hiện không chỉ là test yếu mà còn là
+**code thừa** — một nhánh `stride >= 1` và một guard kích thước pool, cả hai không đầu
+vào nào chạm tới được. Đột biến sống sót thường là dấu hiệu của một trong hai điều đó.
 
 ## 9. Hiệu năng
 
@@ -685,6 +867,8 @@ nft --handle list table inet sbproxy | grep -c '^\s*iifname'   # đếm luật
 
 ## 10. Lộ trình
 
+### 10.1 Phase và rủi ro
+
 | Phase | Nội dung | Rủi ro |
 |---|---|---|
 | **P0** | `settings.sh`, `proxy-pools.conf`, schema `resource-profiles.conf`, parse + validate trong `lib.sh`, test | thấp |
@@ -697,6 +881,56 @@ nft --handle list table inet sbproxy | grep -c '^\s*iifname'   # đếm luật
 **Làm spike D2 trước tiên, nửa ngày trên router.** Trình tự thử: map → nếu hỏng thì
 set theo slot (D2a) → nếu `ether saddr` hỏng thì đổi khoá sang IP (D2b). P2–P4 không
 đổi hình dạng trong cả ba nhánh.
+
+### 10.2 Trình tự commit
+
+Mỗi bước là **một commit**: viết test trước, code sau, và **chỉ chạy test của bước đó**.
+Toàn bộ suite (`sh tests/run-all.sh`) chạy **một lần duy nhất ở bước cuối**, không chạy
+lại sau mỗi commit.
+
+| Bước | Nội dung | Chạm vào | Test chạy | Phase |
+|---|---|---|---|---|
+| F1 | Lớp config pool: `pool_port`, `pool_rows`, `pool_count`, `pool_enabled`, `for_each_pool`, `pool_hosts`, `validate_pools`, `validate_pool_settings` | `settings.sh`, `lib.sh` | `sh tests/test_pool.sh` | P0 |
+| F2 | sing-box sinh inbound/outbound/route theo slot | `lib.sh:build_singbox` | `sh tests/test_pool.sh` | P1 |
+| F3 | nft **tái cấu trúc, giữ nguyên hành vi**: `vmap` + chain riêng mỗi SSID + luật divert + gộp tcp/udp + `@proxy_hosts` | `lib.sh:build_nft` | `sh tests/test_pool.sh` + `sh tests/run.sh` | P1 |
+| F4 | nft định tuyến pool: map có `size`, elements nướng sẵn, luật ghim trước luật mặc định | `lib.sh:build_nft` | `sh tests/test_pool.sh` | P1 |
+| F5 | State ghim `/etc/sbproxy.assign`, gán lại slot mồ côi, `assign.sh`, `rebalance.sh`, nạp state khi apply | `lib.sh`, `assign.sh`, `rebalance.sh`, `apply.sh` | `sh tests/test_pool.sh` | P2 |
+| F6 | Parser danh sách dán + hàm chia đều (hàm thuần) | `console/desktop/main.py` | `python -m unittest tests.test_pool_console` | P4 |
+| F7 | Agent API: `get_pool`, `save_pool`, `assign_proxy`, `rebalance`, `capacity`, `pool_health`, `probe_pool` | `agent/cgi/sbproxy` | `sh tests/test_pool_agent.sh` | P3 |
+| F8a | `clients` báo pin của từng máy: `slot`, `proxy_label`, `proxy_host`, `proxy_state`, `pool_size` | `scripts/clients.sh` | `sh tests/run.sh` | P4 |
+| F8b | Console desktop: khu Pool proxy, cột Proxy, hộp thoại đổi hàng loạt có xem trước | `console/desktop/main.py` | `python -m unittest tests.test_pool_console tests.test_desktop_workflows tests.test_desktop_gui` | P4 |
+| F9 | `sbproxy-assignd` + móc DHCP + init.d + `install-deps.sh` cài `nft_socket` | `agent/`, `etc/init.d/`, `install-deps.sh` | `sh tests/test_assignd.sh` | P2 |
+| F10 | Tài liệu và CHANGELOG (cả bản `.en`) | `docs/`, `README*`, `CHANGELOG.md` | `sh tests/run-all.sh` | P5 |
+
+Bất biến phải giữ ở **mọi** bước: SSID không có pool thì `config.json` và `sbproxy.nft`
+sinh ra **giống hệt hôm nay, từng byte**. F3 là bước duy nhất được phép đổi output của
+cấu hình không-pool, và chỉ theo nghĩa tương đương ngữ nghĩa — test phải chứng minh.
+
+### 10.3 F5b — bộ tính trần theo RAM
+
+Khối này tách riêng vì toàn bộ giá trị của nó nằm ở **hệ số đo được từ phần cứng thật**.
+Làm bộ tính trước khi có số đo chỉ tạo ra một hàm in hằng số 32.
+
+| Bước | Nội dung | Test chạy |
+|---|---|---|
+| F5b.6 | `calibrate-pool.sh` — đo trên router, sinh `resource-profiles.conf` | `sh tests/test_pool_capacity.sh` (phần số học: median, độ dốc, headroom) |
+| F5b.1 | Đọc số liệu: `MemAvailable`, `smaps_rollup`, `df -Pk`, FD, cổng | ↑ |
+| F5b.2 | Schema và tra profile theo board + kiến trúc + major.minor sing-box + `POOL_FAILOVER` | ↑ |
+| F5b.3 | Bộ tính: năm trần + `limiting_factor` | ↑ |
+| F5b.4 | `pool-capacity.sh` xuất JSON theo khuôn `gateway.sh`, preflight gọi read-only | ↑ |
+| F5b.5 | Cổng chặn ở `apply.sh` + guard 30 giây sau apply + rollback | ↑ + `sh tests/test_pool.sh` |
+
+**F5b.6 chạy ngay sau spike D2/D9 ở P1**, khi đã có router trong tay; F5b.1–5 làm sau đó
+với hệ số thật. Ba điểm kỹ thuật phải chốt trong F5b.3:
+
+- POSIX sh không có số thực: `×1.25` viết là `* 5 / 4`, `20%` là `* 20 / 100`; tính toàn
+  bộ bằng KiB, chỉ đổi ra MiB khi in.
+- **Chặn chia cho 0**: chưa có profile thì `slot_ram_kib = 0`, phải rẽ sang fallback
+  trước phép chia chứ không để nó xảy ra.
+- sing-box chưa chạy thì `current_singbox_rss = 0` và `predicted_base_rss` lấy từ profile.
+
+**Xung đột cần biết:** F5b.5 và F5 cùng sửa `apply.sh`. F5 phải xong trước, hoặc gộp hai
+phần sửa `apply.sh` vào một commit.
 
 ## 11. Rủi ro còn mở
 
