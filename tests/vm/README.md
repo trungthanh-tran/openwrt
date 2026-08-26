@@ -114,10 +114,20 @@ Tiện thể, WSL cho chạy suite dưới `dash`/BusyBox — gần với `ash` 
 git-bash trên Windows:
 
 ```bash
-sudo apt install -y busybox shellcheck jq
+sudo apt install -y busybox shellcheck jq python3-tk
 cd /mnt/d/working/gitlab.vgplay.vn/research/openwrt-multiwifi-socks5
-sh tests/run-all.sh
+sh tests/run-all.sh                       # dash
+busybox sh tests/run.sh                   # ash, đúng shell của router
+busybox sh tests/test_pool.sh
+busybox sh tests/test_assignd.sh
 ```
+
+Đã chạy 2026-08-26: toàn bộ đạt dưới `dash`, và ba suite shell (270 + 197 +
+120) đạt dưới BusyBox `ash` — cùng shell router chạy. Trước đó chúng chỉ từng
+chạy dưới git-bash trên Windows.
+
+`python3-tk` là cần thiết: thiếu nó thì sáu module test console không import
+được và `run-all.sh` dừng ngay tại đó.
 
 ## Dựng máy ảo
 
