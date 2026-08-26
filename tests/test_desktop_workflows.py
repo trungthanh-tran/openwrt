@@ -1376,6 +1376,19 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         instance.client.save_pool.assert_not_called()
         warning.assert_called_once()
 
+    def test_proxy_used_by_an_online_device_cannot_be_removed_from_pool(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", slot=0)])
+        with mock.patch.object(appmod.messagebox, "showwarning") as warning:
+            instance.apply_pool_text(1, "2.2.2.2:8080")
+        instance.client.save_pool.assert_not_called()
+        warning.assert_called_once()
+        self.assertIn("one", warning.call_args.args[1])
+
+    def test_unused_proxy_can_be_removed_while_another_proxy_stays_connected(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", slot=0)])
+        instance.apply_pool_text(1, "1.1.1.1:1080")
+        self.assertEqual(instance.client.save_pool.call_args.args[1][0][1], "1.1.1.1")
+
     def test_replacing_a_pool_asks_before_touching_the_router(self):
         instance = self.make_instance([])
         instance.confirm_important.return_value = False

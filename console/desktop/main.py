@@ -5593,6 +5593,22 @@ class NativeApp:
                 return True
         return False
 
+    def online_pool_proxies(self, idx, proxies):
+        """Return pool entries currently used by online devices on one SSID."""
+        used = []
+        for item in getattr(self, "clients_data", []) or []:
+            if not isinstance(item, dict) or not bool(item.get("online", True)):
+                continue
+            try:
+                if int(item.get("idx")) != int(idx):
+                    continue
+                slot = int(item.get("slot"))
+            except (TypeError, ValueError):
+                continue
+            if 0 <= slot < len(proxies) and proxies[slot] not in used:
+                used.append(proxies[slot])
+        return used
+
     def _pool_or_complaint(self, idx):
         """The proxies of one Wi-Fi, or None having already said why not."""
         try:
@@ -5674,6 +5690,25 @@ class NativeApp:
             messagebox.showwarning(
                 APP_NAME,
                 self.t("Không thể xóa toàn bộ proxy khi SSID còn device đang kết nối"),
+                parent=self.root,
+            )
+            return
+        try:
+            current_pool = self.pool_for_idx(idx, refresh=True)
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        current_proxies = current_pool.get("proxies") or []
+        protected = self.online_pool_proxies(idx, current_proxies)
+        new_identities = {row[:5] for row in rows}
+        removed = [proxy_display(proxy) for proxy in protected
+                   if (identity := proxy_object_tuple(proxy)) is not None
+                   and identity[:5] not in new_identities]
+        if removed:
+            messagebox.showwarning(
+                APP_NAME,
+                self.t("Không thể xóa proxy đang được device kết nối: "
+                       + ", ".join(removed)),
                 parent=self.root,
             )
             return
