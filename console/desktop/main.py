@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Native Windows controller for the sbproxy OpenWrt agent.
 
 This desktop application deliberately does not embed the web console or use a
@@ -40,7 +40,7 @@ from urllib.request import Request, urlopen
 
 APP_NAME = "sbproxy Console Native"
 # Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
-APP_VERSION = "0.5.1-SNAPSHOT"
+APP_VERSION = "0.5.1"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
 # Fallbacks for an agent too old to report the router's effective settings.sh
@@ -230,7 +230,7 @@ def setup_logging(verbose: bool = False) -> Path:
 
 
 def install_exception_logging() -> None:
-    """Uncaught failures — main thread and workers — must reach the log file."""
+    """Uncaught failures â€” main thread and workers â€” must reach the log file."""
     previous = sys.excepthook
 
     def hook(exc_type, exc, tb):
@@ -346,339 +346,339 @@ def rounded_tab_image(master, color: str, width=32, height=30, radius=9):
     return image
 
 EN_TRANSLATIONS = {
-    "Chưa kết nối": "Not connected",
-    "Kết nối": "Connect",
-    "Làm mới": "Refresh",
-    "Kiểm tra cổng ra": "Check gateway",
-    "CỔNG RA INTERNET": "INTERNET GATEWAY",
-    "● Internet chưa kiểm tra": "● Gateway not checked",
-    "● Internet chưa xác định": "● Gateway unknown",
-    "● Mất kết nối Internet": "● Gateway down",
-    "● Internet suy giảm": "● Gateway degraded",
-    "● Internet hoạt động": "● Gateway OK",
-    "Đường ra: —": "Egress: —",
-    "Kết nối/DNS: —": "Link/DNS: —",
-    "Internet HTTP: —": "Internet HTTP: —",
-    "Wi‑Fi / SOCKS5": "Wi-Fi / SOCKS5",
-    "Thiết bị": "Devices",
-    "Backup / Nhật ký": "Backups / Logs",
-    "＋ Thêm SSID": "+ Add SSID",
-    "Đẩy cấu hình & Apply": "Push configuration & Apply",
-    "CHỈNH SỬA SSID ĐANG CHỌN": "EDIT SELECTED SSID",
-    "Sửa cấu hình": "Edit configuration",
-    "Đổi SOCKS": "Change SOCKS",
-    "Xoá SSID": "Delete SSID",
-    "Chọn một SSID trong bảng để chỉnh sửa": "Select an SSID in the table to edit",
-    "Làm mới": "Refresh",
-    "Chặn MAC…": "Block MAC…",
-    "Xuất CSV": "Export CSV",
-    "Tự làm mới": "Auto refresh",
-    "Kết nối": "Connection",
-    "Quyền": "Access",
-    "Tìm IP / tên / MAC": "Find IP / name / MAC",
-    "Tín hiệu": "Signal",
-    "Lưu lượng": "Traffic",
-    "Thời gian": "Duration",
-    "Đặt lại bộ lọc": "Reset filters",
-    "ĐIỀU KHIỂN THIẾT BỊ ĐANG CHỌN": "CONTROL SELECTED DEVICES",
-    "Chi tiết": "Details",
+    "ChÆ°a káº¿t ná»‘i": "Not connected",
+    "Káº¿t ná»‘i": "Connect",
+    "LÃ m má»›i": "Refresh",
+    "Kiá»ƒm tra cá»•ng ra": "Check gateway",
+    "Cá»”NG RA INTERNET": "INTERNET GATEWAY",
+    "â— Internet chÆ°a kiá»ƒm tra": "â— Gateway not checked",
+    "â— Internet chÆ°a xÃ¡c Ä‘á»‹nh": "â— Gateway unknown",
+    "â— Máº¥t káº¿t ná»‘i Internet": "â— Gateway down",
+    "â— Internet suy giáº£m": "â— Gateway degraded",
+    "â— Internet hoáº¡t Ä‘á»™ng": "â— Gateway OK",
+    "ÄÆ°á»ng ra: â€”": "Egress: â€”",
+    "Káº¿t ná»‘i/DNS: â€”": "Link/DNS: â€”",
+    "Internet HTTP: â€”": "Internet HTTP: â€”",
+    "Wiâ€‘Fi / SOCKS5": "Wi-Fi / SOCKS5",
+    "Thiáº¿t bá»‹": "Devices",
+    "Backup / Nháº­t kÃ½": "Backups / Logs",
+    "ï¼‹ ThÃªm SSID": "+ Add SSID",
+    "Äáº©y cáº¥u hÃ¬nh & Apply": "Push configuration & Apply",
+    "CHá»ˆNH Sá»¬A SSID ÄANG CHá»ŒN": "EDIT SELECTED SSID",
+    "Sá»­a cáº¥u hÃ¬nh": "Edit configuration",
+    "Äá»•i SOCKS": "Change SOCKS",
+    "XoÃ¡ SSID": "Delete SSID",
+    "Chá»n má»™t SSID trong báº£ng Ä‘á»ƒ chá»‰nh sá»­a": "Select an SSID in the table to edit",
+    "LÃ m má»›i": "Refresh",
+    "Cháº·n MACâ€¦": "Block MACâ€¦",
+    "Xuáº¥t CSV": "Export CSV",
+    "Tá»± lÃ m má»›i": "Auto refresh",
+    "Káº¿t ná»‘i": "Connection",
+    "Quyá»n": "Access",
+    "TÃ¬m IP / tÃªn / MAC": "Find IP / name / MAC",
+    "TÃ­n hiá»‡u": "Signal",
+    "LÆ°u lÆ°á»£ng": "Traffic",
+    "Thá»i gian": "Duration",
+    "Äáº·t láº¡i bá»™ lá»c": "Reset filters",
+    "ÄIá»€U KHIá»‚N THIáº¾T Bá»Š ÄANG CHá»ŒN": "CONTROL SELECTED DEVICES",
+    "Chi tiáº¿t": "Details",
     "Copy IP/MAC": "Copy IP/MAC",
-    "Cấm": "Block",
-    "Bỏ cấm": "Unblock",
-    "Tải danh sách": "Load list",
-    "Tạo backup": "Create backup",
-    "Rollback backup đang chọn": "Roll back selected backup",
-    "Nhật ký thao tác": "Operation log",
-    "Tất cả SSID": "All SSIDs",
-    "Tất cả band": "All bands",
-    "Tất cả kết nối": "All connections",
-    "Tất cả quyền truy cập": "All access states",
-    "Tất cả tín hiệu": "All signal levels",
-    "Tất cả lưu lượng": "All traffic",
-    "Tất cả thời gian": "All durations",
-    "Đang cấm": "Blocked",
-    "Không cấm": "Not blocked",
-    "Rất tốt (≥ -60 dBm)": "Excellent (≥ -60 dBm)",
-    "Tốt (-70 đến -61 dBm)": "Good (-70 to -61 dBm)",
-    "Yếu (-80 đến -71 dBm)": "Weak (-80 to -71 dBm)",
-    "Rất yếu (< -80 dBm)": "Very weak (< -80 dBm)",
-    "Không rõ": "Unknown",
-    "Có lưu lượng": "Has traffic",
-    "Không lưu lượng": "No traffic",
-    "Từ 10 MB": "At least 10 MB",
-    "Từ 100 MB": "At least 100 MB",
-    "Dưới 5 phút": "Under 5 minutes",
-    "5–60 phút": "5–60 minutes",
-    "Trên 1 giờ": "Over 1 hour",
-    "Sửa Wi‑Fi": "Edit Wi-Fi",
-    "Thêm Wi‑Fi": "Add Wi-Fi",
-    "Băng tần": "Band",
-    "Mật khẩu Wi‑Fi": "Wi-Fi password",
-    "Hãng router / MAC": "Router vendor / MAC",
-    "Cách ly client": "Client isolation",
-    "Chặn WebRTC": "Block WebRTC",
-    "Huỷ": "Cancel",
-    "Lưu": "Save",
-    "Dữ liệu không hợp lệ": "Invalid data",
-    "Chọn hãng router": "Select router vendor",
+    "Cáº¥m": "Block",
+    "Bá» cáº¥m": "Unblock",
+    "Táº£i danh sÃ¡ch": "Load list",
+    "Táº¡o backup": "Create backup",
+    "Rollback backup Ä‘ang chá»n": "Roll back selected backup",
+    "Nháº­t kÃ½ thao tÃ¡c": "Operation log",
+    "Táº¥t cáº£ SSID": "All SSIDs",
+    "Táº¥t cáº£ band": "All bands",
+    "Táº¥t cáº£ káº¿t ná»‘i": "All connections",
+    "Táº¥t cáº£ quyá»n truy cáº­p": "All access states",
+    "Táº¥t cáº£ tÃ­n hiá»‡u": "All signal levels",
+    "Táº¥t cáº£ lÆ°u lÆ°á»£ng": "All traffic",
+    "Táº¥t cáº£ thá»i gian": "All durations",
+    "Äang cáº¥m": "Blocked",
+    "KhÃ´ng cáº¥m": "Not blocked",
+    "Ráº¥t tá»‘t (â‰¥ -60 dBm)": "Excellent (â‰¥ -60 dBm)",
+    "Tá»‘t (-70 Ä‘áº¿n -61 dBm)": "Good (-70 to -61 dBm)",
+    "Yáº¿u (-80 Ä‘áº¿n -71 dBm)": "Weak (-80 to -71 dBm)",
+    "Ráº¥t yáº¿u (< -80 dBm)": "Very weak (< -80 dBm)",
+    "KhÃ´ng rÃµ": "Unknown",
+    "CÃ³ lÆ°u lÆ°á»£ng": "Has traffic",
+    "KhÃ´ng lÆ°u lÆ°á»£ng": "No traffic",
+    "Tá»« 10 MB": "At least 10 MB",
+    "Tá»« 100 MB": "At least 100 MB",
+    "DÆ°á»›i 5 phÃºt": "Under 5 minutes",
+    "5â€“60 phÃºt": "5â€“60 minutes",
+    "TrÃªn 1 giá»": "Over 1 hour",
+    "Sá»­a Wiâ€‘Fi": "Edit Wi-Fi",
+    "ThÃªm Wiâ€‘Fi": "Add Wi-Fi",
+    "BÄƒng táº§n": "Band",
+    "Máº­t kháº©u Wiâ€‘Fi": "Wi-Fi password",
+    "HÃ£ng router / MAC": "Router vendor / MAC",
+    "CÃ¡ch ly client": "Client isolation",
+    "Cháº·n WebRTC": "Block WebRTC",
+    "Huá»·": "Cancel",
+    "LÆ°u": "Save",
+    "Dá»¯ liá»‡u khÃ´ng há»£p lá»‡": "Invalid data",
+    "Chá»n hÃ£ng router": "Select router vendor",
     "Provider / OUI": "Provider / OUI",
-    "Random sẽ cập nhật provider trong config, tạo BSSID mới và reload radio.": "Randomization updates the provider, creates a new BSSID, and reloads the radio.",
-    "OUI không hợp lệ": "Invalid OUI",
-    "Provider không hợp lệ": "Invalid provider",
-    "Ngẫu nhiên / ẩn danh": "Random / anonymous",
-    "OUI tuỳ chỉnh · ": "Custom OUI · ",
-    "Thêm MAC vào blocklist": "Add MAC to blocklist",
-    "Chặn thiết bị theo MAC": "Block device by MAC",
-    "Ví dụ: AA:BB:CC:DD:EE:FF": "Example: AA:BB:CC:DD:EE:FF",
-    "Thêm vào blocklist": "Add to blocklist",
-    "MAC không hợp lệ": "Invalid MAC",
-    "MAC phải có dạng AA:BB:CC:DD:EE:FF": "MAC must use AA:BB:CC:DD:EE:FF format",
-    "Thiếu SSID": "Missing SSID",
-    "Hãy chọn SSID cần chặn": "Select the SSID to block on",
-    "sbproxy · Đang xử lý": "sbproxy · Working",
-    "Đang kiểm tra và áp dụng": "Validating and applying",
-    "CẢNH BÁO · TÁC VỤ QUAN TRỌNG": "WARNING · IMPORTANT ACTION",
-    "Thao tác": "Action",
-    "Ảnh hưởng có thể xảy ra": "Possible impact",
-    "Chỉ tiếp tục khi bạn đã kiểm tra đúng SSID/thiết bị và chấp nhận ảnh hưởng.": "Continue only after verifying the target SSID/device and accepting the impact.",
-    "Cảnh báo": "Warning",
-    "Dữ liệu không hợp lệ": "Invalid data",
-    "IDX bị trùng": "Duplicate IDX",
-    "IDX này đã được sử dụng": "This IDX is already in use",
-    "Hãy chọn một Wi‑Fi": "Select a Wi-Fi network",
-    "Hãy chọn một Wi‑Fi cần random MAC": "Select a Wi-Fi network to randomize",
-    "Đổi SOCKS nhanh": "Quick SOCKS change",
-    "Dry-run và Apply": "Dry-run and Apply",
-    "Chưa có SSID nào để áp dụng blocklist": "No SSID is available for the blocklist",
-    "Hãy chọn một hoặc nhiều thiết bị": "Select one or more devices",
-    "Các thiết bị đã chọn đều offline": "All selected devices are offline",
-    "Không có thiết bị bị cấm trong lựa chọn": "No blocked device is selected",
-    "Các thiết bị đã chọn đều đã bị cấm": "All selected devices are already blocked",
-    "Hãy chọn thiết bị cần copy": "Select devices to copy",
-    "Không xuất được CSV": "Could not export CSV",
-    "Chi tiết thiết bị": "Device details",
-    "Nhãn backup": "Backup label",
-    "Nhãn chỉ được chứa chữ, số, dấu . _ -": "The label may only contain letters, numbers, dots, underscores, and hyphens",
-    "Hãy chọn một backup": "Select a backup",
-    "Có": "Yes",
-    "Không": "No",
-    "Chặn": "Blocked",
-    "Cho phép": "Allowed",
-    "Trạng thái": "Status",
-    "Tên máy": "Hostname",
-    "Đường ra": "Egress",
-    "không kiểm tra": "not checked",
-    "không truy cập được": "unreachable",
-    "không có route": "no route",
-    "đang chạy": "running",
-    "KHÔNG chạy": "NOT running",
-    "Hoàn tất": "Completed",
-    "LỖI": "ERROR",
-    "Lỗi": "Error",
-    "Tất cả file": "All files",
-    "Ngôn ngữ": "Language",
-    "Giao diện": "Theme",
-    "Thư mục log": "Log folder",
-    "Chọn thiết bị trong bảng để điều khiển": "Select devices in the table to control",
-    "Chọn một backup để khôi phục": "Select a backup to restore",
-    "Đổi SOCKS5": "Change SOCKS5",
-    "Loại proxy": "Proxy type",
-    "Nhập nhanh proxy": "Quick proxy input",
-    "Tách & điền": "Parse & fill",
-    "Nhập proxy theo dạng host:port:user:password": "Enter the proxy as host:port:user:password",
-    "Chuỗi proxy nhập nhanh không hợp lệ": "Invalid quick proxy value",
-    "Loại proxy phải là SOCKS5 hoặc HTTP": "Proxy type must be SOCKS5 or HTTP",
-    "Agent trả dữ liệu không phải JSON": "The Agent returned non-JSON data",
-    "Agent trả JSON không phải object": "The Agent returned JSON that is not an object",
-    "Agent báo lỗi": "The Agent reported an error",
-    "IDX Wi‑Fi bị trùng": "Duplicate Wi-Fi IDX",
-    "Base URL phải bắt đầu bằng http:// hoặc https://": "Base URL must start with http:// or https://",
-    "Thiếu token Agent": "Agent token is required",
-    "Chưa kết nối Agent": "Not connected to the Agent",
-    "DPAPI chỉ có trên Windows": "DPAPI is only available on Windows",
-    "Các trường không được chứa | hoặc xuống dòng": "Fields cannot contain | or line breaks",
-    "SSID phải dài 1–32 ký tự": "SSID must be 1–32 characters long",
-    "Băng tần phải là 2g hoặc 5g": "Band must be 2g or 5g",
-    "IDX phải từ 1 đến 200": "IDX must be between 1 and 200",
-    "Mật khẩu Wi‑Fi phải dài 8–63 ký tự": "Wi-Fi password must be 8–63 characters long",
-    "Thiếu địa chỉ SOCKS5": "SOCKS5 address is required",
-    "Port SOCKS5 không hợp lệ": "Invalid SOCKS5 port",
-    "MAC OUI phải có dạng AA:BB:CC": "MAC OUI must use AA:BB:CC format",
-    "Không xác định được OUI của hãng đã chọn": "Could not determine the selected vendor OUI",
-    "Đang kết nối Agent…": "Connecting to Agent…",
-    "Đang làm mới…": "Refreshing…",
-    "Đang kiểm tra cổng ra Internet…": "Checking Internet gateway…",
-    "Đang đổi SOCKS…": "Changing SOCKS…",
-    "Đang dry-run trước khi apply…": "Running dry-run before apply…",
-    "Đang đọc backup…": "Loading backups…",
-    "Đang tạo backup…": "Creating backup…",
-    "Đang rollback…": "Rolling back…",
-    "Dry-run thất bại": "Dry-run failed",
-    "Apply thất bại": "Apply failed",
-    "isolate và webrtc phải là 0 hoặc 1": "isolate and webrtc must be 0 or 1",
-    "isolate và webrtc phải là boolean": "isolate and webrtc must be boolean values",
-    "Các trường văn bản phải là chuỗi": "Text fields must be strings",
-    "Đã đạt giới hạn 200 SSID": "The 200-SSID limit has been reached",
-    "Bỏ qua": "Skipped",
-    'Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn': 'The router runs a newer build than this package; use a newer console',
-    'Nâng cấp agent': 'Upgrade the agent',
-    'Cài đè agent qua SSH': 'Reinstall the agent over SSH',
-    'Nâng cấp tự động': 'Automatic upgrade',
-    'Để sau': 'Later',
-    'CẬP NHẬT AGENT': 'UPDATE AGENT',
-    'Chọn cách cập nhật phù hợp. Cả hai cách đều giữ nguyên wifi-socks.conf và settings.sh.': 'Choose an update method. Both methods preserve wifi-socks.conf and settings.sh.',
-    'Dùng API self-update của agent. Nhanh nhất khi agent hiện tại hoạt động bình thường.': 'Use the agent self-update API. This is fastest when the current agent works normally.',
-    'Dùng SSH để cài đè agent, dành cho agent cũ bị lỗi nhận diện gói .tar.gz. Không chạy apply cấu hình.': 'Use SSH to reinstall the agent when an old agent cannot recognize .tar.gz packages. Configuration is not applied.',
-    'Đang nâng cấp agent…': 'Upgrading the agent…',
-    'Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn; console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.': 'The router runs agent v{agent}, newer than console v{app}. Use a newer console; this one is read-only and every change is blocked.',
-    'Agent trên router là v{agent}, cũ hơn console v{app}.': 'The router runs agent v{agent}, older than console v{app}.',
-    'Nâng cấp agent lên v{app} ngay bây giờ? Cấu hình wifi-socks.conf và settings.sh trên router được giữ nguyên, router tự backup trước khi cập nhật.': 'Upgrade the agent to v{app} now? The router keeps its wifi-socks.conf and settings.sh, and backs itself up before updating.',
-    'Agent đã ở v{agent}; console này không có bản mới hơn để đẩy lên.': 'The agent is already at v{agent}; this console has nothing newer to push.',
-    'Đã nâng cấp agent: {old} → {new}': 'Agent upgraded: {old} → {new}',
-    'Console v{app} cũ hơn agent v{agent} — hãy cập nhật console trước khi thay đổi router.': 'Console v{app} is older than agent v{agent} — update the console before changing the router.',
-    'Agent vẫn chạy version cũ, hãy chạy lại và tick “Cài lại agent dù đã có”': 'The agent still runs the old version; run again with “Reinstall the agent even if it is present”',
-    'So khớp agent đã cài': 'Compare the installed agent',
-    'Kiểm tra hiện trạng router': 'Check what the router already has',
-    'Đã có': 'Present',
-    'Chưa có': 'Missing',
-    'Mã nguồn trên router': 'Code on the router',
-    'Cấu hình wifi-socks.conf': 'wifi-socks.conf configuration',
-    'Gói phụ thuộc (sing-box)': 'Dependencies (sing-box)',
+    "Random sáº½ cáº­p nháº­t provider trong config, táº¡o BSSID má»›i vÃ  reload radio.": "Randomization updates the provider, creates a new BSSID, and reloads the radio.",
+    "OUI khÃ´ng há»£p lá»‡": "Invalid OUI",
+    "Provider khÃ´ng há»£p lá»‡": "Invalid provider",
+    "Ngáº«u nhiÃªn / áº©n danh": "Random / anonymous",
+    "OUI tuá»³ chá»‰nh Â· ": "Custom OUI Â· ",
+    "ThÃªm MAC vÃ o blocklist": "Add MAC to blocklist",
+    "Cháº·n thiáº¿t bá»‹ theo MAC": "Block device by MAC",
+    "VÃ­ dá»¥: AA:BB:CC:DD:EE:FF": "Example: AA:BB:CC:DD:EE:FF",
+    "ThÃªm vÃ o blocklist": "Add to blocklist",
+    "MAC khÃ´ng há»£p lá»‡": "Invalid MAC",
+    "MAC pháº£i cÃ³ dáº¡ng AA:BB:CC:DD:EE:FF": "MAC must use AA:BB:CC:DD:EE:FF format",
+    "Thiáº¿u SSID": "Missing SSID",
+    "HÃ£y chá»n SSID cáº§n cháº·n": "Select the SSID to block on",
+    "sbproxy Â· Äang xá»­ lÃ½": "sbproxy Â· Working",
+    "Äang kiá»ƒm tra vÃ  Ã¡p dá»¥ng": "Validating and applying",
+    "Cáº¢NH BÃO Â· TÃC Vá»¤ QUAN TRá»ŒNG": "WARNING Â· IMPORTANT ACTION",
+    "Thao tÃ¡c": "Action",
+    "áº¢nh hÆ°á»Ÿng cÃ³ thá»ƒ xáº£y ra": "Possible impact",
+    "Chá»‰ tiáº¿p tá»¥c khi báº¡n Ä‘Ã£ kiá»ƒm tra Ä‘Ãºng SSID/thiáº¿t bá»‹ vÃ  cháº¥p nháº­n áº£nh hÆ°á»Ÿng.": "Continue only after verifying the target SSID/device and accepting the impact.",
+    "Cáº£nh bÃ¡o": "Warning",
+    "Dá»¯ liá»‡u khÃ´ng há»£p lá»‡": "Invalid data",
+    "IDX bá»‹ trÃ¹ng": "Duplicate IDX",
+    "IDX nÃ y Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng": "This IDX is already in use",
+    "HÃ£y chá»n má»™t Wiâ€‘Fi": "Select a Wi-Fi network",
+    "HÃ£y chá»n má»™t Wiâ€‘Fi cáº§n random MAC": "Select a Wi-Fi network to randomize",
+    "Äá»•i SOCKS nhanh": "Quick SOCKS change",
+    "Dry-run vÃ  Apply": "Dry-run and Apply",
+    "ChÆ°a cÃ³ SSID nÃ o Ä‘á»ƒ Ã¡p dá»¥ng blocklist": "No SSID is available for the blocklist",
+    "HÃ£y chá»n má»™t hoáº·c nhiá»u thiáº¿t bá»‹": "Select one or more devices",
+    "CÃ¡c thiáº¿t bá»‹ Ä‘Ã£ chá»n Ä‘á»u offline": "All selected devices are offline",
+    "KhÃ´ng cÃ³ thiáº¿t bá»‹ bá»‹ cáº¥m trong lá»±a chá»n": "No blocked device is selected",
+    "CÃ¡c thiáº¿t bá»‹ Ä‘Ã£ chá»n Ä‘á»u Ä‘Ã£ bá»‹ cáº¥m": "All selected devices are already blocked",
+    "HÃ£y chá»n thiáº¿t bá»‹ cáº§n copy": "Select devices to copy",
+    "KhÃ´ng xuáº¥t Ä‘Æ°á»£c CSV": "Could not export CSV",
+    "Chi tiáº¿t thiáº¿t bá»‹": "Device details",
+    "NhÃ£n backup": "Backup label",
+    "NhÃ£n chá»‰ Ä‘Æ°á»£c chá»©a chá»¯, sá»‘, dáº¥u . _ -": "The label may only contain letters, numbers, dots, underscores, and hyphens",
+    "HÃ£y chá»n má»™t backup": "Select a backup",
+    "CÃ³": "Yes",
+    "KhÃ´ng": "No",
+    "Cháº·n": "Blocked",
+    "Cho phÃ©p": "Allowed",
+    "Tráº¡ng thÃ¡i": "Status",
+    "TÃªn mÃ¡y": "Hostname",
+    "ÄÆ°á»ng ra": "Egress",
+    "khÃ´ng kiá»ƒm tra": "not checked",
+    "khÃ´ng truy cáº­p Ä‘Æ°á»£c": "unreachable",
+    "khÃ´ng cÃ³ route": "no route",
+    "Ä‘ang cháº¡y": "running",
+    "KHÃ”NG cháº¡y": "NOT running",
+    "HoÃ n táº¥t": "Completed",
+    "Lá»–I": "ERROR",
+    "Lá»—i": "Error",
+    "Táº¥t cáº£ file": "All files",
+    "NgÃ´n ngá»¯": "Language",
+    "Giao diá»‡n": "Theme",
+    "ThÆ° má»¥c log": "Log folder",
+    "Chá»n thiáº¿t bá»‹ trong báº£ng Ä‘á»ƒ Ä‘iá»u khiá»ƒn": "Select devices in the table to control",
+    "Chá»n má»™t backup Ä‘á»ƒ khÃ´i phá»¥c": "Select a backup to restore",
+    "Äá»•i SOCKS5": "Change SOCKS5",
+    "Loáº¡i proxy": "Proxy type",
+    "Nháº­p nhanh proxy": "Quick proxy input",
+    "TÃ¡ch & Ä‘iá»n": "Parse & fill",
+    "Nháº­p proxy theo dáº¡ng host:port:user:password": "Enter the proxy as host:port:user:password",
+    "Chuá»—i proxy nháº­p nhanh khÃ´ng há»£p lá»‡": "Invalid quick proxy value",
+    "Loáº¡i proxy pháº£i lÃ  SOCKS5 hoáº·c HTTP": "Proxy type must be SOCKS5 or HTTP",
+    "Agent tráº£ dá»¯ liá»‡u khÃ´ng pháº£i JSON": "The Agent returned non-JSON data",
+    "Agent tráº£ JSON khÃ´ng pháº£i object": "The Agent returned JSON that is not an object",
+    "Agent bÃ¡o lá»—i": "The Agent reported an error",
+    "IDX Wiâ€‘Fi bá»‹ trÃ¹ng": "Duplicate Wi-Fi IDX",
+    "Base URL pháº£i báº¯t Ä‘áº§u báº±ng http:// hoáº·c https://": "Base URL must start with http:// or https://",
+    "Thiáº¿u token Agent": "Agent token is required",
+    "ChÆ°a káº¿t ná»‘i Agent": "Not connected to the Agent",
+    "DPAPI chá»‰ cÃ³ trÃªn Windows": "DPAPI is only available on Windows",
+    "CÃ¡c trÆ°á»ng khÃ´ng Ä‘Æ°á»£c chá»©a | hoáº·c xuá»‘ng dÃ²ng": "Fields cannot contain | or line breaks",
+    "SSID pháº£i dÃ i 1â€“32 kÃ½ tá»±": "SSID must be 1â€“32 characters long",
+    "BÄƒng táº§n pháº£i lÃ  2g hoáº·c 5g": "Band must be 2g or 5g",
+    "IDX pháº£i tá»« 1 Ä‘áº¿n 200": "IDX must be between 1 and 200",
+    "Máº­t kháº©u Wiâ€‘Fi pháº£i dÃ i 8â€“63 kÃ½ tá»±": "Wi-Fi password must be 8â€“63 characters long",
+    "Thiáº¿u Ä‘á»‹a chá»‰ SOCKS5": "SOCKS5 address is required",
+    "Port SOCKS5 khÃ´ng há»£p lá»‡": "Invalid SOCKS5 port",
+    "MAC OUI pháº£i cÃ³ dáº¡ng AA:BB:CC": "MAC OUI must use AA:BB:CC format",
+    "KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c OUI cá»§a hÃ£ng Ä‘Ã£ chá»n": "Could not determine the selected vendor OUI",
+    "Äang káº¿t ná»‘i Agentâ€¦": "Connecting to Agentâ€¦",
+    "Äang lÃ m má»›iâ€¦": "Refreshingâ€¦",
+    "Äang kiá»ƒm tra cá»•ng ra Internetâ€¦": "Checking Internet gatewayâ€¦",
+    "Äang Ä‘á»•i SOCKSâ€¦": "Changing SOCKSâ€¦",
+    "Äang dry-run trÆ°á»›c khi applyâ€¦": "Running dry-run before applyâ€¦",
+    "Äang Ä‘á»c backupâ€¦": "Loading backupsâ€¦",
+    "Äang táº¡o backupâ€¦": "Creating backupâ€¦",
+    "Äang rollbackâ€¦": "Rolling backâ€¦",
+    "Dry-run tháº¥t báº¡i": "Dry-run failed",
+    "Apply tháº¥t báº¡i": "Apply failed",
+    "isolate vÃ  webrtc pháº£i lÃ  0 hoáº·c 1": "isolate and webrtc must be 0 or 1",
+    "isolate vÃ  webrtc pháº£i lÃ  boolean": "isolate and webrtc must be boolean values",
+    "CÃ¡c trÆ°á»ng vÄƒn báº£n pháº£i lÃ  chuá»—i": "Text fields must be strings",
+    "ÄÃ£ Ä‘áº¡t giá»›i háº¡n 200 SSID": "The 200-SSID limit has been reached",
+    "Bá» qua": "Skipped",
+    'Router Ä‘ang cháº¡y báº£n má»›i hÆ¡n gÃ³i cÃ i, hÃ£y dÃ¹ng console má»›i hÆ¡n': 'The router runs a newer build than this package; use a newer console',
+    'NÃ¢ng cáº¥p agent': 'Upgrade the agent',
+    'CÃ i Ä‘Ã¨ agent qua SSH': 'Reinstall the agent over SSH',
+    'NÃ¢ng cáº¥p tá»± Ä‘á»™ng': 'Automatic upgrade',
+    'Äá»ƒ sau': 'Later',
+    'Cáº¬P NHáº¬T AGENT': 'UPDATE AGENT',
+    'Chá»n cÃ¡ch cáº­p nháº­t phÃ¹ há»£p. Cáº£ hai cÃ¡ch Ä‘á»u giá»¯ nguyÃªn wifi-socks.conf vÃ  settings.sh.': 'Choose an update method. Both methods preserve wifi-socks.conf and settings.sh.',
+    'DÃ¹ng API self-update cá»§a agent. Nhanh nháº¥t khi agent hiá»‡n táº¡i hoáº¡t Ä‘á»™ng bÃ¬nh thÆ°á»ng.': 'Use the agent self-update API. This is fastest when the current agent works normally.',
+    'DÃ¹ng SSH Ä‘á»ƒ cÃ i Ä‘Ã¨ agent, dÃ nh cho agent cÅ© bá»‹ lá»—i nháº­n diá»‡n gÃ³i .tar.gz. KhÃ´ng cháº¡y apply cáº¥u hÃ¬nh.': 'Use SSH to reinstall the agent when an old agent cannot recognize .tar.gz packages. Configuration is not applied.',
+    'Äang nÃ¢ng cáº¥p agentâ€¦': 'Upgrading the agentâ€¦',
+    'Agent trÃªn router lÃ  v{agent}, má»›i hÆ¡n console v{app}. HÃ£y dÃ¹ng báº£n console má»›i hÆ¡n; console cÅ© chá»‰ Ä‘Æ°á»£c phÃ©p xem, má»i thao tÃ¡c thay Ä‘á»•i bá»‹ khoÃ¡.': 'The router runs agent v{agent}, newer than console v{app}. Use a newer console; this one is read-only and every change is blocked.',
+    'Agent trÃªn router lÃ  v{agent}, cÅ© hÆ¡n console v{app}.': 'The router runs agent v{agent}, older than console v{app}.',
+    'NÃ¢ng cáº¥p agent lÃªn v{app} ngay bÃ¢y giá»? Cáº¥u hÃ¬nh wifi-socks.conf vÃ  settings.sh trÃªn router Ä‘Æ°á»£c giá»¯ nguyÃªn, router tá»± backup trÆ°á»›c khi cáº­p nháº­t.': 'Upgrade the agent to v{app} now? The router keeps its wifi-socks.conf and settings.sh, and backs itself up before updating.',
+    'Agent Ä‘Ã£ á»Ÿ v{agent}; console nÃ y khÃ´ng cÃ³ báº£n má»›i hÆ¡n Ä‘á»ƒ Ä‘áº©y lÃªn.': 'The agent is already at v{agent}; this console has nothing newer to push.',
+    'ÄÃ£ nÃ¢ng cáº¥p agent: {old} â†’ {new}': 'Agent upgraded: {old} â†’ {new}',
+    'Console v{app} cÅ© hÆ¡n agent v{agent} â€” hÃ£y cáº­p nháº­t console trÆ°á»›c khi thay Ä‘á»•i router.': 'Console v{app} is older than agent v{agent} â€” update the console before changing the router.',
+    'Agent váº«n cháº¡y version cÅ©, hÃ£y cháº¡y láº¡i vÃ  tick â€œCÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³â€': 'The agent still runs the old version; run again with â€œReinstall the agent even if it is presentâ€',
+    'So khá»›p agent Ä‘Ã£ cÃ i': 'Compare the installed agent',
+    'Kiá»ƒm tra hiá»‡n tráº¡ng router': 'Check what the router already has',
+    'ÄÃ£ cÃ³': 'Present',
+    'ChÆ°a cÃ³': 'Missing',
+    'MÃ£ nguá»“n trÃªn router': 'Code on the router',
+    'Cáº¥u hÃ¬nh wifi-socks.conf': 'wifi-socks.conf configuration',
+    'GÃ³i phá»¥ thuá»™c (sing-box)': 'Dependencies (sing-box)',
     'Agent CGI': 'Agent CGI',
     'Token agent': 'Agent token',
-    'sing-box đang chạy': 'sing-box running',
-    'Ghi đè cấu hình đã có trên router': 'Overwrite the configuration already on the router',
-    'Cài lại agent dù đã có': 'Reinstall the agent even if it is present',
-    'Đang kiểm tra router…': 'Checking the router…',
-    'Chưa kiểm tra được router': 'The router has not been checked yet',
+    'sing-box Ä‘ang cháº¡y': 'sing-box running',
+    'Ghi Ä‘Ã¨ cáº¥u hÃ¬nh Ä‘Ã£ cÃ³ trÃªn router': 'Overwrite the configuration already on the router',
+    'CÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³': 'Reinstall the agent even if it is present',
+    'Äang kiá»ƒm tra routerâ€¦': 'Checking the routerâ€¦',
+    'ChÆ°a kiá»ƒm tra Ä‘Æ°á»£c router': 'The router has not been checked yet',
     # Post-flash provisioning
-    'Thiếu địa chỉ router': 'Router address is required',
-    'Thiếu tài khoản SSH': 'SSH account is required',
-    'Port SSH không hợp lệ': 'Invalid SSH port',
-    'Thư mục trên router phải là đường dẫn tuyệt đối': 'The router directory must be an absolute path',
-    'Không thấy SSH key': 'SSH key not found',
-    'Chưa chọn mã nguồn hoặc gói cập nhật': 'Select the source folder or the update package',
-    'Không thấy mã nguồn hoặc gói cập nhật': 'Source folder or update package not found',
-    'Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)': 'Invalid source folder (scripts/ or agent/ is missing)',
-    'Không thấy file wifi-socks.conf đã chọn': 'The selected wifi-socks.conf file was not found',
-    'Không thấy file settings.sh đã chọn': 'The selected settings.sh file was not found',
-    'Không đọc được token agent trên router': 'Could not read the agent token on the router',
-    'Agent chưa trả lời đúng': 'The agent did not answer correctly',
-    'Đã dừng theo yêu cầu': 'Stopped on request',
-    'quá thời gian chờ': 'timed out',
-    'Kiểm tra kết nối SSH': 'Check the SSH connection',
-    'Đẩy mã nguồn lên router': 'Push the code to the router',
-    'Cài gói phụ thuộc': 'Install dependencies',
-    'Đẩy cấu hình wifi-socks.conf': 'Push the wifi-socks.conf configuration',
-    'Chạy preflight và dry-run': 'Run preflight and dry-run',
-    'Chạy apply.sh khởi tạo': 'Run the initial apply.sh',
-    'Cài / cập nhật agent': 'Install / update the agent',
-    'Lấy token agent': 'Fetch the agent token',
-    'Kiểm tra agent API': 'Check the agent API',
-    'Đóng gói mã nguồn': 'Package the code',
-    'Đẩy mã nguồn': 'Upload the code',
-    'Giải nén mã nguồn': 'Extract the code',
-    'Đẩy wifi-socks.conf': 'Upload wifi-socks.conf',
-    'Đẩy settings.sh': 'Upload settings.sh',
-    'Đặt quyền cấu hình': 'Set configuration permissions',
-    'Chạy preflight': 'Run preflight',
+    'Thiáº¿u Ä‘á»‹a chá»‰ router': 'Router address is required',
+    'Thiáº¿u tÃ i khoáº£n SSH': 'SSH account is required',
+    'Port SSH khÃ´ng há»£p lá»‡': 'Invalid SSH port',
+    'ThÆ° má»¥c trÃªn router pháº£i lÃ  Ä‘Æ°á»ng dáº«n tuyá»‡t Ä‘á»‘i': 'The router directory must be an absolute path',
+    'KhÃ´ng tháº¥y SSH key': 'SSH key not found',
+    'ChÆ°a chá»n mÃ£ nguá»“n hoáº·c gÃ³i cáº­p nháº­t': 'Select the source folder or the update package',
+    'KhÃ´ng tháº¥y mÃ£ nguá»“n hoáº·c gÃ³i cáº­p nháº­t': 'Source folder or update package not found',
+    'ThÆ° má»¥c mÃ£ nguá»“n khÃ´ng há»£p lá»‡ (thiáº¿u scripts/ hoáº·c agent/)': 'Invalid source folder (scripts/ or agent/ is missing)',
+    'KhÃ´ng tháº¥y file wifi-socks.conf Ä‘Ã£ chá»n': 'The selected wifi-socks.conf file was not found',
+    'KhÃ´ng tháº¥y file settings.sh Ä‘Ã£ chá»n': 'The selected settings.sh file was not found',
+    'KhÃ´ng Ä‘á»c Ä‘Æ°á»£c token agent trÃªn router': 'Could not read the agent token on the router',
+    'Agent chÆ°a tráº£ lá»i Ä‘Ãºng': 'The agent did not answer correctly',
+    'ÄÃ£ dá»«ng theo yÃªu cáº§u': 'Stopped on request',
+    'quÃ¡ thá»i gian chá»': 'timed out',
+    'Kiá»ƒm tra káº¿t ná»‘i SSH': 'Check the SSH connection',
+    'Äáº©y mÃ£ nguá»“n lÃªn router': 'Push the code to the router',
+    'CÃ i gÃ³i phá»¥ thuá»™c': 'Install dependencies',
+    'Äáº©y cáº¥u hÃ¬nh wifi-socks.conf': 'Push the wifi-socks.conf configuration',
+    'Cháº¡y preflight vÃ  dry-run': 'Run preflight and dry-run',
+    'Cháº¡y apply.sh khá»Ÿi táº¡o': 'Run the initial apply.sh',
+    'CÃ i / cáº­p nháº­t agent': 'Install / update the agent',
+    'Láº¥y token agent': 'Fetch the agent token',
+    'Kiá»ƒm tra agent API': 'Check the agent API',
+    'ÄÃ³ng gÃ³i mÃ£ nguá»“n': 'Package the code',
+    'Äáº©y mÃ£ nguá»“n': 'Upload the code',
+    'Giáº£i nÃ©n mÃ£ nguá»“n': 'Extract the code',
+    'Äáº©y wifi-socks.conf': 'Upload wifi-socks.conf',
+    'Äáº©y settings.sh': 'Upload settings.sh',
+    'Äáº·t quyá»n cáº¥u hÃ¬nh': 'Set configuration permissions',
+    'Cháº¡y preflight': 'Run preflight',
     'Dry-run apply': 'Dry-run apply',
-    'Chạy apply.sh': 'Run apply.sh',
-    'Cài agent': 'Install the agent',
-    'Đọc token agent': 'Read the agent token',
-    'Cài đặt router sau khi flash': 'Router setup after flashing',
-    'CÀI ĐẶT SAU KHI FLASH LẠI ROUTER': 'POST-FLASH ROUTER SETUP',
-    'Đẩy mã nguồn, cài phụ thuộc, đẩy cấu hình, chạy script khởi tạo, cài agent rồi lấy token.': 'Push the code, install dependencies, push the configuration, run the initial scripts, install the agent, then fetch the token.',
-    'Chưa chạy bước nào': 'No step has run yet',
-    'Tài khoản SSH': 'SSH account',
+    'Cháº¡y apply.sh': 'Run apply.sh',
+    'CÃ i agent': 'Install the agent',
+    'Äá»c token agent': 'Read the agent token',
+    'CÃ i Ä‘áº·t router sau khi flash': 'Router setup after flashing',
+    'CÃ€I Äáº¶T SAU KHI FLASH Láº I ROUTER': 'POST-FLASH ROUTER SETUP',
+    'Äáº©y mÃ£ nguá»“n, cÃ i phá»¥ thuá»™c, Ä‘áº©y cáº¥u hÃ¬nh, cháº¡y script khá»Ÿi táº¡o, cÃ i agent rá»“i láº¥y token.': 'Push the code, install dependencies, push the configuration, run the initial scripts, install the agent, then fetch the token.',
+    'ChÆ°a cháº¡y bÆ°á»›c nÃ o': 'No step has run yet',
+    'TÃ i khoáº£n SSH': 'SSH account',
     'Port SSH': 'SSH port',
-    'Mật khẩu SSH': 'SSH password',
-    'SSH key (tuỳ chọn)': 'SSH key (optional)',
-    'Thư mục trên router': 'Router directory',
-    'Mã nguồn hoặc gói .tar.gz': 'Source folder or .tar.gz package',
-    'settings.sh (tuỳ chọn)': 'settings.sh (optional)',
-    'Chạy apply.sh sau khi đẩy cấu hình': 'Run apply.sh after pushing the configuration',
-    'Bắt đầu cài đặt': 'Start setup',
-    'Kiểm tra tình trạng': 'Check status',
-    'KHÔNG CẤU HÌNH ĐƯỢC ROUTER': 'ROUTER CANNOT BE CONFIGURED',
-    'Cài agent ngay': 'Install the agent now',
-    'Kết nối SSH thành công nhưng router chưa cài xong agent. Cài ngay bây giờ?': 'The SSH login works but the router has no agent installed yet. Install it now?',
-    'Router đã có agent và token — không cần cài lại.': 'The router already has an agent and a token — no reinstall is needed.',
-    'Đã chọn không cài — console bị khoá cho tới khi agent được cài.': 'Installing was declined — the console stays locked until an agent is installed.',
-    'Router chưa cài agent nên console không điều khiển được gì. Hãy cài agent rồi thử lại.': 'With no agent on the router this console cannot control anything. Install the agent, then try again.',
-    'Không cấu hình được router — chưa cài agent': 'The router cannot be configured — no agent installed',
-    'Dừng': 'Stop',
-    'Đóng': 'Close',
-    'Bước': 'Step',
-    'Chọn gói cập nhật': 'Select the update package',
-    'Chọn thư mục mã nguồn': 'Select the source folder',
-    'Chọn file': 'Select a file',
-    'Chờ': 'Pending',
-    'Đang chạy': 'Running',
+    'Máº­t kháº©u SSH': 'SSH password',
+    'SSH key (tuá»³ chá»n)': 'SSH key (optional)',
+    'ThÆ° má»¥c trÃªn router': 'Router directory',
+    'MÃ£ nguá»“n hoáº·c gÃ³i .tar.gz': 'Source folder or .tar.gz package',
+    'settings.sh (tuá»³ chá»n)': 'settings.sh (optional)',
+    'Cháº¡y apply.sh sau khi Ä‘áº©y cáº¥u hÃ¬nh': 'Run apply.sh after pushing the configuration',
+    'Báº¯t Ä‘áº§u cÃ i Ä‘áº·t': 'Start setup',
+    'Kiá»ƒm tra tÃ¬nh tráº¡ng': 'Check status',
+    'KHÃ”NG Cáº¤U HÃŒNH ÄÆ¯á»¢C ROUTER': 'ROUTER CANNOT BE CONFIGURED',
+    'CÃ i agent ngay': 'Install the agent now',
+    'Káº¿t ná»‘i SSH thÃ nh cÃ´ng nhÆ°ng router chÆ°a cÃ i xong agent. CÃ i ngay bÃ¢y giá»?': 'The SSH login works but the router has no agent installed yet. Install it now?',
+    'Router Ä‘Ã£ cÃ³ agent vÃ  token â€” khÃ´ng cáº§n cÃ i láº¡i.': 'The router already has an agent and a token â€” no reinstall is needed.',
+    'ÄÃ£ chá»n khÃ´ng cÃ i â€” console bá»‹ khoÃ¡ cho tá»›i khi agent Ä‘Æ°á»£c cÃ i.': 'Installing was declined â€” the console stays locked until an agent is installed.',
+    'Router chÆ°a cÃ i agent nÃªn console khÃ´ng Ä‘iá»u khiá»ƒn Ä‘Æ°á»£c gÃ¬. HÃ£y cÃ i agent rá»“i thá»­ láº¡i.': 'With no agent on the router this console cannot control anything. Install the agent, then try again.',
+    'KhÃ´ng cáº¥u hÃ¬nh Ä‘Æ°á»£c router â€” chÆ°a cÃ i agent': 'The router cannot be configured â€” no agent installed',
+    'Dá»«ng': 'Stop',
+    'ÄÃ³ng': 'Close',
+    'BÆ°á»›c': 'Step',
+    'Chá»n gÃ³i cáº­p nháº­t': 'Select the update package',
+    'Chá»n thÆ° má»¥c mÃ£ nguá»“n': 'Select the source folder',
+    'Chá»n file': 'Select a file',
+    'Chá»': 'Pending',
+    'Äang cháº¡y': 'Running',
     'Xong': 'Done',
-    'Cài đặt chưa hoàn tất': 'Setup did not complete',
-    'Cài đặt chưa hoàn tất — hãy xử lý bước lỗi rồi chạy lại.': 'Setup did not complete — fix the failed step and run it again.',
-    'Cài đặt hoàn tất': 'Setup complete',
-    'Cài đặt hoàn tất — đã lấy token và mở màn hình điều khiển.': 'Setup complete — the token was fetched and the control screens are open.',
-    'Đang cài đặt — vẫn đóng cửa sổ?': 'Setup is running — close the window anyway?',
-    'Agent trả lời OK với token hiện tại': 'The agent answers OK with the current token',
-    'Agent đang chạy nhưng token sai hoặc thiếu': 'The agent is running but the token is wrong or missing',
-    'Router trả lời nhưng chưa cài agent': 'The router answers but the agent is not installed',
-    'Không liên lạc được với router': 'The router cannot be reached',
-    'Chưa cấu hình router — hãy chạy cài đặt sau khi flash': 'Router not configured — run the post-flash setup',
-    'CHƯA CẤU HÌNH ROUTER': 'ROUTER NOT CONFIGURED',
-    'Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
-    'Cài đặt sau khi flash…': 'Post-flash setup…',
-    'Nâng cấp agent trên router': 'Upgrade the router agent',
-    'NÂNG CẤP AGENT TRÊN ROUTER': 'UPGRADE THE ROUTER AGENT',
-    'Đẩy gói của console lên agent. Cấu hình wifi-socks.conf và settings.sh được giữ nguyên.': "Upload this console's package to the agent. wifi-socks.conf and settings.sh are kept.",
-    'Đang chạy…': 'Running…',
-    'Nâng cấp xong': 'Upgrade complete',
-    'Nâng cấp thất bại': 'Upgrade failed',
-    'Nâng cấp xong — agent đã chạy bản mới.': 'Upgrade complete — the agent is on the new version.',
-    'Nâng cấp dừng lại ở bước lỗi. Sửa nguyên nhân rồi thử lại, hoặc cài lại agent qua SSH bằng Cài đặt sau khi flash → Cài lại agent dù đã có.': 'The upgrade stopped at the failed step. Fix the cause and try again, or reinstall the agent over SSH with Post-flash setup → Reinstall the agent even if it is present.',
-    'Chuẩn bị gói cập nhật': 'Prepare the update package',
-    'Kiểm tra phiên bản agent': 'Check the agent version',
-    'Đẩy gói lên agent': 'Upload the package to the agent',
-    'Kiểm tra agent sau nâng cấp': 'Verify the agent afterwards',
-    'Không tìm thấy gói cập nhật': 'No update package was found',
-    'Gói cập nhật rỗng': 'The update package is empty',
-    'Đường ra': 'Egress',
-    'Đang đổi đường ra…': 'Changing the egress…',
-    'Đang cập nhật gateway trên router…': 'Updating the gateway setting on the router…',
-    'Đang lưu lựa chọn gateway…': 'Saving the gateway selection…',
-    'Đã lưu lựa chọn; đang kiểm tra kết nối qua gateway…': 'Selection saved; checking connectivity through the gateway…',
-    'Đã cập nhật gateway: {interface}': 'Gateway updated: {interface}',
-    'Cài agent riêng — bỏ qua gói phụ thuộc': 'Agent-only install — dependencies are unchanged',
-    'Cài agent riêng — giữ nguyên cấu hình': 'Agent-only install — configuration is preserved',
-    'Cài agent riêng — không chạy preflight': 'Agent-only install — preflight is skipped',
-    'Cài agent riêng — không apply cấu hình': 'Agent-only install — configuration is not applied',
-    'Đường ra: dùng {interface}': 'Egress: using {interface}',
-    'tự động': 'automatic',
-    'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
-    'Đang kiểm tra tình trạng router…': 'Checking the router status…',
-    'Pool proxy…': 'Proxy pool…',
+    'CÃ i Ä‘áº·t chÆ°a hoÃ n táº¥t': 'Setup did not complete',
+    'CÃ i Ä‘áº·t chÆ°a hoÃ n táº¥t â€” hÃ£y xá»­ lÃ½ bÆ°á»›c lá»—i rá»“i cháº¡y láº¡i.': 'Setup did not complete â€” fix the failed step and run it again.',
+    'CÃ i Ä‘áº·t hoÃ n táº¥t': 'Setup complete',
+    'CÃ i Ä‘áº·t hoÃ n táº¥t â€” Ä‘Ã£ láº¥y token vÃ  má»Ÿ mÃ n hÃ¬nh Ä‘iá»u khiá»ƒn.': 'Setup complete â€” the token was fetched and the control screens are open.',
+    'Äang cÃ i Ä‘áº·t â€” váº«n Ä‘Ã³ng cá»­a sá»•?': 'Setup is running â€” close the window anyway?',
+    'Agent tráº£ lá»i OK vá»›i token hiá»‡n táº¡i': 'The agent answers OK with the current token',
+    'Agent Ä‘ang cháº¡y nhÆ°ng token sai hoáº·c thiáº¿u': 'The agent is running but the token is wrong or missing',
+    'Router tráº£ lá»i nhÆ°ng chÆ°a cÃ i agent': 'The router answers but the agent is not installed',
+    'KhÃ´ng liÃªn láº¡c Ä‘Æ°á»£c vá»›i router': 'The router cannot be reached',
+    'ChÆ°a cáº¥u hÃ¬nh router â€” hÃ£y cháº¡y cÃ i Ä‘áº·t sau khi flash': 'Router not configured â€” run the post-flash setup',
+    'CHÆ¯A Cáº¤U HÃŒNH ROUTER': 'ROUTER NOT CONFIGURED',
+    'Router vá»«a flash láº¡i chÆ°a cÃ³ agent hoáº·c token. Cháº¡y cÃ i Ä‘áº·t Ä‘á»ƒ Ä‘áº©y mÃ£ nguá»“n, cáº¥u hÃ¬nh, script khá»Ÿi táº¡o vÃ  láº¥y token.': 'A freshly flashed router has no agent and no token. Run the setup to push the code, the configuration, and the initial scripts, then fetch the token.',
+    'CÃ i Ä‘áº·t sau khi flashâ€¦': 'Post-flash setupâ€¦',
+    'NÃ¢ng cáº¥p agent trÃªn router': 'Upgrade the router agent',
+    'NÃ‚NG Cáº¤P AGENT TRÃŠN ROUTER': 'UPGRADE THE ROUTER AGENT',
+    'Äáº©y gÃ³i cá»§a console lÃªn agent. Cáº¥u hÃ¬nh wifi-socks.conf vÃ  settings.sh Ä‘Æ°á»£c giá»¯ nguyÃªn.': "Upload this console's package to the agent. wifi-socks.conf and settings.sh are kept.",
+    'Äang cháº¡yâ€¦': 'Runningâ€¦',
+    'NÃ¢ng cáº¥p xong': 'Upgrade complete',
+    'NÃ¢ng cáº¥p tháº¥t báº¡i': 'Upgrade failed',
+    'NÃ¢ng cáº¥p xong â€” agent Ä‘Ã£ cháº¡y báº£n má»›i.': 'Upgrade complete â€” the agent is on the new version.',
+    'NÃ¢ng cáº¥p dá»«ng láº¡i á»Ÿ bÆ°á»›c lá»—i. Sá»­a nguyÃªn nhÃ¢n rá»“i thá»­ láº¡i, hoáº·c cÃ i láº¡i agent qua SSH báº±ng CÃ i Ä‘áº·t sau khi flash â†’ CÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³.': 'The upgrade stopped at the failed step. Fix the cause and try again, or reinstall the agent over SSH with Post-flash setup â†’ Reinstall the agent even if it is present.',
+    'Chuáº©n bá»‹ gÃ³i cáº­p nháº­t': 'Prepare the update package',
+    'Kiá»ƒm tra phiÃªn báº£n agent': 'Check the agent version',
+    'Äáº©y gÃ³i lÃªn agent': 'Upload the package to the agent',
+    'Kiá»ƒm tra agent sau nÃ¢ng cáº¥p': 'Verify the agent afterwards',
+    'KhÃ´ng tÃ¬m tháº¥y gÃ³i cáº­p nháº­t': 'No update package was found',
+    'GÃ³i cáº­p nháº­t rá»—ng': 'The update package is empty',
+    'ÄÆ°á»ng ra': 'Egress',
+    'Äang Ä‘á»•i Ä‘Æ°á»ng raâ€¦': 'Changing the egressâ€¦',
+    'Äang cáº­p nháº­t gateway trÃªn routerâ€¦': 'Updating the gateway setting on the routerâ€¦',
+    'Äang lÆ°u lá»±a chá»n gatewayâ€¦': 'Saving the gateway selectionâ€¦',
+    'ÄÃ£ lÆ°u lá»±a chá»n; Ä‘ang kiá»ƒm tra káº¿t ná»‘i qua gatewayâ€¦': 'Selection saved; checking connectivity through the gatewayâ€¦',
+    'ÄÃ£ cáº­p nháº­t gateway: {interface}': 'Gateway updated: {interface}',
+    'CÃ i agent riÃªng â€” bá» qua gÃ³i phá»¥ thuá»™c': 'Agent-only install â€” dependencies are unchanged',
+    'CÃ i agent riÃªng â€” giá»¯ nguyÃªn cáº¥u hÃ¬nh': 'Agent-only install â€” configuration is preserved',
+    'CÃ i agent riÃªng â€” khÃ´ng cháº¡y preflight': 'Agent-only install â€” preflight is skipped',
+    'CÃ i agent riÃªng â€” khÃ´ng apply cáº¥u hÃ¬nh': 'Agent-only install â€” configuration is not applied',
+    'ÄÆ°á»ng ra: dÃ¹ng {interface}': 'Egress: using {interface}',
+    'tá»± Ä‘á»™ng': 'automatic',
+    'KhÃ´ng má»Ÿ Ä‘Æ°á»£c cá»­a sá»• cÃ i Ä‘áº·t': 'Cannot open the setup window',
+    'Äang kiá»ƒm tra tÃ¬nh tráº¡ng routerâ€¦': 'Checking the router statusâ€¦',
+    'Pool proxyâ€¦': 'Proxy poolâ€¦',
     'Pool proxy': 'Proxy pool',
-    'Đổi proxy cho thiết bị đã chọn…': 'Change the proxy of the selected devices…',
-    'Đổi proxy…': 'Change proxy…',
-    'Gán proxy…': 'Assign a proxy…',
-    'Hãy chọn thiết bị trong bảng trước': 'Select devices in the table first',
-    'Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi':
+    'Äá»•i proxy cho thiáº¿t bá»‹ Ä‘Ã£ chá»nâ€¦': 'Change the proxy of the selected devicesâ€¦',
+    'Äá»•i proxyâ€¦': 'Change proxyâ€¦',
+    'GÃ¡n proxyâ€¦': 'Assign a proxyâ€¦',
+    'HÃ£y chá»n thiáº¿t bá»‹ trong báº£ng trÆ°á»›c': 'Select devices in the table first',
+    'Chá»‰ Ä‘á»•i proxy cho cÃ¡c thiáº¿t bá»‹ trong cÃ¹ng má»™t Wiâ€‘Fi':
         'Devices must be on the same Wi-Fi to share one split',
-    'Wi‑Fi này chưa có proxy nào trong pool': 'This Wi-Fi has no proxy in its pool yet',
-    'Hãy chọn đúng một thiết bị': 'Select exactly one device',
-    'chưa ghim': 'not pinned',
-    'slot {slot} đã biến mất': 'slot {slot} no longer exists',
-    'Không ghim proxy': 'Do not pin a proxy',
-    'Máy': 'Devices',
-    'Dán danh sách proxy (mỗi dòng một proxy)': 'Paste a proxy list, one per line',
+    'Wiâ€‘Fi nÃ y chÆ°a cÃ³ proxy nÃ o trong pool': 'This Wi-Fi has no proxy in its pool yet',
+    'HÃ£y chá»n Ä‘Ãºng má»™t thiáº¿t bá»‹': 'Select exactly one device',
+    'chÆ°a ghim': 'not pinned',
+    'slot {slot} Ä‘Ã£ biáº¿n máº¥t': 'slot {slot} no longer exists',
+    'KhÃ´ng ghim proxy': 'Do not pin a proxy',
+    'MÃ¡y': 'Devices',
+    'DÃ¡n danh sÃ¡ch proxy (má»—i dÃ²ng má»™t proxy)': 'Paste a proxy list, one per line',
     'Ghi pool': 'Save the pool',
-    'Đang ghi pool proxy…': 'Saving the proxy pool…',
-    'Đang đổi proxy cho thiết bị…': 'Changing the proxy of the devices…',
-    'Xem trước cách chia proxy': 'Preview of the split',
-    'Áp dụng': 'Apply',
-    'Những dòng bị bỏ qua': 'Lines that were left out',
-    'Không có dòng nào dùng được': 'No usable line in what was pasted',
+    'Äang ghi pool proxyâ€¦': 'Saving the proxy poolâ€¦',
+    'Äang Ä‘á»•i proxy cho thiáº¿t bá»‹â€¦': 'Changing the proxy of the devicesâ€¦',
+    'Xem trÆ°á»›c cÃ¡ch chia proxy': 'Preview of the split',
+    'Ãp dá»¥ng': 'Apply',
+    'Nhá»¯ng dÃ²ng bá»‹ bá» qua': 'Lines that were left out',
+    'KhÃ´ng cÃ³ dÃ²ng nÃ o dÃ¹ng Ä‘Æ°á»£c': 'No usable line in what was pasted',
 }
 
 
@@ -686,9 +686,9 @@ def translate(text: str, language: str = "en", **values) -> str:
     translated = EN_TRANSLATIONS.get(text, text) if language == "en" else text
     if language == "en" and translated == text:
         dynamic_prefixes = (
-            ("Dòng cấu hình cần 10 hoặc 11 cột: ", "Configuration row must have 10 or 11 columns: "),
-            ("Không kết nối được ", "Could not connect to "),
-            ("Thiếu công cụ ", "Missing local tool "),
+            ("DÃ²ng cáº¥u hÃ¬nh cáº§n 10 hoáº·c 11 cá»™t: ", "Configuration row must have 10 or 11 columns: "),
+            ("KhÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c ", "Could not connect to "),
+            ("Thiáº¿u cÃ´ng cá»¥ ", "Missing local tool "),
         )
         for source, target in dynamic_prefixes:
             if text.startswith(source):
@@ -735,40 +735,40 @@ def localize_widget_tree(widget, language: str) -> None:
     for child in widget.winfo_children():
         localize_widget_tree(child, language)
 
-ALL_SSIDS = "Tất cả SSID"
-ALL_BANDS = "Tất cả band"
-ALL_PRESENCE = "Tất cả kết nối"
-ALL_STATES = "Tất cả quyền truy cập"
-ALL_SIGNALS = "Tất cả tín hiệu"
-ALL_TRAFFIC = "Tất cả lưu lượng"
-ALL_DURATIONS = "Tất cả thời gian"
+ALL_SSIDS = "Táº¥t cáº£ SSID"
+ALL_BANDS = "Táº¥t cáº£ band"
+ALL_PRESENCE = "Táº¥t cáº£ káº¿t ná»‘i"
+ALL_STATES = "Táº¥t cáº£ quyá»n truy cáº­p"
+ALL_SIGNALS = "Táº¥t cáº£ tÃ­n hiá»‡u"
+ALL_TRAFFIC = "Táº¥t cáº£ lÆ°u lÆ°á»£ng"
+ALL_DURATIONS = "Táº¥t cáº£ thá»i gian"
 PRESENCE_FILTERS = (ALL_PRESENCE, "Online", "Offline")
-CLIENT_STATES = (ALL_STATES, "Đang cấm", "Không cấm")
+CLIENT_STATES = (ALL_STATES, "Äang cáº¥m", "KhÃ´ng cáº¥m")
 BAND_FILTERS = (ALL_BANDS, "2.4 GHz", "5 GHz")
 SIGNAL_FILTERS = (
     ALL_SIGNALS,
-    "Rất tốt (≥ -60 dBm)",
-    "Tốt (-70 đến -61 dBm)",
-    "Yếu (-80 đến -71 dBm)",
-    "Rất yếu (< -80 dBm)",
-    "Không rõ",
+    "Ráº¥t tá»‘t (â‰¥ -60 dBm)",
+    "Tá»‘t (-70 Ä‘áº¿n -61 dBm)",
+    "Yáº¿u (-80 Ä‘áº¿n -71 dBm)",
+    "Ráº¥t yáº¿u (< -80 dBm)",
+    "KhÃ´ng rÃµ",
 )
 TRAFFIC_FILTERS = (
     ALL_TRAFFIC,
-    "Có lưu lượng",
-    "Không lưu lượng",
-    "Từ 10 MB",
-    "Từ 100 MB",
+    "CÃ³ lÆ°u lÆ°á»£ng",
+    "KhÃ´ng lÆ°u lÆ°á»£ng",
+    "Tá»« 10 MB",
+    "Tá»« 100 MB",
 )
 DURATION_FILTERS = (
     ALL_DURATIONS,
-    "Dưới 5 phút",
-    "5–60 phút",
-    "Trên 1 giờ",
+    "DÆ°á»›i 5 phÃºt",
+    "5â€“60 phÃºt",
+    "TrÃªn 1 giá»",
 )
 
 MAC_VENDORS = (
-    ("Ngẫu nhiên / ẩn danh", ""),
+    ("Ngáº«u nhiÃªn / áº©n danh", ""),
     ("TP-Link", "50:C7:BF"),
     ("Netgear", "20:E5:2A"),
     ("ASUS", "AC:9E:17"),
@@ -788,9 +788,9 @@ def vendor_label(oui: str) -> str:
     normalized = str(oui or "").upper()
     for name, item_oui in MAC_VENDORS:
         if item_oui == normalized:
-            suffix = f" · {item_oui}" if item_oui else " · 02:xx local"
+            suffix = f" Â· {item_oui}" if item_oui else " Â· 02:xx local"
             return name + suffix
-    return f"OUI tuỳ chỉnh · {normalized}"
+    return f"OUI tuá»³ chá»‰nh Â· {normalized}"
 
 
 def vendor_oui(label: str) -> str:
@@ -800,7 +800,7 @@ def vendor_oui(label: str) -> str:
     match = re.search(r"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){2})$", label)
     if match:
         return match.group(1).upper()
-    raise ValueError("Không xác định được OUI của hãng đã chọn")
+    raise ValueError("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c OUI cá»§a hÃ£ng Ä‘Ã£ chá»n")
 
 
 def vendor_choices(current_oui=""):
@@ -821,7 +821,7 @@ class DATA_BLOB(ctypes.Structure):
 
 def _dpapi_protect(value: str) -> str:
     if os.name != "nt":
-        raise RuntimeError("DPAPI chỉ có trên Windows")
+        raise RuntimeError("DPAPI chá»‰ cÃ³ trÃªn Windows")
     raw = value.encode("utf-8")
     buf = ctypes.create_string_buffer(raw)
     source = DATA_BLOB(len(raw), ctypes.cast(buf, ctypes.POINTER(ctypes.c_byte)))
@@ -846,7 +846,7 @@ def _dpapi_protect(value: str) -> str:
 
 def _dpapi_unprotect(value: str) -> str:
     if os.name != "nt":
-        raise RuntimeError("DPAPI chỉ có trên Windows")
+        raise RuntimeError("DPAPI chá»‰ cÃ³ trÃªn Windows")
     encrypted = base64.b64decode(value)
     buf = ctypes.create_string_buffer(encrypted)
     source = DATA_BLOB(len(encrypted), ctypes.cast(buf, ctypes.POINTER(ctypes.c_byte)))
@@ -942,21 +942,21 @@ DEFAULT_PROXY_TYPE = "socks5"
 def _proxy_port(value: str) -> int:
     """Port as an int, or ValueError with a message the operator can act on."""
     if not value.isdigit():
-        raise ValueError("cổng phải là số")
+        raise ValueError("cá»•ng pháº£i lÃ  sá»‘")
     port = int(value)
     if not 1 <= port <= 65535:
-        raise ValueError("cổng phải trong khoảng 1..65535")
+        raise ValueError("cá»•ng pháº£i trong khoáº£ng 1..65535")
     return port
 
 
 def _proxy_host(value: str) -> str:
     if not value:
-        raise ValueError("thiếu host")
+        raise ValueError("thiáº¿u host")
     if len(value) > 253 or any(c.isspace() for c in value):
-        raise ValueError("host không hợp lệ")
+        raise ValueError("host khÃ´ng há»£p lá»‡")
     allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:-_")
     if set(value) - allowed:
-        raise ValueError("host không hợp lệ")
+        raise ValueError("host khÃ´ng há»£p lá»‡")
     return value
 
 
@@ -976,7 +976,7 @@ def parse_proxy_line(line: str) -> tuple:
         scheme, _, text = text.partition("://")
         scheme = scheme.strip().lower()
         if scheme not in PROXY_SCHEMES:
-            raise ValueError(f"loại proxy không hỗ trợ: {scheme}")
+            raise ValueError(f"loáº¡i proxy khÃ´ng há»— trá»£: {scheme}")
         proxy_type = PROXY_SCHEMES[scheme]
 
     user = password = ""
@@ -994,7 +994,7 @@ def parse_proxy_line(line: str) -> tuple:
     elif len(parts) == 2:
         host, port = parts
     else:
-        raise ValueError("thiếu cổng" if len(parts) == 1 else "không nhận ra định dạng")
+        raise ValueError("thiáº¿u cá»•ng" if len(parts) == 1 else "khÃ´ng nháº­n ra Ä‘á»‹nh dáº¡ng")
 
     return (proxy_type, _proxy_host(host.strip()), _proxy_port(port.strip()),
             user, password, "")
@@ -1015,10 +1015,10 @@ def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
         if not line or line.startswith("#"):
             continue
         if "|" in line:
-            dropped.append((number, line, "chứa ký tự | vốn là dấu phân cách của cấu hình"))
+            dropped.append((number, line, "chá»©a kÃ½ tá»± | vá»‘n lÃ  dáº¥u phÃ¢n cÃ¡ch cá»§a cáº¥u hÃ¬nh"))
             continue
         if any(ord(c) < 32 or ord(c) == 127 for c in line):
-            dropped.append((number, line, "chứa ký tự điều khiển"))
+            dropped.append((number, line, "chá»©a kÃ½ tá»± Ä‘iá»u khiá»ƒn"))
             continue
         try:
             row = parse_proxy_line(line)
@@ -1027,10 +1027,10 @@ def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
             continue
         identity = row[:5]
         if identity in seen:
-            dropped.append((number, line, "trùng với một proxy đã có ở trên"))
+            dropped.append((number, line, "trÃ¹ng vá»›i má»™t proxy Ä‘Ã£ cÃ³ á»Ÿ trÃªn"))
             continue
         if limit is not None and len(rows) >= limit:
-            dropped.append((number, line, f"vượt quá giới hạn {limit} proxy cho một Wi-Fi"))
+            dropped.append((number, line, f"vÆ°á»£t quÃ¡ giá»›i háº¡n {limit} proxy cho má»™t Wi-Fi"))
             continue
         seen.add(identity)
         rows.append(row)
@@ -1045,7 +1045,7 @@ def split_devices_evenly(devices, slots: int, seed=None) -> dict:
     instead of shuffling twice.
     """
     if slots <= 0:
-        raise ValueError("Wi-Fi này chưa có proxy nào trong pool")
+        raise ValueError("Wi-Fi nÃ y chÆ°a cÃ³ proxy nÃ o trong pool")
     unique: list = []
     for mac in devices:
         mac = str(mac).strip().lower()
@@ -1088,10 +1088,10 @@ def client_proxy_text(item, language: str = "vi") -> str:
     if state == "pinned":
         return str(item.get("proxy_label") or "").strip() or str(item.get("proxy_host") or "")
     if state == "unpinned":
-        return translate("chưa ghim", language)
+        return translate("chÆ°a ghim", language)
     if state == "stale":
-        return translate("slot {slot} đã biến mất", language, slot=item.get("slot"))
-    return "—"
+        return translate("slot {slot} Ä‘Ã£ biáº¿n máº¥t", language, slot=item.get("slot"))
+    return "â€”"
 
 
 def pool_slot_usage(clients, idx, slots: int) -> list:
@@ -1213,7 +1213,7 @@ def write_stdout(text: str) -> bool:
     """Write to whatever stdout this build has.
 
     A windowed PyInstaller build has no `sys.stdout`, so the inherited pipe is
-    written through the file descriptor (and the Win32 handle) instead — that
+    written through the file descriptor (and the Win32 handle) instead â€” that
     pipe is how `ssh` reads an askpass answer.
     """
     data = text.encode("utf-8")
@@ -1273,8 +1273,8 @@ PYINSTALLER_CHILD_VARS = (
 def clean_child_environment(env: dict) -> dict:
     """Strip the PyInstaller state ssh would pass on to the askpass helper.
 
-    ssh spawns SSH_ASKPASS itself, so this executable runs with ssh — not with
-    itself — as its parent. The onefile bootloader finds its own variables in
+    ssh spawns SSH_ASKPASS itself, so this executable runs with ssh â€” not with
+    itself â€” as its parent. The onefile bootloader finds its own variables in
     the inherited environment, checks that the parent runs the same executable,
     and aborts with "Security validation failure: parent process has different
     executable!". Removing those variables (and asking the bootloader to reset)
@@ -1352,23 +1352,23 @@ class ProvisionSettings:
 
     def validate(self) -> None:
         if not str(self.host).strip():
-            raise ValueError("Thiếu địa chỉ router")
+            raise ValueError("Thiáº¿u Ä‘á»‹a chá»‰ router")
         if not str(self.user).strip():
-            raise ValueError("Thiếu tài khoản SSH")
+            raise ValueError("Thiáº¿u tÃ i khoáº£n SSH")
         try:
             port = int(self.port)
         except (TypeError, ValueError):
-            raise ValueError("Port SSH không hợp lệ") from None
+            raise ValueError("Port SSH khÃ´ng há»£p lá»‡") from None
         if not 1 <= port <= 65535:
-            raise ValueError("Port SSH không hợp lệ")
+            raise ValueError("Port SSH khÃ´ng há»£p lá»‡")
         if not str(self.remote_dir).startswith("/"):
-            raise ValueError("Thư mục trên router phải là đường dẫn tuyệt đối")
+            raise ValueError("ThÆ° má»¥c trÃªn router pháº£i lÃ  Ä‘Æ°á»ng dáº«n tuyá»‡t Ä‘á»‘i")
         if self.key_path and not Path(self.key_path).is_file():
-            raise ValueError("Không thấy SSH key")
+            raise ValueError("KhÃ´ng tháº¥y SSH key")
         if not self.payload:
-            raise ValueError("Chưa chọn mã nguồn hoặc gói cập nhật")
+            raise ValueError("ChÆ°a chá»n mÃ£ nguá»“n hoáº·c gÃ³i cáº­p nháº­t")
         if not Path(self.payload).exists():
-            raise ValueError("Không thấy mã nguồn hoặc gói cập nhật")
+            raise ValueError("KhÃ´ng tháº¥y mÃ£ nguá»“n hoáº·c gÃ³i cáº­p nháº­t")
 
     @property
     def target(self) -> str:
@@ -1411,7 +1411,7 @@ class ProvisionSettings:
         return self.ssh_command(f"cat > {shlex.quote(remote)}")
 
     def to_payload(self) -> dict:
-        """Persistable form — the password is deliberately left out."""
+        """Persistable form â€” the password is deliberately left out."""
         return {
             "host": str(self.host).strip(),
             "user": str(self.user).strip(),
@@ -1494,12 +1494,12 @@ def build_update_package(payload: str = "") -> Path:
     """
     source = Path(payload or find_payload() or "")
     if not str(source) or not source.exists():
-        raise ProvisionError("Chưa chọn mã nguồn hoặc gói cập nhật")
+        raise ProvisionError("ChÆ°a chá»n mÃ£ nguá»“n hoáº·c gÃ³i cáº­p nháº­t")
     if source.is_file():
         return source
     entries = [name for name in PAYLOAD_ENTRIES if (source / name).exists()]
     if "scripts" not in entries or "agent" not in entries:
-        raise ProvisionError("Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)")
+        raise ProvisionError("ThÆ° má»¥c mÃ£ nguá»“n khÃ´ng há»£p lá»‡ (thiáº¿u scripts/ hoáº·c agent/)")
     ensure_app_home()
     package = CACHE_DIR / f"sbproxy-update-{payload_version(source) or APP_VERSION}.tar.gz"
     completed = subprocess.run(  # noqa: S603 - fixed argv, never a shell
@@ -1509,7 +1509,7 @@ def build_update_package(payload: str = "") -> Path:
         **hidden_process_options(),
     )
     if completed.returncode != 0:
-        raise ProvisionError(f"Đóng gói mã nguồn: {(completed.stderr or '').strip() or 'tar lỗi'}")
+        raise ProvisionError(f"ÄÃ³ng gÃ³i mÃ£ nguá»“n: {(completed.stderr or '').strip() or 'tar lá»—i'}")
     return package
 
 
@@ -1553,7 +1553,7 @@ def parse_router_token(text: str) -> str:
     lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
     token = lines[0] if lines else ""
     if not re.fullmatch(r"[A-Za-z0-9._-]{16,128}", token):
-        raise ProvisionError("Không đọc được token agent trên router")
+        raise ProvisionError("KhÃ´ng Ä‘á»c Ä‘Æ°á»£c token agent trÃªn router")
     return token
 
 
@@ -1607,12 +1607,12 @@ def payload_version(path) -> str:
 ROUTER_INVENTORY_KEYS = ("code", "conf", "deps", "agent", "token", "running")
 
 ROUTER_INVENTORY_LABELS = {
-    "code": "Mã nguồn trên router",
-    "conf": "Cấu hình wifi-socks.conf",
-    "deps": "Gói phụ thuộc (sing-box)",
+    "code": "MÃ£ nguá»“n trÃªn router",
+    "conf": "Cáº¥u hÃ¬nh wifi-socks.conf",
+    "deps": "GÃ³i phá»¥ thuá»™c (sing-box)",
     "agent": "Agent CGI",
     "token": "Token agent",
-    "running": "sing-box đang chạy",
+    "running": "sing-box Ä‘ang cháº¡y",
 }
 
 
@@ -1656,10 +1656,10 @@ def describe_router_inventory(inventory: dict, language: str = "en") -> str:
     missing = [ROUTER_INVENTORY_LABELS[key] for key in ROUTER_INVENTORY_KEYS if not inventory.get(key)]
     parts = []
     if present:
-        parts.append(translate("Đã có", language) + ": " + ", ".join(translate(item, language) for item in present))
+        parts.append(translate("ÄÃ£ cÃ³", language) + ": " + ", ".join(translate(item, language) for item in present))
     if missing:
-        parts.append(translate("Chưa có", language) + ": " + ", ".join(translate(item, language) for item in missing))
-    return " · ".join(parts)
+        parts.append(translate("ChÆ°a cÃ³", language) + ": " + ", ".join(translate(item, language) for item in missing))
+    return " Â· ".join(parts)
 
 
 class ProvisionRunner:
@@ -1685,16 +1685,16 @@ class ProvisionRunner:
         self.pushed_version = ""  # version of the package this run put on the router
         self.router_version = ""   # version already on the router, before the push
         self.steps = [
-            ("Kiểm tra kết nối SSH", self.step_check_ssh),
-            ("Kiểm tra hiện trạng router", self.step_inventory),
-            ("Đẩy mã nguồn lên router", self.step_push_code),
-            ("Cài gói phụ thuộc", self.step_install_deps),
-            ("Đẩy cấu hình wifi-socks.conf", self.step_push_config),
-            ("Chạy preflight và dry-run", self.step_preflight),
-            ("Chạy apply.sh khởi tạo", self.step_apply),
-            ("Cài / cập nhật agent", self.step_install_agent),
-            ("Lấy token agent", self.step_fetch_token),
-            ("Kiểm tra agent API", self.step_verify_agent),
+            ("Kiá»ƒm tra káº¿t ná»‘i SSH", self.step_check_ssh),
+            ("Kiá»ƒm tra hiá»‡n tráº¡ng router", self.step_inventory),
+            ("Äáº©y mÃ£ nguá»“n lÃªn router", self.step_push_code),
+            ("CÃ i gÃ³i phá»¥ thuá»™c", self.step_install_deps),
+            ("Äáº©y cáº¥u hÃ¬nh wifi-socks.conf", self.step_push_config),
+            ("Cháº¡y preflight vÃ  dry-run", self.step_preflight),
+            ("Cháº¡y apply.sh khá»Ÿi táº¡o", self.step_apply),
+            ("CÃ i / cáº­p nháº­t agent", self.step_install_agent),
+            ("Láº¥y token agent", self.step_fetch_token),
+            ("Kiá»ƒm tra agent API", self.step_verify_agent),
         ]
 
     # -- process plumbing ---------------------------------------------------
@@ -1725,7 +1725,7 @@ class ProvisionRunner:
 
     def run_command(self, argv, description, timeout=600, stdin_path=None) -> str:
         if self.cancelled:
-            raise ProvisionError("Đã dừng theo yêu cầu")
+            raise ProvisionError("ÄÃ£ dá»«ng theo yÃªu cáº§u")
         log.info("provision: %s", redact(" ".join(argv)))
         # Only pass the keyword when it is used, so an injected runner that
         # does not take it keeps working for every other call.
@@ -1733,9 +1733,9 @@ class ProvisionRunner:
         try:
             code, out, err = self._execute(argv, timeout=timeout, **extra)
         except FileNotFoundError as exc:
-            raise ProvisionError(f"Thiếu công cụ {argv[0]}") from exc
+            raise ProvisionError(f"Thiáº¿u cÃ´ng cá»¥ {argv[0]}") from exc
         except subprocess.TimeoutExpired as exc:
-            raise ProvisionError(f"{description}: quá thời gian chờ") from exc
+            raise ProvisionError(f"{description}: quÃ¡ thá»i gian chá»") from exc
         output = (out + ("\n" + err if err.strip() else "")).strip()
         if code != 0:
             # One line reaches the checklist; the whole thing reaches the log,
@@ -1755,7 +1755,7 @@ class ProvisionRunner:
         try:
             size = source.stat().st_size
         except OSError as exc:
-            raise ProvisionError(f"{description}: không đọc được file cần đẩy") from exc
+            raise ProvisionError(f"{description}: khÃ´ng Ä‘á»c Ä‘Æ°á»£c file cáº§n Ä‘áº©y") from exc
         self.run_command(self.settings.upload_command(remote), description,
                          timeout=600, stdin_path=str(source))
         # A truncated transfer can still exit 0, so compare what actually landed.
@@ -1763,28 +1763,28 @@ class ProvisionRunner:
         landed = answer.split()[-1] if answer.split() else ""
         if landed != str(size):
             raise ProvisionError(
-                f"{description}: file trên router lệch kích thước "
+                f"{description}: file trÃªn router lá»‡ch kÃ­ch thÆ°á»›c "
                 f"({landed or '?'} / {size} byte)"
             )
-        return f"{remote} · {human_bytes(size)}"
+        return f"{remote} Â· {human_bytes(size)}"
 
     # -- steps --------------------------------------------------------------
 
     def step_check_ssh(self) -> str:
         board = self.ssh(
             'uname -sr; . /etc/openwrt_release 2>/dev/null && echo "$DISTRIB_DESCRIPTION"; exit 0',
-            "Kiểm tra kết nối SSH", timeout=90,
+            "Kiá»ƒm tra káº¿t ná»‘i SSH", timeout=90,
         )
-        return board.replace("\n", " · ") or self.settings.target
+        return board.replace("\n", " Â· ") or self.settings.target
 
     def step_inventory(self) -> str:
         """Look before installing: reuse dependencies, config, and agent."""
         output = self.ssh(router_inventory_command(self.settings.remote_dir),
-                          "Kiểm tra hiện trạng router", timeout=90)
+                          "Kiá»ƒm tra hiá»‡n tráº¡ng router", timeout=90)
         self.inventory = parse_router_inventory(output)
         self.router_version = parse_inventory_version(output)
         summary = describe_router_inventory(self.inventory)
-        return f"v{self.router_version} · {summary}" if self.router_version else summary
+        return f"v{self.router_version} Â· {summary}" if self.router_version else summary
 
     def package_payload(self, workdir: Path) -> Path:
         """Return a tarball of router-side files, building one from a checkout."""
@@ -1793,11 +1793,11 @@ class ProvisionRunner:
             return source
         entries = [name for name in PAYLOAD_ENTRIES if (source / name).exists()]
         if "scripts" not in entries or "agent" not in entries:
-            raise ProvisionError("Thư mục mã nguồn không hợp lệ (thiếu scripts/ hoặc agent/)")
+            raise ProvisionError("ThÆ° má»¥c mÃ£ nguá»“n khÃ´ng há»£p lá»‡ (thiáº¿u scripts/ hoáº·c agent/)")
         package = workdir / "sbproxy-payload.tar.gz"
         self.run_command(
             ["tar", "-czf", str(package), "-C", str(source), "--exclude=node_modules", *entries],
-            "Đóng gói mã nguồn", timeout=300,
+            "ÄÃ³ng gÃ³i mÃ£ nguá»“n", timeout=300,
         )
         return package
 
@@ -1806,59 +1806,59 @@ class ProvisionRunner:
         available = payload_version(self.settings.payload)
         if self.router_version and available and compare_versions(available, self.router_version) == -1:
             raise ProvisionError(
-                "Router đang chạy bản mới hơn gói cài, hãy dùng console mới hơn: "
+                "Router Ä‘ang cháº¡y báº£n má»›i hÆ¡n gÃ³i cÃ i, hÃ£y dÃ¹ng console má»›i hÆ¡n: "
                 f"{self.router_version} > {available}"
             )
         workdir = Path(tempfile.mkdtemp(prefix="sbproxy-provision-", dir=str(CACHE_DIR) if CACHE_DIR.is_dir() else None))
         try:
             package = self.package_payload(workdir)
-            self.upload(package, "/tmp/sbproxy-update.tar.gz", "Đẩy mã nguồn")
+            self.upload(package, "/tmp/sbproxy-update.tar.gz", "Äáº©y mÃ£ nguá»“n")
             self.ssh(
                 f"set -e; mkdir -p {remote}; tar xzf /tmp/sbproxy-update.tar.gz -C {remote}; "
                 f"chmod +x {remote}/scripts/*.sh {remote}/agent/install-agent.sh; "
                 "rm -f /tmp/sbproxy-update.tar.gz",
-                "Giải nén mã nguồn", timeout=300,
+                "Giáº£i nÃ©n mÃ£ nguá»“n", timeout=300,
             )
             self.pushed_version = payload_version(package) or payload_version(self.settings.payload)
             size = package.stat().st_size if package.is_file() else 0
-            detail = f"{remote} · {human_bytes(size)}" if size else remote
-            return f"{detail} · v{self.pushed_version}" if self.pushed_version else detail
+            detail = f"{remote} Â· {human_bytes(size)}" if size else remote
+            return f"{detail} Â· v{self.pushed_version}" if self.pushed_version else detail
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
     def step_install_deps(self) -> str:
         if self.settings.agent_only:
-            return Skipped("Cài agent riêng — bỏ qua gói phụ thuộc")
+            return Skipped("CÃ i agent riÃªng â€” bá» qua gÃ³i phá»¥ thuá»™c")
         if self.inventory.get("deps"):
             return ""  # sing-box is already installed; nothing to add
         output = self.ssh(
             f"cd {self.settings.remote_dir}; sh scripts/install-deps.sh",
-            "Cài gói phụ thuộc", timeout=1200,
+            "CÃ i gÃ³i phá»¥ thuá»™c", timeout=1200,
         )
         lines = output.splitlines()
         return lines[-1] if lines else "OK"
 
     def step_push_config(self) -> str:
         if self.settings.agent_only:
-            return Skipped("Cài agent riêng — giữ nguyên cấu hình")
+            return Skipped("CÃ i agent riÃªng â€” giá»¯ nguyÃªn cáº¥u hÃ¬nh")
         remote = self.settings.remote_dir
         if self.inventory.get("conf") and not self.settings.overwrite_config:
             return ""  # the router already has a configuration; keep it
         pushed = []
         if self.settings.config_path:
             if not Path(self.settings.config_path).is_file():
-                raise ProvisionError("Không thấy file wifi-socks.conf đã chọn")
-            self.upload(self.settings.config_path, f"{remote}/config/wifi-socks.conf", "Đẩy wifi-socks.conf")
+                raise ProvisionError("KhÃ´ng tháº¥y file wifi-socks.conf Ä‘Ã£ chá»n")
+            self.upload(self.settings.config_path, f"{remote}/config/wifi-socks.conf", "Äáº©y wifi-socks.conf")
             pushed.append("wifi-socks.conf")
         if self.settings.settings_path:
             if not Path(self.settings.settings_path).is_file():
-                raise ProvisionError("Không thấy file settings.sh đã chọn")
-            self.upload(self.settings.settings_path, f"{remote}/config/settings.sh", "Đẩy settings.sh")
+                raise ProvisionError("KhÃ´ng tháº¥y file settings.sh Ä‘Ã£ chá»n")
+            self.upload(self.settings.settings_path, f"{remote}/config/settings.sh", "Äáº©y settings.sh")
             pushed.append("settings.sh")
         if not pushed:
             return self.seed_empty_config()
         self.ssh(f"chmod 600 {remote}/config/wifi-socks.conf 2>/dev/null; exit 0",
-                 "Đặt quyền cấu hình", timeout=60)
+                 "Äáº·t quyá»n cáº¥u hÃ¬nh", timeout=60)
         return " + ".join(pushed)
 
     def seed_empty_config(self) -> str:
@@ -1882,11 +1882,11 @@ class ProvisionRunner:
             "echo '# name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type'; "
             "} > config/wifi-socks.conf; fi; "
             "chmod 600 config/wifi-socks.conf; echo state=created",
-            "Tạo wifi-socks.conf trống", timeout=90,
+            "Táº¡o wifi-socks.conf trá»‘ng", timeout=90,
         )
         if "state=created" not in answer:
             return ""  # the router already had one; nothing was written
-        return "wifi-socks.conf trống (kèm chú thích các cột)"
+        return "wifi-socks.conf trá»‘ng (kÃ¨m chÃº thÃ­ch cÃ¡c cá»™t)"
 
     def router_has_config(self) -> bool:
         """True when the router carries a non-empty wifi-socks.conf.
@@ -1897,39 +1897,39 @@ class ProvisionRunner:
         """
         answer = self.ssh(
             f"[ -s {self.settings.remote_dir}/config/wifi-socks.conf ] && echo have=1; exit 0",
-            "Kiểm tra wifi-socks.conf", timeout=60,
+            "Kiá»ƒm tra wifi-socks.conf", timeout=60,
         )
         return "have=1" in answer
 
     def step_preflight(self) -> str:
         if self.settings.agent_only:
-            return Skipped("Cài agent riêng — không chạy preflight")
-        self.ssh(f"cd {self.settings.remote_dir}; sh scripts/preflight.sh", "Chạy preflight", timeout=600)
+            return Skipped("CÃ i agent riÃªng â€” khÃ´ng cháº¡y preflight")
+        self.ssh(f"cd {self.settings.remote_dir}; sh scripts/preflight.sh", "Cháº¡y preflight", timeout=600)
         # apply.sh refuses to run without a configuration, and starting without
         # one is a supported path: Wi-Fi entries get added in the console after
         # the agent is up.
         if not self.router_has_config():
-            return Skipped("preflight OK · chưa có wifi-socks.conf nên bỏ qua dry-run")
+            return Skipped("preflight OK Â· chÆ°a cÃ³ wifi-socks.conf nÃªn bá» qua dry-run")
         self.ssh(f"cd {self.settings.remote_dir}; DRYRUN=1 sh scripts/apply.sh >/dev/null",
                  "Dry-run apply", timeout=600)
         return "preflight + dry-run OK"
 
     def step_apply(self) -> str:
         if self.settings.agent_only:
-            return Skipped("Cài agent riêng — không apply cấu hình")
+            return Skipped("CÃ i agent riÃªng â€” khÃ´ng apply cáº¥u hÃ¬nh")
         if not self.settings.run_apply:
             return ""
         if not self.router_has_config():
-            return Skipped("Chưa có wifi-socks.conf — thêm Wi-Fi trong app rồi bấm Đẩy cấu hình & Apply")
+            return Skipped("ChÆ°a cÃ³ wifi-socks.conf â€” thÃªm Wi-Fi trong app rá»“i báº¥m Äáº©y cáº¥u hÃ¬nh & Apply")
         output = self.ssh(f"cd {self.settings.remote_dir}; sh scripts/apply.sh",
-                          "Chạy apply.sh", timeout=1800)
+                          "Cháº¡y apply.sh", timeout=1800)
         lines = output.splitlines()
         return lines[-1] if lines else "apply OK"
 
     def step_install_agent(self) -> str:
         if not self.settings.reinstall_agent and self.agent_matches_pushed_code():
             return ""  # the installed agent is already this exact code
-        self.ssh(f"cd {self.settings.remote_dir}; sh agent/install-agent.sh", "Cài agent", timeout=1200)
+        self.ssh(f"cd {self.settings.remote_dir}; sh agent/install-agent.sh", "CÃ i agent", timeout=1200)
         return f"uhttpd CGI + healthd v{self.pushed_version}" if self.pushed_version else "uhttpd CGI + healthd"
 
     def agent_matches_pushed_code(self) -> bool:
@@ -1949,29 +1949,29 @@ class ProvisionRunner:
             f"cmp -s /usr/sbin/sbproxy-healthd {remote}/agent/sbproxy-healthd || same=0; "
             f"cmp -s /www/sbproxy/index.html {remote}/console/web/control-panel.html || same=0; "
             'echo "same=$same"; exit 0',
-            "So khớp agent đã cài", timeout=90,
+            "So khá»›p agent Ä‘Ã£ cÃ i", timeout=90,
         )
         return "same=1" in answer
 
     def step_fetch_token(self) -> str:
-        raw = self.ssh(f"cat {REMOTE_TOKEN_FILE}", "Đọc token agent", timeout=60)
+        raw = self.ssh(f"cat {REMOTE_TOKEN_FILE}", "Äá»c token agent", timeout=60)
         self.token = parse_router_token(raw)
         save_connection(self.settings.base_url, self.token)
-        return f"{self.settings.base_url} · token ok"
+        return f"{self.settings.base_url} Â· token ok"
 
     def step_verify_agent(self) -> str:
         state = self._probe(self.settings.base_url, self.token)
         if state != "ok":
-            raise ProvisionError(f"Agent chưa trả lời đúng: {ROUTER_STATE_LABELS.get(state, state)}")
+            raise ProvisionError(f"Agent chÆ°a tráº£ lá»i Ä‘Ãºng: {ROUTER_STATE_LABELS.get(state, state)}")
         expected = self.pushed_version or APP_VERSION
         reported = self._agent_version(self.settings.base_url, self.token)
         if reported and compare_versions(reported, expected) != 0:
             # "head: detail" so translate() renders both halves in English.
             raise ProvisionError(
-                f"Agent vẫn chạy version cũ, hãy chạy lại và tick “Cài lại agent dù đã có”: "
-                f"{reported} ≠ {expected}"
+                f"Agent váº«n cháº¡y version cÅ©, hÃ£y cháº¡y láº¡i vÃ  tick â€œCÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³â€: "
+                f"{reported} â‰  {expected}"
             )
-        return f"status ok · agent v{reported}" if reported else "status ok"
+        return f"status ok Â· agent v{reported}" if reported else "status ok"
 
     # -- orchestration ------------------------------------------------------
 
@@ -1986,7 +1986,7 @@ class ProvisionRunner:
         for index, (label, function) in enumerate(self.steps):
             if self.cancelled:
                 audit("provision.cancelled", router=self.settings.target, step=label)
-                self.emit(index, STEP_FAILED, "Đã dừng theo yêu cầu")
+                self.emit(index, STEP_FAILED, "ÄÃ£ dá»«ng theo yÃªu cáº§u")
                 return False
             self.emit(index, STEP_RUNNING, "")
             try:
@@ -2001,7 +2001,7 @@ class ProvisionRunner:
                 self.emit(index, STEP_FAILED, str(exc))
                 return False
             skipped = isinstance(detail, Skipped) or not detail
-            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bỏ qua")
+            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bá» qua")
         audit("provision.finished", router=self.settings.target,
               agent=self.pushed_version or self.router_version or "?")
         return True
@@ -2066,7 +2066,7 @@ class AgentClient:
         except (URLError, TimeoutError, OSError) as exc:
             log.warning("agent %s %s -> transport error: %s", method, action, redact(exc))
             self._audit(action, router=self.base_url, result="unreachable", detail=exc)
-            raise AgentError(f"Không kết nối được {self.base_url} trong {request_timeout}s: {exc}") from exc
+            raise AgentError(f"KhÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c {self.base_url} trong {request_timeout}s: {exc}") from exc
         elapsed = (time.monotonic() - started) * 1000
         log.info("agent %s %s -> %s bytes in %.0f ms", method, action, len(raw), elapsed)
         self._audit(action, router=self.base_url, result="ok", ms=f"{elapsed:.0f}")
@@ -2077,11 +2077,11 @@ class AgentClient:
         try:
             payload = json.loads(decoded)
         except json.JSONDecodeError as exc:
-            raise AgentError("Agent trả dữ liệu không phải JSON") from exc
+            raise AgentError("Agent tráº£ dá»¯ liá»‡u khÃ´ng pháº£i JSON") from exc
         if not isinstance(payload, dict):
-            raise AgentError("Agent trả JSON không phải object")
+            raise AgentError("Agent tráº£ JSON khÃ´ng pháº£i object")
         if payload.get("ok") is False:
-            raise AgentError(payload.get("error") or payload.get("log") or "Agent báo lỗi")
+            raise AgentError(payload.get("error") or payload.get("log") or "Agent bÃ¡o lá»—i")
         return payload
 
     def _audit(self, action: str, **fields) -> None:
@@ -2176,19 +2176,19 @@ class AgentClient:
 def parse_proxy_compact(value: str) -> tuple[str, int, str, str]:
     """Parse host:port:user:password copied from a proxy provider."""
     if not isinstance(value, str):
-        raise ValueError("Chuỗi proxy nhập nhanh không hợp lệ")
+        raise ValueError("Chuá»—i proxy nháº­p nhanh khÃ´ng há»£p lá»‡")
     parts = value.strip().split(":", 3)
     if len(parts) != 4:
-        raise ValueError("Nhập proxy theo dạng host:port:user:password")
+        raise ValueError("Nháº­p proxy theo dáº¡ng host:port:user:password")
     host, port_text, user, password = (part.strip() for part in parts)
     if not host:
-        raise ValueError("Thiếu địa chỉ SOCKS5")
+        raise ValueError("Thiáº¿u Ä‘á»‹a chá»‰ SOCKS5")
     try:
         port = int(port_text)
     except ValueError as exc:
-        raise ValueError("Port SOCKS5 không hợp lệ") from exc
+        raise ValueError("Port SOCKS5 khÃ´ng há»£p lá»‡") from exc
     if not 1 <= port <= 65535:
-        raise ValueError("Port SOCKS5 không hợp lệ")
+        raise ValueError("Port SOCKS5 khÃ´ng há»£p lá»‡")
     return host, port, user, password
 
 
@@ -2211,13 +2211,13 @@ class WifiRecord:
     def from_row(cls, row: str) -> "WifiRecord":
         columns = row.rstrip("\r\n").split("|")
         if len(columns) not in (10, 11, 12):
-            raise ValueError(f"Dòng cấu hình cần 10, 11 hoặc 12 cột: {row}")
+            raise ValueError(f"DÃ²ng cáº¥u hÃ¬nh cáº§n 10, 11 hoáº·c 12 cá»™t: {row}")
         if len(columns) == 10:
             columns.append("")
         if len(columns) == 11:
             columns.append("socks5")
         if columns[8].strip() not in ("0", "1") or columns[9].strip() not in ("0", "1"):
-            raise ValueError("isolate và webrtc phải là 0 hoặc 1")
+            raise ValueError("isolate vÃ  webrtc pháº£i lÃ  0 hoáº·c 1")
         record = cls(
             name=columns[0], band=columns[1].strip(), idx=int(columns[2].strip()),
             wifi_password=columns[3], host=columns[4].strip(),
@@ -2232,40 +2232,40 @@ class WifiRecord:
     def validate(self) -> None:
         values = [self.name, self.wifi_password, self.host, self.user, self.socks_password]
         if any(not isinstance(value, str) for value in values):
-            raise ValueError("Các trường văn bản phải là chuỗi")
+            raise ValueError("CÃ¡c trÆ°á»ng vÄƒn báº£n pháº£i lÃ  chuá»—i")
         if any("|" in value or any(unicodedata.category(char) == "Cc" for char in value) for value in values):
-            raise ValueError("Các trường không được chứa | hoặc ký tự điều khiển")
+            raise ValueError("CÃ¡c trÆ°á»ng khÃ´ng Ä‘Æ°á»£c chá»©a | hoáº·c kÃ½ tá»± Ä‘iá»u khiá»ƒn")
         try:
             name_size = len(self.name.encode("utf-8"))
             wifi_password_size = len(self.wifi_password.encode("utf-8"))
             user_size = len(self.user.encode("utf-8"))
             socks_password_size = len(self.socks_password.encode("utf-8"))
         except UnicodeEncodeError as exc:
-            raise ValueError("Các trường văn bản chứa Unicode không hợp lệ") from exc
+            raise ValueError("CÃ¡c trÆ°á»ng vÄƒn báº£n chá»©a Unicode khÃ´ng há»£p lá»‡") from exc
         if not 1 <= name_size <= 32:
-            raise ValueError("SSID phải dài 1–32 byte UTF-8")
+            raise ValueError("SSID pháº£i dÃ i 1â€“32 byte UTF-8")
         if self.band not in ("2g", "5g"):
-            raise ValueError("Băng tần phải là 2g hoặc 5g")
+            raise ValueError("BÄƒng táº§n pháº£i lÃ  2g hoáº·c 5g")
         if isinstance(self.idx, bool) or not isinstance(self.idx, int) or not 1 <= self.idx <= 200:
-            raise ValueError("IDX phải từ 1 đến 200")
+            raise ValueError("IDX pháº£i tá»« 1 Ä‘áº¿n 200")
         if not 8 <= wifi_password_size <= 63:
-            raise ValueError("Mật khẩu Wi‑Fi phải dài 8–63 byte UTF-8")
+            raise ValueError("Máº­t kháº©u Wiâ€‘Fi pháº£i dÃ i 8â€“63 byte UTF-8")
         if not self.host.strip():
-            raise ValueError("Thiếu địa chỉ SOCKS5")
+            raise ValueError("Thiáº¿u Ä‘á»‹a chá»‰ SOCKS5")
         if len(self.host) > 253 or not re.fullmatch(r"[A-Za-z0-9._:-]+", self.host):
-            raise ValueError("Địa chỉ SOCKS5 không hợp lệ")
+            raise ValueError("Äá»‹a chá»‰ SOCKS5 khÃ´ng há»£p lá»‡")
         if user_size > 255 or socks_password_size > 255:
-            raise ValueError("Thông tin xác thực SOCKS5 quá dài")
+            raise ValueError("ThÃ´ng tin xÃ¡c thá»±c SOCKS5 quÃ¡ dÃ i")
         if isinstance(self.port, bool) or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
-            raise ValueError("Port SOCKS5 không hợp lệ")
+            raise ValueError("Port SOCKS5 khÃ´ng há»£p lá»‡")
         if self.proxy_type not in ("socks5", "http"):
-            raise ValueError("Loại proxy phải là SOCKS5 hoặc HTTP")
+            raise ValueError("Loáº¡i proxy pháº£i lÃ  SOCKS5 hoáº·c HTTP")
         if not isinstance(self.isolate, bool) or not isinstance(self.webrtc, bool):
-            raise ValueError("isolate và webrtc phải là boolean")
+            raise ValueError("isolate vÃ  webrtc pháº£i lÃ  boolean")
         if not isinstance(self.mac_oui, str):
-            raise ValueError("MAC OUI phải có dạng AA:BB:CC")
+            raise ValueError("MAC OUI pháº£i cÃ³ dáº¡ng AA:BB:CC")
         if self.mac_oui and not re.fullmatch(r"[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){2}", self.mac_oui):
-            raise ValueError("MAC OUI phải có dạng AA:BB:CC")
+            raise ValueError("MAC OUI pháº£i cÃ³ dáº¡ng AA:BB:CC")
 
     def to_row(self) -> str:
         self.validate()
@@ -2286,7 +2286,7 @@ def parse_conf(content: str) -> list[WifiRecord]:
             continue
         record = WifiRecord.from_row(line)
         if record.idx in indexes:
-            raise ValueError("IDX Wi‑Fi bị trùng")
+            raise ValueError("IDX Wiâ€‘Fi bá»‹ trÃ¹ng")
         indexes.add(record.idx)
         records.append(record)
     return sorted(records, key=lambda item: item.idx)
@@ -2295,10 +2295,10 @@ def parse_conf(content: str) -> list[WifiRecord]:
 def render_conf(records: list[WifiRecord]) -> str:
     indexes = [record.idx for record in records]
     if len(indexes) != len(set(indexes)):
-        raise ValueError("IDX Wi‑Fi bị trùng")
+        raise ValueError("IDX Wiâ€‘Fi bá»‹ trÃ¹ng")
     rows = [record.to_row() for record in sorted(records, key=lambda item: item.idx)]
     header = (
-        "# wifi-socks.conf — generated by sbproxy Console Native\n"
+        "# wifi-socks.conf â€” generated by sbproxy Console Native\n"
         "# name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type\n"
     )
     return header + "\n".join(rows) + ("\n" if rows else "")
@@ -2402,9 +2402,9 @@ def filter_clients(
         if presence == "Offline" and online:
             continue
         banned = bool(item.get("banned"))
-        if state in ("Đang cấm", "Blocked") and not banned:
+        if state in ("Äang cáº¥m", "Blocked") and not banned:
             continue
-        if state in ("Không cấm", "Not blocked") and banned:
+        if state in ("KhÃ´ng cáº¥m", "Not blocked") and banned:
             continue
         raw_signal = item.get("signal_dbm")
         try:
@@ -2413,35 +2413,35 @@ def filter_clients(
                 signal_dbm = None
         except (TypeError, ValueError):
             signal_dbm = None
-        if signal in ("Rất tốt (≥ -60 dBm)", "Excellent (≥ -60 dBm)") and (signal_dbm is None or signal_dbm < -60):
+        if signal in ("Ráº¥t tá»‘t (â‰¥ -60 dBm)", "Excellent (â‰¥ -60 dBm)") and (signal_dbm is None or signal_dbm < -60):
             continue
-        if signal in ("Tốt (-70 đến -61 dBm)", "Good (-70 to -61 dBm)") and (
+        if signal in ("Tá»‘t (-70 Ä‘áº¿n -61 dBm)", "Good (-70 to -61 dBm)") and (
             signal_dbm is None or signal_dbm < -70 or signal_dbm >= -60
         ):
             continue
-        if signal in ("Yếu (-80 đến -71 dBm)", "Weak (-80 to -71 dBm)") and (
+        if signal in ("Yáº¿u (-80 Ä‘áº¿n -71 dBm)", "Weak (-80 to -71 dBm)") and (
             signal_dbm is None or signal_dbm < -80 or signal_dbm >= -70
         ):
             continue
-        if signal in ("Rất yếu (< -80 dBm)", "Very weak (< -80 dBm)") and (signal_dbm is None or signal_dbm >= -80):
+        if signal in ("Ráº¥t yáº¿u (< -80 dBm)", "Very weak (< -80 dBm)") and (signal_dbm is None or signal_dbm >= -80):
             continue
-        if signal in ("Không rõ", "Unknown") and signal_dbm is not None:
+        if signal in ("KhÃ´ng rÃµ", "Unknown") and signal_dbm is not None:
             continue
         total_bytes = _nonnegative_int(item.get("rx_bytes")) + _nonnegative_int(item.get("tx_bytes"))
-        if traffic in ("Có lưu lượng", "Has traffic") and total_bytes <= 0:
+        if traffic in ("CÃ³ lÆ°u lÆ°á»£ng", "Has traffic") and total_bytes <= 0:
             continue
-        if traffic in ("Không lưu lượng", "No traffic") and total_bytes > 0:
+        if traffic in ("KhÃ´ng lÆ°u lÆ°á»£ng", "No traffic") and total_bytes > 0:
             continue
-        if traffic in ("Từ 10 MB", "At least 10 MB") and total_bytes < 10 * 1024 * 1024:
+        if traffic in ("Tá»« 10 MB", "At least 10 MB") and total_bytes < 10 * 1024 * 1024:
             continue
-        if traffic in ("Từ 100 MB", "At least 100 MB") and total_bytes < 100 * 1024 * 1024:
+        if traffic in ("Tá»« 100 MB", "At least 100 MB") and total_bytes < 100 * 1024 * 1024:
             continue
         connected = _nonnegative_int(item.get("connected_s"))
-        if duration in ("Dưới 5 phút", "Under 5 minutes") and not (online and connected < 300):
+        if duration in ("DÆ°á»›i 5 phÃºt", "Under 5 minutes") and not (online and connected < 300):
             continue
-        if duration in ("5–60 phút", "5–60 minutes") and not (online and 300 <= connected <= 3600):
+        if duration in ("5â€“60 phÃºt", "5â€“60 minutes") and not (online and 300 <= connected <= 3600):
             continue
-        if duration in ("Trên 1 giờ", "Over 1 hour") and not (online and connected > 3600):
+        if duration in ("TrÃªn 1 giá»", "Over 1 hour") and not (online and connected > 3600):
             continue
         result.append(item)
     return result
@@ -2531,7 +2531,7 @@ class WifiDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(self.t("Sửa Wi‑Fi" if record else "Thêm Wi‑Fi"))
+        self.title(self.t("Sá»­a Wiâ€‘Fi" if record else "ThÃªm Wiâ€‘Fi"))
         self.configure(bg=self.palette["bg"])
         self.resizable(False, False)
         self.transient(parent)
@@ -2549,20 +2549,20 @@ class WifiDialog(tk.Toplevel):
         }
         self.compact_socks = tk.StringVar()
         fields = [
-            ("SSID", "name", None), ("Băng tần", "band", "combo"), ("IDX", "idx", None),
-            ("Loại proxy", "proxy_type", "proxy_type"),
-            ("Mật khẩu Wi‑Fi", "wifi_password", "secret"), ("SOCKS host", "host", None),
+            ("SSID", "name", None), ("BÄƒng táº§n", "band", "combo"), ("IDX", "idx", None),
+            ("Loáº¡i proxy", "proxy_type", "proxy_type"),
+            ("Máº­t kháº©u Wiâ€‘Fi", "wifi_password", "secret"), ("SOCKS host", "host", None),
             ("SOCKS port", "port", None), ("SOCKS user", "user", None),
-            ("SOCKS password", "socks_password", "secret"), ("Hãng router / MAC", "vendor", "vendor"),
+            ("SOCKS password", "socks_password", "secret"), ("HÃ£ng router / MAC", "vendor", "vendor"),
         ]
         body = ttk.Frame(self, padding=14)
         body.grid(sticky="nsew")
-        ttk.Label(body, text="Nhập nhanh proxy").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 8))
+        ttk.Label(body, text="Nháº­p nhanh proxy").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 8))
         compact = ttk.Frame(body)
         compact.grid(row=0, column=1, sticky="ew", pady=(0, 8))
         compact_entry = ttk.Entry(compact, textvariable=self.compact_socks, width=27)
         compact_entry.pack(side="left", fill="x", expand=True)
-        ttk.Button(compact, text="Tách & điền", command=self._fill_compact_socks).pack(side="left", padx=(8, 0))
+        ttk.Button(compact, text="TÃ¡ch & Ä‘iá»n", command=self._fill_compact_socks).pack(side="left", padx=(8, 0))
         compact_entry.bind("<Return>", lambda _event: self._fill_compact_socks())
         first = None
         for row, (label, key, kind) in enumerate(fields):
@@ -2575,17 +2575,17 @@ class WifiDialog(tk.Toplevel):
             elif kind == "vendor":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=vendor_choices(record.mac_oui), state="readonly", width=33)
             else:
-                widget = ttk.Entry(body, textvariable=self.values[key], width=36, show="•" if kind == "secret" else "")
+                widget = ttk.Entry(body, textvariable=self.values[key], width=36, show="â€¢" if kind == "secret" else "")
             widget.grid(row=row, column=1, sticky="ew", pady=4)
             first = first or widget
         checks = ttk.Frame(body)
         checks.grid(row=len(fields) + 1, column=0, columnspan=2, sticky="w", pady=(8, 4))
-        ttk.Checkbutton(checks, text="Cách ly client", variable=self.values["isolate"]).pack(side="left", padx=(0, 18))
-        ttk.Checkbutton(checks, text="Chặn WebRTC", variable=self.values["webrtc"]).pack(side="left")
+        ttk.Checkbutton(checks, text="CÃ¡ch ly client", variable=self.values["isolate"]).pack(side="left", padx=(0, 18))
+        ttk.Checkbutton(checks, text="Cháº·n WebRTC", variable=self.values["webrtc"]).pack(side="left")
         actions = ttk.Frame(body)
         actions.grid(row=len(fields) + 2, column=0, columnspan=2, sticky="e", pady=(14, 0))
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Lưu", command=self._save).pack(side="right", padx=(0, 8))
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="LÆ°u", command=self._save).pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._save())
         self.bind("<Escape>", lambda _event: self.destroy())
         if first:
@@ -2597,7 +2597,7 @@ class WifiDialog(tk.Toplevel):
         try:
             host, port, user, password = parse_proxy_compact(self.compact_socks.get())
         except ValueError as exc:
-            messagebox.showerror(self.t("Dữ liệu không hợp lệ"), self.t(str(exc)), parent=self)
+            messagebox.showerror(self.t("Dá»¯ liá»‡u khÃ´ng há»£p lá»‡"), self.t(str(exc)), parent=self)
             return
         self.values["host"].set(host)
         self.values["port"].set(str(port))
@@ -2617,7 +2617,7 @@ class WifiDialog(tk.Toplevel):
             )
             result.validate()
         except (ValueError, TypeError) as exc:
-            messagebox.showerror(self.t("Dữ liệu không hợp lệ"), self.t(str(exc)), parent=self)
+            messagebox.showerror(self.t("Dá»¯ liá»‡u khÃ´ng há»£p lá»‡"), self.t(str(exc)), parent=self)
             return
         self.result = result
         self.destroy()
@@ -2629,7 +2629,7 @@ class RandomMacDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(f"Random MAC · {record.name}")
+        self.title(f"Random MAC Â· {record.name}")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -2640,11 +2640,11 @@ class RandomMacDialog(tk.Toplevel):
 
         body = ttk.Frame(self, style="Card.TFrame", padding=18)
         body.grid(sticky="nsew")
-        ttk.Label(body, text="Chọn hãng router", font=("Segoe UI Semibold", 13)).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(body, text="Chá»n hÃ£ng router", font=("Segoe UI Semibold", 13)).grid(row=0, column=0, columnspan=2, sticky="w")
         current_label = (
-            f"SSID: {record.name}  ·  Current MAC: {current_mac}"
+            f"SSID: {record.name}  Â·  Current MAC: {current_mac}"
             if self.language == "en" else
-            f"SSID: {record.name}  ·  MAC hiện tại: {current_mac}"
+            f"SSID: {record.name}  Â·  MAC hiá»‡n táº¡i: {current_mac}"
         )
         ttk.Label(body, text=current_label, style="Muted.TLabel").grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 14))
         ttk.Label(body, text="Provider / OUI").grid(row=2, column=0, sticky="w", padx=(0, 12))
@@ -2653,13 +2653,13 @@ class RandomMacDialog(tk.Toplevel):
         ttk.Label(body, textvariable=self.preview_var, style="Muted.TLabel").grid(row=3, column=0, columnspan=2, sticky="w", pady=(10, 4))
         ttk.Label(
             body,
-            text="Random sẽ cập nhật provider trong config, tạo BSSID mới và reload radio.",
+            text="Random sáº½ cáº­p nháº­t provider trong config, táº¡o BSSID má»›i vÃ  reload radio.",
             style="Muted.TLabel",
         ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 14))
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.grid(row=5, column=0, columnspan=2, sticky="e")
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Random MAC", command=self._submit, style="Warning.TButton").pack(side="right", padx=(0, 8))
         self.vendor_var.trace_add("write", lambda *_args: self._update_preview())
         self._update_preview()
@@ -2673,17 +2673,17 @@ class RandomMacDialog(tk.Toplevel):
         try:
             oui = vendor_oui(self.vendor_var.get())
         except ValueError:
-            self.preview_var.set(self.t("OUI không hợp lệ"))
+            self.preview_var.set(self.t("OUI khÃ´ng há»£p lá»‡"))
             return
         pattern = f"{oui}:xx:xx:xx" if oui else "02:xx:xx:xx:xx:xx"
-        prefix = "New MAC pattern: " if self.language == "en" else "Mẫu MAC mới: "
+        prefix = "New MAC pattern: " if self.language == "en" else "Máº«u MAC má»›i: "
         self.preview_var.set(f"{prefix}{pattern}")
 
     def _submit(self):
         try:
             self.result = vendor_oui(self.vendor_var.get())
         except ValueError as exc:
-            messagebox.showerror(self.t("Provider không hợp lệ"), self.t(str(exc)), parent=self)
+            messagebox.showerror(self.t("Provider khÃ´ng há»£p lá»‡"), self.t(str(exc)), parent=self)
             return
         self.destroy()
 
@@ -2694,30 +2694,30 @@ class ManualBanDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(self.t("Thêm MAC vào blocklist"))
+        self.title(self.t("ThÃªm MAC vÃ o blocklist"))
         self.configure(bg=self.palette["bg"])
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
         self.result = None
-        self.choices = {f"{record.name} · idx {record.idx}": record.idx for record in records}
+        self.choices = {f"{record.name} Â· idx {record.idx}": record.idx for record in records}
         first = next(iter(self.choices), "")
         self.ssid_var = tk.StringVar(value=first)
         self.mac_var = tk.StringVar()
 
         body = ttk.Frame(self, style="Card.TFrame", padding=18)
         body.grid(sticky="nsew")
-        ttk.Label(body, text="Chặn thiết bị theo MAC", font=("Segoe UI Semibold", 13)).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
+        ttk.Label(body, text="Cháº·n thiáº¿t bá»‹ theo MAC", font=("Segoe UI Semibold", 13)).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
         ttk.Label(body, text="SSID").grid(row=1, column=0, sticky="w", padx=(0, 12), pady=5)
         ttk.Combobox(body, textvariable=self.ssid_var, values=tuple(self.choices), state="readonly", width=34).grid(row=1, column=1, pady=5)
         ttk.Label(body, text="MAC").grid(row=2, column=0, sticky="w", padx=(0, 12), pady=5)
         mac_entry = ttk.Entry(body, textvariable=self.mac_var, width=37)
         mac_entry.grid(row=2, column=1, pady=5)
-        ttk.Label(body, text="Ví dụ: AA:BB:CC:DD:EE:FF", style="Muted.TLabel").grid(row=3, column=0, columnspan=2, sticky="w", pady=(2, 12))
+        ttk.Label(body, text="VÃ­ dá»¥: AA:BB:CC:DD:EE:FF", style="Muted.TLabel").grid(row=3, column=0, columnspan=2, sticky="w", pady=(2, 12))
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.grid(row=4, column=0, columnspan=2, sticky="e")
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Thêm vào blocklist", command=self._submit, style="Danger.TButton").pack(side="right", padx=(0, 8))
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="ThÃªm vÃ o blocklist", command=self._submit, style="Danger.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._submit())
         self.bind("<Escape>", lambda _event: self.destroy())
         mac_entry.focus_set()
@@ -2727,11 +2727,11 @@ class ManualBanDialog(tk.Toplevel):
     def _submit(self):
         mac = self.mac_var.get().strip().lower()
         if not re.fullmatch(r"(?:[0-9a-f]{2}:){5}[0-9a-f]{2}", mac):
-            messagebox.showerror(self.t("MAC không hợp lệ"), self.t("MAC phải có dạng AA:BB:CC:DD:EE:FF"), parent=self)
+            messagebox.showerror(self.t("MAC khÃ´ng há»£p lá»‡"), self.t("MAC pháº£i cÃ³ dáº¡ng AA:BB:CC:DD:EE:FF"), parent=self)
             return
         idx = self.choices.get(self.ssid_var.get())
         if idx is None:
-            messagebox.showerror(self.t("Thiếu SSID"), self.t("Hãy chọn SSID cần chặn"), parent=self)
+            messagebox.showerror(self.t("Thiáº¿u SSID"), self.t("HÃ£y chá»n SSID cáº§n cháº·n"), parent=self)
             return
         self.result = idx, mac
         self.destroy()
@@ -2745,7 +2745,7 @@ class PoolDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(f"{self.t('Pool proxy')} · {record.name}")
+        self.title(f"{self.t('Pool proxy')} Â· {record.name}")
         self.transient(parent)
         self.grab_set()
         self.configure(bg=self.palette["bg"])
@@ -2753,11 +2753,11 @@ class PoolDialog(tk.Toplevel):
 
         body = ttk.Frame(self, style="Card.TFrame", padding=18)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text=f"SSID: {record.name}  ·  IDX {record.idx}",
+        ttk.Label(body, text=f"SSID: {record.name}  Â·  IDX {record.idx}",
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
 
         columns = ("slot", "proxy", "type", "devices")
-        titles = (self.t("Slot"), self.t("Proxy"), "Type", self.t("Máy"))
+        titles = (self.t("Slot"), self.t("Proxy"), "Type", self.t("MÃ¡y"))
         table = ttk.Treeview(body, columns=columns, show="headings", height=8)
         for column, title, width in zip(columns, titles, (50, 260, 70, 70)):
             table.heading(column, text=title)
@@ -2768,7 +2768,7 @@ class PoolDialog(tk.Toplevel):
                                             row.get("type", ""), count))
         table.pack(fill="both", expand=True, pady=(0, 10))
 
-        ttk.Label(body, text="Dán danh sách proxy (mỗi dòng một proxy)",
+        ttk.Label(body, text="DÃ¡n danh sÃ¡ch proxy (má»—i dÃ²ng má»™t proxy)",
                   style="Muted.TLabel").pack(anchor="w")
         self.text = tk.Text(body, height=8, width=64, background=self.palette["card"],
                             foreground=self.palette["text"], insertbackground=self.palette["text"],
@@ -2779,14 +2779,14 @@ class PoolDialog(tk.Toplevel):
             text=("Replacing keeps every device on the proxy it is using, as long as that "
                   "proxy is still in the list. Wi-Fi is not interrupted."
                   if language == "en" else
-                  "Thay pool vẫn giữ mỗi máy ở đúng proxy nó đang dùng, miễn là proxy đó còn "
-                  "trong danh sách. Wi‑Fi không bị ngắt."),
+                  "Thay pool váº«n giá»¯ má»—i mÃ¡y á»Ÿ Ä‘Ãºng proxy nÃ³ Ä‘ang dÃ¹ng, miá»…n lÃ  proxy Ä‘Ã³ cÃ²n "
+                  "trong danh sÃ¡ch. Wiâ€‘Fi khÃ´ng bá»‹ ngáº¯t."),
             style="Muted.TLabel", wraplength=460, justify="left",
         ).pack(anchor="w", pady=(0, 12))
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Ghi pool", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Escape>", lambda _event: self.destroy())
@@ -2807,7 +2807,7 @@ class BulkProxyDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(self.t("Xem trước cách chia proxy"))
+        self.title(self.t("Xem trÆ°á»›c cÃ¡ch chia proxy"))
         self.transient(parent)
         self.grab_set()
         self.configure(bg=self.palette["bg"])
@@ -2817,7 +2817,7 @@ class BulkProxyDialog(tk.Toplevel):
         body.pack(fill="both", expand=True)
         summary = (f"{len(rows)} devices over {len({slot for _mac, slot, _label in rows})} proxies"
                    if language == "en" else
-                   f"{len(rows)} thiết bị chia cho {len({slot for _mac, slot, _label in rows})} proxy")
+                   f"{len(rows)} thiáº¿t bá»‹ chia cho {len({slot for _mac, slot, _label in rows})} proxy")
         ttk.Label(body, text=summary, style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
 
         columns = ("mac", "slot", "proxy")
@@ -2832,8 +2832,8 @@ class BulkProxyDialog(tk.Toplevel):
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Áp dụng", command=self._submit,
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Ãp dá»¥ng", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Escape>", lambda _event: self.destroy())
         localize_widget_tree(self, self.language)
@@ -2852,15 +2852,15 @@ class SlotChoiceDialog(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(self.t("Gán proxy…"))
+        self.title(self.t("GÃ¡n proxyâ€¦"))
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
         self.configure(bg=self.palette["bg"])
         self.result = None
-        self._choices = {self.t("Không ghim proxy"): "none"}
+        self._choices = {self.t("KhÃ´ng ghim proxy"): "none"}
         for position, row in enumerate(proxies):
-            self._choices[f"{position} · {proxy_display(row)}"] = position
+            self._choices[f"{position} Â· {proxy_display(row)}"] = position
         preselect = next((text for text, value in self._choices.items() if value == current),
                          next(iter(self._choices)))
         self.choice_var = tk.StringVar(value=preselect)
@@ -2872,8 +2872,8 @@ class SlotChoiceDialog(tk.Toplevel):
                      state="readonly", width=46).pack(fill="x", pady=(0, 14))
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
-        ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Áp dụng", command=self._submit,
+        ttk.Button(actions, text="Huá»·", command=self.destroy).pack(side="right")
+        ttk.Button(actions, text="Ãp dá»¥ng", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._submit())
         self.bind("<Escape>", lambda _event: self.destroy())
@@ -2893,7 +2893,7 @@ class LoadingWindow(tk.Toplevel):
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
-        self.title(self.t("sbproxy · Đang xử lý"))
+        self.title(self.t("sbproxy Â· Äang xá»­ lÃ½"))
         self.resizable(False, False)
         self.transient(parent)
         self.configure(bg=self.palette["bg"])
@@ -2905,7 +2905,7 @@ class LoadingWindow(tk.Toplevel):
 
         body = ttk.Frame(self, style="Card.TFrame", padding=22)
         body.grid(sticky="nsew")
-        ttk.Label(body, text="Đang kiểm tra và áp dụng", font=("Segoe UI Semibold", 15)).pack(anchor="w")
+        ttk.Label(body, text="Äang kiá»ƒm tra vÃ  Ã¡p dá»¥ng", font=("Segoe UI Semibold", 15)).pack(anchor="w")
         ttk.Label(body, textvariable=self.detail_var, style="Muted.TLabel", wraplength=440).pack(anchor="w", pady=(7, 14))
         self.progress = ttk.Progressbar(body, mode="indeterminate", length=440)
         self.progress.pack(fill="x")
@@ -2923,12 +2923,12 @@ class LoadingWindow(tk.Toplevel):
         elapsed = int(time.monotonic() - self.started)
         if self.timeout_hint:
             self.elapsed_var.set(
-                f"Running {elapsed}s · maximum about {self.timeout_hint}s"
+                f"Running {elapsed}s Â· maximum about {self.timeout_hint}s"
                 if self.language == "en" else
-                f"Đã chạy {elapsed}s · giới hạn tối đa khoảng {self.timeout_hint}s"
+                f"ÄÃ£ cháº¡y {elapsed}s Â· giá»›i háº¡n tá»‘i Ä‘a khoáº£ng {self.timeout_hint}s"
             )
         else:
-            self.elapsed_var.set(f"Running {elapsed}s" if self.language == "en" else f"Đã chạy {elapsed}s")
+            self.elapsed_var.set(f"Running {elapsed}s" if self.language == "en" else f"ÄÃ£ cháº¡y {elapsed}s")
         self.after(1000, self._tick)
 
     def set_detail(self, detail: str):
@@ -2947,19 +2947,19 @@ class LoadingWindow(tk.Toplevel):
 
 
 STEP_ICONS = {
-    STEP_PENDING: "○",
-    STEP_RUNNING: "▶",
-    STEP_OK: "✓",
-    STEP_SKIPPED: "–",
-    STEP_FAILED: "✗",
+    STEP_PENDING: "â—‹",
+    STEP_RUNNING: "â–¶",
+    STEP_OK: "âœ“",
+    STEP_SKIPPED: "â€“",
+    STEP_FAILED: "âœ—",
 }
 
 STEP_STATE_LABELS = {
-    STEP_PENDING: "Chờ",
-    STEP_RUNNING: "Đang chạy",
+    STEP_PENDING: "Chá»",
+    STEP_RUNNING: "Äang cháº¡y",
     STEP_OK: "Xong",
-    STEP_SKIPPED: "Bỏ qua",
-    STEP_FAILED: "Lỗi",
+    STEP_SKIPPED: "Bá» qua",
+    STEP_FAILED: "Lá»—i",
 }
 
 def set_widget_tree_disabled(widget, disabled, remembered=None):
@@ -2999,20 +2999,20 @@ def package_problem(path) -> str:
     back as the router's puzzling "package is not a .tar.gz or .zip file".
     """
     if not path:
-        return "Không tìm thấy gói cập nhật"
+        return "KhÃ´ng tÃ¬m tháº¥y gÃ³i cáº­p nháº­t"
     file = Path(path)
     if not file.is_file():
-        return f"Không thấy file gói: {file}"
+        return f"KhÃ´ng tháº¥y file gÃ³i: {file}"
     try:
         size = file.stat().st_size
         with open(file, "rb") as handle:
             head = handle.read(4)
     except OSError as exc:
-        return f"Không đọc được gói: {exc}"
+        return f"KhÃ´ng Ä‘á»c Ä‘Æ°á»£c gÃ³i: {exc}"
     if size == 0:
-        return "Gói cập nhật rỗng"
+        return "GÃ³i cáº­p nháº­t rá»—ng"
     if head[:2] != b"\x1f\x8b" and head != b"PK\x03\x04":
-        return f"Gói không phải .tar.gz hoặc .zip (bắt đầu bằng {head.hex() or '?'})"
+        return f"GÃ³i khÃ´ng pháº£i .tar.gz hoáº·c .zip (báº¯t Ä‘áº§u báº±ng {head.hex() or '?'})"
     return ""
 
 
@@ -3030,10 +3030,10 @@ class AgentUpdater:
         self.package_path = None
         self.package_version = ""
         self.steps = [
-            ("Chuẩn bị gói cập nhật", self.step_prepare),
-            ("Kiểm tra phiên bản agent", self.step_check_versions),
-            ("Đẩy gói lên agent", self.step_upload),
-            ("Kiểm tra agent sau nâng cấp", self.step_verify),
+            ("Chuáº©n bá»‹ gÃ³i cáº­p nháº­t", self.step_prepare),
+            ("Kiá»ƒm tra phiÃªn báº£n agent", self.step_check_versions),
+            ("Äáº©y gÃ³i lÃªn agent", self.step_upload),
+            ("Kiá»ƒm tra agent sau nÃ¢ng cáº¥p", self.step_verify),
         ]
 
     # -- steps --------------------------------------------------------------
@@ -3042,65 +3042,65 @@ class AgentUpdater:
         try:
             package = self._build(self.package)
         except Exception as exc:
-            raise AgentUpdateError(f"Không dựng được gói cập nhật: {exc}") from exc
+            raise AgentUpdateError(f"KhÃ´ng dá»±ng Ä‘Æ°á»£c gÃ³i cáº­p nháº­t: {exc}") from exc
         problem = package_problem(package)
         if problem:
             raise AgentUpdateError(problem)
         self.package_path = Path(package)
         self.package_version = payload_version(self.package_path) or APP_VERSION
         size = self.package_path.stat().st_size
-        return f"v{self.package_version} · {human_bytes(size)}"
+        return f"v{self.package_version} Â· {human_bytes(size)}"
 
     def step_check_versions(self) -> str:
         try:
             status = self.client.status()
         except AgentError as exc:
-            raise AgentUpdateError(f"Không đọc được trạng thái agent: {exc}") from exc
+            raise AgentUpdateError(f"KhÃ´ng Ä‘á»c Ä‘Æ°á»£c tráº¡ng thÃ¡i agent: {exc}") from exc
         meta = status.get("meta") if isinstance(status, dict) else {}
         self.from_version = clean_agent_version(meta if isinstance(meta, dict) else {})
         order = compare_versions(self.package_version, self.from_version)
         if order == -1:
             raise AgentUpdateError(
-                f"Gói v{self.package_version} cũ hơn agent v{self.from_version} — "
-                "hãy dùng console mới hơn thay vì hạ cấp"
+                f"GÃ³i v{self.package_version} cÅ© hÆ¡n agent v{self.from_version} â€” "
+                "hÃ£y dÃ¹ng console má»›i hÆ¡n thay vÃ¬ háº¡ cáº¥p"
             )
         if order == 0:
-            return Skipped(f"Agent đã ở v{self.from_version}; vẫn cài lại để sửa file hỏng")
-        return f"v{self.from_version or '?'} → v{self.package_version}"
+            return Skipped(f"Agent Ä‘Ã£ á»Ÿ v{self.from_version}; váº«n cÃ i láº¡i Ä‘á»ƒ sá»­a file há»ng")
+        return f"v{self.from_version or '?'} â†’ v{self.package_version}"
 
     def step_upload(self) -> str:
         try:
             payload = self.package_path.read_bytes()
         except OSError as exc:
-            raise AgentUpdateError(f"Không đọc được gói cập nhật: {exc}") from exc
+            raise AgentUpdateError(f"KhÃ´ng Ä‘á»c Ä‘Æ°á»£c gÃ³i cáº­p nháº­t: {exc}") from exc
         try:
             result = self.client.update(payload)
         except AgentError as exc:
-            raise AgentUpdateError(f"Agent từ chối gói: {exc}") from exc
+            raise AgentUpdateError(f"Agent tá»« chá»‘i gÃ³i: {exc}") from exc
         result = result if isinstance(result, dict) else {}
         router_log = str(result.get("log") or "").strip()
         if router_log:
             self.on_output(router_log)
         if result.get("ok") is False:
             raise AgentUpdateError(
-                f"Agent không cài được gói: {failure_line(router_log) or 'không rõ lý do'}",
+                f"Agent khÃ´ng cÃ i Ä‘Æ°á»£c gÃ³i: {failure_line(router_log) or 'khÃ´ng rÃµ lÃ½ do'}",
                 router_log,
             )
         self.to_version = str(result.get("to") or "")
-        return f"{human_bytes(len(payload))} · {result.get('from') or '?'} → {self.to_version or '?'}"
+        return f"{human_bytes(len(payload))} Â· {result.get('from') or '?'} â†’ {self.to_version or '?'}"
 
     def step_verify(self) -> str:
         try:
             status = self.client.status()
         except AgentError as exc:
             raise AgentUpdateError(
-                f"Agent không trả lời sau khi nâng cấp: {exc}") from exc
+                f"Agent khÃ´ng tráº£ lá»i sau khi nÃ¢ng cáº¥p: {exc}") from exc
         meta = status.get("meta") if isinstance(status, dict) else {}
         running = clean_agent_version(meta if isinstance(meta, dict) else {})
         if running and self.package_version and running != self.package_version:
             raise AgentUpdateError(
-                f"Agent vẫn báo version {running} thay vì {self.package_version} — "
-                "hãy cài lại agent qua SSH (Cài đặt sau khi flash → Cài lại agent)"
+                f"Agent váº«n bÃ¡o version {running} thay vÃ¬ {self.package_version} â€” "
+                "hÃ£y cÃ i láº¡i agent qua SSH (CÃ i Ä‘áº·t sau khi flash â†’ CÃ i láº¡i agent)"
             )
         return f"agent v{running or '?'}"
 
@@ -3118,15 +3118,15 @@ class AgentUpdater:
                 self.emit(index, STEP_FAILED, str(exc))
                 return False
             skipped = isinstance(detail, Skipped) or not detail
-            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bỏ qua")
+            self.emit(index, STEP_SKIPPED if skipped else STEP_OK, detail or "Bá» qua")
         return True
 
 
 ROUTER_STATE_LABELS = {
-    "ok": "Agent trả lời OK với token hiện tại",
-    "unauthorized": "Agent đang chạy nhưng token sai hoặc thiếu",
-    "absent": "Router trả lời nhưng chưa cài agent",
-    "unreachable": "Không liên lạc được với router",
+    "ok": "Agent tráº£ lá»i OK vá»›i token hiá»‡n táº¡i",
+    "unauthorized": "Agent Ä‘ang cháº¡y nhÆ°ng token sai hoáº·c thiáº¿u",
+    "absent": "Router tráº£ lá»i nhÆ°ng chÆ°a cÃ i agent",
+    "unreachable": "KhÃ´ng liÃªn láº¡c Ä‘Æ°á»£c vá»›i router",
 }
 
 
@@ -3145,7 +3145,7 @@ class SetupWizard(tk.Toplevel):
         self.busy = False
         self.declined = False
         self.last_settings: ProvisionSettings | None = None
-        self.title(self.t("Cài đặt router sau khi flash"))
+        self.title(self.t("CÃ i Ä‘áº·t router sau khi flash"))
         self.configure(bg=self.palette["bg"])
         self.transient(parent)
         self.minsize(880, 640)
@@ -3163,60 +3163,60 @@ class SetupWizard(tk.Toplevel):
         self.overwrite_var = tk.BooleanVar(value=settings.overwrite_config)
         self.reinstall_var = tk.BooleanVar(value=settings.reinstall_agent)
         self.agent_only = bool(settings.agent_only)
-        self.state_var = tk.StringVar(value=self.t("Chưa chạy bước nào"))
+        self.state_var = tk.StringVar(value=self.t("ChÆ°a cháº¡y bÆ°á»›c nÃ o"))
 
         body = ttk.Frame(self, style="Card.TFrame", padding=14)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text="CÀI ĐẶT SAU KHI FLASH LẠI ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(body, text="CÃ€I Äáº¶T SAU KHI FLASH Láº I ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
         ttk.Label(
             body,
-            text="Đẩy mã nguồn, cài phụ thuộc, đẩy cấu hình, chạy script khởi tạo, cài agent rồi lấy token.",
+            text="Äáº©y mÃ£ nguá»“n, cÃ i phá»¥ thuá»™c, Ä‘áº©y cáº¥u hÃ¬nh, cháº¡y script khá»Ÿi táº¡o, cÃ i agent rá»“i láº¥y token.",
             style="Muted.TLabel", wraplength=820,
         ).pack(anchor="w", pady=(3, 10))
 
         form = ttk.Frame(body, style="Card.TFrame")
         form.pack(fill="x")
         self._field(form, 0, 0, "Router (IP)", self.host_var, width=18)
-        self._field(form, 0, 2, "Tài khoản SSH", self.user_var, width=14)
+        self._field(form, 0, 2, "TÃ i khoáº£n SSH", self.user_var, width=14)
         self._field(form, 0, 4, "Port SSH", self.port_var, width=8)
-        self._field(form, 1, 0, "Mật khẩu SSH", self.password_var, width=18, show="•")
-        self._field(form, 1, 2, "SSH key (tuỳ chọn)", self.key_var, width=24, browse="file")
-        self._field(form, 1, 4, "Thư mục trên router", self.remote_var, width=18)
-        self._field(form, 2, 0, "Mã nguồn hoặc gói .tar.gz", self.payload_var, width=34, browse="any", span=3)
+        self._field(form, 1, 0, "Máº­t kháº©u SSH", self.password_var, width=18, show="â€¢")
+        self._field(form, 1, 2, "SSH key (tuá»³ chá»n)", self.key_var, width=24, browse="file")
+        self._field(form, 1, 4, "ThÆ° má»¥c trÃªn router", self.remote_var, width=18)
+        self._field(form, 2, 0, "MÃ£ nguá»“n hoáº·c gÃ³i .tar.gz", self.payload_var, width=34, browse="any", span=3)
         self._field(form, 2, 4, "wifi-socks.conf", self.config_var, width=18, browse="file")
-        self._field(form, 3, 0, "settings.sh (tuỳ chọn)", self.settings_var, width=34, browse="file", span=3)
-        ttk.Checkbutton(form, text="Chạy apply.sh sau khi đẩy cấu hình", variable=self.apply_var).grid(
+        self._field(form, 3, 0, "settings.sh (tuá»³ chá»n)", self.settings_var, width=34, browse="file", span=3)
+        ttk.Checkbutton(form, text="Cháº¡y apply.sh sau khi Ä‘áº©y cáº¥u hÃ¬nh", variable=self.apply_var).grid(
             row=3, column=4, columnspan=2, sticky="w", padx=(8, 0), pady=4)
         # Default to reusing what the router already carries; both boxes are
         # opt-in because either one overwrites working router state.
-        ttk.Checkbutton(form, text="Ghi đè cấu hình đã có trên router", variable=self.overwrite_var).grid(
+        ttk.Checkbutton(form, text="Ghi Ä‘Ã¨ cáº¥u hÃ¬nh Ä‘Ã£ cÃ³ trÃªn router", variable=self.overwrite_var).grid(
             row=4, column=1, columnspan=3, sticky="w", pady=4)
-        ttk.Checkbutton(form, text="Cài lại agent dù đã có", variable=self.reinstall_var).grid(
+        ttk.Checkbutton(form, text="CÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³", variable=self.reinstall_var).grid(
             row=4, column=4, columnspan=2, sticky="w", padx=(8, 0), pady=4)
         for column in (1, 3, 5):
             form.columnconfigure(column, weight=1)
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x", pady=(10, 8))
-        self.run_button = ttk.Button(actions, text="Bắt đầu cài đặt", command=self.start, style="Primary.TButton")
+        self.run_button = ttk.Button(actions, text="Báº¯t Ä‘áº§u cÃ i Ä‘áº·t", command=self.start, style="Primary.TButton")
         self.run_button.pack(side="left")
-        self.check_button = ttk.Button(actions, text="Kiểm tra tình trạng", command=self.check_state)
+        self.check_button = ttk.Button(actions, text="Kiá»ƒm tra tÃ¬nh tráº¡ng", command=self.check_state)
         self.check_button.pack(side="left", padx=(8, 0))
-        self.stop_button = ttk.Button(actions, text="Dừng", command=self.stop, style="Warning.TButton", state="disabled")
+        self.stop_button = ttk.Button(actions, text="Dá»«ng", command=self.stop, style="Warning.TButton", state="disabled")
         self.stop_button.pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Đóng", command=self.close).pack(side="right")
+        ttk.Button(actions, text="ÄÃ³ng", command=self.close).pack(side="right")
         ttk.Label(actions, textvariable=self.state_var, style="Muted.TLabel").pack(side="right", padx=(0, 14))
 
         self.progress = ttk.Progressbar(body, mode="determinate", maximum=1)
         self.progress.pack(fill="x", pady=(0, 8))
 
         self.steps_tree = ttk.Treeview(body, columns=("state", "step", "detail"), show="headings", height=9)
-        for column, title, width in (("state", "Trạng thái", 110), ("step", "Bước", 260), ("detail", "Chi tiết", 430)):
+        for column, title, width in (("state", "Tráº¡ng thÃ¡i", 110), ("step", "BÆ°á»›c", 260), ("detail", "Chi tiáº¿t", 430)):
             self.steps_tree.heading(column, text=title)
             self.steps_tree.column(column, width=width, anchor="w")
         self.steps_tree.pack(fill="x")
 
-        ttk.Label(body, text="Nhật ký thao tác").pack(anchor="w", pady=(10, 3))
+        ttk.Label(body, text="Nháº­t kÃ½ thao tÃ¡c").pack(anchor="w", pady=(10, 3))
         self.log_text = tk.Text(
             body, height=9, wrap="word", state="disabled",
             bg=self.palette["input"], fg=self.palette["log_text"], borderwidth=0,
@@ -3244,17 +3244,17 @@ class SetupWizard(tk.Toplevel):
         entry = ttk.Entry(holder, textvariable=variable, width=width, show=show)
         entry.pack(side="left", fill="x", expand=True)
         if browse:
-            ttk.Button(holder, text="…", width=3,
+            ttk.Button(holder, text="â€¦", width=3,
                        command=lambda: self._browse(variable, browse)).pack(side="left", padx=(5, 0))
 
     def _browse(self, variable, kind):
         if kind == "any":
             path = filedialog.askopenfilename(
-                parent=self, title=self.t("Chọn gói cập nhật"),
-                filetypes=[("tar.gz", "*.tar.gz"), (self.t("Tất cả file"), "*.*")],
-            ) or filedialog.askdirectory(parent=self, title=self.t("Chọn thư mục mã nguồn"))
+                parent=self, title=self.t("Chá»n gÃ³i cáº­p nháº­t"),
+                filetypes=[("tar.gz", "*.tar.gz"), (self.t("Táº¥t cáº£ file"), "*.*")],
+            ) or filedialog.askdirectory(parent=self, title=self.t("Chá»n thÆ° má»¥c mÃ£ nguá»“n"))
         else:
-            path = filedialog.askopenfilename(parent=self, title=self.t("Chọn file"))
+            path = filedialog.askopenfilename(parent=self, title=self.t("Chá»n file"))
         if path:
             variable.set(path)
 
@@ -3262,7 +3262,7 @@ class SetupWizard(tk.Toplevel):
         try:
             port = int(self.port_var.get().strip() or "22")
         except ValueError:
-            raise ValueError("Port SSH không hợp lệ") from None
+            raise ValueError("Port SSH khÃ´ng há»£p lá»‡") from None
         settings = ProvisionSettings(
             host=self.host_var.get().strip(),
             user=self.user_var.get().strip() or "root",
@@ -3297,16 +3297,16 @@ class SetupWizard(tk.Toplevel):
         if not self.winfo_exists() or index >= len(self.step_labels):
             return
         self.steps_tree.item(str(index), values=(
-            f"{STEP_ICONS.get(state, '○')} {self.t(STEP_STATE_LABELS.get(state, state))}",
+            f"{STEP_ICONS.get(state, 'â—‹')} {self.t(STEP_STATE_LABELS.get(state, state))}",
             self.t(self.step_labels[index]),
             self.t(detail) if detail else "",
         ))
         self.steps_tree.see(str(index))
         done = index + (0 if state == STEP_RUNNING else 1)
         self.progress.configure(value=done)
-        self.state_var.set(f"{done}/{len(self.step_labels)} · {self.t(self.step_labels[index])}")
+        self.state_var.set(f"{done}/{len(self.step_labels)} Â· {self.t(self.step_labels[index])}")
         if state == STEP_RUNNING:
-            self.append(f"→ {self.t(self.step_labels[index])}")
+            self.append(f"â†’ {self.t(self.step_labels[index])}")
         elif detail:
             self.append(f"   {STEP_ICONS.get(state, '')} {self.t(detail)}")
 
@@ -3340,7 +3340,7 @@ class SetupWizard(tk.Toplevel):
         self.last_settings = settings
         self.reset_steps()
         self._set_busy(True)
-        self.append(self.t("Bắt đầu cài đặt") + f" · {settings.target}")
+        self.append(self.t("Báº¯t Ä‘áº§u cÃ i Ä‘áº·t") + f" Â· {settings.target}")
 
         def emit(index, state, detail):
             self.after(0, lambda: self.set_step(index, state, detail))
@@ -3363,15 +3363,15 @@ class SetupWizard(tk.Toplevel):
     def _finish(self, success, error):
         self._set_busy(False)
         if error:
-            self.append(f"✗ {self.t(error)}")
+            self.append(f"âœ— {self.t(error)}")
             messagebox.showerror(APP_NAME, self.t(error), parent=self)
             return
         if not success:
-            self.state_var.set(self.t("Cài đặt chưa hoàn tất"))
-            self.append(self.t("Cài đặt chưa hoàn tất — hãy xử lý bước lỗi rồi chạy lại."))
+            self.state_var.set(self.t("CÃ i Ä‘áº·t chÆ°a hoÃ n táº¥t"))
+            self.append(self.t("CÃ i Ä‘áº·t chÆ°a hoÃ n táº¥t â€” hÃ£y xá»­ lÃ½ bÆ°á»›c lá»—i rá»“i cháº¡y láº¡i."))
             return
-        self.state_var.set(self.t("Cài đặt hoàn tất"))
-        self.append(self.t("Cài đặt hoàn tất — đã lấy token và mở màn hình điều khiển."))
+        self.state_var.set(self.t("CÃ i Ä‘áº·t hoÃ n táº¥t"))
+        self.append(self.t("CÃ i Ä‘áº·t hoÃ n táº¥t â€” Ä‘Ã£ láº¥y token vÃ  má»Ÿ mÃ n hÃ¬nh Ä‘iá»u khiá»ƒn."))
         token = self.runner.token if self.runner else ""
         base_url = self.runner.settings.base_url if self.runner else ""
         if self.on_success and token:
@@ -3384,7 +3384,7 @@ class SetupWizard(tk.Toplevel):
             return
         host = self.host_var.get().strip()
         if not host:
-            messagebox.showerror(APP_NAME, self.t("Thiếu địa chỉ router"), parent=self)
+            messagebox.showerror(APP_NAME, self.t("Thiáº¿u Ä‘á»‹a chá»‰ router"), parent=self)
             return
         base_url = f"http://{host}"
         _base, token = load_connection()
@@ -3393,7 +3393,7 @@ class SetupWizard(tk.Toplevel):
         except ValueError:
             settings = None  # SSH inventory needs valid settings; HTTP probe does not
         self._set_busy(True)
-        self.state_var.set(self.t("Đang kiểm tra router…"))
+        self.state_var.set(self.t("Äang kiá»ƒm tra routerâ€¦"))
 
         self.last_settings = settings
 
@@ -3416,9 +3416,9 @@ class SetupWizard(tk.Toplevel):
         self._set_busy(False)
         message = self.t(ROUTER_STATE_LABELS.get(state, state))
         self.state_var.set(message)
-        self.append(f"• {message}")
+        self.append(f"â€¢ {message}")
         if inventory:
-            self.append(f"• {self.t(inventory)}")
+            self.append(f"â€¢ {self.t(inventory)}")
         if reachable and details is not None:
             # SSH works, so the only open question left is whether to install.
             self._offer_install(details)
@@ -3436,18 +3436,18 @@ class SetupWizard(tk.Toplevel):
         """Ask, right after a working SSH login, whether to provision now."""
         if inventory.get("agent") and inventory.get("token"):
             messagebox.showinfo(
-                APP_NAME, self.t("Router đã có agent và token — không cần cài lại."), parent=self,
+                APP_NAME, self.t("Router Ä‘Ã£ cÃ³ agent vÃ  token â€” khÃ´ng cáº§n cÃ i láº¡i."), parent=self,
             )
             return
         if messagebox.askyesno(
             APP_NAME,
-            self.t("Kết nối SSH thành công nhưng router chưa cài xong agent. Cài ngay bây giờ?"),
+            self.t("Káº¿t ná»‘i SSH thÃ nh cÃ´ng nhÆ°ng router chÆ°a cÃ i xong agent. CÃ i ngay bÃ¢y giá»?"),
             parent=self,
         ):
             self.start()
             return
         self.declined = True
-        self.append(self.t("Đã chọn không cài — console bị khoá cho tới khi agent được cài."))
+        self.append(self.t("ÄÃ£ chá»n khÃ´ng cÃ i â€” console bá»‹ khoÃ¡ cho tá»›i khi agent Ä‘Æ°á»£c cÃ i."))
         if self.on_decline:
             self.on_decline(self.current_settings())
         self.close()
@@ -3455,11 +3455,11 @@ class SetupWizard(tk.Toplevel):
     def stop(self):
         if self.runner:
             self.runner.cancel()
-            self.append(self.t("Đã dừng theo yêu cầu"))
+            self.append(self.t("ÄÃ£ dá»«ng theo yÃªu cáº§u"))
 
     def close(self):
         if self.busy and not messagebox.askyesno(
-            APP_NAME, self.t("Đang cài đặt — vẫn đóng cửa sổ?"), parent=self
+            APP_NAME, self.t("Äang cÃ i Ä‘áº·t â€” váº«n Ä‘Ã³ng cá»­a sá»•?"), parent=self
         ):
             return
         if self.runner:
@@ -3480,47 +3480,47 @@ class AgentUpgradeChoiceDialog(tk.Toplevel):
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
         self.choice = None
-        self.title(self.t("Nâng cấp agent"))
+        self.title(self.t("NÃ¢ng cáº¥p agent"))
         self.configure(bg=self.palette["bg"])
         self.transient(parent)
         self.resizable(False, False)
 
         body = ttk.Frame(self, style="Card.TFrame", padding=18)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text="CẬP NHẬT AGENT", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(body, text="Cáº¬P NHáº¬T AGENT", style="MetricBlue.TLabel").pack(anchor="w")
         ttk.Label(body, text=message, style="Muted.TLabel", wraplength=620).pack(
             anchor="w", fill="x", pady=(6, 12)
         )
         ttk.Label(
             body,
-            text="Chọn cách cập nhật phù hợp. Cả hai cách đều giữ nguyên wifi-socks.conf và settings.sh.",
+            text="Chá»n cÃ¡ch cáº­p nháº­t phÃ¹ há»£p. Cáº£ hai cÃ¡ch Ä‘á»u giá»¯ nguyÃªn wifi-socks.conf vÃ  settings.sh.",
             style="Muted.TLabel", wraplength=620,
         ).pack(anchor="w", fill="x", pady=(0, 14))
 
         api = ttk.Frame(body, style="Card.TFrame")
         api.pack(fill="x", pady=(0, 8))
         ttk.Button(
-            api, text="Nâng cấp tự động", command=lambda: self.finish("api"),
+            api, text="NÃ¢ng cáº¥p tá»± Ä‘á»™ng", command=lambda: self.finish("api"),
             style="Success.TButton", width=24,
         ).pack(side="left")
         ttk.Label(
             api,
-            text="Dùng API self-update của agent. Nhanh nhất khi agent hiện tại hoạt động bình thường.",
+            text="DÃ¹ng API self-update cá»§a agent. Nhanh nháº¥t khi agent hiá»‡n táº¡i hoáº¡t Ä‘á»™ng bÃ¬nh thÆ°á»ng.",
             style="Muted.TLabel", wraplength=390,
         ).pack(side="left", padx=(12, 0))
 
         ssh = ttk.Frame(body, style="Card.TFrame")
         ssh.pack(fill="x", pady=(0, 14))
         ttk.Button(
-            ssh, text="Cài đè agent qua SSH", command=lambda: self.finish("ssh"), width=24,
+            ssh, text="CÃ i Ä‘Ã¨ agent qua SSH", command=lambda: self.finish("ssh"), width=24,
         ).pack(side="left")
         ttk.Label(
             ssh,
-            text="Dùng SSH để cài đè agent, dành cho agent cũ bị lỗi nhận diện gói .tar.gz. Không chạy apply cấu hình.",
+            text="DÃ¹ng SSH Ä‘á»ƒ cÃ i Ä‘Ã¨ agent, dÃ nh cho agent cÅ© bá»‹ lá»—i nháº­n diá»‡n gÃ³i .tar.gz. KhÃ´ng cháº¡y apply cáº¥u hÃ¬nh.",
             style="Muted.TLabel", wraplength=390,
         ).pack(side="left", padx=(12, 0))
 
-        ttk.Button(body, text="Để sau", command=lambda: self.finish(None)).pack(anchor="e")
+        ttk.Button(body, text="Äá»ƒ sau", command=lambda: self.finish(None)).pack(anchor="e")
         self.protocol("WM_DELETE_WINDOW", lambda: self.finish(None))
         localize_widget_tree(self, self.language)
         center_dialog(self)
@@ -3552,25 +3552,25 @@ class AgentUpdateWindow(tk.Toplevel):
         self.updater = updater
         self.on_success = on_success
         self.busy = True
-        self.title(self.t("Nâng cấp agent"))
+        self.title(self.t("NÃ¢ng cáº¥p agent"))
         self.configure(bg=self.palette["bg"])
         self.transient(parent)
         self.minsize(720, 460)
 
         body = ttk.Frame(self, style="Card.TFrame", padding=14)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text="NÂNG CẤP AGENT TRÊN ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
+        ttk.Label(body, text="NÃ‚NG Cáº¤P AGENT TRÃŠN ROUTER", style="MetricBlue.TLabel").pack(anchor="w")
         ttk.Label(
             body,
-            text="Đẩy gói của console lên agent. Cấu hình wifi-socks.conf và settings.sh được giữ nguyên.",
+            text="Äáº©y gÃ³i cá»§a console lÃªn agent. Cáº¥u hÃ¬nh wifi-socks.conf vÃ  settings.sh Ä‘Æ°á»£c giá»¯ nguyÃªn.",
             style="Muted.TLabel", wraplength=660,
         ).pack(anchor="w", pady=(3, 10))
 
-        self.state_var = tk.StringVar(value=self.t("Đang chạy…"))
+        self.state_var = tk.StringVar(value=self.t("Äang cháº¡yâ€¦"))
         self.progress = ttk.Progressbar(body, mode="determinate", maximum=len(updater.steps))
         self.progress.pack(fill="x", pady=(0, 8))
         self.steps_tree = ttk.Treeview(body, columns=("state", "step", "detail"), show="headings", height=5)
-        for column, title, width in (("state", "Trạng thái", 110), ("step", "Bước", 220), ("detail", "Chi tiết", 380)):
+        for column, title, width in (("state", "Tráº¡ng thÃ¡i", 110), ("step", "BÆ°á»›c", 220), ("detail", "Chi tiáº¿t", 380)):
             self.steps_tree.heading(column, text=title)
             self.steps_tree.column(column, width=width, anchor="w")
         self.steps_tree.pack(fill="x")
@@ -3578,7 +3578,7 @@ class AgentUpdateWindow(tk.Toplevel):
             self.steps_tree.insert("", "end", iid=str(index), values=(
                 f"{STEP_ICONS[STEP_PENDING]} {self.t(STEP_STATE_LABELS[STEP_PENDING])}", self.t(label), ""))
 
-        ttk.Label(body, text="Nhật ký thao tác").pack(anchor="w", pady=(10, 3))
+        ttk.Label(body, text="Nháº­t kÃ½ thao tÃ¡c").pack(anchor="w", pady=(10, 3))
         self.log_text = tk.Text(
             body, height=9, wrap="word", state="disabled",
             bg=self.palette["input"], fg=self.palette["log_text"], borderwidth=0,
@@ -3590,7 +3590,7 @@ class AgentUpdateWindow(tk.Toplevel):
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x", pady=(10, 0))
         ttk.Label(actions, textvariable=self.state_var, style="Muted.TLabel").pack(side="left")
-        self.close_button = ttk.Button(actions, text="Đóng", command=self.close, state="disabled")
+        self.close_button = ttk.Button(actions, text="ÄÃ³ng", command=self.close, state="disabled")
         self.close_button.pack(side="right")
         self.protocol("WM_DELETE_WINDOW", self.close)
         localize_widget_tree(self, self.language)
@@ -3612,15 +3612,15 @@ class AgentUpdateWindow(tk.Toplevel):
             return
         label = self.updater.steps[index][0]
         self.steps_tree.item(str(index), values=(
-            f"{STEP_ICONS.get(state, '○')} {self.t(STEP_STATE_LABELS.get(state, state))}",
+            f"{STEP_ICONS.get(state, 'â—‹')} {self.t(STEP_STATE_LABELS.get(state, state))}",
             self.t(label), self.t(detail) if detail else "",
         ))
         self.steps_tree.see(str(index))
         done = index + (0 if state == STEP_RUNNING else 1)
         self.progress.configure(value=done)
-        self.state_var.set(f"{done}/{len(self.updater.steps)} · {self.t(label)}")
+        self.state_var.set(f"{done}/{len(self.updater.steps)} Â· {self.t(label)}")
         if state == STEP_RUNNING:
-            self.append(f"→ {self.t(label)}")
+            self.append(f"â†’ {self.t(label)}")
         elif detail:
             self.append(f"   {STEP_ICONS.get(state, '')} {self.t(detail)}")
 
@@ -3645,18 +3645,18 @@ class AgentUpdateWindow(tk.Toplevel):
         if self.winfo_exists():
             self.close_button.configure(state="normal")
         if error:
-            self.append(f"✗ {self.t(error)}")
+            self.append(f"âœ— {self.t(error)}")
         if success:
-            self.state_var.set(self.t("Nâng cấp xong"))
-            self.append(self.t("Nâng cấp xong — agent đã chạy bản mới."))
+            self.state_var.set(self.t("NÃ¢ng cáº¥p xong"))
+            self.append(self.t("NÃ¢ng cáº¥p xong â€” agent Ä‘Ã£ cháº¡y báº£n má»›i."))
             if self.on_success:
                 self.on_success(self.updater.to_version)
             self.close()
             return
-        self.state_var.set(self.t("Nâng cấp thất bại"))
+        self.state_var.set(self.t("NÃ¢ng cáº¥p tháº¥t báº¡i"))
         self.append(self.t(
-            "Nâng cấp dừng lại ở bước lỗi. Sửa nguyên nhân rồi thử lại, hoặc cài lại agent"
-            " qua SSH bằng Cài đặt sau khi flash → Cài lại agent dù đã có."
+            "NÃ¢ng cáº¥p dá»«ng láº¡i á»Ÿ bÆ°á»›c lá»—i. Sá»­a nguyÃªn nhÃ¢n rá»“i thá»­ láº¡i, hoáº·c cÃ i láº¡i agent"
+            " qua SSH báº±ng CÃ i Ä‘áº·t sau khi flash â†’ CÃ i láº¡i agent dÃ¹ Ä‘Ã£ cÃ³."
         ))
 
     def close(self):
@@ -3669,7 +3669,7 @@ class AgentUpdateWindow(tk.Toplevel):
 class NativeApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title(f"{APP_NAME} · v{APP_VERSION}")
+        self.root.title(f"{APP_NAME} Â· v{APP_VERSION}")
         self.root.geometry("1380x840")
         self.root.minsize(1100, 700)
         self.client: AgentClient | None = None
@@ -3691,17 +3691,17 @@ class NativeApp:
         self._style_images = {}
         self.language, self.theme = load_preferences()
         self.palette = PALETTES[self.theme]
-        self.language_var = tk.StringVar(value="English" if self.language == "en" else "Tiếng Việt")
+        self.language_var = tk.StringVar(value="English" if self.language == "en" else "Tiáº¿ng Viá»‡t")
         self.theme_var = tk.StringVar(value="Dark" if self.theme == "dark" else "Light")
         self.t = lambda text, **values: translate(text, self.language, **values)
         base, token = load_connection()
         self.base_var = tk.StringVar(value=base)
         self.token_var = tk.StringVar(value=token)
-        self.status_var = tk.StringVar(value=self.t("Chưa kết nối"))
+        self.status_var = tk.StringVar(value=self.t("ChÆ°a káº¿t ná»‘i"))
         self.lock_hint_var = tk.StringVar(value="")
         self.gateway_iface_var = tk.StringVar(value="")
         self.setup_hint_var = tk.StringVar(value=self.t(
-            "Router vừa flash lại chưa có agent hoặc token. Chạy cài đặt để đẩy mã nguồn, cấu hình, script khởi tạo và lấy token."
+            "Router vá»«a flash láº¡i chÆ°a cÃ³ agent hoáº·c token. Cháº¡y cÃ i Ä‘áº·t Ä‘á»ƒ Ä‘áº©y mÃ£ nguá»“n, cáº¥u hÃ¬nh, script khá»Ÿi táº¡o vÃ  láº¥y token."
         ))
         self.agent_version = ""
         # Mirrors config/settings.sh on the router; never assumed, always read.
@@ -3720,18 +3720,18 @@ class NativeApp:
         self.client_presence_var = tk.StringVar(value=self.t(ALL_PRESENCE))
         self.client_traffic_var = tk.StringVar(value=self.t(ALL_TRAFFIC))
         self.client_duration_var = tk.StringVar(value=self.t(ALL_DURATIONS))
-        self.client_count_var = tk.StringVar(value="0 devices" if self.language == "en" else "0 thiết bị")
+        self.client_count_var = tk.StringVar(value="0 devices" if self.language == "en" else "0 thiáº¿t bá»‹")
         self.client_online_count_var = tk.StringVar(value="0 online")
-        self.client_weak_count_var = tk.StringVar(value="0 weak signal" if self.language == "en" else "0 tín hiệu yếu")
-        self.client_blocked_count_var = tk.StringVar(value="0 blocked" if self.language == "en" else "0 đã chặn")
-        self.client_traffic_total_var = tk.StringVar(value="0 B total traffic" if self.language == "en" else "0 B tổng lưu lượng")
-        self.gateway_state_var = tk.StringVar(value=self.t("● Internet chưa kiểm tra"))
-        self.gateway_route_var = tk.StringVar(value=self.t("Đường ra: —"))
-        self.gateway_link_var = tk.StringVar(value=self.t("Kết nối/DNS: —"))
-        self.gateway_http_var = tk.StringVar(value=self.t("Internet HTTP: —"))
-        self.wifi_selection_var = tk.StringVar(value=self.t("Chọn một SSID trong bảng để chỉnh sửa"))
-        self.client_selection_var = tk.StringVar(value=self.t("Chọn thiết bị trong bảng để điều khiển"))
-        self.backup_selection_var = tk.StringVar(value=self.t("Chọn một backup để khôi phục"))
+        self.client_weak_count_var = tk.StringVar(value="0 weak signal" if self.language == "en" else "0 tÃ­n hiá»‡u yáº¿u")
+        self.client_blocked_count_var = tk.StringVar(value="0 blocked" if self.language == "en" else "0 Ä‘Ã£ cháº·n")
+        self.client_traffic_total_var = tk.StringVar(value="0 B total traffic" if self.language == "en" else "0 B tá»•ng lÆ°u lÆ°á»£ng")
+        self.gateway_state_var = tk.StringVar(value=self.t("â— Internet chÆ°a kiá»ƒm tra"))
+        self.gateway_route_var = tk.StringVar(value=self.t("ÄÆ°á»ng ra: â€”"))
+        self.gateway_link_var = tk.StringVar(value=self.t("Káº¿t ná»‘i/DNS: â€”"))
+        self.gateway_http_var = tk.StringVar(value=self.t("Internet HTTP: â€”"))
+        self.wifi_selection_var = tk.StringVar(value=self.t("Chá»n má»™t SSID trong báº£ng Ä‘á»ƒ chá»‰nh sá»­a"))
+        self.client_selection_var = tk.StringVar(value=self.t("Chá»n thiáº¿t bá»‹ trong báº£ng Ä‘á»ƒ Ä‘iá»u khiá»ƒn"))
+        self.backup_selection_var = tk.StringVar(value=self.t("Chá»n má»™t backup Ä‘á»ƒ khÃ´i phá»¥c"))
         self.client_auto_var = tk.BooleanVar(value=True)
         self.client_interval_var = tk.StringVar(value="15s")
         self.client_refresh_job = None
@@ -3770,7 +3770,7 @@ class NativeApp:
             # A token is already provisioned: go straight into the live tool.
             self.root.after(350, self.connect)
         else:
-            self.status_var.set(self.t("Chưa cấu hình router — hãy chạy cài đặt sau khi flash"))
+            self.status_var.set(self.t("ChÆ°a cáº¥u hÃ¬nh router â€” hÃ£y cháº¡y cÃ i Ä‘áº·t sau khi flash"))
             # A known router may already be installed: say so before anyone
             # starts a setup run that would repeat work.
             self.root.after(700, lambda: self.check_router_state(announce=False))
@@ -3928,20 +3928,20 @@ class NativeApp:
         brand = ttk.Frame(header, style="Header.TFrame")
         brand.pack(side="left")
         ttk.Label(brand, text="sbproxy", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(brand, text=f"OPENWRT · MULTI-SSID SOCKS5 CONTROL CENTER · v{APP_VERSION}",
+        ttk.Label(brand, text=f"OPENWRT Â· MULTI-SSID SOCKS5 CONTROL CENTER Â· v{APP_VERSION}",
                   style="Subtitle.TLabel").pack(anchor="w")
         ttk.Label(header, textvariable=self.status_var, style="Status.TLabel").pack(side="right", padx=(20, 0))
         preferences = ttk.Frame(header, style="Header.TFrame")
         preferences.pack(side="right", padx=(18, 0))
-        ttk.Label(preferences, text="Ngôn ngữ", style="Header.TLabel").pack(side="left", padx=(0, 5))
-        language = ttk.Combobox(preferences, textvariable=self.language_var, values=("English", "Tiếng Việt"), state="readonly", width=11)
+        ttk.Label(preferences, text="NgÃ´n ngá»¯", style="Header.TLabel").pack(side="left", padx=(0, 5))
+        language = ttk.Combobox(preferences, textvariable=self.language_var, values=("English", "Tiáº¿ng Viá»‡t"), state="readonly", width=11)
         language.pack(side="left", padx=(0, 10))
         language.bind("<<ComboboxSelected>>", self._on_language_changed)
-        ttk.Label(preferences, text="Giao diện", style="Header.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(preferences, text="Giao diá»‡n", style="Header.TLabel").pack(side="left", padx=(0, 5))
         theme = ttk.Combobox(preferences, textvariable=self.theme_var, values=("Dark", "Light"), state="readonly", width=7)
         theme.pack(side="left")
         theme.bind("<<ComboboxSelected>>", self._on_theme_changed)
-        ttk.Button(preferences, text=self.t("Thư mục log"), command=self.open_log_folder).pack(side="left", padx=(10, 0))
+        ttk.Button(preferences, text=self.t("ThÆ° má»¥c log"), command=self.open_log_folder).pack(side="left", padx=(10, 0))
 
         top = ttk.Frame(self.root, style="Card.TFrame", padding=(14, 12))
         self.connection_row = top
@@ -3949,34 +3949,34 @@ class NativeApp:
         ttk.Label(top, text="Router").grid(row=0, column=0, sticky="w")
         ttk.Entry(top, textvariable=self.base_var, width=31).grid(row=0, column=1, padx=(8, 18), sticky="ew")
         ttk.Label(top, text="Agent token").grid(row=0, column=2, sticky="w")
-        ttk.Entry(top, textvariable=self.token_var, show="•", width=37).grid(row=0, column=3, padx=(8, 18), sticky="ew")
-        ttk.Button(top, text="Kết nối", command=self.connect, style="Primary.TButton").grid(row=0, column=4, padx=4)
-        ttk.Button(top, text="Làm mới", command=self.refresh_all).grid(row=0, column=5, padx=4)
+        ttk.Entry(top, textvariable=self.token_var, show="â€¢", width=37).grid(row=0, column=3, padx=(8, 18), sticky="ew")
+        ttk.Button(top, text="Káº¿t ná»‘i", command=self.connect, style="Primary.TButton").grid(row=0, column=4, padx=4)
+        ttk.Button(top, text="LÃ m má»›i", command=self.refresh_all).grid(row=0, column=5, padx=4)
         # Always reachable: a router can be reflashed while a token is still stored.
-        ttk.Button(top, text="Cài đặt sau khi flash…", command=self.open_setup_wizard).grid(row=0, column=6, padx=(4, 0))
+        ttk.Button(top, text="CÃ i Ä‘áº·t sau khi flashâ€¦", command=self.open_setup_wizard).grid(row=0, column=6, padx=(4, 0))
         top.columnconfigure(1, weight=1)
         top.columnconfigure(3, weight=1)
 
         self.setup_bar = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
-        ttk.Label(self.setup_bar, text="CHƯA CẤU HÌNH ROUTER", style="MetricYellow.TLabel").pack(side="left", padx=(0, 14))
+        ttk.Label(self.setup_bar, text="CHÆ¯A Cáº¤U HÃŒNH ROUTER", style="MetricYellow.TLabel").pack(side="left", padx=(0, 14))
         ttk.Label(self.setup_bar, textvariable=self.setup_hint_var,
                   style="MetricYellow.TLabel", wraplength=760).pack(side="left")
-        ttk.Button(self.setup_bar, text="Kiểm tra tình trạng", command=self.check_router_state).pack(side="right")
-        self.upgrade_button = ttk.Button(self.setup_bar, text="Nâng cấp agent",
+        ttk.Button(self.setup_bar, text="Kiá»ƒm tra tÃ¬nh tráº¡ng", command=self.check_router_state).pack(side="right")
+        self.upgrade_button = ttk.Button(self.setup_bar, text="NÃ¢ng cáº¥p agent",
                                          command=self.upgrade_agent, style="Success.TButton")
         self.ssh_upgrade_button = ttk.Button(
-            self.setup_bar, text="Cài đè agent qua SSH",
+            self.setup_bar, text="CÃ i Ä‘Ã¨ agent qua SSH",
             command=self.reinstall_agent_over_ssh,
         )
-        ttk.Button(self.setup_bar, text="Cài đặt sau khi flash…", command=self.open_setup_wizard,
+        ttk.Button(self.setup_bar, text="CÃ i Ä‘áº·t sau khi flashâ€¦", command=self.open_setup_wizard,
                    style="Primary.TButton").pack(side="right", padx=(0, 8))
 
         self.lock_bar = ttk.Frame(self.root, style="Metric.TFrame", padding=(14, 10))
-        ttk.Label(self.lock_bar, text="KHÔNG CẤU HÌNH ĐƯỢC ROUTER",
+        ttk.Label(self.lock_bar, text="KHÃ”NG Cáº¤U HÃŒNH ÄÆ¯á»¢C ROUTER",
                   style="MetricRed.TLabel").pack(side="left", padx=(0, 14))
         ttk.Label(self.lock_bar, textvariable=self.lock_hint_var,
                   style="MetricRed.TLabel", wraplength=700).pack(side="left")
-        self.lock_button = ttk.Button(self.lock_bar, text="Cài agent ngay",
+        self.lock_button = ttk.Button(self.lock_bar, text="CÃ i agent ngay",
                                       command=self.install_agent_now, style="Primary.TButton")
         self.lock_button.pack(side="right")
 
@@ -3985,17 +3985,17 @@ class NativeApp:
         gateway.pack(fill="x", padx=14, pady=(0, 8))
         gateway_head = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_head.pack(fill="x")
-        ttk.Label(gateway_head, text="CỔNG RA INTERNET", style="MetricBlue.TLabel").pack(side="left", padx=(0, 18))
+        ttk.Label(gateway_head, text="Cá»”NG RA INTERNET", style="MetricBlue.TLabel").pack(side="left", padx=(0, 18))
         self.gateway_state_label = ttk.Label(gateway_head, textvariable=self.gateway_state_var, style="MetricBlue.TLabel")
         self.gateway_state_label.pack(side="left")
-        ttk.Button(gateway_head, text="Kiểm tra cổng ra", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
+        ttk.Button(gateway_head, text="Kiá»ƒm tra cá»•ng ra", command=self.refresh_gateway, style="Primary.TButton").pack(side="right")
         self.gateway_iface_combo = ttk.Combobox(
             gateway_head, textvariable=self.gateway_iface_var, state="readonly", width=34,
             style="GatewayUnknown.TCombobox", postcommand=self._color_gateway_interface_menu,
         )
         self.gateway_iface_combo.pack(side="right", padx=(0, 8))
         self.gateway_iface_combo.bind("<<ComboboxSelected>>", self._on_gateway_interface_changed)
-        ttk.Label(gateway_head, text="Đường ra", style="MetricBlue.TLabel").pack(side="right", padx=(0, 6))
+        ttk.Label(gateway_head, text="ÄÆ°á»ng ra", style="MetricBlue.TLabel").pack(side="right", padx=(0, 6))
         gateway_detail = ttk.Frame(gateway, style="Metric.TFrame")
         gateway_detail.pack(fill="x", pady=(7, 0))
         ttk.Label(gateway_detail, textvariable=self.gateway_route_var, style="MetricBlue.TLabel").pack(side="left", padx=(0, 28))
@@ -4012,7 +4012,7 @@ class NativeApp:
         self._apply_lock_state()
 
     def _on_language_changed(self, _event=None):
-        language = "vi" if self.language_var.get() == "Tiếng Việt" else "en"
+        language = "vi" if self.language_var.get() == "Tiáº¿ng Viá»‡t" else "en"
         if language == self.language:
             return
         filter_vars = (
@@ -4057,10 +4057,10 @@ class NativeApp:
         if self.gateway_payload:
             self.render_gateway(self.gateway_payload)
         else:
-            self.gateway_state_var.set(self.t("● Internet chưa kiểm tra"))
-            self.gateway_route_var.set(self.t("Đường ra: —"))
-            self.gateway_link_var.set(self.t("Kết nối/DNS: —"))
-            self.gateway_http_var.set(self.t("Internet HTTP: —"))
+            self.gateway_state_var.set(self.t("â— Internet chÆ°a kiá»ƒm tra"))
+            self.gateway_route_var.set(self.t("ÄÆ°á»ng ra: â€”"))
+            self.gateway_link_var.set(self.t("Káº¿t ná»‘i/DNS: â€”"))
+            self.gateway_http_var.set(self.t("Internet HTTP: â€”"))
         for name in self.backup_names:
             self.backup_list.insert("end", name)
         for entry in self.log_history:
@@ -4068,10 +4068,10 @@ class NativeApp:
         if self.client:
             self.status_var.set(
                 f"Connected to {self.client.base_url}" if self.language == "en"
-                else f"Đã kết nối {self.client.base_url}"
+                else f"ÄÃ£ káº¿t ná»‘i {self.client.base_url}"
             )
         else:
-            self.status_var.set(self.t("Chưa kết nối"))
+            self.status_var.set(self.t("ChÆ°a káº¿t ná»‘i"))
         self.schedule_client_refresh()
 
     def _tree(self, parent, columns, widths, selectmode="browse"):
@@ -4095,13 +4095,13 @@ class NativeApp:
 
     def _build_wifi_tab(self):
         tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)
-        self.tabs.add(tab, text="Wi‑Fi / SOCKS5")
+        self.tabs.add(tab, text="Wiâ€‘Fi / SOCKS5")
         bar = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         bar.pack(fill="x", pady=(0, 10))
         for text, command, button_style in [
-            ("＋ Thêm SSID", self.add_wifi, "Success.TButton"),
-            ("Pool proxy…", self.open_pool_editor, "TButton"),
-            ("Đẩy cấu hình & Apply", self.save_apply, "Success.TButton"),
+            ("ï¼‹ ThÃªm SSID", self.add_wifi, "Success.TButton"),
+            ("Pool proxyâ€¦", self.open_pool_editor, "TButton"),
+            ("Äáº©y cáº¥u hÃ¬nh & Apply", self.save_apply, "Success.TButton"),
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
         columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "socks": "Proxy", "isolate": "Isolate", "webrtc": "WebRTC", "health": "Health"}
@@ -4128,24 +4128,24 @@ class NativeApp:
         )
         self.wifi_context_entries = {}
         for key, text, command in (
-            ("edit", "Sửa cấu hình", self.edit_wifi),
-            ("sock", "Đổi SOCKS", self.quick_sock),
-            ("pool", "Pool proxy…", self.open_pool_editor),
+            ("edit", "Sá»­a cáº¥u hÃ¬nh", self.edit_wifi),
+            ("sock", "Äá»•i SOCKS", self.quick_sock),
+            ("pool", "Pool proxyâ€¦", self.open_pool_editor),
             ("mac", "Random MAC", self.rotate_wifi_mac),
         ):
             self.wifi_context_menu.add_command(label=self.t(text), command=command)
             self.wifi_context_entries[key] = self.wifi_context_menu.index("end")
         self.wifi_context_menu.add_separator()
-        self.wifi_context_menu.add_command(label=self.t("Xoá SSID"), command=self.delete_wifi)
+        self.wifi_context_menu.add_command(label=self.t("XoÃ¡ SSID"), command=self.delete_wifi)
         self.wifi_context_entries["delete"] = self.wifi_context_menu.index("end")
 
         editor = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         editor.pack(fill="x", pady=(8, 0))
-        ttk.Label(editor, text="CHỈNH SỬA SSID ĐANG CHỌN", style="Count.TLabel").pack(side="left", padx=(0, 12))
+        ttk.Label(editor, text="CHá»ˆNH Sá»¬A SSID ÄANG CHá»ŒN", style="Count.TLabel").pack(side="left", padx=(0, 12))
         ttk.Label(editor, textvariable=self.wifi_selection_var, style="Toolbar.TLabel").pack(side="left", fill="x", expand=True)
         for key, text, command, button_style in (
-            ("edit", "Sửa cấu hình", self.edit_wifi, "TButton"),
-            ("delete", "Xoá SSID", self.delete_wifi, "Danger.TButton"),
+            ("edit", "Sá»­a cáº¥u hÃ¬nh", self.edit_wifi, "TButton"),
+            ("delete", "XoÃ¡ SSID", self.delete_wifi, "Danger.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
             button.pack(side="left", padx=(7, 0))
@@ -4153,14 +4153,14 @@ class NativeApp:
 
     def _build_clients_tab(self):
         tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)
-        self.tabs.add(tab, text="Thiết bị")
+        self.tabs.add(tab, text="Thiáº¿t bá»‹")
         bar = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         bar.pack(fill="x", pady=(0, 8))
-        ttk.Button(bar, text="Làm mới", command=self.refresh_clients, style="Primary.TButton").pack(side="left", padx=(0, 7))
-        ttk.Button(bar, text="Chặn MAC…", command=self.manual_ban_client, style="Danger.TButton").pack(side="left", padx=(0, 7))
-        ttk.Button(bar, text="Xuất CSV", command=self.export_clients_csv).pack(side="left", padx=(0, 7))
+        ttk.Button(bar, text="LÃ m má»›i", command=self.refresh_clients, style="Primary.TButton").pack(side="left", padx=(0, 7))
+        ttk.Button(bar, text="Cháº·n MACâ€¦", command=self.manual_ban_client, style="Danger.TButton").pack(side="left", padx=(0, 7))
+        ttk.Button(bar, text="Xuáº¥t CSV", command=self.export_clients_csv).pack(side="left", padx=(0, 7))
         ttk.Combobox(bar, textvariable=self.client_interval_var, values=("5s", "10s", "15s", "30s", "60s"), state="readonly", width=5).pack(side="right", padx=(6, 0))
-        ttk.Checkbutton(bar, text="Tự làm mới", variable=self.client_auto_var, command=self.toggle_client_auto_refresh, style="Toolbar.TCheckbutton").pack(side="right")
+        ttk.Checkbutton(bar, text="Tá»± lÃ m má»›i", variable=self.client_auto_var, command=self.toggle_client_auto_refresh, style="Toolbar.TCheckbutton").pack(side="right")
 
         filters = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         filters.pack(fill="x", pady=(0, 8))
@@ -4171,22 +4171,22 @@ class NativeApp:
         self.client_ssid_combo.pack(side="left", padx=(0, 10))
         ttk.Label(row1, text="Band", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row1, textvariable=self.client_band_var, values=BAND_FILTERS, state="readonly", width=13).pack(side="left", padx=(0, 10))
-        ttk.Label(row1, text="Kết nối", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row1, text="Káº¿t ná»‘i", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row1, textvariable=self.client_presence_var, values=PRESENCE_FILTERS, state="readonly", width=16).pack(side="left", padx=(0, 10))
-        ttk.Label(row1, text="Quyền", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row1, text="Quyá»n", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row1, textvariable=self.client_state_var, values=CLIENT_STATES, state="readonly", width=20).pack(side="left", padx=(0, 10))
-        ttk.Label(row1, text="Tìm IP / tên / MAC", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row1, text="TÃ¬m IP / tÃªn / MAC", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Entry(row1, textvariable=self.client_query_var, width=24).pack(side="left", fill="x", expand=True)
 
         row2 = ttk.Frame(filters, style="Toolbar.TFrame")
         row2.pack(fill="x")
-        ttk.Label(row2, text="Tín hiệu", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row2, text="TÃ­n hiá»‡u", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row2, textvariable=self.client_signal_var, values=SIGNAL_FILTERS, state="readonly", width=24).pack(side="left", padx=(0, 10))
-        ttk.Label(row2, text="Lưu lượng", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row2, text="LÆ°u lÆ°á»£ng", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row2, textvariable=self.client_traffic_var, values=TRAFFIC_FILTERS, state="readonly", width=18).pack(side="left", padx=(0, 10))
-        ttk.Label(row2, text="Thời gian", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
+        ttk.Label(row2, text="Thá»i gian", style="Toolbar.TLabel").pack(side="left", padx=(0, 5))
         ttk.Combobox(row2, textvariable=self.client_duration_var, values=DURATION_FILTERS, state="readonly", width=18).pack(side="left", padx=(0, 10))
-        ttk.Button(row2, text="Đặt lại bộ lọc", command=self.reset_client_filters).pack(side="left")
+        ttk.Button(row2, text="Äáº·t láº¡i bá»™ lá»c", command=self.reset_client_filters).pack(side="left")
         ttk.Label(row2, textvariable=self.client_count_var, style="Count.TLabel").pack(side="right", padx=6)
 
         summary = ttk.Frame(tab, style="Metric.TFrame", padding=(10, 8))
@@ -4199,7 +4199,7 @@ class NativeApp:
         ):
             ttk.Label(summary, textvariable=variable, style=label_style).pack(side="left", padx=(4, 24))
 
-        columns = {"ssid": "SSID", "band": "Band", "ip": "IP", "host": "Tên máy", "mac": "MAC", "proxy": "Proxy", "time": "Kết nối", "rx": "RX", "tx": "TX", "signal": "Signal", "status": "Trạng thái"}
+        columns = {"ssid": "SSID", "band": "Band", "ip": "IP", "host": "TÃªn mÃ¡y", "mac": "MAC", "proxy": "Proxy", "time": "Káº¿t ná»‘i", "rx": "RX", "tx": "TX", "signal": "Signal", "status": "Tráº¡ng thÃ¡i"}
         self.client_column_titles = columns.copy()
         self.client_tree = self._tree(tab, columns, {"ssid": 125, "band": 60, "ip": 115, "host": 145, "mac": 140, "proxy": 150, "time": 85, "rx": 85, "tx": 85, "signal": 70, "status": 120}, selectmode="extended")
         for column, title in columns.items():
@@ -4216,15 +4216,15 @@ class NativeApp:
 
         editor = ttk.Frame(tab, style="Toolbar.TFrame", padding=9)
         editor.pack(fill="x", pady=(8, 0))
-        ttk.Label(editor, text="ĐIỀU KHIỂN THIẾT BỊ ĐANG CHỌN", style="Count.TLabel").pack(side="left", padx=(0, 12))
+        ttk.Label(editor, text="ÄIá»€U KHIá»‚N THIáº¾T Bá»Š ÄANG CHá»ŒN", style="Count.TLabel").pack(side="left", padx=(0, 12))
         ttk.Label(editor, textvariable=self.client_selection_var, style="Toolbar.TLabel").pack(side="left", fill="x", expand=True)
         for key, text, command, button_style in (
-            ("details", "Chi tiết", self.show_client_details, "TButton"),
+            ("details", "Chi tiáº¿t", self.show_client_details, "TButton"),
             ("copy", "Copy IP/MAC", self.copy_selected_clients, "TButton"),
             ("kick", "Kick", lambda: self.client_action("kick"), "Warning.TButton"),
-            ("ban", "Cấm", lambda: self.client_action("ban"), "Danger.TButton"),
-            ("unban", "Bỏ cấm", lambda: self.client_action("unban"), "Success.TButton"),
-            ("proxy", "Đổi proxy…", self.bulk_assign_proxy, "Primary.TButton"),
+            ("ban", "Cáº¥m", lambda: self.client_action("ban"), "Danger.TButton"),
+            ("unban", "Bá» cáº¥m", lambda: self.client_action("unban"), "Success.TButton"),
+            ("proxy", "Äá»•i proxyâ€¦", self.bulk_assign_proxy, "Primary.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
             button.pack(side="left", padx=(7, 0))
@@ -4240,28 +4240,28 @@ class NativeApp:
             relief="flat",
             borderwidth=1,
         )
-        self.client_context_menu.add_command(label=self.t("Gán proxy…"), command=self.assign_one_proxy)
-        self.client_context_menu.add_command(label=self.t("Đổi proxy cho thiết bị đã chọn…"),
+        self.client_context_menu.add_command(label=self.t("GÃ¡n proxyâ€¦"), command=self.assign_one_proxy)
+        self.client_context_menu.add_command(label=self.t("Äá»•i proxy cho thiáº¿t bá»‹ Ä‘Ã£ chá»nâ€¦"),
                                              command=self.bulk_assign_proxy)
 
     def _build_backup_tab(self):
         tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)
-        self.tabs.add(tab, text="Backup / Nhật ký")
+        self.tabs.add(tab, text="Backup / Nháº­t kÃ½")
         left = ttk.Frame(tab, style="Card.TFrame")
         left.pack(side="left", fill="y", padx=(0, 10))
-        ttk.Button(left, text="Tải danh sách", command=self.refresh_backups, style="Primary.TButton").pack(fill="x", pady=(0, 6))
-        ttk.Button(left, text="Tạo backup", command=self.create_backup, style="Success.TButton").pack(fill="x", pady=(0, 6))
+        ttk.Button(left, text="Táº£i danh sÃ¡ch", command=self.refresh_backups, style="Primary.TButton").pack(fill="x", pady=(0, 6))
+        ttk.Button(left, text="Táº¡o backup", command=self.create_backup, style="Success.TButton").pack(fill="x", pady=(0, 6))
         self.backup_list = tk.Listbox(left, width=40, height=25, bg=self.palette["input"], fg=self.palette["text"], selectbackground=self.palette["primary"], selectforeground=self.palette["selection_text"], borderwidth=0, highlightthickness=1, highlightbackground=self.palette["border"], font=("Segoe UI", 10))
         self.backup_list.pack(fill="both", expand=True)
         self.backup_list.bind("<<ListboxSelect>>", self.update_backup_editor)
         backup_editor = ttk.Frame(left, style="Toolbar.TFrame", padding=9)
         backup_editor.pack(fill="x", pady=(8, 0))
         ttk.Label(backup_editor, textvariable=self.backup_selection_var, style="Toolbar.TLabel").pack(anchor="w", pady=(0, 7))
-        self.rollback_button = ttk.Button(backup_editor, text="Rollback backup đang chọn", command=self.rollback, style="Warning.TButton", state="disabled")
+        self.rollback_button = ttk.Button(backup_editor, text="Rollback backup Ä‘ang chá»n", command=self.rollback, style="Warning.TButton", state="disabled")
         self.rollback_button.pack(fill="x")
         right = ttk.Frame(tab, style="Card.TFrame")
         right.pack(side="left", fill="both", expand=True)
-        ttk.Label(right, text="Nhật ký thao tác").pack(anchor="w")
+        ttk.Label(right, text="Nháº­t kÃ½ thao tÃ¡c").pack(anchor="w")
         self.log = tk.Text(right, wrap="word", state="disabled", bg=self.palette["input"], fg=self.palette["log_text"], insertbackground=self.palette["text"], borderwidth=0, highlightthickness=1, highlightbackground=self.palette["border"], padx=10, pady=10, font=("Cascadia Mono", 9))
         self.log.pack(fill="both", expand=True, pady=(5, 0))
 
@@ -4330,13 +4330,13 @@ class NativeApp:
     def _task_error(self, exc):
         self.hide_loading()
         detail = self.t(str(exc))
-        self.status_var.set(f"Error: {detail}" if self.language == "en" else f"Lỗi: {detail}")
-        self.append_log(f"ERROR: {detail}" if self.language == "en" else f"LỖI: {detail}")
+        self.status_var.set(f"Error: {detail}" if self.language == "en" else f"Lá»—i: {detail}")
+        self.append_log(f"ERROR: {detail}" if self.language == "en" else f"Lá»–I: {detail}")
         messagebox.showerror("sbproxy", detail, parent=self.root)
 
     def _task_success(self, result, callback):
         self.hide_loading()
-        self.status_var.set(self.t("Hoàn tất"))
+        self.status_var.set(self.t("HoÃ n táº¥t"))
         if callback:
             callback(result)
 
@@ -4344,20 +4344,20 @@ class NativeApp:
         """Require an explicit, default-deny confirmation before router mutations."""
         if self.language == "en":
             message = (
-                "WARNING · IMPORTANT ACTION\n\n"
+                "WARNING Â· IMPORTANT ACTION\n\n"
                 f"Action:\n{self.t(action)}\n\n"
                 f"Possible impact:\n{self.t(impact)}\n\n"
                 "Continue only after verifying the target SSID/device and accepting the impact."
             )
-            dialog_title = f"Warning — {self.t(title)}"
+            dialog_title = f"Warning â€” {self.t(title)}"
         else:
             message = (
-                "CẢNH BÁO · TÁC VỤ QUAN TRỌNG\n\n"
-                f"Thao tác:\n{action}\n\n"
-                f"Ảnh hưởng có thể xảy ra:\n{impact}\n\n"
-                "Chỉ tiếp tục khi bạn đã kiểm tra đúng SSID/thiết bị và chấp nhận ảnh hưởng."
+                "Cáº¢NH BÃO Â· TÃC Vá»¤ QUAN TRá»ŒNG\n\n"
+                f"Thao tÃ¡c:\n{action}\n\n"
+                f"áº¢nh hÆ°á»Ÿng cÃ³ thá»ƒ xáº£y ra:\n{impact}\n\n"
+                "Chá»‰ tiáº¿p tá»¥c khi báº¡n Ä‘Ã£ kiá»ƒm tra Ä‘Ãºng SSID/thiáº¿t bá»‹ vÃ  cháº¥p nháº­n áº£nh hÆ°á»Ÿng."
             )
-            dialog_title = f"Cảnh báo — {title}"
+            dialog_title = f"Cáº£nh bÃ¡o â€” {title}"
         return messagebox.askyesno(
             dialog_title,
             message,
@@ -4370,9 +4370,9 @@ class NativeApp:
         base = self.base_var.get().strip().rstrip("/")
         token = self.token_var.get().strip()
         if not base.startswith(("http://", "https://")):
-            raise ValueError("Base URL phải bắt đầu bằng http:// hoặc https://")
+            raise ValueError("Base URL pháº£i báº¯t Ä‘áº§u báº±ng http:// hoáº·c https://")
         if not token:
-            raise ValueError("Thiếu token Agent")
+            raise ValueError("Thiáº¿u token Agent")
         return AgentClient(base, token)
 
     def connect(self):
@@ -4407,29 +4407,29 @@ class NativeApp:
                   agent=self.agent_version or "?", console=APP_VERSION,
                   singbox="running" if running else "stopped")
             self.status_var.set(
-                f"Connected to {self.client.base_url} · sing-box {'running' if running else 'NOT running'}"
+                f"Connected to {self.client.base_url} Â· sing-box {'running' if running else 'NOT running'}"
                 if self.language == "en" else
-                f"Đã kết nối {self.client.base_url} · sing-box {'đang chạy' if running else 'KHÔNG chạy'}"
+                f"ÄÃ£ káº¿t ná»‘i {self.client.base_url} Â· sing-box {'Ä‘ang cháº¡y' if running else 'KHÃ”NG cháº¡y'}"
             )
             if self.agent_version:
-                suffix = f" · agent v{self.agent_version}"
+                suffix = f" Â· agent v{self.agent_version}"
                 if self.agent_version != APP_VERSION:
-                    suffix += " (≠ app)" if self.language == "en" else " (khác app)"
+                    suffix += " (â‰  app)" if self.language == "en" else " (khÃ¡c app)"
                 self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
             self.refresh_clients()
             self.refresh_backups()
             self.evaluate_agent_compatibility()
-        self.run_task("Đang kết nối Agent…", work, done)
+        self.run_task("Äang káº¿t ná»‘i Agentâ€¦", work, done)
 
     def lock_console(self, settings=None, reason=""):
         """No agent on the router: dim every control and offer one way out."""
         self.pending_provision = settings or self.pending_provision
         self.console_locked = True
         self.lock_hint_var.set(reason or self.t(
-            "Router chưa cài agent nên console không điều khiển được gì. Hãy cài agent rồi thử lại."
+            "Router chÆ°a cÃ i agent nÃªn console khÃ´ng Ä‘iá»u khiá»ƒn Ä‘Æ°á»£c gÃ¬. HÃ£y cÃ i agent rá»“i thá»­ láº¡i."
         ))
-        self.status_var.set(self.t("Không cấu hình được router — chưa cài agent"))
+        self.status_var.set(self.t("KhÃ´ng cáº¥u hÃ¬nh Ä‘Æ°á»£c router â€” chÆ°a cÃ i agent"))
         self.append_log(self.lock_hint_var.get())
         self._apply_lock_state()
 
@@ -4530,7 +4530,7 @@ class NativeApp:
             self.setup_wizard = None
             messagebox.showerror(
                 APP_NAME,
-                f'{self.t("Không mở được cửa sổ cài đặt")}: {exc}',
+                f'{self.t("KhÃ´ng má»Ÿ Ä‘Æ°á»£c cá»­a sá»• cÃ i Ä‘áº·t")}: {exc}',
                 parent=self.root,
             )
             return
@@ -4545,8 +4545,8 @@ class NativeApp:
         self.token_var.set(token)
         save_connection(base_url, token)
         self.append_log(
-            f"Provisioning finished · {base_url}" if self.language == "en"
-            else f"Cài đặt xong · {base_url}"
+            f"Provisioning finished Â· {base_url}" if self.language == "en"
+            else f"CÃ i Ä‘áº·t xong Â· {base_url}"
         )
         self.update_setup_banner()
         self.connect()
@@ -4560,8 +4560,8 @@ class NativeApp:
         def done(state):
             message = self.t(ROUTER_STATE_LABELS.get(state, state))
             self.status_var.set(message)
-            self.setup_hint_var.set(f"{base} · {message}")
-            self.append_log(f"{base} · {message}")
+            self.setup_hint_var.set(f"{base} Â· {message}")
+            self.append_log(f"{base} Â· {message}")
             if announce:
                 messagebox.showinfo(APP_NAME, f"{base}\n\n{message}", parent=self.root)
         if not announce:
@@ -4574,13 +4574,13 @@ class NativeApp:
                 self.root.after(0, lambda: done(state))
             threading.Thread(target=worker, daemon=True).start()
             return
-        self.run_task("Đang kiểm tra tình trạng router…", work, done)
+        self.run_task("Äang kiá»ƒm tra tÃ¬nh tráº¡ng routerâ€¦", work, done)
 
     def evaluate_agent_compatibility(self):
         """Compare the agent with this console and act on the difference.
 
         Older agent: offer to upgrade it in place (the router keeps its
-        configuration). Newer agent: refuse to drive it — an old console may
+        configuration). Newer agent: refuse to drive it â€” an old console may
         not understand the API or configuration format it serves.
         """
         order = compare_versions(self.agent_version, APP_VERSION)
@@ -4591,8 +4591,8 @@ class NativeApp:
             return
         if self.agent_too_new:
             message = self.t(
-                "Agent trên router là v{agent}, mới hơn console v{app}. Hãy dùng bản console mới hơn;"
-                " console cũ chỉ được phép xem, mọi thao tác thay đổi bị khoá.",
+                "Agent trÃªn router lÃ  v{agent}, má»›i hÆ¡n console v{app}. HÃ£y dÃ¹ng báº£n console má»›i hÆ¡n;"
+                " console cÅ© chá»‰ Ä‘Æ°á»£c phÃ©p xem, má»i thao tÃ¡c thay Ä‘á»•i bá»‹ khoÃ¡.",
                 agent=self.agent_version, app=APP_VERSION,
             )
             self.setup_hint_var.set(message)
@@ -4601,7 +4601,7 @@ class NativeApp:
             messagebox.showerror(APP_NAME, message, parent=self.root)
             return
         message = self.t(
-            "Agent trên router là v{agent}, cũ hơn console v{app}.",
+            "Agent trÃªn router lÃ  v{agent}, cÅ© hÆ¡n console v{app}.",
             agent=self.agent_version, app=APP_VERSION,
         )
         self.setup_hint_var.set(message)
@@ -4613,8 +4613,8 @@ class NativeApp:
         choice = ask_agent_upgrade_choice(
             self.root,
             message + "\n\n" + self.t(
-                "Nâng cấp agent lên v{app} ngay bây giờ? Cấu hình wifi-socks.conf và settings.sh"
-                " trên router được giữ nguyên, router tự backup trước khi cập nhật.",
+                "NÃ¢ng cáº¥p agent lÃªn v{app} ngay bÃ¢y giá»? Cáº¥u hÃ¬nh wifi-socks.conf vÃ  settings.sh"
+                " trÃªn router Ä‘Æ°á»£c giá»¯ nguyÃªn, router tá»± backup trÆ°á»›c khi cáº­p nháº­t.",
                 app=APP_VERSION,
             ),
             self.language,
@@ -4630,12 +4630,12 @@ class NativeApp:
         client = self.require_client()
         if self.agent_version and compare_versions(APP_VERSION, self.agent_version) != 1:
             messagebox.showinfo(APP_NAME, self.t(
-                "Agent đã ở v{agent}; console này không có bản mới hơn để đẩy lên.",
+                "Agent Ä‘Ã£ á»Ÿ v{agent}; console nÃ y khÃ´ng cÃ³ báº£n má»›i hÆ¡n Ä‘á»ƒ Ä‘áº©y lÃªn.",
                 agent=self.agent_version,
             ), parent=self.root)
             return
         def done(to_version):
-            self.append_log(self.t("Đã nâng cấp agent: {old} → {new}",
+            self.append_log(self.t("ÄÃ£ nÃ¢ng cáº¥p agent: {old} â†’ {new}",
                                    old=self.agent_version or "?", new=to_version or "?"))
             self.agent_outdated = False
             self.upgrade_offered = False
@@ -4673,7 +4673,7 @@ class NativeApp:
         if not getattr(self, "agent_too_new", False):
             return False
         message = self.t(
-            "Console v{app} cũ hơn agent v{agent} — hãy cập nhật console trước khi thay đổi router.",
+            "Console v{app} cÅ© hÆ¡n agent v{agent} â€” hÃ£y cáº­p nháº­t console trÆ°á»›c khi thay Ä‘á»•i router.",
             app=APP_VERSION, agent=self.agent_version,
         )
         self.append_log(message)
@@ -4682,7 +4682,7 @@ class NativeApp:
 
     def require_client(self) -> AgentClient:
         if not self.client:
-            raise AgentError("Chưa kết nối Agent")
+            raise AgentError("ChÆ°a káº¿t ná»‘i Agent")
         return self.client
 
     def refresh_all(self):
@@ -4706,17 +4706,17 @@ class NativeApp:
             running = bool(meta.get("singbox_running"))
             self.agent_version = clean_agent_version(meta)
             self.status_var.set(
-                f"Refreshed · sing-box {'running' if running else 'NOT running'}"
+                f"Refreshed Â· sing-box {'running' if running else 'NOT running'}"
                 if self.language == "en" else
-                f"Đã làm mới · sing-box {'đang chạy' if running else 'KHÔNG chạy'}"
+                f"ÄÃ£ lÃ m má»›i Â· sing-box {'Ä‘ang cháº¡y' if running else 'KHÃ”NG cháº¡y'}"
             )
             if self.agent_version:
-                suffix = f" · agent v{self.agent_version}"
+                suffix = f" Â· agent v{self.agent_version}"
                 if self.agent_version != APP_VERSION:
-                    suffix += " (≠ app)" if self.language == "en" else " (khác app)"
+                    suffix += " (â‰  app)" if self.language == "en" else " (khÃ¡c app)"
                 self.status_var.set(self.status_var.get() + suffix)
             self.render_wifi()
-        self.run_task("Đang làm mới…", work, done)
+        self.run_task("Äang lÃ m má»›iâ€¦", work, done)
 
     def render_gateway(self, payload):
         payload = payload if isinstance(payload, dict) else {}
@@ -4724,10 +4724,10 @@ class NativeApp:
         self.render_gateway_interfaces(payload)
         state = str(payload.get("state") or "unknown")
         labels = {
-            "ok": ("● Internet hoạt động", "MetricGreen.TLabel"),
-            "degraded": ("● Internet suy giảm", "MetricYellow.TLabel"),
-            "down": ("● Mất kết nối Internet", "MetricRed.TLabel"),
-            "unknown": ("● Internet chưa xác định", "MetricBlue.TLabel"),
+            "ok": ("â— Internet hoáº¡t Ä‘á»™ng", "MetricGreen.TLabel"),
+            "degraded": ("â— Internet suy giáº£m", "MetricYellow.TLabel"),
+            "down": ("â— Máº¥t káº¿t ná»‘i Internet", "MetricRed.TLabel"),
+            "unknown": ("â— Internet chÆ°a xÃ¡c Ä‘á»‹nh", "MetricBlue.TLabel"),
         }
         text, style = labels.get(state, labels["unknown"])
         self.gateway_state_var.set(self.t(text))
@@ -4735,46 +4735,46 @@ class NativeApp:
 
         # Empty means the agent accepts whatever uplink the default route uses.
         expected = str(payload.get("expected_interface") or "")
-        logical = str(payload.get("interface") or "—")
-        device = str(payload.get("device") or "—")
-        via = str(payload.get("gateway") or ("direct" if self.language == "en" else "trực tiếp"))
-        source = str(payload.get("source_ip") or "—")
+        logical = str(payload.get("interface") or "â€”")
+        device = str(payload.get("device") or "â€”")
+        via = str(payload.get("gateway") or ("direct" if self.language == "en" else "trá»±c tiáº¿p"))
+        source = str(payload.get("source_ip") or "â€”")
         route = (
-            f"Egress: {logical}/{device} · via {via} · src {source}"
+            f"Egress: {logical}/{device} Â· via {via} Â· src {source}"
             if self.language == "en" else
-            f"Đường ra: {logical}/{device} · qua {via} · IP nguồn {source}"
+            f"ÄÆ°á»ng ra: {logical}/{device} Â· qua {via} Â· IP nguá»“n {source}"
         )
         if payload.get("expected_active") is False:
             problem = str(payload.get("egress_problem") or "")
             if problem == "proxied-bridge":
-                route += (" · EGRESS THROUGH A PROXIED SSID" if self.language == "en"
-                          else " · ĐI QUA SSID ĐƯỢC PROXY")
+                route += (" Â· EGRESS THROUGH A PROXIED SSID" if self.language == "en"
+                          else " Â· ÄI QUA SSID ÄÆ¯á»¢C PROXY")
             elif expected:
-                route += (f" · NOT VIA {expected}" if self.language == "en"
-                          else f" · KHÔNG QUA {expected}")
+                route += (f" Â· NOT VIA {expected}" if self.language == "en"
+                          else f" Â· KHÃ”NG QUA {expected}")
             else:
-                route += (" · UNEXPECTED EGRESS" if self.language == "en"
-                          else " · ĐƯỜNG RA BẤT THƯỜNG")
+                route += (" Â· UNEXPECTED EGRESS" if self.language == "en"
+                          else " Â· ÄÆ¯á»œNG RA Báº¤T THÆ¯á»œNG")
         self.gateway_route_var.set(route)
 
-        link = "OK" if payload.get("link_ok") else ("ERROR" if self.language == "en" else "LỖI")
+        link = "OK" if payload.get("link_ok") else ("ERROR" if self.language == "en" else "Lá»–I")
         if not payload.get("dns_checked", True):
-            dns = "not checked" if self.language == "en" else "chưa kiểm tra"
+            dns = "not checked" if self.language == "en" else "chÆ°a kiá»ƒm tra"
         else:
-            dns = "OK" if payload.get("dns_ok") else ("ERROR" if self.language == "en" else "LỖI")
+            dns = "OK" if payload.get("dns_ok") else ("ERROR" if self.language == "en" else "Lá»–I")
         self.gateway_link_var.set(
-            f"Link: {link} · DNS: {dns}"
+            f"Link: {link} Â· DNS: {dns}"
             if self.language == "en" else
-            f"Kết nối: {'Tốt' if link == 'OK' else link} · DNS: {'Tốt' if dns == 'OK' else dns}"
+            f"Káº¿t ná»‘i: {'Tá»‘t' if link == 'OK' else link} Â· DNS: {'Tá»‘t' if dns == 'OK' else dns}"
         )
 
         if payload.get("http_ok"):
             self.gateway_http_var.set(
-                f"HTTP: {payload.get('http_code') or 0} · {payload.get('latency_ms') or 0} ms"
+                f"HTTP: {payload.get('http_code') or 0} Â· {payload.get('latency_ms') or 0} ms"
             )
         else:
-            error = str(payload.get("error") or ("unreachable" if self.language == "en" else "không truy cập được"))
-            self.gateway_http_var.set(f"HTTP: {'ERROR' if self.language == 'en' else 'LỖI'} · {error}")
+            error = str(payload.get("error") or ("unreachable" if self.language == "en" else "khÃ´ng truy cáº­p Ä‘Æ°á»£c"))
+            self.gateway_http_var.set(f"HTTP: {'ERROR' if self.language == 'en' else 'Lá»–I'} Â· {error}")
 
     def render_gateway_interfaces(self, payload):
         """Offer the router's own interfaces, with the live one as automatic.
@@ -4801,12 +4801,12 @@ class NativeApp:
                 parts.append(f"({device})")
             address = str(entry.get("ipv4") or "")
             if address:
-                parts.append(f"· {address}")
+                parts.append(f"Â· {address}")
             if entry.get("current"):
                 current = name
-                parts.append("· đang dùng" if self.language != "en" else "· in use")
+                parts.append("Â· Ä‘ang dÃ¹ng" if self.language != "en" else "Â· in use")
             elif not entry.get("up"):
-                parts.append("· không hoạt động" if self.language != "en" else "· down")
+                parts.append("Â· khÃ´ng hoáº¡t Ä‘á»™ng" if self.language != "en" else "Â· down")
             if entry.get("proxied"):
                 continue
             label = " ".join(parts)
@@ -4814,7 +4814,7 @@ class NativeApp:
             mapping[label] = name
             states[label] = "up" if entry.get("up") else "down"
         automatic = (
-            f"Tự động ({current})" if current else "Tự động"
+            f"Tá»± Ä‘á»™ng ({current})" if current else "Tá»± Ä‘á»™ng"
         ) if self.language != "en" else (
             f"Automatic ({current})" if current else "Automatic"
         )
@@ -4880,18 +4880,18 @@ class NativeApp:
             return
         client = self.require_client()
         def work():
-            self.update_loading("Đang lưu lựa chọn gateway…")
+            self.update_loading("Äang lÆ°u lá»±a chá»n gatewayâ€¦")
             client.set_gateway(interface)
-            self.update_loading("Đã lưu lựa chọn; đang kiểm tra kết nối qua gateway…")
+            self.update_loading("ÄÃ£ lÆ°u lá»±a chá»n; Ä‘ang kiá»ƒm tra káº¿t ná»‘i qua gatewayâ€¦")
             return client.gateway()
         def done(payload):
-            selected = interface or self.t("tự động")
-            message = self.t("Đã cập nhật gateway: {interface}", interface=selected)
+            selected = interface or self.t("tá»± Ä‘á»™ng")
+            message = self.t("ÄÃ£ cáº­p nháº­t gateway: {interface}", interface=selected)
             self.append_log(message)
             self.status_var.set(message)
             self.render_gateway(payload)
         self.run_task(
-            "Đang cập nhật gateway trên router…",
+            "Äang cáº­p nháº­t gateway trÃªn routerâ€¦",
             work,
             done,
             show_loading=True,
@@ -4908,17 +4908,17 @@ class NativeApp:
             self.render_gateway(payload)
             state = payload.get("state") or "unknown"
             state_vi = {
-                "ok": "hoạt động",
-                "degraded": "suy giảm",
-                "down": "mất kết nối",
-                "unknown": "chưa xác định",
+                "ok": "hoáº¡t Ä‘á»™ng",
+                "degraded": "suy giáº£m",
+                "down": "máº¥t káº¿t ná»‘i",
+                "unknown": "chÆ°a xÃ¡c Ä‘á»‹nh",
             }.get(state, str(state))
             self.append_log(
-                f"Gateway check: {state} · {payload.get('route') or 'no route'}"
+                f"Gateway check: {state} Â· {payload.get('route') or 'no route'}"
                 if self.language == "en" else
-                f"Kiểm tra cổng ra: {state_vi} · {payload.get('route') or 'không có route'}"
+                f"Kiá»ƒm tra cá»•ng ra: {state_vi} Â· {payload.get('route') or 'khÃ´ng cÃ³ route'}"
             )
-        self.run_task("Đang kiểm tra cổng ra Internet…", client.gateway, done)
+        self.run_task("Äang kiá»ƒm tra cá»•ng ra Internetâ€¦", client.gateway, done)
 
     def capture_runtime_ssids(self, status):
         self.runtime_ssids = {}
@@ -4963,16 +4963,16 @@ class NativeApp:
         for entry in getattr(self, "wifi_context_entries", {}).values():
             self.wifi_context_menu.entryconfigure(entry, state=state)
         if record:
-            self.wifi_selection_var.set(f"{record.name} · IDX {record.idx} · {record.band}")
+            self.wifi_selection_var.set(f"{record.name} Â· IDX {record.idx} Â· {record.band}")
         else:
-            self.wifi_selection_var.set(self.t("Chọn một SSID trong bảng để chỉnh sửa"))
+            self.wifi_selection_var.set(self.t("Chá»n má»™t SSID trong báº£ng Ä‘á»ƒ chá»‰nh sá»­a"))
 
     def next_idx(self):
         used = {item.idx for item in self.records}
         for idx in range(1, 201):
             if idx not in used:
                 return idx
-        raise AgentError("Đã đạt giới hạn 200 SSID")
+        raise AgentError("ÄÃ£ Ä‘áº¡t giá»›i háº¡n 200 SSID")
 
     def add_wifi(self):
         if self.block_if_incompatible():
@@ -4986,7 +4986,7 @@ class NativeApp:
         self.root.wait_window(dialog)
         if dialog.result:
             if any(item.idx == dialog.result.idx for item in self.records):
-                messagebox.showerror(self.t("IDX bị trùng"), self.t("IDX này đã được sử dụng"), parent=self.root)
+                messagebox.showerror(self.t("IDX bá»‹ trÃ¹ng"), self.t("IDX nÃ y Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng"), parent=self.root)
                 return
             self.records.append(dialog.result)
             self.records.sort(key=lambda item: item.idx)
@@ -4997,13 +4997,13 @@ class NativeApp:
             return
         record = self.selected_wifi()
         if not record:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t Wiâ€‘Fi"), parent=self.root)
             return
         dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette)
         self.root.wait_window(dialog)
         if dialog.result:
             if any(item.idx == dialog.result.idx and item is not record for item in self.records):
-                messagebox.showerror(self.t("IDX bị trùng"), self.t("IDX này đã được sử dụng"), parent=self.root)
+                messagebox.showerror(self.t("IDX bá»‹ trÃ¹ng"), self.t("IDX nÃ y Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng"), parent=self.root)
                 return
             self.records[self.records.index(record)] = dialog.result
             self.records.sort(key=lambda item: item.idx)
@@ -5016,16 +5016,16 @@ class NativeApp:
         action = (
             f"Delete SSID {record.name} (IDX {record.idx}) from the configuration being edited."
             if record and self.language == "en" else
-            f"Xoá SSID {record.name} (IDX {record.idx}) khỏi cấu hình đang chỉnh sửa."
+            f"XoÃ¡ SSID {record.name} (IDX {record.idx}) khá»i cáº¥u hÃ¬nh Ä‘ang chá»‰nh sá»­a."
             if record else ""
         )
         impact = (
             "The router is not changed yet. On Apply, this SSID, its routing rules, and its connections will be removed."
             if self.language == "en" else
-            "Chưa tác động router ngay. Khi Apply, SSID, rule định tuyến và các kết nối của SSID này sẽ bị xoá."
+            "ChÆ°a tÃ¡c Ä‘á»™ng router ngay. Khi Apply, SSID, rule Ä‘á»‹nh tuyáº¿n vÃ  cÃ¡c káº¿t ná»‘i cá»§a SSID nÃ y sáº½ bá»‹ xoÃ¡."
         )
         if record and self.confirm_important(
-            "Xoá SSID",
+            "XoÃ¡ SSID",
             action,
             impact,
         ):
@@ -5037,10 +5037,10 @@ class NativeApp:
             return
         record = self.selected_wifi()
         if not record:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t Wiâ€‘Fi"), parent=self.root)
             return
         dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette)
-        dialog.title(self.t("Đổi SOCKS nhanh"))
+        dialog.title(self.t("Äá»•i SOCKS nhanh"))
         self.root.wait_window(dialog)
         if not dialog.result:
             return
@@ -5048,15 +5048,15 @@ class NativeApp:
         action = (
             f"Change the {updated.proxy_type.upper()} proxy used by SSID {record.name}."
             if self.language == "en" else
-            f"Đổi proxy {updated.proxy_type.upper()} đang dùng cho SSID {record.name}."
+            f"Äá»•i proxy {updated.proxy_type.upper()} Ä‘ang dÃ¹ng cho SSID {record.name}."
         )
         impact = (
             "The change is sent to the router immediately. Existing sessions may disconnect, and an invalid endpoint may leave the SSID without Internet access."
             if self.language == "en" else
-            "Thay đổi được gửi lên router ngay. Phiên mạng hiện tại có thể bị ngắt; endpoint sai có thể làm SSID mất Internet."
+            "Thay Ä‘á»•i Ä‘Æ°á»£c gá»­i lÃªn router ngay. PhiÃªn máº¡ng hiá»‡n táº¡i cÃ³ thá»ƒ bá»‹ ngáº¯t; endpoint sai cÃ³ thá»ƒ lÃ m SSID máº¥t Internet."
         )
         if not self.confirm_important(
-            "Đổi SOCKS5",
+            "Äá»•i SOCKS5",
             action,
             impact,
         ):
@@ -5069,18 +5069,18 @@ class NativeApp:
         def done(response):
             self.records[self.records.index(record)] = updated
             self.render_wifi()
-            fallback = "SOCKS changed successfully" if self.language == "en" else "Đổi SOCKS thành công"
+            fallback = "SOCKS changed successfully" if self.language == "en" else "Äá»•i SOCKS thÃ nh cÃ´ng"
             self.append_log(response.get("log", fallback))
-        self.run_task("Đang đổi SOCKS…", lambda: client.set_sock(updated), done)
+        self.run_task("Äang Ä‘á»•i SOCKSâ€¦", lambda: client.set_sock(updated), done)
 
     def rotate_wifi_mac(self):
         if self.block_if_incompatible():
             return
         record = self.selected_wifi()
         if not record:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi cần random MAC"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t Wiâ€‘Fi cáº§n random MAC"), parent=self.root)
             return
-        current = (self.runtime_ssids.get(record.idx) or {}).get("macaddr") or "chưa đặt"
+        current = (self.runtime_ssids.get(record.idx) or {}).get("macaddr") or "chÆ°a Ä‘áº·t"
         dialog = RandomMacDialog(self.root, record, current, self.language, self.palette)
         self.root.wait_window(dialog)
         if dialog.result is None:
@@ -5090,12 +5090,12 @@ class NativeApp:
         action = (
             f"Change the BSSID/MAC of {record.name}.\nCurrent: {current}\nNew provider: {provider}"
             if self.language == "en" else
-            f"Đổi BSSID/MAC của {record.name}.\nHiện tại: {current}\nProvider mới: {provider}"
+            f"Äá»•i BSSID/MAC cá»§a {record.name}.\nHiá»‡n táº¡i: {current}\nProvider má»›i: {provider}"
         )
         impact = (
             "Wi-Fi networks on the same radio will reload, briefly disconnecting devices. The new provider and MAC will persist across future Apply operations."
             if self.language == "en" else
-            "Wi‑Fi cùng radio sẽ reload và các thiết bị có thể mất kết nối ngắn. Provider và MAC mới sẽ được lưu qua các lần Apply."
+            "Wiâ€‘Fi cÃ¹ng radio sáº½ reload vÃ  cÃ¡c thiáº¿t bá»‹ cÃ³ thá»ƒ máº¥t káº¿t ná»‘i ngáº¯n. Provider vÃ  MAC má»›i sáº½ Ä‘Æ°á»£c lÆ°u qua cÃ¡c láº§n Apply."
         )
         if not self.confirm_important(
             "Random MAC",
@@ -5110,7 +5110,7 @@ class NativeApp:
             return
 
         def done(payload):
-            new_mac = payload.get("mac") or ("changed" if self.language == "en" else "đã đổi")
+            new_mac = payload.get("mac") or ("changed" if self.language == "en" else "Ä‘Ã£ Ä‘á»•i")
             record.mac_oui = selected_oui
             runtime = self.runtime_ssids.setdefault(record.idx, {})
             runtime["macaddr"] = new_mac
@@ -5118,18 +5118,18 @@ class NativeApp:
             self.render_wifi()
             fallback = (
                 f"Rotated MAC {record.name} -> {new_mac}" if self.language == "en" else
-                f"Đã xoay MAC {record.name} -> {new_mac}"
+                f"ÄÃ£ xoay MAC {record.name} -> {new_mac}"
             )
             self.append_log(payload.get("log", fallback))
             self.status_var.set(
-                f"Rotated BSSID {record.name} → {new_mac}; Wi-Fi is reloading"
+                f"Rotated BSSID {record.name} â†’ {new_mac}; Wi-Fi is reloading"
                 if self.language == "en" else
-                f"Đã xoay BSSID {record.name} → {new_mac}; Wi‑Fi đang reload"
+                f"ÄÃ£ xoay BSSID {record.name} â†’ {new_mac}; Wiâ€‘Fi Ä‘ang reload"
             )
             self.root.after(5000, self.refresh_all)
 
         self.run_task(
-            f"Rotating BSSID/MAC for {record.name}…" if self.language == "en" else f"Đang xoay BSSID/MAC của {record.name}…",
+            f"Rotating BSSID/MAC for {record.name}â€¦" if self.language == "en" else f"Äang xoay BSSID/MAC cá»§a {record.name}â€¦",
             lambda: client.rotate_mac(record.idx, selected_oui),
             done,
         )
@@ -5146,59 +5146,59 @@ class NativeApp:
         action = (
             f"Save and activate the complete configuration containing {len(self.records)} SSIDs."
             if self.language == "en" else
-            f"Ghi và kích hoạt toàn bộ cấu hình gồm {len(self.records)} SSID."
+            f"Ghi vÃ  kÃ­ch hoáº¡t toÃ n bá»™ cáº¥u hÃ¬nh gá»“m {len(self.records)} SSID."
         )
         impact = (
             "The app will run a dry-run and create a backup first, then save the configuration, replace network rules, and reload Wi-Fi. Devices may be disconnected temporarily."
             if self.language == "en" else
-            "App sẽ dry-run và backup trước, sau đó ghi cấu hình, thay rule mạng và reload Wi‑Fi. Các thiết bị có thể mất kết nối tạm thời."
+            "App sáº½ dry-run vÃ  backup trÆ°á»›c, sau Ä‘Ã³ ghi cáº¥u hÃ¬nh, thay rule máº¡ng vÃ  reload Wiâ€‘Fi. CÃ¡c thiáº¿t bá»‹ cÃ³ thá»ƒ máº¥t káº¿t ná»‘i táº¡m thá»i."
         )
         if not self.confirm_important(
-            "Dry-run và Apply",
+            "Dry-run vÃ  Apply",
             action,
             impact,
         ):
             return
         def work():
             self.update_loading(
-                "Step 1/3 · Dry-running the temporary configuration; the router is unchanged…"
+                "Step 1/3 Â· Dry-running the temporary configuration; the router is unchangedâ€¦"
                 if self.language == "en" else
-                "Bước 1/3 · Dry-run cấu hình tạm, chưa ghi lên router…"
+                "BÆ°á»›c 1/3 Â· Dry-run cáº¥u hÃ¬nh táº¡m, chÆ°a ghi lÃªn routerâ€¦"
             )
             dryrun = client.dryrun_conf(content)
             if not dryrun.get("ok", False):
-                raise AgentError(dryrun.get("log") or "Dry-run thất bại")
+                raise AgentError(dryrun.get("log") or "Dry-run tháº¥t báº¡i")
             self.update_loading(
-                "Step 2/3 · Dry-run passed; creating a backup and saving configuration…"
+                "Step 2/3 Â· Dry-run passed; creating a backup and saving configurationâ€¦"
                 if self.language == "en" else
-                "Bước 2/3 · Dry-run đạt, đang backup và lưu cấu hình…"
+                "BÆ°á»›c 2/3 Â· Dry-run Ä‘áº¡t, Ä‘ang backup vÃ  lÆ°u cáº¥u hÃ¬nhâ€¦"
             )
             client.save_conf(content)
             self.update_loading(
-                "Step 3/3 · Running the final required dry-run and applying to the router…"
+                "Step 3/3 Â· Running the final required dry-run and applying to the routerâ€¦"
                 if self.language == "en" else
-                "Bước 3/3 · Dry-run bắt buộc lần cuối và apply lên router…"
+                "BÆ°á»›c 3/3 Â· Dry-run báº¯t buá»™c láº§n cuá»‘i vÃ  apply lÃªn routerâ€¦"
             )
             result = client.apply()
             if not result.get("ok", False):
-                raise AgentError(result.get("log") or "Apply thất bại")
+                raise AgentError(result.get("log") or "Apply tháº¥t báº¡i")
             return dryrun, result
         def done(payload):
             _dryrun, result = payload
             self.append_log(
-                "DRY-RUN OK · No errors found; apply was allowed."
+                "DRY-RUN OK Â· No errors found; apply was allowed."
                 if self.language == "en" else
-                "DRY-RUN OK · Không phát hiện lỗi, đã cho phép apply."
+                "DRY-RUN OK Â· KhÃ´ng phÃ¡t hiá»‡n lá»—i, Ä‘Ã£ cho phÃ©p apply."
             )
-            self.append_log(result.get("log", "Apply succeeded" if self.language == "en" else "Apply thành công"))
+            self.append_log(result.get("log", "Apply succeeded" if self.language == "en" else "Apply thÃ nh cÃ´ng"))
             self.status_var.set(
                 "Apply succeeded; Wi-Fi is reloading"
                 if self.language == "en" else
-                "Apply thành công; Wi‑Fi đang reload"
+                "Apply thÃ nh cÃ´ng; Wiâ€‘Fi Ä‘ang reload"
             )
             self.root.after(5000, self.refresh_all)
         self.run_task(
-            "Đang dry-run trước khi apply…",
+            "Äang dry-run trÆ°á»›c khi applyâ€¦",
             work,
             done,
             show_loading=True,
@@ -5227,7 +5227,7 @@ class NativeApp:
             reverse=self.wifi_sort_reverse,
         )
         for column, title in self.wifi_column_titles.items():
-            marker = " ▼" if self.wifi_sort_reverse else " ▲"
+            marker = " â–¼" if self.wifi_sort_reverse else " â–²"
             self.wifi_tree.heading(
                 column,
                 text=self.t(title) + marker if column == self.wifi_sort_column else self.t(title),
@@ -5236,25 +5236,25 @@ class NativeApp:
         self.wifi_tree.delete(*self.wifi_tree.get_children())
         for pos, record in enumerate(records):
             probe = self.health.get(str(record.idx), self.health.get(record.idx, {})) or {}
-            state = probe.get("state", "—")
+            state = probe.get("state", "â€”")
             latency = probe.get("latency_ms")
             health = f"{state} {latency}ms" if latency is not None else state
             runtime = self.runtime_ssids.get(record.idx) or {}
-            mac = runtime.get("macaddr") or "—"
-            provider = self.t(vendor_label(record.mac_oui)).split(" · ", 1)[0]
-            mac_display = f"{mac} · {provider}"
+            mac = runtime.get("macaddr") or "â€”"
+            provider = self.t(vendor_label(record.mac_oui)).split(" Â· ", 1)[0]
+            mac_display = f"{mac} Â· {provider}"
             normalized = str(state).casefold()
             tag = ""
             if any(word in normalized for word in ("ok", "up", "healthy")):
                 tag = "healthy"
             elif any(word in normalized for word in ("slow", "warn")):
                 tag = "warning"
-            elif state not in ("", "—", None):
+            elif state not in ("", "â€”", None):
                 tag = "error"
             row_tag = "row_even" if pos % 2 == 0 else "row_odd"
             tags = (row_tag, tag) if tag else (row_tag,)
-            proxy_display = f"{record.proxy_type.upper()} · {record.host}:{record.port}"
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép"), health))
+            proxy_display = f"{record.proxy_type.upper()} Â· {record.host}:{record.port}"
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=tags, values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, self.t("CÃ³") if record.isolate else self.t("KhÃ´ng"), self.t("Cháº·n") if record.webrtc else self.t("Cho phÃ©p"), health))
         self.update_client_filter_options()
         self.update_wifi_editor()
 
@@ -5290,10 +5290,10 @@ class NativeApp:
             _nonnegative_int(item.get("rx_bytes")) + _nonnegative_int(item.get("tx_bytes"))
             for item in clients
         )
-        self.client_online_count_var.set(f"● {online} online")
-        self.client_weak_count_var.set(f"● {weak} weak signal" if self.language == "en" else f"● {weak} tín hiệu yếu")
-        self.client_blocked_count_var.set(f"● {blocked} blocked" if self.language == "en" else f"● {blocked} đã chặn")
-        self.client_traffic_total_var.set(f"● {human_bytes(traffic)} total traffic" if self.language == "en" else f"● {human_bytes(traffic)} tổng lưu lượng")
+        self.client_online_count_var.set(f"â— {online} online")
+        self.client_weak_count_var.set(f"â— {weak} weak signal" if self.language == "en" else f"â— {weak} tÃ­n hiá»‡u yáº¿u")
+        self.client_blocked_count_var.set(f"â— {blocked} blocked" if self.language == "en" else f"â— {blocked} Ä‘Ã£ cháº·n")
+        self.client_traffic_total_var.set(f"â— {human_bytes(traffic)} total traffic" if self.language == "en" else f"â— {human_bytes(traffic)} tá»•ng lÆ°u lÆ°á»£ng")
 
     def sort_clients(self, column):
         if self.client_sort_column == column:
@@ -5322,7 +5322,7 @@ class NativeApp:
             reverse=self.client_sort_reverse,
         )
         for column, title in self.client_column_titles.items():
-            marker = " ▼" if self.client_sort_reverse else " ▲"
+            marker = " â–¼" if self.client_sort_reverse else " â–²"
             self.client_tree.heading(
                 column,
                 text=self.t(title) + marker if column == self.client_sort_column else self.t(title),
@@ -5342,9 +5342,9 @@ class NativeApp:
                 elif signal >= -60:
                     tag = "strong"
             if online and item.get("banned"):
-                status = "Online · blocked" if self.language == "en" else "Online · đã cấm"
+                status = "Online Â· blocked" if self.language == "en" else "Online Â· Ä‘Ã£ cáº¥m"
             elif item.get("banned"):
-                status = "Offline · blocked" if self.language == "en" else "Offline · đã cấm"
+                status = "Offline Â· blocked" if self.language == "en" else "Offline Â· Ä‘Ã£ cáº¥m"
             elif online:
                 status = "Online"
             else:
@@ -5357,15 +5357,15 @@ class NativeApp:
                 values=(
                     item.get("ssid", ""), band, item.get("ip", ""), item.get("host", ""),
                     item.get("mac", ""), client_proxy_text(item, self.language),
-                    human_time(item.get("connected_s")) if online else "—",
+                    human_time(item.get("connected_s")) if online else "â€”",
                     human_bytes(item.get("rx_bytes")), human_bytes(item.get("tx_bytes")),
-                    f"{signal} dBm" if signal is not None else "—", status,
+                    f"{signal} dBm" if signal is not None else "â€”", status,
                 ),
             )
         self.client_count_var.set(
             f"{len(self.visible_clients)} / {len(self.clients_data)} devices"
             if self.language == "en" else
-            f"{len(self.visible_clients)} / {len(self.clients_data)} thiết bị"
+            f"{len(self.visible_clients)} / {len(self.clients_data)} thiáº¿t bá»‹"
         )
         self.update_client_editor()
 
@@ -5416,7 +5416,7 @@ class NativeApp:
                 self.root.after(0, lambda: done(payload))
             threading.Thread(target=auto_worker, daemon=True).start()
         else:
-            self.run_task("Reading device list…" if self.language == "en" else "Đang đọc danh sách thiết bị…", work, done)
+            self.run_task("Reading device listâ€¦" if self.language == "en" else "Äang Ä‘á»c danh sÃ¡ch thiáº¿t bá»‹â€¦", work, done)
 
     def _finish_client_refresh(self):
         self.client_refreshing = False
@@ -5424,7 +5424,7 @@ class NativeApp:
             self.schedule_client_refresh()
 
     def _auto_client_error(self, exc):
-        self.status_var.set(f"Auto-refresh error: {exc}" if self.language == "en" else f"Auto-refresh lỗi: {exc}")
+        self.status_var.set(f"Auto-refresh error: {exc}" if self.language == "en" else f"Auto-refresh lá»—i: {exc}")
         self.schedule_client_refresh()
 
     def selected_client_items(self):
@@ -5433,17 +5433,17 @@ class NativeApp:
     def update_client_editor(self, _event=None):
         items = self.selected_client_items()
         if not items:
-            self.client_selection_var.set(self.t("Chọn thiết bị trong bảng để điều khiển"))
+            self.client_selection_var.set(self.t("Chá»n thiáº¿t bá»‹ trong báº£ng Ä‘á»ƒ Ä‘iá»u khiá»ƒn"))
             states = {key: "disabled" for key in self.client_edit_buttons}
         else:
             if len(items) == 1:
                 item = items[0]
-                label = item.get("host") or item.get("ip") or item.get("mac") or self.t("Thiết bị")
-                self.client_selection_var.set(f"{label} · {item.get('ssid') or '—'}")
+                label = item.get("host") or item.get("ip") or item.get("mac") or self.t("Thiáº¿t bá»‹")
+                self.client_selection_var.set(f"{label} Â· {item.get('ssid') or 'â€”'}")
             else:
                 self.client_selection_var.set(
                     f"Selected {len(items)} devices" if self.language == "en"
-                    else f"Đã chọn {len(items)} thiết bị"
+                    else f"ÄÃ£ chá»n {len(items)} thiáº¿t bá»‹"
                 )
             states = {
                 "details": "normal" if len(items) == 1 else "disabled",
@@ -5477,7 +5477,7 @@ class NativeApp:
             return None
         proxies = pool.get("proxies") or []
         if not proxies:
-            messagebox.showinfo(APP_NAME, self.t("Wi‑Fi này chưa có proxy nào trong pool"),
+            messagebox.showinfo(APP_NAME, self.t("Wiâ€‘Fi nÃ y chÆ°a cÃ³ proxy nÃ o trong pool"),
                                 parent=self.root)
             return None
         return proxies
@@ -5487,7 +5487,7 @@ class NativeApp:
             return
         record = self.selected_wifi()
         if not record:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t Wiâ€‘Fi"), parent=self.root)
             return
         try:
             self.require_client()
@@ -5507,24 +5507,24 @@ class NativeApp:
         """Parse a pasted list and replace one Wi-Fi's pool with it."""
         rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX)
         if dropped:
-            detail = "\n".join(f"{number}: {line} — {reason}" for number, line, reason in dropped[:25])
+            detail = "\n".join(f"{number}: {line} â€” {reason}" for number, line, reason in dropped[:25])
             if len(dropped) > 25:
-                detail += f"\n… {len(dropped) - 25}"
-            messagebox.showwarning(APP_NAME, f"{self.t('Những dòng bị bỏ qua')}:\n{detail}",
+                detail += f"\nâ€¦ {len(dropped) - 25}"
+            messagebox.showwarning(APP_NAME, f"{self.t('Nhá»¯ng dÃ²ng bá»‹ bá» qua')}:\n{detail}",
                                    parent=self.root)
         if not rows and text.strip():
             # Every line was unusable. Saving now would clear the pool because of
             # a typo, so treat it as nothing having been asked for.
-            messagebox.showinfo(APP_NAME, self.t("Không có dòng nào dùng được"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("KhÃ´ng cÃ³ dÃ²ng nÃ o dÃ¹ng Ä‘Æ°á»£c"), parent=self.root)
             return
         action = (f"Replace the proxy pool of Wi-Fi {idx} with {len(rows)} proxies."
                   if self.language == "en" else
-                  f"Thay pool proxy của Wi‑Fi {idx} bằng {len(rows)} proxy.")
+                  f"Thay pool proxy cá»§a Wiâ€‘Fi {idx} báº±ng {len(rows)} proxy.")
         impact = ("Devices keep the proxy they are on if it is still in the list; the others "
                   "are moved. Wi-Fi is not reloaded, but sing-box restarts."
                   if self.language == "en" else
-                  "Máy nào còn proxy cũ trong danh sách thì giữ nguyên, còn lại bị chuyển. "
-                  "Wi‑Fi không bị reload, nhưng sing-box khởi động lại.")
+                  "MÃ¡y nÃ o cÃ²n proxy cÅ© trong danh sÃ¡ch thÃ¬ giá»¯ nguyÃªn, cÃ²n láº¡i bá»‹ chuyá»ƒn. "
+                  "Wiâ€‘Fi khÃ´ng bá»‹ reload, nhÆ°ng sing-box khá»Ÿi Ä‘á»™ng láº¡i.")
         if not self.confirm_important("Pool proxy", action, impact):
             return
         try:
@@ -5534,9 +5534,9 @@ class NativeApp:
             return
         def done(response):
             self.pool_cache.pop(idx, None)
-            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.append_log(response.get("log") or self.t("HoÃ n táº¥t"))
             self.refresh_clients()
-        self.run_task("Đang ghi pool proxy…", lambda: client.save_pool(idx, rows), done)
+        self.run_task("Äang ghi pool proxyâ€¦", lambda: client.save_pool(idx, rows), done)
 
     def bulk_assign_proxy(self, ask=None):
         """Deal the selected devices evenly over their Wi-Fi's pool."""
@@ -5544,14 +5544,14 @@ class NativeApp:
             return
         items = self.selected_client_items()
         if not items:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn thiết bị trong bảng trước"),
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n thiáº¿t bá»‹ trong báº£ng trÆ°á»›c"),
                                 parent=self.root)
             return
         indices = {item.get("idx") for item in items}
         if len(indices) != 1:
             # Slots are numbered per Wi-Fi, so one split cannot span two of them.
             messagebox.showinfo(APP_NAME,
-                                self.t("Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi"),
+                                self.t("Chá»‰ Ä‘á»•i proxy cho cÃ¡c thiáº¿t bá»‹ trong cÃ¹ng má»™t Wiâ€‘Fi"),
                                 parent=self.root)
             return
         idx = indices.pop()
@@ -5570,9 +5570,9 @@ class NativeApp:
         assignments = [{"mac": mac, "slot": slot} for mac, slot, _label in preview]
         client = self.require_client()
         def done(response):
-            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.append_log(response.get("log") or self.t("HoÃ n táº¥t"))
             self.refresh_clients()
-        self.run_task("Đang đổi proxy cho thiết bị…",
+        self.run_task("Äang Ä‘á»•i proxy cho thiáº¿t bá»‹â€¦",
                       lambda: client.assign_proxy(idx, assignments), done)
 
     def _ask_bulk_proxy(self, rows) -> bool:
@@ -5586,7 +5586,7 @@ class NativeApp:
             return
         items = self.selected_client_items()
         if len(items) != 1:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn đúng một thiết bị"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n Ä‘Ãºng má»™t thiáº¿t bá»‹"), parent=self.root)
             return
         item = items[0]
         idx = item.get("idx")
@@ -5599,9 +5599,9 @@ class NativeApp:
         mac = str(item.get("mac") or "").strip().lower()
         client = self.require_client()
         def done(response):
-            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.append_log(response.get("log") or self.t("HoÃ n táº¥t"))
             self.refresh_clients()
-        self.run_task("Đang đổi proxy cho thiết bị…",
+        self.run_task("Äang Ä‘á»•i proxy cho thiáº¿t bá»‹â€¦",
                       lambda: client.assign_proxy(idx, [{"mac": mac, "slot": choice}]), done)
 
     def _ask_slot(self, proxies, current):
@@ -5633,7 +5633,7 @@ class NativeApp:
         if self.block_if_incompatible():
             return
         if not self.records:
-            messagebox.showinfo(APP_NAME, self.t("Chưa có SSID nào để áp dụng blocklist"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("ChÆ°a cÃ³ SSID nÃ o Ä‘á»ƒ Ã¡p dá»¥ng blocklist"), parent=self.root)
             return
         dialog = ManualBanDialog(self.root, self.records, self.language, self.palette)
         self.root.wait_window(dialog)
@@ -5643,12 +5643,12 @@ class NativeApp:
         record = next((item for item in self.records if item.idx == idx), None)
         target = record.name if record else idx
         if not self.confirm_important(
-            "Thêm vào blocklist",
-            f"Block MAC {mac} on SSID {target}." if self.language == "en" else f"Chặn MAC {mac} trên SSID {target}.",
+            "ThÃªm vÃ o blocklist",
+            f"Block MAC {mac} on SSID {target}." if self.language == "en" else f"Cháº·n MAC {mac} trÃªn SSID {target}.",
             (
                 "This device will lose access, and Wi-Fi networks on the same radio may reload briefly."
                 if self.language == "en" else
-                "Thiết bị này sẽ mất truy cập và Wi‑Fi cùng radio có thể reload ngắn."
+                "Thiáº¿t bá»‹ nÃ y sáº½ máº¥t truy cáº­p vÃ  Wiâ€‘Fi cÃ¹ng radio cÃ³ thá»ƒ reload ngáº¯n."
             ),
         ):
             return
@@ -5658,10 +5658,10 @@ class NativeApp:
             self._task_error(exc)
             return
         def done(payload):
-            self.append_log(payload.get("log", f"Blocked {mac}" if self.language == "en" else f"Đã chặn {mac}"))
+            self.append_log(payload.get("log", f"Blocked {mac}" if self.language == "en" else f"ÄÃ£ cháº·n {mac}"))
             self.refresh_clients()
         self.run_task(
-            f"Adding {mac} to the blocklist…" if self.language == "en" else f"Đang thêm {mac} vào blocklist…",
+            f"Adding {mac} to the blocklistâ€¦" if self.language == "en" else f"Äang thÃªm {mac} vÃ o blocklistâ€¦",
             lambda: client.client_action("ban", idx, mac),
             done,
             show_loading=True,
@@ -5673,23 +5673,23 @@ class NativeApp:
             return
         items = self.selected_client_items()
         if not items:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một hoặc nhiều thiết bị"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t hoáº·c nhiá»u thiáº¿t bá»‹"), parent=self.root)
             return
         if action == "kick":
             online_items = [item for item in items if item.get("online", True)]
             if not online_items:
-                messagebox.showinfo(APP_NAME, self.t("Các thiết bị đã chọn đều offline"), parent=self.root)
+                messagebox.showinfo(APP_NAME, self.t("CÃ¡c thiáº¿t bá»‹ Ä‘Ã£ chá»n Ä‘á»u offline"), parent=self.root)
                 return
             items = online_items
         if action == "unban":
             items = [item for item in items if item.get("banned")]
             if not items:
-                messagebox.showinfo(APP_NAME, self.t("Không có thiết bị bị cấm trong lựa chọn"), parent=self.root)
+                messagebox.showinfo(APP_NAME, self.t("KhÃ´ng cÃ³ thiáº¿t bá»‹ bá»‹ cáº¥m trong lá»±a chá»n"), parent=self.root)
                 return
         if action == "ban":
             items = [item for item in items if not item.get("banned")]
             if not items:
-                messagebox.showinfo(APP_NAME, self.t("Các thiết bị đã chọn đều đã bị cấm"), parent=self.root)
+                messagebox.showinfo(APP_NAME, self.t("CÃ¡c thiáº¿t bá»‹ Ä‘Ã£ chá»n Ä‘á»u Ä‘Ã£ bá»‹ cáº¥m"), parent=self.root)
                 return
         if self.language == "en":
             labels = {"kick": "disconnect", "ban": "block", "unban": "unblock"}
@@ -5700,13 +5700,13 @@ class NativeApp:
             }
             action_text = f"{labels[action].capitalize()} {len(items)} selected devices."
         else:
-            labels = {"kick": "kick", "ban": "cấm", "unban": "bỏ cấm"}
+            labels = {"kick": "kick", "ban": "cáº¥m", "unban": "bá» cáº¥m"}
             impacts = {
-                "kick": "Các thiết bị sẽ bị ngắt kết nối ngay nhưng có thể tự kết nối lại.",
-                "ban": "Các MAC sẽ vào blocklist, mất truy cập; Wi‑Fi liên quan có thể reload ngắn.",
-                "unban": "Các MAC sẽ được gỡ khỏi blocklist; Wi‑Fi liên quan có thể reload ngắn.",
+                "kick": "CÃ¡c thiáº¿t bá»‹ sáº½ bá»‹ ngáº¯t káº¿t ná»‘i ngay nhÆ°ng cÃ³ thá»ƒ tá»± káº¿t ná»‘i láº¡i.",
+                "ban": "CÃ¡c MAC sáº½ vÃ o blocklist, máº¥t truy cáº­p; Wiâ€‘Fi liÃªn quan cÃ³ thá»ƒ reload ngáº¯n.",
+                "unban": "CÃ¡c MAC sáº½ Ä‘Æ°á»£c gá»¡ khá»i blocklist; Wiâ€‘Fi liÃªn quan cÃ³ thá»ƒ reload ngáº¯n.",
             }
-            action_text = f"{labels[action].capitalize()} {len(items)} thiết bị đã chọn."
+            action_text = f"{labels[action].capitalize()} {len(items)} thiáº¿t bá»‹ Ä‘Ã£ chá»n."
         if not self.confirm_important(
             labels[action].capitalize(),
             action_text,
@@ -5722,7 +5722,7 @@ class NativeApp:
                     fallback = (
                         f"Successfully {labels[action]}ed {item['mac']}"
                         if self.language == "en" else
-                        f"{labels[action]} {item['mac']} thành công"
+                        f"{labels[action]} {item['mac']} thÃ nh cÃ´ng"
                     )
                     logs.append(payload.get("log", fallback))
                 except Exception as exc:
@@ -5733,23 +5733,23 @@ class NativeApp:
             no_success = (
                 f"No device was successfully {labels[action]}ed"
                 if self.language == "en" else
-                f"Không có thiết bị nào {labels[action]} thành công"
+                f"KhÃ´ng cÃ³ thiáº¿t bá»‹ nÃ o {labels[action]} thÃ nh cÃ´ng"
             )
             self.append_log("\n".join(logs) if logs else no_success)
             if failures:
-                self.append_log(("ERROR:\n" if self.language == "en" else "LỖI:\n") + "\n".join(failures))
+                self.append_log(("ERROR:\n" if self.language == "en" else "Lá»–I:\n") + "\n".join(failures))
                 warning = (
                     f"Completed with {len(failures)} errors. See the log."
                     if self.language == "en" else
-                    f"Hoàn tất với {len(failures)} lỗi. Xem nhật ký."
+                    f"HoÃ n táº¥t vá»›i {len(failures)} lá»—i. Xem nháº­t kÃ½."
                 )
                 messagebox.showwarning(APP_NAME, warning, parent=self.root)
             self.refresh_clients()
         self.run_task(
             (
-                f"Processing {labels[action]} for {len(items)} devices…"
+                f"Processing {labels[action]} for {len(items)} devicesâ€¦"
                 if self.language == "en" else
-                f"Đang {labels[action]} {len(items)} thiết bị…"
+                f"Äang {labels[action]} {len(items)} thiáº¿t bá»‹â€¦"
             ),
             work,
             done,
@@ -5760,7 +5760,7 @@ class NativeApp:
     def copy_selected_clients(self):
         items = self.selected_client_items()
         if not items:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn thiết bị cần copy"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n thiáº¿t bá»‹ cáº§n copy"), parent=self.root)
             return
         text = "\n".join(
             f"{item.get('ip') or '-'}\t{item.get('mac') or '-'}\t{item.get('host') or '-'}"
@@ -5771,15 +5771,15 @@ class NativeApp:
         self.status_var.set(
             f"Copied IP/MAC for {len(items)} devices"
             if self.language == "en" else
-            f"Đã copy IP/MAC của {len(items)} thiết bị"
+            f"ÄÃ£ copy IP/MAC cá»§a {len(items)} thiáº¿t bá»‹"
         )
 
     def export_clients_csv(self):
         path = filedialog.asksaveasfilename(
             parent=self.root,
-            title="Export filtered devices" if self.language == "en" else "Xuất danh sách thiết bị đang lọc",
+            title="Export filtered devices" if self.language == "en" else "Xuáº¥t danh sÃ¡ch thiáº¿t bá»‹ Ä‘ang lá»c",
             defaultextension=".csv",
-            filetypes=(("CSV UTF-8", "*.csv"), (self.t("Tất cả file"), "*.*")),
+            filetypes=(("CSV UTF-8", "*.csv"), (self.t("Táº¥t cáº£ file"), "*.*")),
             initialfile="sbproxy-clients.csv",
         )
         if not path:
@@ -5791,12 +5791,12 @@ class NativeApp:
                 for item in self.visible_clients:
                     writer.writerow(tuple(item.get(key, "") for key in ("ssid", "band", "online", "banned", "ip", "host", "mac", "connected_s", "rx_bytes", "tx_bytes", "signal_dbm")))
         except OSError as exc:
-            messagebox.showerror(self.t("Không xuất được CSV"), str(exc), parent=self.root)
+            messagebox.showerror(self.t("KhÃ´ng xuáº¥t Ä‘Æ°á»£c CSV"), str(exc), parent=self.root)
             return
         self.status_var.set(
             f"Exported {len(self.visible_clients)} devices"
             if self.language == "en" else
-            f"Đã xuất {len(self.visible_clients)} thiết bị"
+            f"ÄÃ£ xuáº¥t {len(self.visible_clients)} thiáº¿t bá»‹"
         )
 
     def show_client_details(self, event=None):
@@ -5811,29 +5811,29 @@ class NativeApp:
         total = _nonnegative_int(item.get("rx_bytes")) + _nonnegative_int(item.get("tx_bytes"))
         if self.language == "en":
             details = (
-                f"SSID: {item.get('ssid') or '—'} ({item.get('band') or '—'})\n"
+                f"SSID: {item.get('ssid') or 'â€”'} ({item.get('band') or 'â€”'})\n"
                 f"Status: {'Online' if item.get('online', True) else 'Offline'}"
-                f"{' · Blocked' if item.get('banned') else ''}\n"
-                f"Hostname: {item.get('host') or '—'}\nIP: {item.get('ip') or '—'}\n"
-                f"MAC: {item.get('mac') or '—'}\nInterface: {item.get('ifname') or '—'}\n"
-                f"Signal: {item.get('signal_dbm') if item.get('signal_dbm') is not None else '—'} dBm\n"
-                f"Connected: {human_time(item.get('connected_s')) if item.get('online', True) else '—'}\n"
+                f"{' Â· Blocked' if item.get('banned') else ''}\n"
+                f"Hostname: {item.get('host') or 'â€”'}\nIP: {item.get('ip') or 'â€”'}\n"
+                f"MAC: {item.get('mac') or 'â€”'}\nInterface: {item.get('ifname') or 'â€”'}\n"
+                f"Signal: {item.get('signal_dbm') if item.get('signal_dbm') is not None else 'â€”'} dBm\n"
+                f"Connected: {human_time(item.get('connected_s')) if item.get('online', True) else 'â€”'}\n"
                 f"RX / TX: {human_bytes(item.get('rx_bytes'))} / {human_bytes(item.get('tx_bytes'))}\n"
                 f"Total: {human_bytes(total)}"
             )
         else:
             details = (
-                f"SSID: {item.get('ssid') or '—'} ({item.get('band') or '—'})\n"
-                f"Trạng thái: {'Online' if item.get('online', True) else 'Offline'}"
-                f"{' · Đã cấm' if item.get('banned') else ''}\n"
-                f"Tên máy: {item.get('host') or '—'}\nIP: {item.get('ip') or '—'}\n"
-                f"MAC: {item.get('mac') or '—'}\nInterface: {item.get('ifname') or '—'}\n"
-                f"Tín hiệu: {item.get('signal_dbm') if item.get('signal_dbm') is not None else '—'} dBm\n"
-                f"Kết nối: {human_time(item.get('connected_s')) if item.get('online', True) else '—'}\n"
+                f"SSID: {item.get('ssid') or 'â€”'} ({item.get('band') or 'â€”'})\n"
+                f"Tráº¡ng thÃ¡i: {'Online' if item.get('online', True) else 'Offline'}"
+                f"{' Â· ÄÃ£ cáº¥m' if item.get('banned') else ''}\n"
+                f"TÃªn mÃ¡y: {item.get('host') or 'â€”'}\nIP: {item.get('ip') or 'â€”'}\n"
+                f"MAC: {item.get('mac') or 'â€”'}\nInterface: {item.get('ifname') or 'â€”'}\n"
+                f"TÃ­n hiá»‡u: {item.get('signal_dbm') if item.get('signal_dbm') is not None else 'â€”'} dBm\n"
+                f"Káº¿t ná»‘i: {human_time(item.get('connected_s')) if item.get('online', True) else 'â€”'}\n"
                 f"RX / TX: {human_bytes(item.get('rx_bytes'))} / {human_bytes(item.get('tx_bytes'))}\n"
-                f"Tổng: {human_bytes(total)}"
+                f"Tá»•ng: {human_bytes(total)}"
             )
-        messagebox.showinfo(self.t("Chi tiết thiết bị"), details, parent=self.root)
+        messagebox.showinfo(self.t("Chi tiáº¿t thiáº¿t bá»‹"), details, parent=self.root)
 
     def refresh_backups(self):
         try:
@@ -5846,17 +5846,17 @@ class NativeApp:
             for name in self.backup_names:
                 self.backup_list.insert("end", name)
             self.update_backup_editor()
-        self.run_task("Đang đọc backup…", client.backups, done)
+        self.run_task("Äang Ä‘á»c backupâ€¦", client.backups, done)
 
     def update_backup_editor(self, _event=None):
         selected = self.backup_list.curselection()
         if selected:
             name = self.backup_list.get(selected[0])
-            self.backup_selection_var.set(f"Selected: {name}" if self.language == "en" else f"Đang chọn: {name}")
+            self.backup_selection_var.set(f"Selected: {name}" if self.language == "en" else f"Äang chá»n: {name}")
             self.rollback_button.configure(state="normal")
         else:
             self.backup_selection_var.set(
-                "Select a backup to restore" if self.language == "en" else "Chọn một backup để khôi phục"
+                "Select a backup to restore" if self.language == "en" else "Chá»n má»™t backup Ä‘á»ƒ khÃ´i phá»¥c"
             )
             self.rollback_button.configure(state="disabled")
 
@@ -5864,45 +5864,45 @@ class NativeApp:
         if self.block_if_incompatible():
             return
         client = self.require_client()
-        label = simpledialog.askstring(self.t("Tạo backup"), self.t("Nhãn backup"), initialvalue="native", parent=self.root)
+        label = simpledialog.askstring(self.t("Táº¡o backup"), self.t("NhÃ£n backup"), initialvalue="native", parent=self.root)
         if label is None:
             return
         if not re.fullmatch(r"[A-Za-z0-9._-]+", label):
-            messagebox.showerror(APP_NAME, self.t("Nhãn chỉ được chứa chữ, số, dấu . _ -"), parent=self.root)
+            messagebox.showerror(APP_NAME, self.t("NhÃ£n chá»‰ Ä‘Æ°á»£c chá»©a chá»¯, sá»‘, dáº¥u . _ -"), parent=self.root)
             return
         def done(payload):
-            self.append_log(payload.get("log", "Backup succeeded" if self.language == "en" else "Backup thành công"))
+            self.append_log(payload.get("log", "Backup succeeded" if self.language == "en" else "Backup thÃ nh cÃ´ng"))
             self.refresh_backups()
-        self.run_task("Đang tạo backup…", lambda: client.backup(label), done)
+        self.run_task("Äang táº¡o backupâ€¦", lambda: client.backup(label), done)
 
     def rollback(self):
         if self.block_if_incompatible():
             return
         selected = self.backup_list.curselection()
         if not selected:
-            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một backup"), parent=self.root)
+            messagebox.showinfo(APP_NAME, self.t("HÃ£y chá»n má»™t backup"), parent=self.root)
             return
         name = self.backup_list.get(selected[0])
         if not self.confirm_important(
             "Rollback",
-            f"Restore the router from backup {name}." if self.language == "en" else f"Khôi phục router từ backup {name}.",
+            f"Restore the router from backup {name}." if self.language == "en" else f"KhÃ´i phá»¥c router tá»« backup {name}.",
             (
                 "The current configuration will be replaced. The router and Wi-Fi will reload, interrupting all connections during recovery."
                 if self.language == "en" else
-                "Cấu hình hiện tại sẽ bị thay thế. Router và Wi‑Fi sẽ reload, làm gián đoạn toàn bộ kết nối trong lúc khôi phục."
+                "Cáº¥u hÃ¬nh hiá»‡n táº¡i sáº½ bá»‹ thay tháº¿. Router vÃ  Wiâ€‘Fi sáº½ reload, lÃ m giÃ¡n Ä‘oáº¡n toÃ n bá»™ káº¿t ná»‘i trong lÃºc khÃ´i phá»¥c."
             ),
         ):
             return
         client = self.require_client()
         def done(payload):
-            self.append_log(payload.get("log", "Rollback succeeded" if self.language == "en" else "Rollback thành công"))
+            self.append_log(payload.get("log", "Rollback succeeded" if self.language == "en" else "Rollback thÃ nh cÃ´ng"))
             self.status_var.set(
                 "Rollback completed; waiting for the router"
                 if self.language == "en" else
-                "Rollback hoàn tất; đang chờ router"
+                "Rollback hoÃ n táº¥t; Ä‘ang chá» router"
             )
             self.root.after(7000, self.connect)
-        self.run_task("Đang rollback…", lambda: client.rollback(name), done)
+        self.run_task("Äang rollbackâ€¦", lambda: client.rollback(name), done)
 
 
 def probe_saved_connection() -> bool:
@@ -5926,7 +5926,7 @@ def main() -> int:
         # write_stdout, not print: a windowed build has no sys.stdout.
         write_stdout(
             f"home={APP_HOME}\nconfig={CONFIG_FILE}\nlogs={LOG_DIR}\n"
-            f"runtime={RUNTIME_DIR}\npayload={find_payload() or '—'}\n"
+            f"runtime={RUNTIME_DIR}\npayload={find_payload() or 'â€”'}\n"
         )
         return 0
     provisioned = provision_from_environment()
