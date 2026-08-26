@@ -1210,7 +1210,7 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         seen = []
         instance.bulk_assign_proxy(ask=lambda rows: seen.append(list(rows)) or True)
         labels = {label for _mac, _slot, label in seen[0]}
-        self.assertTrue(labels <= {"one", "2.2.2.2:8080"})
+        self.assertTrue(labels <= {"socks5:1.1.1.1:1080", "http:2.2.2.2:8080"})
 
     def test_the_index_sent_is_the_wifi_the_devices_are_on(self):
         instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", idx=4)])
@@ -1382,7 +1382,7 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
             instance.apply_pool_text(1, "2.2.2.2:8080")
         instance.client.save_pool.assert_not_called()
         warning.assert_called_once()
-        self.assertIn("one", warning.call_args.args[1])
+        self.assertIn("socks5:1.1.1.1:1080", warning.call_args.args[1])
 
     def test_unused_proxy_can_be_removed_while_another_proxy_stays_connected(self):
         instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", slot=0)])

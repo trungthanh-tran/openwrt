@@ -93,6 +93,23 @@ class ParseProxyListTests(unittest.TestCase):
         rows, _ = self.parse("   1.2.3.4:1080   ")
         self.assertEqual(rows[0][1], "1.2.3.4")
 
+    def test_provider_csv_format_can_be_selected(self):
+        rows, dropped = self.parse("1.2.3.4,1080,user,pass\n5.6.7.8,8080,,",
+                                   input_format="csv")
+        self.assertEqual(dropped, [])
+        self.assertEqual(rows[0][3:5], ("user", "pass"))
+        self.assertEqual(rows[1][1:3], ("5.6.7.8", 8080))
+
+    def test_provider_semicolon_format_can_be_selected(self):
+        rows, dropped = self.parse("1.2.3.4;1080;user;pass", input_format="semicolon")
+        self.assertEqual(dropped, [])
+        self.assertEqual(rows, [("socks5", "1.2.3.4", 1080, "user", "pass", "")])
+
+    def test_type_prefixed_endpoint_is_supported(self):
+        rows, dropped = self.parse("http:proxy.example.com:8080")
+        self.assertEqual(dropped, [])
+        self.assertEqual(rows[0][:3], ("http", "proxy.example.com", 8080))
+
 
 class ParseProxyListRejectionTests(unittest.TestCase):
     """A rejected line is reported, never dropped in silence."""
@@ -241,14 +258,14 @@ class ProxyDisplayTests(unittest.TestCase):
         base.update(over)
         return base
 
-    def test_a_label_wins_over_the_endpoint(self):
-        self.assertEqual(app.proxy_display(self.row(label="Hà Nội 1")), "Hà Nội 1")
+    def test_proxy_display_uses_type_and_endpoint_even_when_label_exists(self):
+        self.assertEqual(app.proxy_display(self.row(label="Hà Nội 1")), "socks5:1.2.3.4:1080")
 
     def test_without_a_label_the_endpoint_is_shown(self):
-        self.assertEqual(app.proxy_display(self.row()), "1.2.3.4:1080")
+        self.assertEqual(app.proxy_display(self.row()), "socks5:1.2.3.4:1080")
 
     def test_a_label_of_spaces_is_not_a_label(self):
-        self.assertEqual(app.proxy_display(self.row(label="   ")), "1.2.3.4:1080")
+        self.assertEqual(app.proxy_display(self.row(label="   ")), "socks5:1.2.3.4:1080")
 
     def test_credentials_are_never_part_of_the_display(self):
         shown = app.proxy_display(self.row(user="secretuser", **{"pass": "secretpass"}))

@@ -943,6 +943,15 @@ def save_preferences(language: str, theme: str) -> None:
 # credentials, never the label.
 PROXY_SCHEMES = {"socks5": "socks5", "socks5h": "socks5", "socks": "socks5", "http": "http"}
 DEFAULT_PROXY_TYPE = "socks5"
+PROXY_IMPORT_FORMATS = {
+    "auto": "Tự động (tự nhận dạng)",
+    "host_port_user_pass": "host:port:user:pass",
+    "user_pass_host_port": "user:pass@host:port",
+    "host_port": "host:port",
+    "csv": "host,port,user,pass",
+    "semicolon": "host;port;user;pass",
+    "url": "socks5://user:pass@host:port",
+}
 
 
 def _proxy_port(value: str) -> int:
@@ -974,7 +983,7 @@ def _proxy_credential(value: str, field: str) -> str:
     return value
 
 
-def parse_proxy_line(line: str) -> tuple:
+def parse_proxy_line(line: str, input_format="auto") -> tuple:
     """One pasted line -> (type, host, port, user, password, label).
 
     Accepted, in the order they are tried:
@@ -985,6 +994,33 @@ def parse_proxy_line(line: str) -> tuple:
         host:port
     """
     text = line.strip()
+    if input_format in ("csv", "semicolon"):
+        separator = "," if input_format == "csv" else ";"
+        parts = [part.strip() for part in text.split(separator)]
+        if len(parts) not in (2, 4):
+            raise ValueError("không đúng số cột của format đã chọn")
+        text = ":".join(parts)
+    elif input_format == "host_port_user_pass":
+        parts = text.split(":", 3)
+        if len(parts) != 4:
+            raise ValueError("cần host:port:user:pass")
+    elif input_format == "user_pass_host_port" and "@" not in text:
+        parts = text.split(":", 3)
+        if len(parts) != 4:
+            raise ValueError("cần user:pass@host:port")
+        host, port, user, password = parts
+        text = f"{user}:{password}@{host}:{port}"
+    elif input_format == "host_port" and (":" not in text or len(text.split(":")) != 2):
+        raise ValueError("cần host:port")
+    elif input_format == "url" and "://" not in text:
+        raise ValueError("cần URL dạng scheme://user:pass@host:port")
+
+    # Providers often prefix a bare endpoint with its proxy type:
+    # socks5:1.2.3.4:1080 or http:proxy.example:8080.
+    explicit_type = ""
+    parts = text.split(":")
+    if "://" not in text and len(parts) == 3 and parts[0].strip().lower() in PROXY_SCHEMES:
+        explicit_type, text = parts[0].strip().lower(), ":".join(parts[1:])
     proxy_type = DEFAULT_PROXY_TYPE
     if "://" in text:
         scheme, _, text = text.partition("://")
@@ -992,6 +1028,8 @@ def parse_proxy_line(line: str) -> tuple:
         if scheme not in PROXY_SCHEMES:
             raise ValueError(f"loại proxy không hỗ trợ: {scheme}")
         proxy_type = PROXY_SCHEMES[scheme]
+    elif explicit_type:
+        proxy_type = PROXY_SCHEMES[explicit_type]
 
     user = password = ""
     if "@" in text:
@@ -1014,7 +1052,7 @@ def parse_proxy_line(line: str) -> tuple:
             _proxy_credential(user, "user"), _proxy_credential(password, "password"), "")
 
 
-def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
+def parse_proxy_list(text: str, limit: int | None = None, input_format="auto") -> tuple:
     """Parse a pasted list into (rows, dropped).
 
     `dropped` carries (line number, original text, reason) for every line left
@@ -1035,7 +1073,7 @@ def parse_proxy_list(text: str, limit: int | None = None) -> tuple:
             dropped.append((number, line, "chứa ký tự điều khiển"))
             continue
         try:
-            row = parse_proxy_line(line)
+            row = parse_proxy_line(line, input_format=input_format)
         except ValueError as exc:
             dropped.append((number, line, str(exc)))
             continue
@@ -1121,19 +1159,15 @@ POOL_SLOTS_PER_SSID_MAX = 256
 
 
 def proxy_display(row) -> str:
-    """One pool row as the operator named it, or as its endpoint.
-
-    Credentials are deliberately absent: this string ends up in tables, logs and
-    screenshots, and the label is what an operator recognises anyway.
-    """
+    """Stable display name: type:ip:port; labels are not used as names."""
     if not isinstance(row, dict):
         return ""
-    label = str(row.get("label") or "").strip()
-    if label:
-        return label
+    proxy_type = str(row.get("type") or DEFAULT_PROXY_TYPE).strip().lower()
     host = str(row.get("host") or "").strip()
     port = row.get("port")
-    return f"{host}:{port}" if host and port else host
+    if host and port:
+        return f"{proxy_type}:{host}:{port}"
+    return host
 
 
 def client_proxy_text(item, language: str = "vi") -> str:
@@ -2853,6 +2887,11 @@ class PoolDialog(tk.Toplevel):
 
         ttk.Label(body, text="Thêm proxy mới (mỗi dòng một proxy)",
                   style="Muted.TLabel").pack(anchor="w")
+        self.format_var = tk.StringVar(value=PROXY_IMPORT_FORMATS["auto"])
+        ttk.Label(body, text="Định dạng nhà cung cấp", style="Muted.TLabel").pack(anchor="w")
+        ttk.Combobox(body, textvariable=self.format_var,
+                     values=tuple(PROXY_IMPORT_FORMATS.values()), state="readonly",
+                     width=48).pack(anchor="w", pady=(2, 4))
         self.text = tk.Text(body, height=8, width=64, background=self.palette["card"],
                             foreground=self.palette["text"], insertbackground=self.palette["text"],
                             relief="flat", borderwidth=1)
@@ -2878,7 +2917,10 @@ class PoolDialog(tk.Toplevel):
         center_dialog(self)
 
     def _submit(self):
-        self.result = ("__ADD_POOL__", self.text.get("1.0", "end"))
+        selected = self.format_var.get()
+        input_format = next((key for key, label in PROXY_IMPORT_FORMATS.items()
+                             if label == selected), "auto")
+        self.result = ("__ADD_POOL__", self.text.get("1.0", "end"), input_format)
         self.destroy()
 
     def _show_detail(self, _event=None):
@@ -2991,6 +3033,11 @@ class AddProxyDialog(tk.Toplevel):
         body.pack(fill="both", expand=True)
         ttk.Label(body, text=self.t("Nhập proxy, mỗi dòng một proxy"),
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
+        self.format_var = tk.StringVar(value=PROXY_IMPORT_FORMATS["auto"])
+        ttk.Label(body, text="Định dạng nhà cung cấp", style="Muted.TLabel").pack(anchor="w")
+        ttk.Combobox(body, textvariable=self.format_var,
+                     values=tuple(PROXY_IMPORT_FORMATS.values()), state="readonly",
+                     width=52).pack(anchor="w", pady=(2, 6))
         self.text = tk.Text(
             body, height=9, width=68, background=self.palette["input"],
             foreground=self.palette["text"], insertbackground=self.palette["text"],
@@ -3018,7 +3065,10 @@ class AddProxyDialog(tk.Toplevel):
         center_dialog(self)
 
     def _submit(self):
-        self.result = self.text.get("1.0", "end")
+        selected = self.format_var.get()
+        input_format = next((key for key, label in PROXY_IMPORT_FORMATS.items()
+                             if label == selected), "auto")
+        self.result = (self.text.get("1.0", "end"), input_format)
         self.destroy()
 
 
@@ -5751,16 +5801,17 @@ class NativeApp:
             self.clear_pool(record.idx)
             return
         if isinstance(dialog.result, tuple):
-            action, payload = dialog.result
+            action, payload, *extra = dialog.result
             if action == "__ADD_POOL__":
-                self.add_pool_text(record.idx, payload)
+                self.add_pool_text(record.idx, payload, extra[0] if extra else "auto")
             elif action == "__DELETE_POOL_SLOTS__":
                 self.delete_pool_slots(record.idx, payload)
             return
         self.apply_pool_text(record.idx, dialog.result)
 
-    def add_pool_text(self, idx, text):
-        rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX)
+    def add_pool_text(self, idx, text, input_format="auto"):
+        rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX,
+                                         input_format=input_format)
         if dropped:
             detail = "\n".join(f"{number}: {line} — {reason}" for number, line, reason in dropped[:25])
             messagebox.showwarning(APP_NAME, f"{self.t('Những dòng bị bỏ qua')}:\n{detail}", parent=self.root)
@@ -5930,7 +5981,10 @@ class NativeApp:
             text = dialog.result
         if text is None:
             return
-        rows, dropped = parse_proxy_list(text, limit=remaining)
+        input_format = "auto"
+        if isinstance(text, tuple):
+            text, input_format = text
+        rows, dropped = parse_proxy_list(text, limit=remaining, input_format=input_format)
         if dropped:
             detail = "\n".join(f"{number}: {line} — {reason}" for number, line, reason in dropped[:25])
             if len(dropped) > 25:
