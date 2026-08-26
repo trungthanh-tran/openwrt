@@ -25,11 +25,19 @@ if ($SkipTests) {
 }
 
 function Set-Version([string]$value) {
-  Set-Content VERSION $value -NoNewline -Encoding utf8
+  # Windows PowerShell's -Encoding utf8 writes a BOM and can transcode the
+  # existing UTF-8 source through the active code page. Keep release edits
+  # byte-stable and UTF-8 without BOM on every supported PowerShell.
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText((Join-Path $repo 'VERSION'), $value, $utf8NoBom)
   $main = Join-Path $repo 'console/desktop/main.py'
-  (Get-Content $main -Raw) -replace 'APP_VERSION = "[^"]+"', ('APP_VERSION = "' + $value + '"') | Set-Content $main -NoNewline -Encoding utf8
+  $mainText = [System.IO.File]::ReadAllText($main, [System.Text.Encoding]::UTF8)
+  $mainText = $mainText -replace 'APP_VERSION = "[^"]+"', ('APP_VERSION = "' + $value + '"')
+  [System.IO.File]::WriteAllText($main, $mainText, $utf8NoBom)
   $web = Join-Path $repo 'console/web/control-panel.html'
-  (Get-Content $web -Raw) -replace 'const UI_VERSION = "[^"]+";', ('const UI_VERSION = "' + $value + '";') | Set-Content $web -NoNewline -Encoding utf8
+  $webText = [System.IO.File]::ReadAllText($web, [System.Text.Encoding]::UTF8)
+  $webText = $webText -replace 'const UI_VERSION = "[^"]+";', ('const UI_VERSION = "' + $value + '";')
+  [System.IO.File]::WriteAllText($web, $webText, $utf8NoBom)
 }
 
 Set-Version $Version

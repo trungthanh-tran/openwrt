@@ -59,6 +59,7 @@ eq()      { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]";
 match()   { if printf '%s' "$2" | grep -Eq "$3"; then ok "$1"; else no "$1 — no /$3/"; fi; }
 nomatch() { if printf '%s' "$2" | grep -Eq "$3"; then no "$1 — unexpected /$3/"; else ok "$1"; fi; }
 contains() { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
+not_contains() { if printf '%s' "$2" | grep -qF "$3"; then no "$1 — found[$3]"; else ok "$1"; fi; }
 dies()    { if ( "$@" ) >/dev/null 2>&1; then no "$L — expected non-zero"; else ok "$L"; fi; }
 mkc()     { printf '%s\n' "$1" > "$STUB/c.conf"; }
 # Run a $STUB/c.conf validator (validate_conf/check_unique_idx) in a subshell so

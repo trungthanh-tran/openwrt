@@ -8,6 +8,11 @@
 # shellcheck disable=SC2034  # POOL_* and ASSIGN_FILE are read by the lib.sh functions under test.
 set -u
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo "SKIP assignment daemon tests: jq is required"
+  exit 0
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SB_ROOT="$ROOT"; export SB_ROOT
 STUB="$(mktemp -d)"
