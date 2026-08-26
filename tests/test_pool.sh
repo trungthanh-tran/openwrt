@@ -673,14 +673,46 @@ echo "== the generated ruleset parses =="
 # before its closing brace, and without one nft rejects the whole file. It went
 # unnoticed because no test ever handed the output to nft.
 #
-# `nft -c` parses without loading, so this is safe to run anywhere nft exists
-# and self-skips where it does not (Windows, and routers are not the point).
+# `nft -c` parses without loading, but it still builds a cache from the running
+# kernel's tables, so it needs privileges: unprivileged it fails outright with
+# "cache initialization failed: Operation not permitted", which says nothing
+# about the file it was handed.
+#
+# Work out once how nft can be run here, rather than reading that error four
+# times and guessing. Losing this check in CI would be the real cost -- it is
+# what caught a ruleset that never loaded -- so a passwordless sudo is used when
+# there is one. It only ever runs a read-only syntax check.
+NFT_RUN=""
+NFT_WHY=""
+# Written across lines on purpose. The first draft of this probe put the whole
+# table on one line and nft rejected it -- the same missing separator before a
+# closing brace that this section was added to catch, which made a working root
+# shell look like it could not run nft at all. A probe has to be the one thing
+# in the file that cannot fail for its own reasons.
+# /dev/null is not usable as an empty ruleset: nft refuses anything that is not
+# a regular file, so there is no smaller probe than this.
+nft_probe() { # how -> empty output when nft can check rules
+  printf 'table inet sbproxy_probe {\n  chain c {\n    type filter hook prerouting priority 1000; policy accept;\n  }\n}\n' \
+    | $1 -c -f - 2>&1
+}
+if ! command -v nft >/dev/null 2>&1; then
+  NFT_WHY="nft is not installed"
+elif [ -z "$(nft_probe nft)" ]; then
+  NFT_RUN="nft"
+elif command -v sudo >/dev/null 2>&1 && [ -z "$(nft_probe "sudo -n nft")" ]; then
+  NFT_RUN="sudo -n nft"
+else
+  NFT_WHY="nft cannot reach netlink here, so it can check nothing"
+fi
+
 nft_parses() { # label
-  if ! command -v nft >/dev/null 2>&1; then
-    printf '  skip %s (nft is not installed)\n' "$1"
+  if [ -z "$NFT_RUN" ]; then
+    printf '  skip %s (%s)\n' "$1" "$NFT_WHY"
     return 0
   fi
-  _nft_out="$(nft -c -f "$NFT_FILE" 2>&1)"
+  # Word splitting is the point: NFT_RUN may carry sudo and its flag.
+  # shellcheck disable=SC2086
+  _nft_out="$($NFT_RUN -c -f "$NFT_FILE" 2>&1)"
   if [ -z "$_nft_out" ]; then
     ok "$1"
   elif printf '%s' "$_nft_out" | grep -q 'No such file or directory'; then

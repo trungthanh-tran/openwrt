@@ -10,8 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install shellcheck, jq, and Tk bindings
-        run: sudo apt-get update && sudo apt-get install -y shellcheck jq python3-tk
+      # nftables so the pool suite can hand its generated ruleset to `nft -c`.
+      # The runner is unprivileged and nft needs netlink, but it has passwordless
+      # sudo, which the suite uses for that read-only check and nothing else.
+      - name: Install shellcheck, jq, nftables, and Tk bindings
+        run: sudo apt-get update && sudo apt-get install -y shellcheck jq nftables python3-tk
 
       - name: Full test suite
         run: sh tests/run-all.sh
