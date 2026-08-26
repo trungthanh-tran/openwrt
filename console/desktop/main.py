@@ -40,7 +40,7 @@ from urllib.request import Request, urlopen
 
 APP_NAME = "sbproxy Console Native"
 # Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
-APP_VERSION = "0.5.3"
+APP_VERSION = "0.5.4-SNAPSHOT"
 APP_DIR_NAME = "sbproxy-console-native"
 DEFAULT_BASE = "http://192.168.8.1"
 # Fallbacks for an agent too old to report the router's effective settings.sh
