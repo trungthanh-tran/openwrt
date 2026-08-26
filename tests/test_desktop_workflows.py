@@ -1227,6 +1227,57 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         instance.client.get_pool.assert_called_once()
         instance.client.assign_proxy.assert_called_once()
 
+    def test_adding_proxy_lines_appends_and_distributes_selected_devices_evenly(self):
+        items = [self.device(f"aa:bb:cc:dd:ee:{n:02d}") for n in range(1, 8)]
+        instance = self.make_instance(items)
+        instance.add_proxy_to_selected(
+            text="socks5://3.3.3.3:1080\nhttp://4.4.4.4:8080\n",
+            ask=lambda _rows: True,
+        )
+        saved = instance.client.save_pool.call_args.args[1]
+        self.assertEqual(len(saved), 4)
+        self.assertEqual([row[1] for row in saved[2:]], ["3.3.3.3", "4.4.4.4"])
+        sent = instance.client.assign_proxy.call_args.args[1]
+        self.assertEqual(len(sent), 7)
+        self.assertEqual(sorted(sum(1 for row in sent if row["slot"] == slot) for slot in (2, 3)), [3, 4])
+        self.assertEqual({row["mac"] for row in sent}, {item["mac"] for item in items})
+
+    def test_adding_proxy_lines_saves_pool_before_assigning_devices(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        calls = []
+        instance.client.save_pool.side_effect = lambda *_args: calls.append("pool") or {"ok": True}
+        instance.client.assign_proxy.side_effect = lambda *_args: calls.append("assign") or {"ok": True}
+        instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
+        self.assertEqual(calls, ["pool", "assign"])
+
+    def test_adding_only_invalid_or_duplicate_proxies_never_touches_router(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        with mock.patch.object(appmod.messagebox, "showwarning"), \
+             mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.add_proxy_to_selected(text="not-a-proxy", ask=lambda _rows: True)
+        instance.client.save_pool.assert_not_called()
+        instance.client.assign_proxy.assert_not_called()
+        info.assert_called_once()
+
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        with mock.patch.object(appmod.messagebox, "showinfo"):
+            instance.add_proxy_to_selected(text="1.1.1.1:1080", ask=lambda _rows: True)
+        instance.client.save_pool.assert_not_called()
+        instance.client.assign_proxy.assert_not_called()
+
+    def test_adding_proxy_lines_respects_same_wifi_and_cancel(self):
+        mixed = self.make_instance([self.device("aa:bb:cc:dd:ee:01", idx=1),
+                                    self.device("aa:bb:cc:dd:ee:02", idx=2)])
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            mixed.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
+        mixed.client.save_pool.assert_not_called()
+        info.assert_called_once()
+
+        cancelled = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        cancelled.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: False)
+        cancelled.client.save_pool.assert_not_called()
+        cancelled.client.assign_proxy.assert_not_called()
+
     def test_an_unreachable_agent_reports_instead_of_sending(self):
         instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
         instance.client.get_pool.side_effect = appmod.AgentError("timeout")
