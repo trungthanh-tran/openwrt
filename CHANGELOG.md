@@ -3,7 +3,7 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
-## [Unreleased]
+## [0.5.0] - 2026-08-26
 
 ### Added
 - **Cập nhật mang theo khoá `settings.sh` mới.** Router vẫn giữ nguyên
