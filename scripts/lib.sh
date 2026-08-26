@@ -1050,7 +1050,11 @@ EOF
 }
 
 desired_idx() {
-  awk -F'|' '!/^#/ && (NF==10 || NF==11) { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
+  # The column counts accepted here must stay the same set validate_conf
+  # accepts. A row validate_conf calls valid but this cannot see is an SSID
+  # emit_stale_uci then tears down as if it had been removed -- which is what
+  # happened to every SSID that named its proxy_type in a 12th column.
+  awk -F'|' '!/^#/ && NF >= 10 && NF <= 12 { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
 }
 
 emit_stale_uci() {
