@@ -1354,6 +1354,14 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         instance.apply_pool_text(1, "")
         self.assertEqual(instance.client.save_pool.call_args.args[1], [])
 
+    def test_clear_pool_action_saves_an_empty_pool_and_refreshes_clients(self):
+        instance = self.make_instance([])
+        instance.pool_cache[1] = {"proxies": [{"slot": 0}], "assignments": []}
+        instance.clear_pool(1)
+        self.assertEqual(instance.client.save_pool.call_args.args, (1, []))
+        self.assertNotIn(1, instance.pool_cache)
+        instance.refresh_clients.assert_called_once()
+
     def test_replacing_a_pool_asks_before_touching_the_router(self):
         instance = self.make_instance([])
         instance.confirm_important.return_value = False

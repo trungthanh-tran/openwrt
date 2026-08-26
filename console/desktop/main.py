@@ -2586,11 +2586,13 @@ def center_dialog(window: tk.Toplevel) -> None:
 
 
 class WifiDialog(tk.Toplevel):
-    def __init__(self, parent, record: WifiRecord | None, next_idx: int, language="en", palette=None):
+    def __init__(self, parent, record: WifiRecord | None, next_idx: int, language="en", palette=None,
+                 pool_command=None):
         super().__init__(parent)
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
+        self.pool_command = pool_command
         self.title(self.t("Sửa Wi‑Fi" if record else "Thêm Wi‑Fi"))
         self.configure(bg=self.palette["bg"])
         self.resizable(False, False)
@@ -2607,7 +2609,6 @@ class WifiDialog(tk.Toplevel):
             "webrtc": tk.BooleanVar(value=record.webrtc),
             "proxy_type": tk.StringVar(value=record.proxy_type.upper()),
         }
-        self.compact_socks = tk.StringVar()
         fields = [
             ("SSID", "name", None), ("Băng tần", "band", "combo"), ("IDX", "idx", None),
             ("Loại proxy", "proxy_type", "proxy_type"),
@@ -2617,16 +2618,8 @@ class WifiDialog(tk.Toplevel):
         ]
         body = ttk.Frame(self, padding=14)
         body.grid(sticky="nsew")
-        ttk.Label(body, text="Nhập nhanh proxy").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 8))
-        compact = ttk.Frame(body)
-        compact.grid(row=0, column=1, sticky="ew", pady=(0, 8))
-        compact_entry = ttk.Entry(compact, textvariable=self.compact_socks, width=27)
-        compact_entry.pack(side="left", fill="x", expand=True)
-        ttk.Button(compact, text="Tách & điền", command=self._fill_compact_socks).pack(side="left", padx=(8, 0))
-        compact_entry.bind("<Return>", lambda _event: self._fill_compact_socks())
         first = None
         for row, (label, key, kind) in enumerate(fields):
-            row += 1
             ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
             if kind == "combo":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=("2g", "5g"), state="readonly", width=33)
@@ -2644,6 +2637,8 @@ class WifiDialog(tk.Toplevel):
         ttk.Checkbutton(checks, text="Chặn WebRTC", variable=self.values["webrtc"]).pack(side="left")
         actions = ttk.Frame(body)
         actions.grid(row=len(fields) + 2, column=0, columnspan=2, sticky="e", pady=(14, 0))
+        if self.pool_command:
+            ttk.Button(actions, text="Pool proxy…", command=self._open_pool).pack(side="left")
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Lưu", command=self._save).pack(side="right", padx=(0, 8))
         self.bind("<Return>", lambda _event: self._save())
@@ -2653,16 +2648,9 @@ class WifiDialog(tk.Toplevel):
         localize_widget_tree(self, self.language)
         center_dialog(self)
 
-    def _fill_compact_socks(self):
-        try:
-            host, port, user, password = parse_proxy_compact(self.compact_socks.get())
-        except ValueError as exc:
-            messagebox.showerror(self.t("Dữ liệu không hợp lệ"), self.t(str(exc)), parent=self)
-            return
-        self.values["host"].set(host)
-        self.values["port"].set(str(port))
-        self.values["user"].set(user)
-        self.values["socks_password"].set(password)
+    def _open_pool(self):
+        self.destroy()
+        self.pool_command()
 
     def _save(self):
         try:
@@ -2846,6 +2834,8 @@ class PoolDialog(tk.Toplevel):
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
+        ttk.Button(actions, text="Xóa toàn bộ proxy", command=self._clear_pool,
+                   style="Danger.TButton").pack(side="left")
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Ghi pool", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
@@ -2857,6 +2847,15 @@ class PoolDialog(tk.Toplevel):
     def _submit(self):
         self.result = self.text.get("1.0", "end")
         self.destroy()
+
+    def _clear_pool(self):
+        if messagebox.askyesno(
+            self.t("Xóa toàn bộ proxy"),
+            self.t("Xóa tất cả proxy của SSID này? Các thiết bị sẽ mất pin proxy hiện tại."),
+            parent=self,
+        ):
+            self.result = "__CLEAR_POOL__"
+            self.destroy()
 
 
 class BulkProxyDialog(tk.Toplevel):
@@ -5111,7 +5110,8 @@ class NativeApp:
         if not record:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
             return
-        dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette)
+        dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette,
+                            pool_command=self.open_pool_editor)
         self.root.wait_window(dialog)
         if dialog.result:
             if any(item.idx == dialog.result.idx and item is not record for item in self.records):
@@ -5613,7 +5613,24 @@ class NativeApp:
         self.root.wait_window(dialog)
         if dialog.result is None:
             return
+        if dialog.result == "__CLEAR_POOL__":
+            self.clear_pool(record.idx)
+            return
         self.apply_pool_text(record.idx, dialog.result)
+
+    def clear_pool(self, idx):
+        try:
+            client = self.require_client()
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+
+        def done(response):
+            self.pool_cache.pop(idx, None)
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+
+        self.run_task("Đang xóa toàn bộ proxy…", lambda: client.save_pool(idx, []), done)
 
     def apply_pool_text(self, idx, text):
         """Parse a pasted list and replace one Wi-Fi's pool with it."""
