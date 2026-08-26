@@ -72,6 +72,8 @@ uci commit dhcp
 uci commit firewall
 uci commit wireless
 
+wire_dhcp_hook
+
 # Re-apply persistent MAC bans so they survive this re-apply (before wifi reload).
 apply_bans
 

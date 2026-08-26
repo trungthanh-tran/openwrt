@@ -1,0 +1,42 @@
+#!/bin/sh
+# sbproxy-dhcp-assign — dnsmasq calls this the moment it hands out a lease,
+# which is before the device sends any application traffic, so the proxy pin
+# lands with almost no gap. Installed at /usr/libexec/sbproxy-dhcp-assign and
+# wired in through `option dhcpscript`.
+#
+# dnsmasq's contract: <action> <mac> <ip> [hostname], where action is add for a
+# new lease, old for a renewal, and del when a lease is released or expires.
+#
+# This runs for every lease on the box, so it stays silent, touches nothing but
+# the pin state, and never fails in a way that could hold up DHCP.
+set -u
+[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+SB_ROOT="${SB_ROOT:-/root/sbproxy}"
+[ -f "$SB_ROOT/scripts/lib.sh" ] || exit 0
+# shellcheck source=/dev/null
+. "$SB_ROOT/scripts/lib.sh"
+
+action="${1:-}"
+mac="$(printf '%s' "${2:-}" | tr 'A-Z' 'a-z')"
+ip="${3:-}"
+
+assign_valid_mac "$mac" || exit 0
+idx="$(idx_of_ip "$ip")"
+# An address outside every managed subnet gives no idx, and no idx has a pool,
+# so this one check covers both. dnsmasq runs us for every lease on the box.
+pool_enabled "$idx" || exit 0
+
+case "$action" in
+  # Only a fresh lease counts as reconnecting. Renewals happen constantly, and
+  # rotating on one would give the device a new exit IP every lease time.
+  add) assign_ensure "$idx" "$mac" 1 >/dev/null 2>&1 ;;
+  old) assign_ensure "$idx" "$mac" 0 >/dev/null 2>&1 ;;
+  # The pin survives: the device will be back, and re-picking every time it
+  # sleeps would hand it a different exit IP each morning. Only the live map
+  # entry goes, because the address may be handed to somebody else.
+  del)
+    command -v nft >/dev/null 2>&1 &&
+      nft delete element inet sbproxy "w${idx}map" "{ $ip }" >/dev/null 2>&1
+    ;;
+esac
+exit 0

@@ -68,6 +68,9 @@ mkdir -p /www/sbproxy
 cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
 
 log "6) Health daemon -> /usr/sbin/ + procd"
+mkdir -p /usr/libexec
+cp "$AGENT/sbproxy-dhcp-assign" /usr/libexec/sbproxy-dhcp-assign
+chmod +x /usr/libexec/sbproxy-dhcp-assign
 cp "$AGENT/sbproxy-healthd" /usr/sbin/sbproxy-healthd
 chmod +x /usr/sbin/sbproxy-healthd
 cp "$AGENT/init.d/sbproxy-healthd" /etc/init.d/sbproxy-healthd
@@ -76,7 +79,7 @@ chmod +x /etc/init.d/sbproxy-healthd
 /etc/init.d/sbproxy-healthd restart
 
 # Preserve agent files across standard OpenWrt backups and upgrades.
-for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd; do
+for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd /usr/libexec/sbproxy-dhcp-assign; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 

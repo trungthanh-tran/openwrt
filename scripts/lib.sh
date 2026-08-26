@@ -160,6 +160,47 @@ band_of_idx() {
 
 # --- Values derived from the Wi-Fi index -----------------------------------
 net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
+
+# Which SSID an address belongs to, reading net_octet backwards. Prints nothing
+# for the router's own LAN or for anything outside the managed range, so a
+# caller can treat "no answer" as "not ours".
+idx_of_ip() { # ip
+  printf '%s' "${1:-}" | awk -F. -v base="${NET_BASE:-10}" '
+    NF == 4 && $1 == "192" && $2 == "168" && $3 ~ /^[0-9]+$/ && $4 ~ /^[0-9]+$/ {
+      idx = $3 - base
+      if (idx >= 1 && idx <= 200) print idx
+    }'
+}
+
+# Where dnsmasq must call us from, and whether its current setting is free to
+# take. Never overwrite a foreign dhcpscript: it belongs to something else that
+# would quietly stop running.
+DHCP_HOOK="/usr/libexec/sbproxy-dhcp-assign"
+dhcp_hook_state() { # current value of dhcp.@dnsmasq[0].dhcpscript
+  case "${1:-}" in
+    "")           echo unset ;;
+    "$DHCP_HOOK") echo ours ;;
+    *)            echo foreign ;;
+  esac
+}
+
+# Point dnsmasq at the hook, unless somebody else already owns dhcpscript.
+# Losing the fast path costs a few seconds of pinning latency; breaking another
+# script's hook costs whatever that script was for.
+wire_dhcp_hook() {
+  command -v uci >/dev/null 2>&1 || return 0
+  _wd_now="$(uci -q get dhcp.@dnsmasq[0].dhcpscript || true)"
+  case "$(dhcp_hook_state "$_wd_now")" in
+    ours) return 0 ;;
+    foreign)
+      warn "Leaving dnsmasq's dhcpscript at '$_wd_now'. Devices will be pinned by sbproxy-assignd instead, a few seconds after they join."
+      return 0
+      ;;
+  esac
+  run "uci set dhcp.@dnsmasq[0].dhcpscript='$DHCP_HOOK'"
+  run "uci commit dhcp"
+  log "dnsmasq will now pin each device as its lease is handed out."
+}
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
 # TPROXY port of one pool slot: pool_port <idx> <slot>.
 pool_port()    { echo $(( ${POOL_PORT_BASE:-13000} + $1 * ${POOL_PORT_STRIDE:-256} + $2 )); }

@@ -44,7 +44,19 @@ for p in sing-box nftables kmod-nft-tproxy ip-full iw-full jq; do
   if [ -n "$installed" ]; then echo "  [OK] $p"; else echo "  [MISSING] $p"; fi
 done
 
-echo; echo "==== 6. Config ===="
+echo; echo "==== 6. DHCP hook ===="
+_dhcpscript="$(uci -q get dhcp.@dnsmasq[0].dhcpscript || true)"
+case "$(dhcp_hook_state "$_dhcpscript")" in
+  ours)  echo "  [OK] dnsmasq calls $DHCP_HOOK, so devices are pinned as their lease is handed out." ;;
+  unset) echo "  [INFO] dhcpscript is unset; apply.sh will point it at $DHCP_HOOK." ;;
+  foreign)
+    warn "dnsmasq already calls '$_dhcpscript'. It will NOT be replaced, because that script would stop running."
+    warn "Devices will still be pinned by sbproxy-assignd, roughly \${POOL_SCAN_INTERVAL:-3}s after they join."
+    warn "To use the faster path, chain $DHCP_HOOK from '$_dhcpscript' yourself."
+    ;;
+esac
+
+echo; echo "==== 7. Config ===="
 if [ -f "$CONF" ]; then validate_settings; validate_conf; validate_pools; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
 else warn "$CONF does not exist — copy it from config/wifi-socks.conf.example"; fi
 
