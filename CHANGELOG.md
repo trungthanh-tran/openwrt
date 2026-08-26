@@ -6,6 +6,11 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Cập nhật mang theo khoá `settings.sh` mới.** Router vẫn giữ nguyên
+  `settings.sh` của mình, nhưng khoá nào bản mới giới thiệu mà router chưa từng
+  có sẽ được **thêm vào cuối file kèm đoạn chú thích của nó**. Không giá trị nào
+  đang đặt bị đụng tới, dòng có dấu nháy không cân bằng bị bỏ qua thay vì chép
+  nửa vời, và log cập nhật liệt kê đúng những khoá đã thêm.
 - `bridge_nf_ok`: `preflight.sh` và `doctor.sh` cảnh báo khi
   `bridge-nf-call-iptables=1` — TPROXY khớp gói rồi không bao giờ giao tới
   sing-box, mọi SSID có proxy treo, log sạch trơn.

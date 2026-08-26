@@ -619,6 +619,8 @@ make_pkg() { # version dest-file
   # person building the package happens to have goes into it -- and that person
   # is usually the one running the router.
   printf '%s\n' '1|socks5|203.0.113.1|1080|pkg|pkgpass|PACKAGED-SLOT' > "$pkgsrc/config/proxy-pools.conf"
+  printf '%s\n' 'ROUTER_SETTING=0' '# What the new one is for.' 'SHIPPED_IN_THIS_VERSION=42' \
+    > "$pkgsrc/config/settings.sh"
   tar czf "$2" -C "$pkgsrc" VERSION scripts agent console config
 }
 
@@ -652,6 +654,18 @@ contains "update replaces code" "$(cat "$SB2/scripts/apply.sh")" 'new-apply'
 contains "update preserves live wifi config" "$(cat "$SB2/config/wifi-socks.conf")" 'Alpha|2g|1|'
 not_contains "update never installs packaged config" "$(cat "$SB2/config/wifi-socks.conf")" 'PACKAGED'
 contains "update preserves live settings" "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=1'
+not_contains "update never lowers a setting to the packaged value" \
+  "$(cat "$SB2/config/settings.sh")" 'ROUTER_SETTING=0'
+# Keeping the file wholesale used to mean a setting introduced later never
+# reached the router at all: the code ran on its hardcoded default and the file
+# no longer described the machine.
+contains "update brings over a setting new in this version" \
+  "$(cat "$SB2/config/settings.sh")" 'SHIPPED_IN_THIS_VERSION=42'
+contains "and the paragraph that explains it" \
+  "$(cat "$SB2/config/settings.sh")" '# What the new one is for.'
+contains "update says which settings it added" "$(json_value "$out" '.log')" 'SHIPPED_IN_THIS_VERSION'
+eq "the merged settings file still sources cleanly" \
+  "$(sh -c '. "$1" && echo sourced' _ "$SB2/config/settings.sh" 2>&1)" 'sourced'
 # Overwriting this one silently repoints every pooled SSID at someone else's
 # proxies, and leaves the slot numbers in /etc/sbproxy.assign pinning devices to
 # rows that now mean something entirely different.

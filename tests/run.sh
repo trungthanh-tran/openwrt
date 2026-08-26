@@ -670,6 +670,64 @@ match "self-update guards downgrades" "$selfupdate" 'use --force to downgrade'
 match "self-update backs up before overwrite" "$selfupdate" 'backup\.sh pre-update'
 match "self-update preserves live config" "$selfupdate" 'wifi-socks\.conf proxy-pools\.conf settings\.sh'
 match "self-update validates package contents" "$selfupdate" 'scripts/apply\.sh scripts/lib\.sh agent/cgi/sbproxy'
+
+echo "== self-update merges newly shipped settings =="
+# An update keeps the router's settings.sh, which is right -- it holds choices
+# nobody wants overwritten. The cost is that a key introduced by a new version
+# never arrives, so the code falls back to whatever default it hardcodes, and
+# the file stops describing what the router is doing. Merging closes that
+# without touching a single value the operator set.
+SU="$ROOT/scripts/self-update.sh"
+mrg() { # packaged-content current-content -> prints added keys; file left in $STUB/cur.sh
+  printf '%s\n' "$1" > "$STUB/pkg.sh"
+  printf '%s\n' "$2" > "$STUB/cur.sh"
+  sh "$SU" --merge-settings "$STUB/pkg.sh" "$STUB/cur.sh"
+}
+
+eq "a key the router has never seen is added" \
+  "$(mrg 'OLD=1
+NEW_KEY=7' 'OLD=9')" "NEW_KEY"
+contains "the added key arrives with its shipped value" "$(cat "$STUB/cur.sh")" 'NEW_KEY=7'
+contains "and the router's own value is untouched" "$(cat "$STUB/cur.sh")" 'OLD=9'
+not_contains "the packaged value never replaces it" "$(cat "$STUB/cur.sh")" 'OLD=1'
+
+eq "nothing new means nothing to say" "$(mrg 'A=1
+B=2' 'A=9
+B=8')" ""
+eq "and the file is left exactly as it was" "$(cat "$STUB/cur.sh")" "A=9
+B=8"
+
+# A setting is worth little without the paragraph that explains it, and that
+# paragraph is the reason settings.sh is readable at all.
+mrg '# What this does.
+# Second line.
+DOCUMENTED=3' 'OTHER=1' >/dev/null
+contains "the comment block above a new key comes with it" "$(cat "$STUB/cur.sh")" '# What this does.'
+contains "including the rest of the block" "$(cat "$STUB/cur.sh")" '# Second line.'
+
+# Commented out is not set: the code is running on its hardcoded default, so
+# the shipped one should arrive and say so.
+eq "a key commented out in the router file counts as absent" \
+  "$(mrg 'PORT=13000' '#PORT=1')" "PORT"
+
+eq "a key shipped twice is added once" \
+  "$(mrg 'DUP=1
+DUP=2' 'X=1')" "DUP"
+eq "and only the first of them is written" \
+  "$(grep -c '^DUP=' "$STUB/cur.sh")" "1"
+
+# Copying one line out of a multi-line value would append an unterminated
+# string and every later `. settings.sh` would fail -- a broken router, from a
+# cosmetic feature.
+eq "a value with an unbalanced quote is skipped, not half-copied" \
+  "$(mrg 'SAFE=1
+BROKEN="start
+end"' 'X=1')" "SAFE"
+not_contains "the half of it that would break sourcing is not there" "$(cat "$STUB/cur.sh")" 'BROKEN='
+eq "the merged file still sources cleanly" \
+  "$(sh -c '. "$1" && echo sourced' _ "$STUB/cur.sh" 2>&1)" "sourced"
+
+eq "a missing packaged file is not an error" "$(sh "$SU" --merge-settings "$STUB/nope.sh" "$STUB/cur.sh"; echo $?)" "0"
 match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
 web_console="$(cat "$ROOT/console/web/control-panel.html")"
 match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'
