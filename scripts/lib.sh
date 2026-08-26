@@ -139,8 +139,13 @@ recover_wifi_networks() {
     ifup "w$_rw_idx" >/dev/null 2>&1 || true
     _rw_if="$(ifname_of_idx "$_rw_idx")"
     if [ -n "$_rw_if" ]; then
-      ip link set "$_rw_if" up >/dev/null 2>&1 || true
       ubus call "hostapd.$_rw_if" reload >/dev/null 2>&1 || true
+      sleep 1
+      # hostapd reload can detach the BSS from its network section again;
+      # re-running ifup after that reload restores the L3 address and bridge
+      # membership before the final link-up assertion.
+      ifup "w$_rw_idx" >/dev/null 2>&1 || true
+      ip link set "$_rw_if" up >/dev/null 2>&1 || true
     fi
     ip link set "br-w$_rw_idx" up >/dev/null 2>&1 || true
   done
