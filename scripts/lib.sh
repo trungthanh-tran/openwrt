@@ -137,16 +137,21 @@ recover_wifi_networks() {
   sleep "${WIFI_RECOVER_WAIT:-2}"
   for _rw_idx in $(desired_idx); do
     ifup "w$_rw_idx" >/dev/null 2>&1 || true
-    _rw_if="$(ifname_of_idx "$_rw_idx")"
-    if [ -n "$_rw_if" ]; then
-      ubus call "hostapd.$_rw_if" reload >/dev/null 2>&1 || true
-      sleep 1
-      # hostapd reload can detach the BSS from its network section again;
-      # re-running ifup after that reload restores the L3 address and bridge
-      # membership before the final link-up assertion.
-      ifup "w$_rw_idx" >/dev/null 2>&1 || true
-      ip link set "$_rw_if" up >/dev/null 2>&1 || true
-    fi
+  done
+  # Do not depend on network.wireless status while the reload is settling:
+  # on this driver it can briefly omit the section/ifname pair even though the
+  # AP exists.  Reload every hostapd AP BSS discovered from iw instead.
+  _rw_ifs="$(iw dev 2>/dev/null | awk '$1 == "Interface" && $2 ~ /^phy[0-9]+-ap[0-9]+$/ { print $2 }')"
+  for _rw_if in $_rw_ifs; do
+    ubus call "hostapd.$_rw_if" reload >/dev/null 2>&1 || true
+  done
+  sleep 1
+  for _rw_idx in $(desired_idx); do
+    # hostapd reload can detach the BSS from its network section again;
+    # re-running ifup after that reload restores the L3 address and bridge
+    # membership before the final link-up assertion.
+    ifup "w$_rw_idx" >/dev/null 2>&1 || true
+    for _rw_if in $_rw_ifs; do ip link set "$_rw_if" up >/dev/null 2>&1 || true; done
     ip link set "br-w$_rw_idx" up >/dev/null 2>&1 || true
   done
 }
