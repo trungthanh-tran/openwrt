@@ -126,6 +126,49 @@ Trên thanh công cụ còn có **Chặn MAC…** (cấm một MAC tự nhập, 
 online) và **Xuất CSV** (xuất danh sách đang lọc ra file). Tick **Tự làm mới** để
 bảng tự cập nhật theo chu kỳ chọn ở ô bên cạnh (5s–60s).
 
+## 4.1 · Nhiều proxy cho một Wi-Fi
+
+**Xem và thay pool.** Ở tab Wi-Fi, chọn một SSID rồi bấm **Pool proxy…**. Bảng
+hiện từng slot theo đúng thứ tự, kèm **số thiết bị đang dùng slot đó**. Ô bên
+dưới nhận danh sách dán vào, mỗi dòng một proxy:
+
+```
+socks5://user:pass@1.2.3.4:1080
+http://5.6.7.8:8080
+user:pass@9.9.9.9:1080
+10.0.0.1:3128:user:pass
+10.0.0.2:1080
+```
+
+Dòng trống và dòng bắt đầu bằng `#` bị bỏ qua. Dòng nào không đọc được thì được
+**liệt kê ra kèm lý do** chứ không bị âm thầm cắt bỏ.
+
+Ghi pool **không ngắt Wi-Fi**. Máy nào đang dùng một proxy vẫn còn trong danh
+sách thì **giữ nguyên proxy đó**, kể cả khi vị trí của nó trong danh sách đổi.
+Chỉ máy nào có proxy bị bỏ đi mới bị chuyển.
+
+**Đổi proxy cho nhiều máy cùng lúc.** Ở tab Thiết bị, chọn các máy (Ctrl/Shift,
+hoặc Ctrl+A), rồi bấm **Đổi proxy…**. Hộp thoại hiện **bảng xem trước từng máy
+sẽ đi proxy nào**; bấm Áp dụng thì đúng bảng đó được gửi đi, không tính lại.
+Số máy trên mỗi proxy chênh nhau tối đa 1.
+
+Nút bị mờ khi chưa chọn máy nào, hoặc khi các máy đã chọn **không cùng một
+Wi-Fi** — slot đánh số riêng theo từng Wi-Fi nên một phép chia không trải qua
+hai mạng được.
+
+**Đổi cho một máy.** Chuột phải một dòng → **Gán proxy…** → chọn slot, hoặc
+*Không ghim proxy* để bỏ ghim.
+
+**Cột Proxy** hiện nhãn của proxy, hoặc `host:port` nếu không đặt nhãn. Bốn
+trạng thái cần phân biệt:
+
+| Hiện | Nghĩa |
+|---|---|
+| tên hoặc `host:port` | Máy đang được ghim và proxy đó còn tồn tại |
+| `chưa ghim` | Wi-Fi có pool nhưng máy này chưa được gán |
+| `slot N đã biến mất` | Máy trỏ vào slot không còn trong pool — **cần xử lý** |
+| `—` | Wi-Fi này không dùng pool |
+
 ## 5 · Tab Backup / Nhật ký
 
 - **Tải danh sách** — nạp lại danh sách backup đang có trên router.

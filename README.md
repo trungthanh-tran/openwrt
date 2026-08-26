@@ -22,6 +22,20 @@ SSID w2 -> br-w2 -> nftables TPROXY :12002 -> sing-box out-w2 -> SOCKS B
 
 Each SSID has its own bridge, subnet, DHCP scope, firewall zone, stable random MAC, and sing-box inbound/outbound pair.
 
+One SSID can also carry several proxies. Each becomes a *slot* with its own
+TPROXY port and outbound, and an nftables map sends each device to its own:
+
+```text
+                            /-> :13256 -> out-w1s0 -> SOCKS A
+SSID w1 -> br-w1 -> map by source address -> :13257 -> out-w1s1 -> SOCKS B
+                            \-> :13258 -> out-w1s2 -> SOCKS C
+```
+
+A device keeps the proxy it was given across reconnections, and moving one to a
+different proxy is a single `nft add element` -- no regenerated configuration,
+no restart, no Wi-Fi interruption. See
+[proxy pools](docs/admin-guide.en.md#proxy-pools).
+
 ## Quick start — the executable
 
 Back up, flash, set the root password, run the app. The desktop console does the
@@ -104,6 +118,11 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 
 Run every workstation-safe suite with `make test` or `sh tests/run-all.sh`.
 This includes the native desktop core/workflows, optional Tk GUI smoke tests,
-Agent CGI endpoints, the health daemon, and OpenWrt generators using isolated
-router stubs. See the [automated test matrix](docs/TEST-MATRIX.md); real-radio
-acceptance scenarios remain in [hardware testing](docs/TESTING.en.md).
+Agent CGI endpoints, the health daemon, the proxy pool and its assignment
+daemon, and OpenWrt generators using isolated router stubs. See the
+[automated test matrix](docs/TEST-MATRIX.md).
+
+Those suites check the text the generators produce, not whether a kernel loads
+it. [`tests/vm/spike.sh`](tests/vm/README.md) closes that gap by loading real
+rules on an OpenWrt VM or on the router. Real-radio acceptance scenarios remain
+in [hardware testing](docs/TESTING.en.md).

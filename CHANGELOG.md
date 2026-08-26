@@ -5,6 +5,59 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Một SSID mang được nhiều proxy.** `config/proxy-pools.conf` khai báo pool
+  cho từng Wi-Fi (`idx|proxy_type|host|port|user|pass|label`); mỗi proxy là một
+  *slot* với cổng TPROXY và outbound sing-box riêng. Thiết bị nào dùng proxy nào
+  do **một map nftables** quyết định — đổi proxy cho một máy chỉ là
+  `nft add element`, không sinh lại config, không restart, không ngắt Wi-Fi.
+- **Ghim dính theo thiết bị.** Máy vào mạng được gán một slot và **giữ nguyên
+  proxy đó qua các lần vào lại**, vì IP ra ngoài nhảy liên tục sẽ làm hỏng phiên
+  đăng nhập. Chọn slot theo `POOL_ASSIGN_POLICY`: `random` (mặc định),
+  `round-robin`, `least-loaded`, `sticky-hash`.
+- **Chia đều một danh sách proxy cho các thiết bị đã chọn.** Dán danh sách vào
+  console, chọn máy, xem trước bảng ánh xạ, rồi áp dụng. Số máy trên mỗi proxy
+  chênh nhau tối đa 1. Bảng xem trước **chính là** thứ được gửi đi — cùng một
+  phép chia, không tính hai lần.
+- **Ghim ngay khi cấp lease.** `/usr/libexec/sbproxy-dhcp-assign` được dnsmasq
+  gọi lúc cấp DHCP, tức trước mọi lưu lượng ứng dụng. `apply.sh` tự trỏ
+  `dhcpscript` vào đó, nhưng **không bao giờ chiếm** `dhcpscript` đang thuộc về
+  script khác.
+- **Daemon `sbproxy-assignd`** làm lưới an toàn cho ba trường hợp móc DHCP không
+  bắt được: máy đặt IP tĩnh, `dhcpscript` đã có chủ, và bảng nftables bị xoá do
+  restart. Nó cũng tự phát hiện map lệch với file state rồi nạp lại.
+- Console desktop: khu **Pool proxy** ở tab Wi‑Fi (bảng slot kèm số máy đang
+  dùng), cột **Proxy** và menu chuột phải ở tab Thiết bị.
+- Agent: `get_pool`, `save_pool`, `assign_proxy`, `rebalance`. `clients` trả
+  thêm `slot`, `proxy_label`, `proxy_host`, `proxy_state`, `pool_size`.
+  `status.meta` trả thêm `pool_port_base`, `pool_port_stride`.
+- `tests/vm/spike.sh` — nạp luật **thật** vào nhân để trả lời những câu mà bộ
+  test workstation không trả lời được. Chạy được trên máy ảo OpenWrt hoặc thẳng
+  trên router. Xem [tests/vm/README.md](tests/vm/README.md).
+
+### Fixed
+- **SSID nào khai `proxy_type` đều bị `apply.sh` phá.** `validate_conf` chấp
+  nhận 10, 11 hoặc 12 cột nhưng `desired_idx` chỉ khớp 10 hoặc 11, mà cột thứ 12
+  chính là `proxy_type`. `desired_idx` nuôi `emit_stale_uci`, thứ xoá section
+  `wireless`/`network`/`dhcp`/`firewall` của mọi idx không còn trong danh sách —
+  nên lần apply kế tiếp phá đúng những SSID dùng proxy HTTP.
+- **Snapshot không chứa pool và pin.** `backup.sh` chỉ chép `wifi-socks.conf` và
+  `sbproxy.nft`. Mà `pool.sh replace` chụp snapshot *ngay trước* khi thay pool,
+  nên bản backup ấy là thứ duy nhất không thể hoàn tác được thao tác nó được tạo
+  ra để hoàn tác. Giờ cả hai script đi qua cùng một danh sách, và hai tên file cũ
+  giữ nguyên để snapshot cũ vẫn khôi phục được.
+- `security-audit.sh` không kiểm quyền `proxy-pools.conf`, file chứa credential
+  của mọi proxy trong mọi pool.
+
+### Changed
+- `install-deps.sh` cài thêm **`kmod-nft-socket`** — phụ thuộc mới duy nhất của
+  cả tính năng. Nó cho phép luật *divert*, thứ chuyển việc tra map từ **mỗi gói**
+  sang **mỗi kết nối**. Thiếu gói này thì `POOL_DIVERT="auto"` tự tắt divert và
+  mọi thứ vẫn chạy, chỉ chậm hơn.
+- `preflight.sh` kiểm thêm số học cổng pool, `socket transparent` nhân có nhận
+  không, và `dhcpscript` đang thuộc về ai.
+
+
 ## [0.4.12] - 2026-08-25
 
 ### Fixed

@@ -114,6 +114,54 @@ sh agent/install-agent.sh
 
 Or rotate only the token with `sh scripts/rotate-token.sh`.
 
+## Proxy pools
+
+By default each Wi-Fi uses one proxy, declared in `wifi-socks.conf`. To give one
+Wi-Fi several proxies and spread devices across them, add
+`config/proxy-pools.conf`:
+
+```
+idx|proxy_type|host|port|user|pass|label
+1|socks5|1.2.3.4|1080|user1|pass1|VN-01
+1|http|5.6.7.8|8080|||US-02
+```
+
+An SSID with no row here behaves exactly as before -- byte for byte the same
+generated configuration.
+
+A device is pinned to one slot and **keeps that proxy across reconnections**: an
+exit IP that moves around breaks logged-in sessions. Pins live in
+`/etc/sbproxy.assign` and are baked into the generated nft file, so a restart
+does not lose them.
+
+Which slot a new device gets is `POOL_ASSIGN_POLICY`: `random` (default),
+`round-robin`, `least-loaded`, or `sticky-hash`. See the settings table in
+[admin-guide.md](admin-guide.md) for the full list of `POOL_*` tunables.
+
+Pinning happens the moment dnsmasq hands out a lease, through
+`/usr/libexec/sbproxy-dhcp-assign`. `apply.sh` points `dhcpscript` at it but
+**never takes over** a `dhcpscript` that belongs to something else. The
+`sbproxy-assignd` daemon is the safety net for devices with static addresses,
+for routers where `dhcpscript` is already taken, and for a map that drifted from
+the state file after a restart.
+
+```sh
+sh scripts/pool.sh list 1
+sh scripts/pool.sh replace 1 /tmp/new.txt
+sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 3
+sh scripts/rebalance.sh 1 --online --dry-run
+```
+
+> `sock_bypass` is global, not per-SSID. The router must reach a proxy host
+> directly or TPROXY would loop it back, and that bypass list is shared, so a
+> proxy added to SSID 1's pool is also reachable directly by SSID 2's clients.
+> This predates pools; pools just make it visible.
+
+`kmod-nft-socket` is the only new dependency: it enables the divert rule, which
+turns a per-packet map lookup into a per-connection one. Without it
+`POOL_DIVERT="auto"` simply switches divert off and everything still works,
+more slowly.
+
 ## Operations and recovery
 
 - Use full apply for SSID topology changes.

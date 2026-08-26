@@ -132,6 +132,49 @@ The toolbar also carries **Block MAC…** (ban an address you type in, online or
 not) and **Export CSV** (write the filtered list to a file). Tick **Auto
 refresh** to reload on the interval beside it (5s–60s).
 
+## 4.1 · Several proxies on one Wi-Fi
+
+**Viewing and replacing a pool.** On the Wi-Fi tab, select an SSID and press
+**Proxy pool…**. The table lists each slot in order together with **how many
+devices are on it**. The box below takes a pasted list, one proxy per line:
+
+```
+socks5://user:pass@1.2.3.4:1080
+http://5.6.7.8:8080
+user:pass@9.9.9.9:1080
+10.0.0.1:3128:user:pass
+10.0.0.2:1080
+```
+
+Blank lines and lines starting with `#` are ignored. Anything unreadable is
+**listed back with the reason** rather than quietly dropped.
+
+Saving a pool does **not** interrupt Wi-Fi. A device whose proxy is still in the
+list **keeps that proxy**, even if its position in the list moved. Only devices
+whose proxy is gone are reassigned.
+
+**Changing several devices at once.** On the Devices tab, select the devices
+(Ctrl/Shift, or Ctrl+A) and press **Change proxy…**. The dialog shows **which
+proxy each device will get**; pressing Apply sends exactly that table, without
+recomputing it. The counts differ by at most one.
+
+The button is greyed out when nothing is selected, or when the selected devices
+are **not on the same Wi-Fi** -- slots are numbered per Wi-Fi, so one split
+cannot span two of them.
+
+**Changing one device.** Right-click a row → **Assign a proxy…** → pick a slot,
+or *Do not pin a proxy* to unpin it.
+
+**The Proxy column** shows the proxy's label, or `host:port` when it has none.
+Four states, which are worth telling apart:
+
+| Shown | Meaning |
+|---|---|
+| a name or `host:port` | Pinned, and that proxy still exists |
+| `not pinned` | The Wi-Fi has a pool but this device has not been assigned |
+| `slot N no longer exists` | The device points past the end of a shortened pool -- **needs attention** |
+| `—` | This Wi-Fi does not use a pool |
+
 ## 5 · The Backup / Log tab
 
 - **Load list** — refresh the snapshots the router holds.
