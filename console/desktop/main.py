@@ -2821,20 +2821,34 @@ class PoolDialog(tk.Toplevel):
         ttk.Label(body, text=f"SSID: {record.name}  ·  IDX {record.idx}",
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 8))
 
-        columns = ("slot", "proxy", "type", "devices")
-        titles = (self.t("Slot"), self.t("Proxy"), "Type", self.t("Máy"))
+        columns = ("slot", "proxy", "type", "ip", "port", "user", "pass", "health", "devices")
+        titles = (self.t("Slot"), self.t("Proxy"), "Type", "IP", "Port",
+                  "Username", "Password", "Health", self.t("Máy"))
+        widths = (50, 180, 75, 150, 70, 130, 130, 120, 60)
         table = ttk.Treeview(body, columns=columns, show="headings", height=8,
                              selectmode="extended")
         self.table = table
         self.proxies = list(proxies)
-        for column, title, width in zip(columns, titles, (50, 260, 70, 70)):
+        for column, title, width in zip(columns, titles, widths):
             table.heading(column, text=title)
             table.column(column, width=width, anchor="w")
         for position, row in enumerate(proxies):
             count = usage[position] if position < len(usage) else 0
-            table.insert("", "end", values=(position, proxy_display(row),
-                                            row.get("type", ""), count))
-        table.pack(fill="both", expand=True, pady=(0, 10))
+            row_health = row.get("health") or row.get("state") or self.health.get("state") or "—"
+            latency = row.get("latency_ms", self.health.get("latency_ms"))
+            if latency is not None:
+                row_health = f"{row_health} {latency}ms"
+            table.insert("", "end", values=(
+                position, proxy_display(row), row.get("type", ""), row.get("host", "—"),
+                row.get("port", "—"), row.get("user", "—"), row.get("pass", "—"),
+                row_health, count,
+            ))
+        table_frame = ttk.Frame(body, style="Card.TFrame")
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        table.pack(in_=table_frame, fill="both", expand=True)
+        table_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=table.xview)
+        table_scroll.pack(fill="x")
+        table.configure(xscrollcommand=table_scroll.set)
         table.bind("<Double-1>", self._show_detail)
 
         ttk.Label(body, text="Thêm proxy mới (mỗi dòng một proxy)",
