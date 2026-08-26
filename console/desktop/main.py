@@ -2587,12 +2587,13 @@ def center_dialog(window: tk.Toplevel) -> None:
 
 class WifiDialog(tk.Toplevel):
     def __init__(self, parent, record: WifiRecord | None, next_idx: int, language="en", palette=None,
-                 pool_command=None):
+                 pool_command=None, show_proxy_fields=True):
         super().__init__(parent)
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
         self.pool_command = pool_command
+        self.show_proxy_fields = show_proxy_fields
         self.title(self.t("Sửa Wi‑Fi" if record else "Thêm Wi‑Fi"))
         self.configure(bg=self.palette["bg"])
         self.resizable(False, False)
@@ -2616,6 +2617,9 @@ class WifiDialog(tk.Toplevel):
             ("SOCKS port", "port", None), ("SOCKS user", "user", None),
             ("SOCKS password", "socks_password", "secret"), ("Hãng router / MAC", "vendor", "vendor"),
         ]
+        if not self.show_proxy_fields:
+            fields = [field for field in fields
+                      if field[1] not in {"proxy_type", "host", "port", "user", "socks_password"}]
         body = ttk.Frame(self, padding=14)
         body.grid(sticky="nsew")
         first = None
@@ -2657,11 +2661,15 @@ class WifiDialog(tk.Toplevel):
             result = WifiRecord(
                 name=self.values["name"].get().strip(), band=self.values["band"].get(),
                 idx=int(self.values["idx"].get()), wifi_password=self.values["wifi_password"].get(),
-                host=self.values["host"].get().strip(), port=int(self.values["port"].get()),
-                user=self.values["user"].get(), socks_password=self.values["socks_password"].get(),
+                host=(self.values["host"].get().strip() if self.show_proxy_fields else record.host),
+                port=(int(self.values["port"].get()) if self.show_proxy_fields else record.port),
+                user=(self.values["user"].get() if self.show_proxy_fields else record.user),
+                socks_password=(self.values["socks_password"].get()
+                                if self.show_proxy_fields else record.socks_password),
                 isolate=self.values["isolate"].get(), webrtc=self.values["webrtc"].get(),
                 mac_oui=vendor_oui(self.values["vendor"].get()),
-                proxy_type=self.values["proxy_type"].get().lower(),
+                proxy_type=(self.values["proxy_type"].get().lower()
+                            if self.show_proxy_fields else record.proxy_type),
             )
             result.validate()
         except (ValueError, TypeError) as exc:
@@ -5115,7 +5123,7 @@ class NativeApp:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
             return
         dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette,
-                            pool_command=self.open_pool_editor)
+                            pool_command=self.open_pool_editor, show_proxy_fields=False)
         self.root.wait_window(dialog)
         if dialog.result:
             if any(item.idx == dialog.result.idx and item is not record for item in self.records):
