@@ -1095,5 +1095,301 @@ class AgentUpdaterTests(unittest.TestCase):
         self.assertIn("Cài lại agent", detail)
 
 
+class ProxyPoolWorkflowTests(unittest.TestCase):
+    """Choosing devices, previewing a split, and committing exactly that split."""
+
+    POOL = {
+        "ok": True, "idx": 1,
+        "proxies": [
+            {"slot": 0, "type": "socks5", "host": "1.1.1.1", "port": 1080,
+             "user": "", "pass": "", "label": "one"},
+            {"slot": 1, "type": "http", "host": "2.2.2.2", "port": 8080,
+             "user": "", "pass": "", "label": ""},
+        ],
+        "assignments": [],
+    }
+
+    def make_instance(self, items, pool=None, language="vi"):
+        instance = bare_app(language)
+        instance.client = mock.Mock()
+        instance.client.get_pool.return_value = self.POOL if pool is None else pool
+        instance.client.assign_proxy.return_value = {"ok": True, "results": []}
+        instance.client.save_pool.return_value = {"ok": True, "log": "saved"}
+        instance.pool_cache = {}
+        instance.clients_data = list(items)
+        instance.selected_client_items = lambda: list(items)
+        instance.block_if_incompatible = lambda: False
+        instance.confirm_important = mock.Mock(return_value=True)
+        instance.append_log = mock.Mock()
+        instance.refresh_clients = mock.Mock()
+        instance.render_clients = mock.Mock()
+        instance.hide_loading = mock.Mock()
+        synchronous_run_task(instance)
+        return instance
+
+    @staticmethod
+    def device(mac, idx=1, **over):
+        item = {"idx": idx, "mac": mac, "ssid": f"w{idx}", "online": True, "banned": False}
+        item.update(over)
+        return item
+
+    # --- the guards --------------------------------------------------------
+
+    def test_nothing_selected_never_reaches_the_agent(self):
+        instance = self.make_instance([])
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.bulk_assign_proxy(ask=lambda _rows: True)
+        info.assert_called_once()
+        # An empty selection also has zero distinct Wi-Fis, so without checking
+        # the wording the same-Wi-Fi guard would answer for this case too and
+        # the operator would be told to fix something they never did.
+        self.assertEqual(info.call_args.args[1], "Hãy chọn thiết bị trong bảng trước")
+        instance.client.get_pool.assert_not_called()
+        instance.client.assign_proxy.assert_not_called()
+
+    def test_a_mixed_selection_is_told_what_is_actually_wrong(self):
+        items = [self.device("aa:bb:cc:dd:ee:01", idx=1), self.device("aa:bb:cc:dd:ee:02", idx=2)]
+        instance = self.make_instance(items)
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.bulk_assign_proxy(ask=lambda _rows: True)
+        self.assertEqual(info.call_args.args[1],
+                         "Chỉ đổi proxy cho các thiết bị trong cùng một Wi\u2011Fi")
+
+    def test_an_empty_pool_stops_before_any_dialog(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")],
+                                      pool={"ok": True, "idx": 1, "proxies": [], "assignments": []})
+        asked = []
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.bulk_assign_proxy(ask=lambda rows: asked.append(rows) or True)
+        info.assert_called_once()
+        self.assertEqual(asked, [])
+        instance.client.assign_proxy.assert_not_called()
+
+    def test_devices_from_two_wifis_are_refused(self):
+        # Slots are numbered per Wi-Fi, so one split cannot span two of them.
+        items = [self.device("aa:bb:cc:dd:ee:01", idx=1), self.device("aa:bb:cc:dd:ee:02", idx=2)]
+        instance = self.make_instance(items)
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.bulk_assign_proxy(ask=lambda _rows: True)
+        info.assert_called_once()
+        instance.client.assign_proxy.assert_not_called()
+
+    def test_cancelling_the_preview_sends_nothing(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        instance.bulk_assign_proxy(ask=lambda _rows: False)
+        instance.client.assign_proxy.assert_not_called()
+
+    # --- the preview is the commit ----------------------------------------
+
+    def test_what_was_previewed_is_exactly_what_is_sent(self):
+        items = [self.device(f"aa:bb:cc:dd:ee:{n:02d}") for n in range(1, 7)]
+        instance = self.make_instance(items)
+        seen = []
+        # Every call to the shuffler here would draw a different layout, so a
+        # second computation between preview and commit cannot go unnoticed.
+        with mock.patch.object(appmod.random, "randrange", side_effect=[11, 22, 33, 44]):
+            instance.bulk_assign_proxy(ask=lambda rows: seen.append(list(rows)) or True)
+        self.assertEqual(len(seen), 1)
+        sent = instance.client.assign_proxy.call_args.args[1]
+        self.assertEqual([(row["mac"], row["slot"]) for row in sent],
+                         [(mac, slot) for mac, slot, _label in seen[0]])
+
+    def test_the_split_is_even_and_covers_every_selected_device(self):
+        items = [self.device(f"aa:bb:cc:dd:ee:{n:02d}") for n in range(1, 8)]
+        instance = self.make_instance(items)
+        instance.bulk_assign_proxy(ask=lambda _rows: True)
+        sent = instance.client.assign_proxy.call_args.args[1]
+        self.assertEqual(len(sent), 7)
+        counts = [sum(1 for row in sent if row["slot"] == slot) for slot in (0, 1)]
+        self.assertEqual(sorted(counts), [3, 4])
+        self.assertEqual({row["mac"] for row in sent}, {item["mac"] for item in items})
+
+    def test_the_preview_carries_the_proxy_the_operator_will_recognise(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01"),
+                                       self.device("aa:bb:cc:dd:ee:02")])
+        seen = []
+        instance.bulk_assign_proxy(ask=lambda rows: seen.append(list(rows)) or True)
+        labels = {label for _mac, _slot, label in seen[0]}
+        self.assertTrue(labels <= {"one", "2.2.2.2:8080"})
+
+    def test_the_index_sent_is_the_wifi_the_devices_are_on(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01", idx=4)])
+        instance.client.get_pool.return_value = dict(self.POOL, idx=4)
+        instance.bulk_assign_proxy(ask=lambda _rows: True)
+        self.assertEqual(instance.client.get_pool.call_args.args[0], 4)
+        self.assertEqual(instance.client.assign_proxy.call_args.args[0], 4)
+
+    def test_the_pool_is_re_read_rather_than_served_from_a_stale_cache(self):
+        # Someone may have replaced the pool from the Wi-Fi tab a moment ago.
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        instance.pool_cache[1] = {"proxies": [], "assignments": []}
+        instance.bulk_assign_proxy(ask=lambda _rows: True)
+        instance.client.get_pool.assert_called_once()
+        instance.client.assign_proxy.assert_called_once()
+
+    def test_an_unreachable_agent_reports_instead_of_sending(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        instance.client.get_pool.side_effect = appmod.AgentError("timeout")
+        with mock.patch.object(appmod.messagebox, "showerror"):
+            instance.bulk_assign_proxy(ask=lambda _rows: True)
+        instance.client.assign_proxy.assert_not_called()
+
+    # --- one device at a time ---------------------------------------------
+
+    def test_assigning_one_device_sends_that_mac_and_slot(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:09")])
+        instance.assign_one_proxy(ask=lambda _rows, _current: 1)
+        self.assertEqual(instance.client.assign_proxy.call_args.args[1],
+                         [{"mac": "aa:bb:cc:dd:ee:09", "slot": 1}])
+
+    def test_assigning_one_device_can_unpin_it(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:09", slot=1)])
+        instance.assign_one_proxy(ask=lambda _rows, _current: "none")
+        self.assertEqual(instance.client.assign_proxy.call_args.args[1],
+                         [{"mac": "aa:bb:cc:dd:ee:09", "slot": "none"}])
+
+    def test_assigning_one_device_offers_its_current_slot(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:09", slot=1)])
+        seen = []
+        instance.assign_one_proxy(ask=lambda rows, current: seen.append((rows, current)) or None)
+        self.assertEqual(seen[0][1], 1)
+        self.assertEqual(len(seen[0][0]), 2)
+
+    def test_assigning_needs_exactly_one_device(self):
+        for items in ([], [self.device("aa:bb:cc:dd:ee:01"), self.device("aa:bb:cc:dd:ee:02")]):
+            with self.subTest(count=len(items)):
+                instance = self.make_instance(items)
+                with mock.patch.object(appmod.messagebox, "showinfo"):
+                    instance.assign_one_proxy(ask=lambda _rows, _current: 0)
+                instance.client.assign_proxy.assert_not_called()
+
+    def test_cancelling_the_slot_choice_sends_nothing(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:09")])
+        instance.assign_one_proxy(ask=lambda _rows, _current: None)
+        instance.client.assign_proxy.assert_not_called()
+
+    # --- replacing a pool --------------------------------------------------
+
+    def test_a_pasted_list_is_parsed_and_saved(self):
+        instance = self.make_instance([])
+        instance.apply_pool_text(1, "socks5://u:p@1.2.3.4:1080\nhttp://5.6.7.8:8080\n")
+        rows = instance.client.save_pool.call_args.args[1]
+        self.assertEqual([row[0] for row in rows], ["socks5", "http"])
+        self.assertEqual(rows[0][1:4], ("1.2.3.4", 1080, "u"))
+
+    def test_unusable_lines_are_reported_and_the_rest_still_saved(self):
+        instance = self.make_instance([])
+        with mock.patch.object(appmod.messagebox, "showwarning") as warning:
+            instance.apply_pool_text(1, "1.2.3.4:1080\nnot-a-proxy\n")
+        warning.assert_called_once()
+        self.assertIn("not-a-proxy", warning.call_args.args[1])
+        self.assertEqual(len(instance.client.save_pool.call_args.args[1]), 1)
+
+    def test_a_list_of_nothing_but_rubbish_is_not_saved(self):
+        # Otherwise a mistyped paste would silently wipe the pool.
+        instance = self.make_instance([])
+        with mock.patch.object(appmod.messagebox, "showwarning"), \
+             mock.patch.object(appmod.messagebox, "showinfo"):
+            instance.apply_pool_text(1, "not-a-proxy\nalso-not\n")
+        instance.client.save_pool.assert_not_called()
+
+    def test_clearing_a_pool_on_purpose_asks_first(self):
+        instance = self.make_instance([])
+        instance.confirm_important.return_value = False
+        instance.apply_pool_text(1, "")
+        instance.client.save_pool.assert_not_called()
+        instance.confirm_important.assert_called_once()
+        instance.confirm_important.return_value = True
+        instance.apply_pool_text(1, "")
+        self.assertEqual(instance.client.save_pool.call_args.args[1], [])
+
+    def test_replacing_a_pool_asks_before_touching_the_router(self):
+        instance = self.make_instance([])
+        instance.confirm_important.return_value = False
+        instance.apply_pool_text(1, "1.2.3.4:1080")
+        instance.client.save_pool.assert_not_called()
+
+    def test_the_cap_is_reported_rather_than_the_list_quietly_shortened(self):
+        instance = self.make_instance([])
+        text = "\n".join(f"10.0.0.{n}:1080" for n in range(1, 260))
+        with mock.patch.object(appmod.messagebox, "showwarning") as warning:
+            instance.apply_pool_text(1, text)
+        warning.assert_called_once()
+        self.assertEqual(len(instance.client.save_pool.call_args.args[1]),
+                         appmod.POOL_SLOTS_PER_SSID_MAX)
+
+    def test_saving_refreshes_the_cached_pool(self):
+        instance = self.make_instance([])
+        instance.pool_cache[1] = {"proxies": [{"slot": 0}], "assignments": []}
+        instance.apply_pool_text(1, "1.2.3.4:1080")
+        self.assertNotIn(1, instance.pool_cache)
+
+
+VIETNAMESE_ONLY = set("ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩị"
+                      "óòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
+
+
+class ProxyButtonStateTests(unittest.TestCase):
+    """The Đổi proxy button greys itself out instead of failing when pressed."""
+
+    def instance(self, items):
+        app_instance = bare_app("vi")
+        app_instance.client_edit_buttons = {
+            key: FakeButton() for key in ("details", "copy", "kick", "ban", "unban", "proxy")}
+        app_instance.client_selection_var = FakeVar()
+        app_instance.selected_client_items = lambda: list(items)
+        return app_instance
+
+    @staticmethod
+    def device(mac, idx=1):
+        return {"idx": idx, "mac": mac, "ssid": f"w{idx}", "online": True, "banned": False}
+
+    def state(self, items):
+        app_instance = self.instance(items)
+        app_instance.update_client_editor()
+        return app_instance.client_edit_buttons["proxy"].options.get("state")
+
+    def test_one_wifi_enables_it(self):
+        self.assertEqual(self.state([self.device("aa:bb:cc:dd:ee:01"),
+                                     self.device("aa:bb:cc:dd:ee:02")]), "normal")
+
+    def test_two_wifis_disable_it(self):
+        # Slots are numbered per Wi-Fi, so a mixed selection has no single split.
+        self.assertEqual(self.state([self.device("aa:bb:cc:dd:ee:01", idx=1),
+                                     self.device("aa:bb:cc:dd:ee:02", idx=2)]), "disabled")
+
+    def test_no_selection_disables_it(self):
+        self.assertEqual(self.state([]), "disabled")
+
+
+class ProxyPoolTranslationTests(unittest.TestCase):
+    """Every Vietnamese string F8 adds must have an English twin."""
+
+    NEW_STRINGS = (
+        "Pool proxy…",
+        "Đổi proxy cho thiết bị đã chọn…",
+        "Gán proxy…",
+        "Hãy chọn thiết bị trong bảng trước",
+        "Chỉ đổi proxy cho các thiết bị trong cùng một Wi‑Fi",
+        "Wi‑Fi này chưa có proxy nào trong pool",
+        "Hãy chọn đúng một thiết bị",
+        "chưa ghim",
+        "Không ghim proxy",
+    )
+
+    def test_each_new_string_is_translated(self):
+        for text in self.NEW_STRINGS:
+            with self.subTest(text=text):
+                english = appmod.translate(text, "en")
+                self.assertNotEqual(english, text)
+                # The ellipsis and the middle dot are shared by both languages;
+                # a Vietnamese diacritic left in the English string is not.
+                self.assertFalse(set(english) & VIETNAMESE_ONLY, english)
+
+    def test_vietnamese_returns_the_source_unchanged(self):
+        for text in self.NEW_STRINGS:
+            self.assertEqual(appmod.translate(text, "vi"), text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

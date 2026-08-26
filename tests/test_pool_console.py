@@ -232,5 +232,136 @@ class SplitDevicesTests(unittest.TestCase):
         self.assertEqual(mapping, {"aa:bb:cc:dd:ee:01": 0})
 
 
+class ProxyDisplayTests(unittest.TestCase):
+    """What one pool row, and one device's pin, read as in the tables."""
+
+    def row(self, **over):
+        base = {"slot": 0, "type": "socks5", "host": "1.2.3.4", "port": 1080,
+                "user": "u", "pass": "p", "label": ""}
+        base.update(over)
+        return base
+
+    def test_a_label_wins_over_the_endpoint(self):
+        self.assertEqual(app.proxy_display(self.row(label="Hà Nội 1")), "Hà Nội 1")
+
+    def test_without_a_label_the_endpoint_is_shown(self):
+        self.assertEqual(app.proxy_display(self.row()), "1.2.3.4:1080")
+
+    def test_a_label_of_spaces_is_not_a_label(self):
+        self.assertEqual(app.proxy_display(self.row(label="   ")), "1.2.3.4:1080")
+
+    def test_credentials_are_never_part_of_the_display(self):
+        shown = app.proxy_display(self.row(user="secretuser", **{"pass": "secretpass"}))
+        self.assertNotIn("secret", shown)
+
+    def test_a_row_missing_its_port_still_renders(self):
+        self.assertEqual(app.proxy_display({"host": "1.2.3.4"}), "1.2.3.4")
+
+
+class ClientProxyTextTests(unittest.TestCase):
+    """The Proxy column has to distinguish four states, not just two."""
+
+    def text(self, language="vi", **item):
+        return app.client_proxy_text(item, language)
+
+    def test_pinned_shows_the_label(self):
+        self.assertEqual(
+            self.text(proxy_state="pinned", proxy_label="Hà Nội 1", proxy_host="1.2.3.4:1080"),
+            "Hà Nội 1")
+
+    def test_pinned_without_a_label_shows_the_endpoint(self):
+        self.assertEqual(
+            self.text(proxy_state="pinned", proxy_label="", proxy_host="1.2.3.4:1080"),
+            "1.2.3.4:1080")
+
+    def test_unpinned_says_so_rather_than_looking_empty(self):
+        self.assertEqual(self.text(proxy_state="unpinned", slot=None), "chưa ghim")
+        self.assertEqual(self.text("en", proxy_state="unpinned", slot=None), "not pinned")
+
+    def test_a_stale_pin_names_the_slot_that_vanished(self):
+        # A device left pointing at a slot the pool no longer has must not read
+        # like an ordinary unpinned device: the operator has to go fix it.
+        vi = self.text(proxy_state="stale", slot=7)
+        self.assertIn("7", vi)
+        self.assertNotEqual(vi, "chưa ghim")
+        self.assertIn("7", self.text("en", proxy_state="stale", slot=7))
+
+    def test_an_ssid_with_no_pool_is_blank(self):
+        self.assertEqual(self.text(proxy_state="none"), "—")
+
+    def test_an_unknown_state_from_an_older_agent_is_blank(self):
+        self.assertEqual(self.text(proxy_state="something-new"), "—")
+        self.assertEqual(self.text(), "—")
+
+
+class PoolSlotUsageTests(unittest.TestCase):
+    """How many devices sit on each slot, for the pool table."""
+
+    def clients(self):
+        return [
+            {"idx": 1, "mac": "aa", "slot": 0},
+            {"idx": 1, "mac": "bb", "slot": 0},
+            {"idx": 1, "mac": "cc", "slot": 2},
+            {"idx": 1, "mac": "dd", "slot": None},
+            {"idx": 2, "mac": "ee", "slot": 1},          # another Wi-Fi
+            {"idx": 1, "mac": "ff", "slot": 9},          # a stale pin
+        ]
+
+    def test_counts_are_per_slot_and_per_wifi(self):
+        self.assertEqual(app.pool_slot_usage(self.clients(), 1, 3), [2, 0, 1])
+
+    def test_another_wifi_is_not_counted(self):
+        self.assertEqual(app.pool_slot_usage(self.clients(), 2, 3), [0, 1, 0])
+
+    def test_a_pin_past_the_end_is_left_out_rather_than_wrapped(self):
+        # Wrapping it would credit the count to an unrelated proxy.
+        self.assertEqual(sum(app.pool_slot_usage(self.clients(), 1, 3)), 3)
+
+    def test_an_empty_pool_gives_an_empty_list(self):
+        self.assertEqual(app.pool_slot_usage(self.clients(), 1, 0), [])
+
+    def test_dirty_rows_do_not_raise(self):
+        rows = [{"idx": "x", "slot": 0}, {"idx": 1, "slot": "0"}, {}, "not a dict"]
+        self.assertEqual(app.pool_slot_usage(rows, 1, 2), [1, 0])
+
+
+class PoolAgentCallTests(unittest.TestCase):
+    """The four pool actions have to reach the agent in the shape it validates."""
+
+    def client(self):
+        instance = app.AgentClient("http://router", "token")
+        instance._request = lambda *a, **kw: (a, kw)
+        return instance
+
+    def test_get_pool_passes_the_index_as_a_query_field(self):
+        args, kwargs = self.client().get_pool(3)
+        self.assertEqual(args[0], "get_pool")
+        self.assertEqual(kwargs["query"], {"idx": "3"})
+
+    def test_save_pool_posts_rows_as_objects(self):
+        rows = [("socks5", "1.2.3.4", 1080, "u", "p", "nhãn")]
+        args, kwargs = self.client().save_pool(2, rows)
+        self.assertEqual(args[:2], ("save_pool", "POST"))
+        self.assertEqual(kwargs["body"], {"idx": 2, "proxies": [
+            {"type": "socks5", "host": "1.2.3.4", "port": 1080,
+             "user": "u", "pass": "p", "label": "nhãn"}]})
+
+    def test_assign_proxy_posts_the_pairs_untouched(self):
+        pairs = [{"mac": "aa:bb:cc:dd:ee:01", "slot": 0}]
+        args, kwargs = self.client().assign_proxy(1, pairs)
+        self.assertEqual(args[:2], ("assign_proxy", "POST"))
+        self.assertEqual(kwargs["body"], {"idx": 1, "assignments": pairs})
+
+    def test_rebalance_omits_the_optional_fields_when_unset(self):
+        _args, kwargs = self.client().rebalance(1, ["aa:bb:cc:dd:ee:01"])
+        self.assertEqual(kwargs["body"], {"idx": 1, "macs": ["aa:bb:cc:dd:ee:01"]})
+
+    def test_rebalance_carries_a_seed_and_a_pool_when_given(self):
+        _args, kwargs = self.client().rebalance(
+            1, ["aa:bb:cc:dd:ee:01"], proxies=[("http", "5.6.7.8", 8080, "", "", "")], seed=42)
+        self.assertEqual(kwargs["body"]["seed"], 42)
+        self.assertEqual(kwargs["body"]["proxies"][0]["type"], "http")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
