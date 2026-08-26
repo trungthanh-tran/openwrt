@@ -2859,7 +2859,9 @@ class PoolDialog(tk.Toplevel):
         titles = (self.t("Slot"), self.t("Proxy"), "Type", "IP", "Port",
                   "Username", "Password", "Health", self.t("Máy"))
         widths = (50, 180, 75, 150, 70, 130, 130, 120, 60)
-        table = ttk.Treeview(body, columns=columns, show="headings", height=8,
+        table_frame = tk.Frame(body, bg=self.palette["border"], bd=1, relief="solid")
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        table = ttk.Treeview(table_frame, columns=columns, show="headings", height=8,
                              selectmode="extended")
         self.table = table
         self.proxies = list(proxies)
@@ -2877,9 +2879,7 @@ class PoolDialog(tk.Toplevel):
                 row.get("port", "—"), row.get("user", "—"), row.get("pass", "—"),
                 row_health, count,
             ))
-        table_frame = ttk.Frame(body, style="Card.TFrame")
-        table_frame.pack(fill="both", expand=True, pady=(0, 10))
-        table.pack(in_=table_frame, fill="both", expand=True)
+        table.pack(fill="both", expand=True)
         table_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=table.xview)
         table_scroll.pack(fill="x")
         table.configure(xscrollcommand=table_scroll.set)
@@ -2892,10 +2892,12 @@ class PoolDialog(tk.Toplevel):
         ttk.Combobox(body, textvariable=self.format_var,
                      values=tuple(PROXY_IMPORT_FORMATS.values()), state="readonly",
                      width=48).pack(anchor="w", pady=(2, 4))
-        self.text = tk.Text(body, height=8, width=64, background=self.palette["card"],
+        text_frame = tk.Frame(body, bg=self.palette["border"], bd=1, relief="solid")
+        text_frame.pack(fill="both", expand=True, pady=(4, 4))
+        self.text = tk.Text(text_frame, height=8, width=64, background=self.palette["input"],
                             foreground=self.palette["text"], insertbackground=self.palette["text"],
-                            relief="flat", borderwidth=1)
-        self.text.pack(fill="both", expand=True, pady=(4, 4))
+                            relief="flat", borderwidth=0)
+        self.text.pack(fill="both", expand=True, padx=1, pady=1)
         ttk.Label(body, text="Double-click một channel để xem chi tiết; proxy hiện có không sửa trực tiếp.",
                   style="Muted.TLabel", wraplength=460, justify="left").pack(anchor="w", pady=(0, 12))
 
