@@ -1188,7 +1188,6 @@ use_divert() {
   esac
   command -v nft >/dev/null 2>&1 || return 1
   printf '%s\n' 'table inet sbproxy_divert_probe {' \
-    '  chain c { type filter hook prerouting priority mangle; meta l4proto tcp socket transparent 1 accept }' \
+    '  chain c { type filter hook prerouting priority mangle; meta l4proto tcp socket transparent 1 accept; }' \
     '}' | nft -c -f - >/dev/null 2>&1
 }
-
