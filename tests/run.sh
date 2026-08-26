@@ -223,6 +223,23 @@ eq "ALLOW_UNSUPPORTED_BOARD still defaults to 0" \
   "$(sh -c 'unset ALLOW_UNSUPPORTED_BOARD; . "$1/config/settings.sh"; echo "$ALLOW_UNSUPPORTED_BOARD"' _ "$ROOT")" \
   "0"
 
+# br_netfilter sends bridged frames through the IP hooks a second time, and a
+# TPROXY verdict taken there never reaches the local socket. The rule counts the
+# packet, nothing is dropped, no counter anywhere moves -- the connection simply
+# hangs. Confirmed on a real kernel: the identical ruleset works with it off and
+# times out with it on. OpenWrt does not ship kmod-br-netfilter by default, so
+# this only bites where something else pulled it in, and that is exactly the
+# case nobody would think to look for.
+BRNF="$STUB/brnf"
+eq "bridge_nf_ok is quiet when br_netfilter is absent" \
+  "$(BRNF_PATH="$STUB/nonexistent" bridge_nf_ok; echo $?)" "0"
+echo 0 > "$BRNF"
+eq "bridge_nf_ok accepts br_netfilter turned off" \
+  "$(BRNF_PATH="$BRNF" bridge_nf_ok; echo $?)" "0"
+echo 1 > "$BRNF"
+eq "bridge_nf_ok rejects br_netfilter turned on" \
+  "$(BRNF_PATH="$BRNF" bridge_nf_ok; echo $?)" "1"
+
 echo "== uci_dquote =="
 eq "escape double-quote" "$(uci_dquote 'a"b')" 'a\"b'
 eq "escape backslash"    "$(uci_dquote 'a\b')" 'a\\b'

@@ -61,6 +61,13 @@ if command -v nft >/dev/null 2>&1; then
 else
   warn "'nft' is missing — the pool ruleset cannot be checked."
 fi
+if bridge_nf_ok; then
+  echo "  [OK] Bridged traffic is not diverted through the IP hooks."
+else
+  warn "br_netfilter is on (bridge-nf-call-iptables=1). TPROXY will match packets and"
+  warn "then never deliver them, so every proxied SSID hangs with nothing in the logs."
+  warn "Fix: sysctl -w net.bridge.bridge-nf-call-iptables=0 (and persist it in /etc/sysctl.conf)."
+fi
 
 echo; echo "==== 7. DHCP hook ===="
 _dhcpscript="$(uci -q get dhcp.@dnsmasq[0].dhcpscript || true)"

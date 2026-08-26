@@ -788,6 +788,16 @@ assign_live_update() { # idx mac slot
     || warn "Could not update the live ruleset for $2; run scripts/apply.sh to resync."
 }
 
+# Whether bridged traffic is kept out of the IP hooks. A `1` here means every
+# proxied SSID will hang: the TPROXY rule matches and the packet is never
+# delivered to sing-box. The path is a variable so this is testable.
+bridge_nf_ok() {
+  _bnf="${BRNF_PATH:-/proc/sys/net/bridge/bridge-nf-call-iptables}"
+  [ -f "$_bnf" ] || return 0          # module absent, which is the OpenWrt default
+  [ "$(cat "$_bnf" 2>/dev/null)" = "1" ] || return 0
+  return 1
+}
+
 validate_pools() {
   [ -f "${POOLS:-}" ] || return 0
   awk -F'|' -v cap="${POOL_SLOTS_PER_SSID_MAX:-256}" '

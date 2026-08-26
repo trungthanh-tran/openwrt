@@ -75,6 +75,8 @@ if nft list table inet sbproxy >/dev/null 2>&1; then
 else
   bad "sbproxy table is missing (has sbproxy init run?)"
 fi
+bridge_nf_ok && ok "br_netfilter is not diverting bridged traffic" \
+  || bad "bridge-nf-call-iptables=1 — TPROXY matches but never delivers; every proxied SSID hangs"
 ip rule 2>/dev/null | grep -q '0x1' && ok "fwmark policy rule exists" || bad "fwmark IP rule is missing"
 ip route show table "${TPROXY_TABLE:-100}" 2>/dev/null | grep -q . && ok "route table ${TPROXY_TABLE:-100} has entries" || bad "route table ${TPROXY_TABLE:-100} is empty"
 

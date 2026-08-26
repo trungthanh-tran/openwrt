@@ -6,6 +6,11 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- `bridge_nf_ok`: `preflight.sh` và `doctor.sh` cảnh báo khi
+  `bridge-nf-call-iptables=1` — TPROXY khớp gói rồi không bao giờ giao tới
+  sing-box, mọi SSID có proxy treo, log sạch trơn.
+- `tests/vm/datapath.sh`: kiểm gói tin thật đi đúng slot, bằng chính code
+  production, hai client trong network namespace và một SOCKS5 giả mỗi slot.
 - **Một SSID mang được nhiều proxy.** `config/proxy-pools.conf` khai báo pool
   cho từng Wi-Fi (`idx|proxy_type|host|port|user|pass|label`); mỗi proxy là một
   *slot* với cổng TPROXY và outbound sing-box riêng. Thiết bị nào dùng proxy nào
@@ -36,6 +41,13 @@ Ngày theo định dạng YYYY-MM-DD.
   trên router. Xem [tests/vm/README.md](tests/vm/README.md).
 
 ### Fixed
+- **Ruleset pool sinh ra không nạp được.** SSID có pool nhưng chưa ghim thiết bị
+  nào sinh ra `map w1map { … size 512 }` — thiếu dấu `;` trước `}`, và nft từ
+  chối *cả file*. Mọi pool đều bắt đầu ở đúng trạng thái đó, nên `apply.sh` sẽ
+  hỏng trên router đầu tiên dùng pool. Không assertion nào thấy được vì tất cả
+  đều đọc file dưới dạng chuỗi; giờ output được đưa thẳng cho `nft -c`.
+- **`ALLOW_UNSUPPORTED_BOARD=1` trên dòng lệnh không có tác dụng.** `settings.sh`
+  gán đè `0` sau khi env đã có, đúng lệnh mà hướng dẫn VM bảo chạy.
 - **SSID nào khai `proxy_type` đều bị `apply.sh` phá.** `validate_conf` chấp
   nhận 10, 11 hoặc 12 cột nhưng `desired_idx` chỉ khớp 10 hoặc 11, mà cột thứ 12
   chính là `proxy_type`. `desired_idx` nuôi `emit_stale_uci`, thứ xoá section

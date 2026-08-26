@@ -214,6 +214,21 @@ divert rule, which that kernel cannot answer because it has no `nft_socket`.
 That covers D2 -- the map-keyed `tproxy` lookup F2-F4 are built on -- on a real
 kernel for the first time. D9 and D10 still need the router.
 
+## End-to-end data path
+
+Script: `tests/vm/datapath.sh`
+
+The spike proves a kernel will load the rules. This proves the rules do what
+they are for: it stands up the production ruleset, the production sing-box
+config, and the production policy routing, puts two clients on the SSID bridge
+in network namespaces, and gives each slot a SOCKS5 server that names itself
+down the connection. A client reading back `SLOT0` went through slot 0; there
+is no way to fake that. It also drives `assign_live_update` rather than `nft`
+directly, so re-pinning a device that already has a map element is covered.
+
+It replaces `inet sbproxy`, so it is for a VM, not a serving router -- it
+refuses to start if that table exists. 10/10 on a WSL2 6.18 kernel, 2026-08-26.
+
 ## Real-router acceptance tests
 
 Automation cannot faithfully emulate radio firmware, MediaTek drivers,

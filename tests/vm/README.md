@@ -239,6 +239,45 @@ vẫn thêm một bảng trong chốc lát.
 Nếu **D2 hỏng**, spike sẽ nói ra, và [`build_nft()`](../../scripts/lib.sh) là chỗ duy
 nhất phải sửa để chuyển sang D2a.
 
+## Chạy thử đường đi thật của gói tin
+
+```sh
+sh tests/vm/datapath.sh
+```
+
+Đây là bài kiểm duy nhất trả lời được câu hỏi cả dự án tồn tại vì nó: **thiết bị
+ghim slot 0 có thật sự ra bằng proxy slot 0 không.** Mọi suite khác dừng trước
+đó một bước — chúng kiểm văn bản bộ sinh viết ra; `spike.sh` kiểm nhân có nạp
+được văn bản đó.
+
+Cách làm: dựng bằng **đúng code production** — `build_nft`, `build_singbox`,
+policy routing lấy từ `etc/init.d/sbproxy` — cộng hai client trong network
+namespace trên `br-w1`, và mỗi slot một SOCKS5 giả tự xưng tên xuống kết nối.
+Client đọc được `SLOT0` nghĩa là gói tin đã đi qua slot 0. Không giả được.
+
+Bài này cũng gọi `assign_live_update` chứ không tự gõ `nft`, nên nó kiểm luôn
+đường đổi proxy lúc đang chạy, kể cả lần đổi thứ hai — `add element` trên key đã
+có sẽ báo `EEXIST`, và production xử lý đúng bằng cách xoá trước.
+
+**Không chạy được trên router đang phục vụ.** Nó nạp ruleset riêng vào chính
+`inet sbproxy`, nên sẽ thay thế cái đang chạy. Script tự từ chối nếu bảng đó đã
+tồn tại.
+
+Kết quả 2026-08-26 trên nhân WSL2 6.18: **10/10 đạt.**
+
+### Một cái bẫy mà bài này lôi ra
+
+Lần chạy đầu treo hoàn toàn: luật nft **có khớp** — counter đếm đủ gói — nhưng
+không gói nào tới được sing-box, và không có bộ đếm drop nào nhúc nhích. Nguyên
+nhân là `br_netfilter`: khi `bridge-nf-call-iptables=1`, khung tin đi qua bridge
+bị đẩy qua các hook IP thêm một lần nữa, và quyết định TPROXY lấy ở đó không bao
+giờ tới được socket cục bộ.
+
+Triệu chứng đúng nghĩa im lặng: mọi SSID có proxy đều treo, log sạch trơn.
+OpenWrt không cài `kmod-br-netfilter` mặc định, nhưng thứ gì kéo nó vào (Docker
+là thủ phạm quen thuộc) sẽ gây ra đúng cảnh này. `preflight.sh` và `doctor.sh`
+giờ đều kiểm.
+
 ## Còn thiếu
 
 Phép đo RAM của D10 (`--ram`) mới chỉ là chỗ trống: nó cần sinh config cho từng mức
