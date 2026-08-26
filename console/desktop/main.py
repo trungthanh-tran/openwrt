@@ -2800,10 +2800,10 @@ class ManualBanDialog(tk.Toplevel):
 
 
 class PoolDialog(tk.Toplevel):
-    """Show one Wi-Fi's proxy pool, and take a replacement list for it."""
+    """Read-only proxy pool view; existing entries are added or removed only."""
 
     def __init__(self, parent, record, proxies, usage, language="en", palette=None,
-                 online_devices=False):
+                 online_devices=False, health=None):
         super().__init__(parent)
         self.language = language
         self.t = lambda text, **values: translate(text, self.language, **values)
@@ -2813,6 +2813,8 @@ class PoolDialog(tk.Toplevel):
         self.grab_set()
         self.configure(bg=self.palette["bg"])
         self.result = None
+        self.usage = list(usage)
+        self.health = health if isinstance(health, dict) else {}
 
         body = ttk.Frame(self, style="Card.TFrame", padding=18)
         body.pack(fill="both", expand=True)
@@ -2821,7 +2823,10 @@ class PoolDialog(tk.Toplevel):
 
         columns = ("slot", "proxy", "type", "devices")
         titles = (self.t("Slot"), self.t("Proxy"), "Type", self.t("Máy"))
-        table = ttk.Treeview(body, columns=columns, show="headings", height=8)
+        table = ttk.Treeview(body, columns=columns, show="headings", height=8,
+                             selectmode="extended")
+        self.table = table
+        self.proxies = list(proxies)
         for column, title, width in zip(columns, titles, (50, 260, 70, 70)):
             table.heading(column, text=title)
             table.column(column, width=width, anchor="w")
@@ -2830,22 +2835,16 @@ class PoolDialog(tk.Toplevel):
             table.insert("", "end", values=(position, proxy_display(row),
                                             row.get("type", ""), count))
         table.pack(fill="both", expand=True, pady=(0, 10))
+        table.bind("<Double-1>", self._show_detail)
 
-        ttk.Label(body, text="Dán danh sách proxy (mỗi dòng một proxy)",
+        ttk.Label(body, text="Thêm proxy mới (mỗi dòng một proxy)",
                   style="Muted.TLabel").pack(anchor="w")
         self.text = tk.Text(body, height=8, width=64, background=self.palette["card"],
                             foreground=self.palette["text"], insertbackground=self.palette["text"],
                             relief="flat", borderwidth=1)
         self.text.pack(fill="both", expand=True, pady=(4, 4))
-        ttk.Label(
-            body,
-            text=("Replacing keeps every device on the proxy it is using, as long as that "
-                  "proxy is still in the list. Wi-Fi is not interrupted."
-                  if language == "en" else
-                  "Thay pool vẫn giữ mỗi máy ở đúng proxy nó đang dùng, miễn là proxy đó còn "
-                  "trong danh sách. Wi‑Fi không bị ngắt."),
-            style="Muted.TLabel", wraplength=460, justify="left",
-        ).pack(anchor="w", pady=(0, 12))
+        ttk.Label(body, text="Double-click một channel để xem chi tiết; proxy hiện có không sửa trực tiếp.",
+                  style="Muted.TLabel", wraplength=460, justify="left").pack(anchor="w", pady=(0, 12))
 
         actions = ttk.Frame(body, style="Card.TFrame")
         actions.pack(fill="x")
@@ -2854,8 +2853,10 @@ class PoolDialog(tk.Toplevel):
         if online_devices:
             ttk.Label(actions, text="Không thể xóa khi có device đang kết nối",
                       style="Muted.TLabel").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Xóa proxy chọn", command=self._delete_selected,
+                   style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Ghi pool", command=self._submit,
+        ttk.Button(actions, text="Thêm proxy", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
         self.bind("<Escape>", lambda _event: self.destroy())
         self.text.focus_set()
@@ -2863,8 +2864,45 @@ class PoolDialog(tk.Toplevel):
         center_dialog(self)
 
     def _submit(self):
-        self.result = self.text.get("1.0", "end")
+        self.result = ("__ADD_POOL__", self.text.get("1.0", "end"))
         self.destroy()
+
+    def _show_detail(self, _event=None):
+        selected = self.table.selection()
+        if not selected:
+            return
+        slot = int(self.table.item(selected[0], "values")[0])
+        row = self.proxies[slot]
+        health = (row.get("health") or row.get("state") or self.health.get("state")
+                  or "Chưa có dữ liệu")
+        latency = row.get("latency_ms", self.health.get("latency_ms"))
+        if latency is not None:
+            health = f"{health} ({latency} ms)"
+        details = (f"Type: {str(row.get('type') or '').upper()}\n"
+                   f"IP: {row.get('host') or '—'}\n"
+                   f"Port: {row.get('port') or '—'}\n"
+                   f"Username: {row.get('user') or '—'}\n"
+                   f"Password: {row.get('pass') or '—'}\n"
+                   f"Health: {health}")
+        messagebox.showinfo(self.t("Chi tiết proxy"), details, parent=self)
+
+    def _delete_selected(self):
+        selected = self.table.selection()
+        if not selected:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn proxy trong bảng trước"), parent=self)
+            return
+        slots = sorted(int(self.table.item(item, "values")[0]) for item in selected)
+        blocked = [slot for slot in slots if slot < len(self.usage) and self.usage[slot] > 0]
+        if blocked:
+            messagebox.showwarning(
+                APP_NAME,
+                self.t("Không thể xóa proxy đang được device kết nối"),
+                parent=self,
+            )
+            return
+        if messagebox.askyesno(self.t("Xóa proxy"), self.t("Xóa proxy đã chọn khỏi pool?"), parent=self):
+            self.result = ("__DELETE_POOL_SLOTS__", slots)
+            self.destroy()
 
     def _clear_pool(self):
         if messagebox.askyesno(
@@ -5690,6 +5728,7 @@ class NativeApp:
         dialog = PoolDialog(
             self.root, record, proxies, usage, self.language, self.palette,
             online_devices=self.has_online_devices(record.idx),
+            health=self.health.get(str(record.idx), self.health.get(record.idx, {})),
         )
         self.root.wait_window(dialog)
         if dialog.result is None:
@@ -5697,7 +5736,69 @@ class NativeApp:
         if dialog.result == "__CLEAR_POOL__":
             self.clear_pool(record.idx)
             return
+        if isinstance(dialog.result, tuple):
+            action, payload = dialog.result
+            if action == "__ADD_POOL__":
+                self.add_pool_text(record.idx, payload)
+            elif action == "__DELETE_POOL_SLOTS__":
+                self.delete_pool_slots(record.idx, payload)
+            return
         self.apply_pool_text(record.idx, dialog.result)
+
+    def add_pool_text(self, idx, text):
+        rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX)
+        if dropped:
+            detail = "\n".join(f"{number}: {line} — {reason}" for number, line, reason in dropped[:25])
+            messagebox.showwarning(APP_NAME, f"{self.t('Những dòng bị bỏ qua')}:\n{detail}", parent=self.root)
+        if not rows:
+            messagebox.showinfo(APP_NAME, self.t("Không có dòng nào dùng được"), parent=self.root)
+            return
+        try:
+            client = self.require_client()
+            existing = self.pool_for_idx(idx, refresh=True).get("proxies") or []
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        merged, new_slots = merge_proxy_rows(existing, rows)
+        if not new_slots:
+            messagebox.showinfo(APP_NAME, self.t("Không có proxy mới để thêm"), parent=self.root)
+            return
+        if not self.confirm_important(
+            "Thêm proxy", f"Thêm {len(new_slots)} proxy vào pool Wi‑Fi {idx}.",
+            "Các device hiện tại không bị ngắt; proxy mới chỉ được thêm vào pool.",
+        ):
+            return
+        def done(response):
+            self.pool_cache.pop(idx, None)
+            self.pool_counts[idx] = len(merged)
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+        self.run_task("Đang thêm proxy…", lambda: client.save_pool(idx, merged), done)
+
+    def delete_pool_slots(self, idx, slots):
+        try:
+            client = self.require_client()
+            existing = self.pool_for_idx(idx, refresh=True).get("proxies") or []
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        slots = {int(slot) for slot in slots}
+        protected = self.online_pool_proxies(idx, existing)
+        protected_ids = {proxy_object_tuple(row)[:5] for row in protected
+                         if proxy_object_tuple(row) is not None}
+        removed_ids = {proxy_object_tuple(existing[slot])[:5] for slot in slots
+                       if 0 <= slot < len(existing) and proxy_object_tuple(existing[slot]) is not None}
+        if protected_ids & removed_ids:
+            messagebox.showwarning(APP_NAME, self.t("Không thể xóa proxy đang được device kết nối"), parent=self.root)
+            return
+        rows = [proxy_object_tuple(row) for position, row in enumerate(existing)
+                if position not in slots and proxy_object_tuple(row) is not None]
+        def done(response):
+            self.pool_cache.pop(idx, None)
+            self.pool_counts[idx] = len(rows)
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+        self.run_task("Đang xóa proxy…", lambda: client.save_pool(idx, rows), done)
 
     def clear_pool(self, idx):
         if self.has_online_devices(idx):
