@@ -41,6 +41,10 @@ echo; echo "==== 5. Required packages ===="
 for p in sing-box nftables kmod-nft-tproxy kmod-nft-socket ip-full iw-full jq; do
   if command -v apk >/dev/null 2>&1; then installed="$(apk list -I "$p" 2>/dev/null || true)"
   else installed="$(opkg list-installed "$p" 2>/dev/null || true)"; fi
+  # OpenWrt 25.x ships the nft binary as nftables-json on apk-based images.
+  if [ "$p" = "nftables" ] && [ -z "$installed" ] && command -v nft >/dev/null 2>&1; then
+    installed="nft binary"
+  fi
   if [ -n "$installed" ]; then echo "  [OK] $p"; else echo "  [MISSING] $p"; fi
 done
 
