@@ -3,6 +3,15 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.10] - 2026-08-28
+
+### Fixed
+- `build_nft` sinh `set proxy_hosts { type ipv4_addr }` thiếu dấu `;` khi
+  `wifi-socks.conf` chưa có proxy nào. nftables 1.1.x trên OpenWrt 25.12 parse
+  chặt hơn và báo `set definition does not specify key`, nên dry-run trong
+  "Post-flash router setup" dừng ở bước preflight. Khai báo set giờ luôn kết
+  thúc bằng `;` cho cả `type` lẫn `elements`.
+
 ## [0.5.0] - 2026-08-26
 
 ### Added

@@ -282,7 +282,7 @@ eq "numeric proxy hosts become set elements" \
   "$(grep -o 'elements = { [^}]*}' "$NFT_FILE")" \
   'elements = { 1.2.3.4, 5.6.7.8, 9.9.9.9 }'
 eq "the set is keyed by IPv4 address" \
-  "$(grep -c 'set proxy_hosts { type ipv4_addr' "$NFT_FILE")" "1"
+  "$(grep -c 'set proxy_hosts { type ipv4_addr;' "$NFT_FILE")" "1"
 
 POOLHOSTS="$STUB/ph.conf"
 printf '%s\n' '1|socks5|203.0.113.7|1080|||' '1|socks5|1.2.3.4|1080|||' \
