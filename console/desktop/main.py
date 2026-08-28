@@ -654,6 +654,17 @@ EN_TRANSLATIONS = {
     'Cài agent riêng — không chạy preflight': 'Agent-only install — preflight is skipped',
     'Cài agent riêng — không apply cấu hình': 'Agent-only install — configuration is not applied',
     'Đường ra: dùng {interface}': 'Egress: using {interface}',
+    'Đổi đường ra': 'Switch egress',
+    'Hãy chọn một interface cụ thể trong ô Đường ra rồi bấm Đổi đường ra.': 'Pick a specific interface in the Egress box, then click Switch egress.',
+    'Đổi đường ra Internet của router sang {interface}?\n\nInterface này nhận ưu tiên cao nhất, các đường ra khác lùi lại phía sau; network trên router sẽ reload. Wi-Fi và proxy không đổi.':
+        "Switch the router's Internet egress to {interface}?\n\nThis interface gets the best route priority and every other uplink steps behind it; the router network reloads. Wi-Fi and proxies are unchanged.",
+    'Đã đổi; đang kiểm tra kết nối qua đường ra mới…': 'Switched; checking connectivity through the new egress…',
+    'Đã đổi đường ra sang {interface}': 'Egress switched to {interface}',
+    'Đang đổi đường ra trên router…': 'Switching the egress on the router…',
+    'Host key SSH của router đã đổi': "The router's SSH host key has changed",
+    'Router {host} trả lời bằng host key SSH khác với lần trước (thường do vừa flash lại firmware). ssh từ chối kết nối cho tới khi xoá khoá cũ.\n\nXoá khoá cũ trong known_hosts của ứng dụng và chạy lại cài đặt?':
+        "Router {host} answered with a different SSH host key than before (usually because the firmware was just reflashed). ssh refuses to connect until the old key is removed.\n\nRemove the old key from the app's known_hosts and run the setup again?",
+    'Đã xoá host key cũ của {host}; chạy lại cài đặt.': 'Removed the old host key for {host}; running the setup again.',
     'tự động': 'automatic',
     'Không mở được cửa sổ cài đặt': 'Cannot open the setup window',
     'Đang kiểm tra tình trạng router…': 'Checking the router status…',
@@ -692,7 +703,7 @@ def translate(text: str, language: str = "en", **values) -> str:
     translated = EN_TRANSLATIONS.get(text, text) if language == "en" else text
     if language == "en" and translated == text:
         dynamic_prefixes = (
-            ("Dòng cấu hình cần 10 hoặc 11 cột: ", "Configuration row must have 10 or 11 columns: "),
+            ("Dòng cấu hình cần 10, 11 hoặc 12 cột: ", "Configuration row must have 10, 11 or 12 columns: "),
             ("Không kết nối được ", "Could not connect to "),
             ("Thiếu công cụ ", "Missing local tool "),
         )
@@ -1477,7 +1488,10 @@ class ProvisionSettings:
         options = [
             "-o", f"ConnectTimeout={SSH_CONNECT_TIMEOUT}",
             "-o", "StrictHostKeyChecking=accept-new",
-            "-o", f"UserKnownHostsFile={KNOWN_HOSTS_FILE}",
+            # ssh parses an -o value like a config line and splits it on
+            # whitespace, so a profile such as C:\Users\Ca Nha Vui must be
+            # quoted or the path ends at the first space.
+            "-o", f'UserKnownHostsFile="{KNOWN_HOSTS_FILE}"',
         ]
         if self.key_path:
             options += ["-i", self.key_path]
@@ -1522,6 +1536,36 @@ class ProvisionSettings:
             "overwrite_config": bool(self.overwrite_config),
             "reinstall_agent": bool(self.reinstall_agent),
         }
+
+
+def forget_host_key(host: str, port: int = 22, path=None) -> int:
+    """Drop every known_hosts line for `host` (plain and [host]:port forms).
+
+    Returns the number of lines removed. Done in Python rather than with
+    `ssh-keygen -R` so it behaves the same whether or not ssh-keygen is on
+    PATH, and so a path with spaces needs no quoting games.
+    """
+    path = Path(path or KNOWN_HOSTS_FILE)
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+    except OSError:
+        return 0
+    host = host.strip().lower()
+    names = {host, f"[{host}]:{port}"}
+    kept, removed = [], 0
+    for line in lines:
+        fields = line.split()
+        if fields and not fields[0].startswith("#") and \
+                any(entry.lower() in names for entry in fields[0].split(",")):
+            removed += 1
+            continue
+        kept.append(line)
+    if removed:
+        try:
+            path.write_text("".join(kept), encoding="utf-8")
+        except OSError:
+            return 0
+    return removed
 
 
 def repo_root_candidate() -> str:
@@ -1776,6 +1820,7 @@ class ProvisionRunner:
         self._agent_version = version_reader or read_agent_version
         self.token = ""
         self.cancelled = False
+        self.host_key_changed = False
         self.inventory = {key: False for key in ROUTER_INVENTORY_KEYS}
         self.pushed_version = ""  # version of the package this run put on the router
         self.router_version = ""   # version already on the router, before the push
@@ -1832,6 +1877,10 @@ class ProvisionRunner:
         except subprocess.TimeoutExpired as exc:
             raise ProvisionError(f"{description}: quá thời gian chờ") from exc
         output = (out + ("\n" + err if err.strip() else "")).strip()
+        if "REMOTE HOST IDENTIFICATION HAS CHANGED" in output or "Host key verification failed" in output:
+            # A reflashed router has a new host key; the stale entry blocks
+            # every ssh until it is removed. The wizard offers to do that.
+            self.host_key_changed = True
         if code != 0:
             # One line reaches the checklist; the whole thing reaches the log,
             # which is what a support bundle needs.
@@ -2107,7 +2156,7 @@ class ProvisionRunner:
 # anything to it.
 AUDITED_ACTIONS = frozenset({
     "save_conf", "apply", "set_sock", "rotate_mac", "backup", "rollback",
-    "update", "uninstall", "kick", "ban", "unban", "rotate_token", "set_gateway",
+    "update", "uninstall", "kick", "ban", "unban", "rotate_token", "set_gateway", "switch_gateway",
     "save_pool", "assign_proxy", "rebalance",
 })
 
@@ -2208,6 +2257,10 @@ class AgentClient:
     def set_gateway(self, interface: str):
         """Pin which interface counts as the uplink; "" means automatic."""
         return self._request("set_gateway", "POST", {"interface": interface}, timeout=30)
+
+    def switch_gateway(self, interface: str):
+        """Make `interface` the router's real uplink (route metrics), then pin it."""
+        return self._request("switch_gateway", "POST", {"interface": interface}, timeout=60)
 
     def clients(self):
         return self._request("clients", timeout=30)
@@ -3601,6 +3654,8 @@ class SetupWizard(tk.Toplevel):
         if not success:
             self.state_var.set(self.t("Cài đặt chưa hoàn tất"))
             self.append(self.t("Cài đặt chưa hoàn tất — hãy xử lý bước lỗi rồi chạy lại."))
+            if self.runner and getattr(self.runner, "host_key_changed", False):
+                self.offer_host_key_reset()
             return
         self.state_var.set(self.t("Cài đặt hoàn tất"))
         self.append(self.t("Cài đặt hoàn tất — đã lấy token và mở màn hình điều khiển."))
@@ -3609,6 +3664,19 @@ class SetupWizard(tk.Toplevel):
         if self.on_success and token:
             self.on_success(base_url, token)
         self.close()
+
+    def offer_host_key_reset(self):
+        """Explain the ssh host-key warning and offer the one-click fix."""
+        host = str(self.runner.settings.host).strip() if self.runner else ""
+        if not messagebox.askyesno(
+            self.t("Host key SSH của router đã đổi"),
+            self.t("Router {host} trả lời bằng host key SSH khác với lần trước (thường do vừa flash lại firmware). ssh từ chối kết nối cho tới khi xoá khoá cũ.\n\nXoá khoá cũ trong known_hosts của ứng dụng và chạy lại cài đặt?", host=host),
+            parent=self,
+        ):
+            return
+        forget_host_key(host, int(self.runner.settings.port))
+        self.append(self.t("Đã xoá host key cũ của {host}; chạy lại cài đặt.", host=host))
+        self.start()
 
     def check_state(self):
         """Read-only: what does the router answer, and what is installed on it?"""
@@ -4226,6 +4294,8 @@ class NativeApp:
             gateway_head, textvariable=self.gateway_iface_var, state="readonly", width=34,
             style="GatewayUnknown.TCombobox", postcommand=self._color_gateway_interface_menu,
         )
+        ttk.Button(gateway_head, text="Đổi đường ra", command=self.switch_gateway_now,
+                   style="Primary.TButton").pack(side="right", padx=(0, 8))
         self.gateway_iface_combo.pack(side="right", padx=(0, 8))
         self.gateway_iface_combo.bind("<<ComboboxSelected>>", self._on_gateway_interface_changed)
         ttk.Label(gateway_head, text="Đường ra", style="MetricBlue.TLabel").pack(side="right", padx=(0, 6))
@@ -5132,6 +5202,39 @@ class NativeApp:
             show_loading=True,
             timeout_hint=45,
         )
+
+    def switch_gateway_now(self):
+        """Route the router's Internet traffic through the selected interface.
+
+        Picking an entry in the box only records which uplink is expected;
+        this changes the default-route metrics on the router so the chosen
+        interface actually carries the traffic.
+        """
+        chosen = self.gateway_iface_var.get()
+        interface = self.gateway_iface_choices.get(chosen, "")
+        if not interface:
+            messagebox.showerror(APP_NAME, self.t("Hãy chọn một interface cụ thể trong ô Đường ra rồi bấm Đổi đường ra."), parent=self.root)
+            return
+        if self.block_if_incompatible():
+            return
+        if not messagebox.askyesno(
+            APP_NAME,
+            self.t("Đổi đường ra Internet của router sang {interface}?\n\nInterface này nhận ưu tiên cao nhất, các đường ra khác lùi lại phía sau; network trên router sẽ reload. Wi-Fi và proxy không đổi.", interface=interface),
+            parent=self.root,
+        ):
+            return
+        client = self.require_client()
+        def work():
+            self.update_loading("Đang đổi đường ra…")
+            client.switch_gateway(interface)
+            self.update_loading("Đã đổi; đang kiểm tra kết nối qua đường ra mới…")
+            return client.gateway()
+        def done(payload):
+            message = self.t("Đã đổi đường ra sang {interface}", interface=interface)
+            self.append_log(message)
+            self.status_var.set(message)
+            self.render_gateway(payload)
+        self.run_task("Đang đổi đường ra trên router…", work, done, show_loading=True, timeout_hint=60)
 
     def refresh_gateway(self):
         try:

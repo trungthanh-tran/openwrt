@@ -18,6 +18,7 @@
 # GET  ?action=health_now    -> run an immediate health probe
 # GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status + interface list
 # POST ?action=set_gateway   body json {interface} -> pin the expected uplink ("" = automatic)
+# POST ?action=switch_gateway body json {interface} -> make that interface the uplink (route metrics) and pin it
 # GET  ?action=get_pool&idx=N -> {proxies:[...], assignments:[...]} pool of one Wi-Fi
 # POST ?action=save_pool     body json {idx,proxies:[...]} -> replace that Wi-Fi's pool
 # POST ?action=assign_proxy  body json {idx,assignments:[{mac,slot}]} -> pin devices, no reload
@@ -257,9 +258,9 @@ case "$ACTION" in
     # validator checks all bounds, duplicate indexes, keys, flags, and OUI.
     bad="$(awk -F'|' '
       /^[[:space:]]*($|#)/ {next}
-      NF != 10 && NF != 11 {print NR; exit}
+      NF != 10 && NF != 11 && NF != 12 {print NR; exit}
     ' "$BODY_FILE")"
-    [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad cần đúng 10 hoặc 11 cột phân tách '|'"
+    [ -z "$bad" ] || json_err "400 Bad Request" "dòng $bad cần đúng 10, 11 hoặc 12 cột phân tách '|'"
     TMP_CONF="$(mktemp "${CONF}.candidate.XXXXXX")" \
       || json_err "500 Internal Server Error" "không tạo được config tạm"
     cp "$BODY_FILE" "$TMP_CONF" \
@@ -468,6 +469,30 @@ case "$ACTION" in
     rm -f "$ENV_TMP"
     json_ok "$(jq -n --arg interface "$iface" \
       '{ok:true, interface:$interface, automatic:($interface == "")}')"
+    ;;
+
+  switch_gateway)
+    # Change the router's real uplink, not just the expectation: the chosen
+    # interface gets the best default-route metric and every other uplink
+    # steps behind it. scripts/switch-gateway.sh does the validation (exists,
+    # up, has a default route, is not a proxied SSID bridge) and pins the
+    # choice in the env file afterwards.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '(.interface | type == "string") and (.interface | length > 0)'       "interface phải là chuỗi khác rỗng"
+    iface="$(trim_field "$(jq -r '.interface' "$BODY_FILE")")"
+    case "$iface" in
+      "") json_err "400 Bad Request" "thiếu interface" ;;
+      *[!A-Za-z0-9_.-]*) json_err "400 Bad Request" "tên interface chỉ được dùng chữ, số, . _ -" ;;
+    esac
+    [ "${#iface}" -le 32 ] || json_err "400 Bad Request" "tên interface dài quá 32 ký tự"
+    OUT="$(cd "$SB_ROOT" && ENV_FILE="$ENV_FILE" sh scripts/switch-gateway.sh "$iface" 2>&1)"; RC=$?
+    if [ "$RC" -ne 0 ]; then
+      detail="$(printf '%s' "$OUT" | jq -r '.error // empty' 2>/dev/null)"
+      json_err "400 Bad Request" "không đổi được đường ra: ${detail:-$OUT}"
+    fi
+    printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1       || json_err "500 Internal Server Error" "switch-gateway trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
     ;;
 
   get_pool)

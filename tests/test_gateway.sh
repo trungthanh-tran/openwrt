@@ -18,6 +18,7 @@ eq()   { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi
 if ! command -v jq >/dev/null 2>&1; then
   echo "== gateway =="
   printf '  skip gateway suite (jq is not installed)\n'
+
   echo; echo "GATEWAY TOTAL: pass=0 fail=0 skip=1"
   exit 0
 fi
@@ -84,6 +85,15 @@ eq "the egress is accepted"      "$(field "$out" .expected_active)" "true"
 eq "no egress problem"           "$(field "$out" .egress_problem)" ""
 eq "no interface is enforced"    "$(field "$out" .expected_interface)" ""
 eq "http result is carried"      "$(field "$out" .http_code)" "204"
+
+echo "== gateway: wan and wan6 share the device; only the IPv4 one is in use =="
+out="$(IP_ROUTE_LINE='1.1.1.1 via 192.168.88.1 dev eth1 src 192.168.88.83 uid 0'        UBUS_DUMP='{"interface":[
+         {"interface":"wan6","l3_device":"eth1","device":"eth1","proto":"dhcpv6","up":true},
+         {"interface":"wan","l3_device":"eth1","device":"eth1","proto":"dhcp","up":true,
+          "ipv4-address":[{"address":"192.168.88.83","mask":24}]}]}'        run_gateway)"
+eq "wan is resolved, not wan6"  "$(field "$out" .interface)" "wan"
+eq "state is ok"                "$(field "$out" .state)" "ok"
+eq "only wan is current"        "$(field "$out" '[.interfaces[] | select(.current) | .name] | join(",")')" "wan"
 
 echo "== gateway: Wi-Fi as WAN is equally normal =="
 out="$(IP_ROUTE_LINE='1.1.1.1 via 192.168.8.1 dev phy0-sta0 src 192.168.8.2 uid 0' \
@@ -159,6 +169,54 @@ out="$(CURL_RESULT='000 0' IP_ROUTE_LINE='1.1.1.1 via 192.168.88.1 dev eth1 src 
        UBUS_DUMP="$DUMP" run_gateway)"
 eq "an HTTP failure is degraded" "$(field "$out" .state)" "degraded"
 eq "http_ok is false"            "$(field "$out" .http_ok)" "false"
+
+
+echo "== switch-gateway: the chosen interface becomes the uplink =="
+cat > "$STUB/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$UCI_LOG"
+case "$1" in
+  get) case "$2" in network.wwan.metric) echo 20 ;; *) exit 1 ;; esac ;;
+esac
+exit 0
+SH
+chmod +x "$STUB/uci"
+UCI_LOG="$STUB/uci.log"; export UCI_LOG
+SWITCH_ENV="$STUB/env"; printf 'FOO=1\nGATEWAY_EXPECTED_INTERFACE=wan\n' > "$SWITCH_ENV"
+DEFROUTE='"route":[{"target":"0.0.0.0","mask":0,"nexthop":"192.168.8.1"}]'
+SWITCH_DUMP='{"interface":[
+  {"interface":"wan","l3_device":"eth1","device":"eth1","up":true,'"$DEFROUTE"'},
+  {"interface":"wwan","l3_device":"phy0-sta0","up":true,'"$DEFROUTE"'},
+  {"interface":"lan","l3_device":"br-lan","up":true},
+  {"interface":"w1","l3_device":"br-w1","up":true,'"$DEFROUTE"'}]}'
+: > "$UCI_LOG"
+out="$(UBUS_DUMP="$SWITCH_DUMP" \
+       UBUS_STATUS_wwan='{"interface":"wwan","l3_device":"phy0-sta0","up":true,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" wwan 2>/dev/null)"
+eq "switch succeeds"                 "$(field "$out" .ok)" "true"
+eq "the other uplink steps behind"   "$(grep -c 'uci set network.wan.metric=100' "$UCI_LOG")" "1"
+eq "the choice takes metric 0"       "$(grep -c 'uci set network.wwan.metric=0' "$UCI_LOG")" "1"
+eq "lan is left alone"               "$(grep -c 'network.lan' "$UCI_LOG")" "0"
+eq "the proxied bridge is left alone" "$(grep -c 'network.w1' "$UCI_LOG")" "0"
+eq "network is committed"            "$(grep -c 'uci commit network' "$UCI_LOG")" "1"
+eq "the choice is pinned"            "$(grep -c '^GATEWAY_EXPECTED_INTERFACE=wwan$' "$SWITCH_ENV")" "1"
+eq "other env keys survive"          "$(grep -c '^FOO=1$' "$SWITCH_ENV")" "1"
+
+echo "== switch-gateway: refusals =="
+out="$(UBUS_DUMP="$SWITCH_DUMP" UBUS_STATUS_lan='{"interface":"lan","l3_device":"br-lan","up":true}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" lan 2>/dev/null)"
+eq "no default route is refused"    "$(field "$out" .ok)" "false"
+out="$(UBUS_DUMP="$SWITCH_DUMP" UBUS_STATUS_w1='{"interface":"w1","l3_device":"br-w1","up":true,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" w1 2>/dev/null)"
+eq "a proxied bridge is refused"    "$(field "$out" .ok)" "false"
+out="$(UBUS_DUMP="$SWITCH_DUMP" UBUS_STATUS_wwan='{"interface":"wwan","l3_device":"phy0-sta0","up":false,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" wwan 2>/dev/null)"
+eq "a down interface is refused"    "$(field "$out" .ok)" "false"
+out="$(UBUS_DUMP="$SWITCH_DUMP" ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" nope 2>/dev/null)"
+eq "an unknown interface is refused" "$(field "$out" .ok)" "false"
+out="$(UBUS_DUMP="$SWITCH_DUMP" ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" 'wan;reboot' 2>/dev/null)"
+eq "a shell-looking name is refused" "$(field "$out" .ok)" "false"
 
 echo
 echo "GATEWAY TOTAL: pass=$pass fail=$fail skip=$skip"

@@ -31,16 +31,19 @@ actual_up=false
 interfaces=""
 if command -v ubus >/dev/null 2>&1; then
   dump="$(ubus call network.interface dump 2>/dev/null || true)"
+  # Several logical interfaces can share one device (wan and wan6 on eth1).
+  # The route being checked is IPv4, so the one holding an IPv4 address is
+  # the uplink; its dhcpv6 sibling must not be reported as "in use".
   if [ -n "$dump" ] && [ -n "$device" ]; then
-    logical_interface="$(printf '%s' "$dump" | jq -r --arg dev "$device" \
-      '[.interface[]? | select((.l3_device // "") == $dev or (.device // "") == $dev)][0].interface // empty' 2>/dev/null)"
-    actual_up="$(printf '%s' "$dump" | jq -r --arg dev "$device" \
-      '[.interface[]? | select((.l3_device // "") == $dev or (.device // "") == $dev)][0].up // false' 2>/dev/null)"
+    _match='[.interface[]? | select((.l3_device // "") == $dev or (.device // "") == $dev)]
+            | sort_by([(((.["ipv4-address"] // []) | length) == 0), ((.up // false) | not)])'
+    logical_interface="$(printf '%s' "$dump" | jq -r --arg dev "$device"       "$_match"' | .[0].interface // empty' 2>/dev/null)"
+    actual_up="$(printf '%s' "$dump" | jq -r --arg dev "$device"       "$_match"' | .[0].up // false' 2>/dev/null)"
   fi
     # Every logical interface the router knows, so a console can offer the choice
   # instead of anyone hard-coding a name here. `current` marks the one carrying
   # the traffic right now, which is what "automatic" resolves to.
-  interfaces="$(printf '%s' "$dump" | jq -c --arg current "$device" '
+  interfaces="$(printf '%s' "$dump" | jq -c --arg current "$logical_interface" '
     [ .interface[]?
       | { name: (.interface // ""),
           device: (.l3_device // .device // ""),
@@ -50,7 +53,7 @@ if command -v ubus >/dev/null 2>&1; then
           default_route: ([ (.route // [])[]
                             | select(((.target // "") == "0.0.0.0") and ((.mask // 0) == 0)) ]
                           | length > 0),
-          current: (((.l3_device // .device // "") == $current) and ($current != "")) }
+          current: (((.interface // "") == $current) and ($current != "")) }
       | select(.name != "" and .name != "loopback")
       | . + { proxied: (.device | startswith("br-w")) }
     ]' 2>/dev/null || true)"

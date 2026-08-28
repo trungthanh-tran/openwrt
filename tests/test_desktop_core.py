@@ -87,10 +87,10 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(app.translate("custom text", "en"), "custom text")
 
     def test_dynamic_prefix_translation(self):
-        message = "Dòng cấu hình cần 10 hoặc 11 cột: broken"
+        message = "Dòng cấu hình cần 10, 11 hoặc 12 cột: broken"
         self.assertEqual(
             app.translate(message, "en"),
-            "Configuration row must have 10 or 11 columns: broken",
+            "Configuration row must have 10, 11 or 12 columns: broken",
         )
 
     def test_format_values(self):

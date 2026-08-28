@@ -82,6 +82,16 @@ fi
 exit "${GATEWAY_RC:-0}"
 SH
 
+cat > "$SB_ROOT/scripts/switch-gateway.sh" <<'SH'
+#!/bin/sh
+printf 'switch-gateway:%s:%s
+' "$#" "${1:-}" >> "$CALLS"
+if [ "${SWITCH_RC:-0}" != "0" ]; then echo '{"ok":false,"error":"interface wan is down"}'; exit 1; fi
+printf '{"ok":true,"interface":"%s","device":"eth1","changed":["wan"]}
+' "$1"
+exit 0
+SH
+
 cat > "$SB_ROOT/scripts/clients.sh" <<'SH'
 #!/bin/sh
 if [ -n "${CLIENTS_OUTPUT:-}" ]; then
@@ -250,7 +260,7 @@ eq "health_now defaults to empty object" "$(json_value "$out" '.health | length'
 
 echo "== agent method and JSON validation =="
 reset_calls
-for action in save_conf dryrun_conf apply set_sock rotate_mac rollback uninstall backup kick ban unban; do
+for action in save_conf dryrun_conf apply set_sock rotate_mac rollback uninstall backup kick ban unban switch_gateway; do
   out="$(auth_run GET "action=$action")"
   contains "$action rejects GET" "$out" 'Status: 405 Method Not Allowed'
 done
@@ -285,6 +295,23 @@ else
   ok "request body temp files are cleaned"
 fi
 eq "dirty generic requests invoke no mutation scripts" "$(wc -l < "$CALLS" | tr -d ' ')" '0'
+
+echo "== agent switch_gateway =="
+reset_calls
+out="$(auth_run POST 'action=switch_gateway' '{"interface":"wan"}')"
+eq "switch_gateway runs the script"        "$(json_value "$out" '.interface')" 'wan'
+eq "switch_gateway passes the name"        "$(grep -c '^switch-gateway:1:wan$' "$CALLS")" '1'
+out="$(auth_run POST 'action=switch_gateway' '{"interface":""}')"
+contains "switch_gateway needs a name"      "$out" 'Status: 400 Bad Request'
+out="$(auth_run POST 'action=switch_gateway' '{"interface":"wan;reboot"}')"
+contains "switch_gateway rejects shell text" "$out" 'Status: 400 Bad Request'
+out="$(auth_run GET 'action=switch_gateway')"
+contains "switch_gateway needs POST"        "$out" 'Status: 405'
+export SWITCH_RC=1
+out="$(auth_run POST 'action=switch_gateway' '{"interface":"wan"}')"
+contains "script failure is a 400"          "$out" 'Status: 400 Bad Request'
+contains "script reason is relayed"         "$out" 'interface wan is down'
+export SWITCH_RC=0
 
 echo "== agent save and dry-run =="
 out="$(auth_run POST 'action=save_conf' '')"
@@ -340,6 +367,8 @@ eq "dryrun success" "$(json_value "$out" '.ok')" 'true'
 eq "dryrun phase" "$(json_value "$out" '.phase')" 'dryrun'
 contains "dryrun uses no-backup" "$(cat "$CALLS")" 'apply:dryrun:--no-backup'
 eq "dryrun does not replace desired config" "$(cat "$CONF")" "$valid"
+out="$(auth_run POST 'action=save_conf' 'Saved|2g|3|password12|proxy3|1080|||1|1||http')"
+eq "save accepts the 12-column proxy_type row" "$(json_value "$out" '.saved')" 'true'
 export APPLY_DRYRUN_RC=7
 out="$(auth_run POST 'action=dryrun_conf' "$valid")"
 eq "dryrun failure is structured" "$(json_value "$out" '.ok,.rc,.phase' | paste -sd ':')" 'false:7:dryrun'

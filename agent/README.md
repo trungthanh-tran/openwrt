@@ -63,6 +63,7 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 | GET | `health_now` | — | probe ngay 1 lần |
 | GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS, HTTP latency và `interfaces[]` — toàn bộ interface router đang có (name, device, proto, ipv4, up, default_route, current, proxied) để console cho chọn. Mặc định chấp nhận mọi uplink; `egress_problem` chỉ ra đường ra vòng qua SSID được proxy hoặc lệch interface đã ghim |
 | POST | `set_gateway` | `{interface}` | Chọn interface làm đường ra (`""` = tự động). Lưu vào `/etc/sbproxy/env`; tên chỉ nhận `A-Za-z0-9._-`, tối đa 32 ký tự vì file này được agent source |
+| POST | `switch_gateway` | `{interface}` | Đổi đường ra thật: interface được chọn nhận metric 0, các uplink khác lùi về metric 100, reload network rồi ghim như `set_gateway`. Từ chối nếu interface đang down, không có default route, hoặc là bridge SSID proxy |
 | GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |
 
 Test nhanh:

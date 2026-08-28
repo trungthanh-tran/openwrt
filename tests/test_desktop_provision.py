@@ -92,6 +92,31 @@ class ProvisionSettingsTests(unittest.TestCase):
         self.assertIn("BatchMode=yes", command)
         self.assertEqual(command[-2:], ["root@192.168.8.1", "uname -a"])
 
+    def test_known_hosts_path_is_quoted_for_ssh(self):
+        """ssh splits -o values on whitespace: a profile with spaces must be quoted."""
+        command = make_settings(self.tmp).ssh_command("true")
+        option = next(o for o in command if o.startswith("UserKnownHostsFile="))
+        self.assertEqual(option, f'UserKnownHostsFile="{appmod.KNOWN_HOSTS_FILE}"')
+
+    def test_forget_host_key_drops_every_form_of_the_host(self):
+        path = self.tmp / "known_hosts"
+        path.write_text(
+            "192.168.1.1 ssh-ed25519 AAAA1\n"
+            "[192.168.1.1]:2222 ssh-ed25519 AAAA2\n"
+            "192.168.1.1,router.lan ssh-rsa AAAA3\n"
+            "192.168.1.10 ssh-ed25519 KEEP\n"
+            "# comment about 192.168.1.1\n",
+            encoding="utf-8",
+        )
+        removed = appmod.forget_host_key("192.168.1.1", 2222, path)
+        self.assertEqual(removed, 3)
+        rest = path.read_text(encoding="utf-8")
+        self.assertIn("192.168.1.10 ssh-ed25519 KEEP", rest)
+        self.assertIn("# comment", rest)
+        self.assertNotIn("AAAA1", rest)
+        self.assertEqual(appmod.forget_host_key("10.0.0.1", 22, path), 0)
+        self.assertEqual(appmod.forget_host_key("x", 22, self.tmp / "missing"), 0)
+
     def test_password_swaps_batch_mode_for_an_askpass_prompt(self):
         command = make_settings(self.tmp, password="secret").ssh_command("true")
         self.assertNotIn("BatchMode=yes", command)

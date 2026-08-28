@@ -3,6 +3,32 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.11] - 2026-08-28
+
+### Added
+- **Đổi đường ra Internet ngay từ console.** Nút **Đổi đường ra** cạnh ô Đường ra
+  (desktop) và nút **🌐 Đường ra** trên web mở danh sách interface của router;
+  chọn một cái rồi đổi: interface đó nhận metric route 0, các uplink khác lùi về
+  metric 100, network reload, và lựa chọn được ghim làm `GATEWAY_EXPECTED_INTERFACE`.
+  Agent thêm `POST switch_gateway {interface}`; `scripts/switch-gateway.sh` từ chối
+  interface đang down, không có default route, hoặc là bridge SSID proxy.
+  Chọn trong ô Đường ra như trước vẫn chỉ ghim kỳ vọng để kiểm tra.
+- Cài đặt sau flash: gặp cảnh báo `REMOTE HOST IDENTIFICATION HAS CHANGED` (router
+  vừa flash lại nên host key SSH đổi) console hiện hộp thoại giải thích và đề nghị
+  xoá khoá cũ trong `known_hosts` của ứng dụng rồi chạy lại ngay.
+
+### Fixed
+- Đường ra: `wan` và `wan6` cùng nằm trên một device (`eth1`) nên cả hai bị đánh
+  dấu "đang dùng" và "Tự động" trỏ vào `wan6`; chọn `wan` xong bảng vẫn báo `wan6`.
+  `gateway.sh` giờ ưu tiên interface có địa chỉ IPv4 trên device đó (route kiểm tra
+  là IPv4), chỉ interface ấy là "đang dùng".
+- `save_conf` từ chối dòng 12 cột (`proxy_type`) với "cần đúng 10 hoặc 11 cột" trong
+  khi dry-run ngay trước đó đã chấp nhận — đẩy cấu hình có proxy HTTP thất bại sau
+  khi dry-run báo OK. Tiền-kiểm của agent giờ nhận 10, 11 hoặc 12 cột như `validate_conf`.
+- SSH từ console: đường dẫn `known_hosts` nằm trong thư mục người dùng có khoảng
+  trắng (`C:\Users\Ca Nha Vui`) bị ssh cắt ở dấu cách đầu tiên vì giá trị `-o`
+  được tách theo khoảng trắng; giờ được bọc trong dấu nháy.
+
 ## [0.5.10] - 2026-08-28
 
 ### Fixed

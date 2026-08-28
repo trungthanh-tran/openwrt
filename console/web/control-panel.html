@@ -323,6 +323,7 @@
       <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
       <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
       <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
+      <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
       <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
     </span>
     <button class="btn ghost" id="exportConf">Tải wifi-socks.conf</button>
@@ -458,6 +459,23 @@
   </div>
 </div>
 
+<!-- Egress modal -->
+<div class="backdrop" id="gwBackdrop">
+  <div class="modal">
+    <h2>Đường ra Internet</h2>
+    <div class="form">
+      <div class="conn-status" id="gwHint" data-i18n-html="gwHint">Chọn interface rồi bấm <b>Đổi đường ra</b>: interface đó nhận ưu tiên route cao nhất, các đường ra khác lùi lại phía sau và network trên router reload. Wi-Fi và proxy không đổi.</div>
+      <div class="conn-status" id="gwState">…</div>
+      <div class="rblist" id="gwList"><div class="sub">Đang tải…</div></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="gwRefresh">Kiểm tra lại</button>
+      <button class="btn ghost" id="gwClose">Đóng</button>
+      <button class="btn primary" id="gwSwitch">Đổi đường ra</button>
+    </div>
+  </div>
+</div>
+
 <!-- Backup / Rollback modal -->
 <div class="backdrop" id="rbBackdrop">
   <div class="modal">
@@ -557,7 +575,8 @@
     "Chưa kết nối. Nhập token rồi bấm “Kết nối”.": "Not connected. Enter the token and click “Connect”.",
     "(để trống nếu mở UI ngay từ router)": "(leave empty when the UI is served by the router)",
     "(in ra bởi install-agent.sh)": "(printed by install-agent.sh)", "Ngắt": "Disconnect", "Đóng": "Close", "Kết nối": "Connect",
-    "Tạo backup ngay": "Create backup now", "Thiết bị đang kết nối": "Connected devices", "Làm mới": "Refresh",
+    "Tạo backup ngay": "Create backup now", "Đường ra": "Egress", "Đường ra Internet": "Internet egress",
+    "Kiểm tra lại": "Check again", "Đổi đường ra": "Switch egress", "Thiết bị đang kết nối": "Connected devices", "Làm mới": "Refresh",
     "Bản đang chạy trên router": "Version running on router", "File package": "Package file",
     "Cho phép hạ version (force)": "Allow version downgrade (force)", "Kết quả": "Result",
     "IP / Tên máy": "IP / Hostname", "Thời gian kết nối": "Connected", "Vào (in)": "Received", "Ra (out)": "Sent", "Sóng": "Signal",
@@ -574,6 +593,7 @@
   const EN_HTML = {
     rbHint: 'The router already backs up on every Apply / SOCKS change. ⚠️ Before <b>updating the firmware</b>, click <b>⭳ Download</b> to save a backup to your computer — backups kept only on the router are lost after a reflash or brick.',
     devHint: 'Clients grouped by Wi-Fi. <b>Disconnect</b> = temporary (the device may reconnect). <b>Block</b> = persistent MAC block (reloads that band).',
+    gwHint: 'Pick an interface and click <b>Switch egress</b>: it gets the best route priority, every other uplink steps behind it, and the router network reloads. Wi-Fi and proxies are unchanged.',
     upStatus: 'Choose the package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (built with <code>make package</code> or <code>pc/make-package.sh</code>). The router backs up before updating and keeps the running Wi-Fi/SOCKS configuration.'
   };
   const EN_ATTR = {
@@ -582,6 +602,7 @@
     "Thiết bị đang kết nối từng WiFi (kick / cấm)": "Devices connected to each Wi-Fi (disconnect / block)",
     "Tải wifi-socks.conf từ router": "Download wifi-socks.conf from the router",
     "Backup & Rollback trên router": "Back up and roll back the router",
+    "Xem và đổi đường ra Internet của router": "View and switch the router's Internet egress",
     "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package"
   };
 
@@ -886,6 +907,56 @@
   }
 
   // ---- backup / rollback ----
+  // ---- Egress: which interface carries the router's Internet traffic ----
+  let gwChoice = "";
+  function openGateway() {
+    if (!agent.connected) return;
+    $("gwBackdrop").classList.add("show");
+    loadGateway();
+  }
+  function loadGateway() {
+    const box = $("gwList"), state = $("gwState");
+    box.innerHTML = `<div class="sub">${pick("Loading…", "Đang tải…")}</div>`;
+    state.textContent = "…";
+    api("gateway").then(d => {
+      if (!d || d.ok === false) { state.textContent = pick("Cannot read the gateway state.", "Không đọc được trạng thái đường ra."); box.innerHTML = ""; return; }
+      const stateTxt = { ok: pick("OK", "Hoạt động"), degraded: pick("degraded", "suy giảm"), down: pick("down", "mất kết nối") }[d.state] || d.state;
+      const problem = d.egress_problem === "proxied-bridge" ? " · " + pick("EGRESS THROUGH A PROXIED SSID", "ĐI RA QUA SSID PROXY")
+        : d.egress_problem === "not-expected" ? " · " + pick("not the pinned interface", "không phải interface đã ghim") : "";
+      state.textContent = `${pick("State", "Trạng thái")}: ${stateTxt} · ${pick("current", "hiện tại")}: ${d.interface || "?"} (${d.device || "?"})`
+        + (d.expected_interface ? ` · ${pick("pinned", "đã ghim")}: ${d.expected_interface}` : "") + problem;
+      const list = (d.interfaces || []).filter(i => !i.proxied);
+      if (!list.length) { box.innerHTML = `<div class="sub">${pick("No interfaces reported.", "Router không báo interface nào.")}</div>`; return; }
+      if (!list.some(i => i.name === gwChoice)) gwChoice = (list.find(i => i.current) || {}).name || "";
+      box.innerHTML = list.map(i => {
+        const flags = [];
+        if (i.current) flags.push(pick("in use", "đang dùng"));
+        if (!i.up) flags.push(pick("down", "không hoạt động"));
+        if (i.default_route) flags.push(pick("has default route", "có default route"));
+        const can = i.up && i.default_route;
+        return `<label class="rbitem" style="cursor:${can ? "pointer" : "not-allowed"};opacity:${can ? 1 : .55}">
+          <div class="nm"><input type="radio" name="gwIface" value="${esc(i.name)}" ${i.name === gwChoice ? "checked" : ""} ${can ? "" : "disabled"}>
+            ${esc(i.name)} <small>(${esc(i.device || "?")}${i.ipv4 ? " · " + esc(i.ipv4) : ""})</small></div>
+          <small>${esc(flags.join(" · "))}</small></label>`;
+      }).join("");
+    }).catch(e => { state.textContent = String(e); box.innerHTML = ""; });
+  }
+  function switchGateway() {
+    const picked = document.querySelector('input[name="gwIface"]:checked');
+    if (!picked) { toast(pick("Pick an interface first.", "Hãy chọn một interface trước.")); return; }
+    const name = picked.value;
+    if (!confirm(pick(`Switch the router's Internet egress to ${name}? The router network reloads; Wi-Fi and proxies are unchanged.`,
+                      `Đổi đường ra Internet của router sang ${name}? Network trên router sẽ reload; Wi-Fi và proxy không đổi.`))) return;
+    gwChoice = name;
+    $("gwSwitch").disabled = true;
+    api("switch_gateway", "POST", { interface: name }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "switch_gateway failed");
+      toast(pick(`Egress switched to ${name}`, `Đã đổi đường ra sang ${name}`));
+      loadGateway();
+    }).catch(e => { toast(String(e.message || e)); loadGateway(); })
+      .finally(() => { $("gwSwitch").disabled = false; });
+  }
+
   function openRollback() {
     document.getElementById("rbBackdrop").classList.add("show");
     loadBackups();
@@ -1336,6 +1407,11 @@
   $("upGo").onclick = doUpdate;
   $("upCancel").onclick = () => $("upBackdrop").classList.remove("show");
   $("upBackdrop").onclick = e => { if (e.target.id === "upBackdrop") $("upBackdrop").classList.remove("show"); };
+  $("gwBtn").onclick = openGateway;
+  $("gwRefresh").onclick = loadGateway;
+  $("gwSwitch").onclick = switchGateway;
+  $("gwClose").onclick = () => $("gwBackdrop").classList.remove("show");
+  $("gwBackdrop").onclick = e => { if (e.target.id === "gwBackdrop") $("gwBackdrop").classList.remove("show"); };
   $("rbBtn").onclick = openRollback;
   $("rbClose").onclick = () => $("rbBackdrop").classList.remove("show");
   $("rbBackupNow").onclick = backupNow;
