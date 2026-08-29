@@ -82,6 +82,20 @@ fi
 exit "${GATEWAY_RC:-0}"
 SH
 
+cat > "$SB_ROOT/scripts/diagnose-ssid.sh" <<'SH'
+#!/bin/sh
+printf 'diagnose-ssid:%s:%s\n' "$#" "${1:-}" >> "$CALLS"
+printf '{"ok":true,"idx":%s,"ssid":"A","verdict":"proxy: blocked","checks":[{"name":"wifi","ok":true,"detail":"up"}],"report":"  ok   wifi","singbox_log":"","probe":null}\n' "$1"
+exit 0
+SH
+
+cat > "$SB_ROOT/scripts/probe-proxy.sh" <<'SH'
+#!/bin/sh
+printf 'probe-proxy:%s:%s:%s:%s:%s:%s\n' "$#" "$1" "$2" "${3:-}" "${4:-}" "${5:-}" >> "$CALLS"
+printf '{"ok":true,"state":"fail","curl_exit":7,"latency_ms":0,"code":0,"error":"curl: (7) refused","hint":"cannot connect","transcript":"","host":"%s","port":"%s","type":"%s"}\n' "$1" "$2" "${5:-socks5}"
+exit 0
+SH
+
 cat > "$SB_ROOT/scripts/switch-gateway.sh" <<'SH'
 #!/bin/sh
 printf 'switch-gateway:%s:%s
@@ -295,6 +309,29 @@ else
   ok "request body temp files are cleaned"
 fi
 eq "dirty generic requests invoke no mutation scripts" "$(wc -l < "$CALLS" | tr -d ' ')" '0'
+
+echo "== agent diagnose_ssid =="
+reset_calls
+out="$(auth_run GET 'action=diagnose_ssid&idx=1')"
+eq "diagnose_ssid relays the verdict"   "$(json_value "$out" '.verdict')" 'proxy: blocked'
+eq "diagnose_ssid passes the idx"       "$(grep -c '^diagnose-ssid:1:1$' "$CALLS")" '1'
+out="$(auth_run GET 'action=diagnose_ssid&idx=0')"
+contains "diagnose_ssid rejects idx 0"   "$out" 'Status: 400'
+out="$(auth_run POST 'action=diagnose_ssid&idx=1' '{}')"
+contains "diagnose_ssid needs GET"       "$out" 'Status: 405'
+
+echo "== agent probe_proxy =="
+reset_calls
+out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":1080,"user":"u","pass":"p","type":"http"}')"
+eq "probe_proxy relays the state"     "$(json_value "$out" '.state')" 'fail'
+eq "probe_proxy relays the hint"      "$(json_value "$out" '.hint')" 'cannot connect'
+eq "probe_proxy passes every field"   "$(grep -c '^probe-proxy:5:1.2.3.4:1080:u:p:http$' "$CALLS")" '1'
+out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4;reboot","port":1080}')"
+contains "probe_proxy rejects a dirty host" "$out" 'Status: 400 Bad Request'
+out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":70000}')"
+contains "probe_proxy rejects a bad port"   "$out" 'Status: 400 Bad Request'
+out="$(auth_run GET 'action=probe_proxy')"
+contains "probe_proxy needs POST"           "$out" 'Status: 405'
 
 echo "== agent switch_gateway =="
 reset_calls

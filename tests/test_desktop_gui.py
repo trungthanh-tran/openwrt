@@ -114,7 +114,7 @@ class DesktopGuiSmokeTests(unittest.TestCase):
 
     def test_wifi_item_actions_use_context_menu(self):
         self.set_mode("en", "dark")
-        self.assertEqual(set(self.app.wifi_edit_buttons), {"edit", "delete"})
+        self.assertEqual(set(self.app.wifi_edit_buttons), {"edit", "diagnose", "delete"})
         self.assertEqual(
             [self.app.wifi_context_menu.entrycget(index, "label") for index in (0, 1, 2, 3, 5)],
             ["Edit configuration", "Change SOCKS", "Proxy pool…", "Random MAC", "Delete SSID"],

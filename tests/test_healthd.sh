@@ -21,20 +21,31 @@ mkdir -p "$BIN"
 
 cat > "$BIN/curl" <<'SH'
 #!/bin/sh
-proxy=""
+proxy=""; url=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -x) proxy="$2"; shift 2 ;;
-    *) shift ;;
+    -o|-m|-w) shift 2 ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
   esac
 done
 printf '%s\n' "$proxy" >> "$CURL_CALLS"
+# probe-proxy.sh side checks: plain TCP, direct Internet, public IP.
+if [ -z "$proxy" ]; then
+  case "$url" in
+    telnet://offline.example:*) exit 7 ;;
+    telnet://*) exit 56 ;;
+    *ipify*) printf '203.0.113.9'; exit 0 ;;
+    *) [ "${DIRECT_DOWN:-0}" = 1 ] && exit 7; printf '204 0.050'; exit 0 ;;
+  esac
+fi
 case "$proxy" in
   *fast.example*) printf '204 0.100' ;;
   *slow.example*) printf '200 0.801' ;;
   *edge.example*) printf '302 0.800' ;;
   *badcode.example*) printf '500 0.050' ;;
-  *offline.example*) exit 7 ;;
+  *offline.example*) echo "curl: (7) Failed to connect to offline.example port 5080: Connection refused (user secret:hunter2)" >&2; exit 7 ;;
   *nan.example*) printf '204 NaN' ;;
   *garbled.example*) printf 'garbled output' ;;
   *) printf '301 0.010' ;;
@@ -48,7 +59,7 @@ Fast|2g|1|password12|fast.example|1080|||1|1
 Slow|5g|2|password12|slow.example|2080|alice|secret|1|1
 Edge|2g|3|password12|edge.example|3080|||1|1
 BadCode|2g|4|password12|badcode.example|4080|||1|1
-Offline|5g|5|password12|offline.example|5080|||1|1
+Offline|5g|5|password12|offline.example|5080|carol|hunter2|1|1
 Http|2g|6|password12|http.example|6080|bob|pw|1|1||http
 
 EOF
@@ -75,6 +86,37 @@ eq "unexpected HTTP code is fail" "$(jq -r '.probes["4"].state' "$HEALTH_FILE")"
 eq "unexpected HTTP code is retained" "$(jq -r '.probes["4"].code' "$HEALTH_FILE")" '500'
 eq "curl transport failure is fail" "$(jq -r '.probes["5"].state' "$HEALTH_FILE")" 'fail'
 eq "curl transport failure code defaults zero" "$(jq -r '.probes["5"].code' "$HEALTH_FILE")" '0'
+eq "the failure reason is kept"  "$(jq -r '.probes["5"].error' "$HEALTH_FILE" | cut -c1-40)" 'curl exit 7: curl: (7) Failed to connect'
+eq "the password is blanked in the reason" "$(jq -r '.probes["5"].error' "$HEALTH_FILE" | grep -c hunter2)" '0'
+eq "a bad HTTP code explains itself" "$(jq -r '.probes["4"].error' "$HEALTH_FILE")" 'probe URL answered HTTP 500 through the proxy'
+eq "a healthy probe carries no error" "$(jq -r '.probes["1"] | has("error")' "$HEALTH_FILE")" 'false'
+
+echo "== probe-proxy.sh: one proxy, with the reason =="
+PROBE="$ROOT/scripts/probe-proxy.sh"
+out="$(sh "$PROBE" fast.example 1080 "" "" socks5)"
+eq "probe: a good proxy is ok"        "$(printf '%s' "$out" | jq -r .state)" 'ok'
+eq "probe: latency is carried"        "$(printf '%s' "$out" | jq -r .latency_ms)" '100'
+out="$(sh "$PROBE" offline.example 5080 carol hunter2 socks5)"
+eq "probe: a dead proxy is fail"      "$(printf '%s' "$out" | jq -r .state)" 'fail'
+eq "probe: curl exit is carried"      "$(printf '%s' "$out" | jq -r .curl_exit)" '7'
+eq "probe: the curl error is carried" "$(printf '%s' "$out" | jq -r .error | cut -c1-9)" 'curl: (7)'
+eq "probe: the hint names the cause"  "$(printf '%s' "$out" | jq -r .hint | grep -c 'cannot connect')" '1'
+eq "probe: the password is blanked"   "$(printf '%s' "$out" | jq -r '.error + .transcript' | grep -c hunter2)" '0'
+eq "probe: TCP refusal is seen"       "$(printf '%s' "$out" | jq -r .checks.tcp_open)" 'false'
+eq "probe: direct Internet is seen"   "$(printf '%s' "$out" | jq -r .checks.direct_internet)" 'true'
+eq "probe: public IP is reported"     "$(printf '%s' "$out" | jq -r .checks.public_ip)" '203.0.113.9'
+eq "probe: verdict is blocked"        "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'blocked'
+eq "probe: verdict names the IP"      "$(printf '%s' "$out" | jq -r .verdict | grep -c 203.0.113.9)" '1'
+out="$(sh "$PROBE" badcode.example 4080)"
+eq "probe: TCP open + handshake fail is socks-refused" "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'socks-refused'
+out="$(DIRECT_DOWN=1 sh "$PROBE" offline.example 5080)"
+eq "probe: no WAN is wan-down"        "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'wan-down'
+out="$(sh "$PROBE" fast.example 1080)"
+eq "probe: a good proxy verdict is ok" "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'ok'
+out="$(sh "$PROBE" 'bad host' 1080)"
+eq "probe: a dirty host is refused"   "$(printf '%s' "$out" | jq -r .ok)" 'false'
+out="$(sh "$PROBE" fast.example 1080 "" "" ftp)"
+eq "probe: a wrong type is refused"   "$(printf '%s' "$out" | jq -r .ok)" 'false'
 if jq -e '.ts | type == "number" and . > 0' "$HEALTH_FILE" >/dev/null; then ok "timestamp is numeric"; else no "timestamp is numeric"; fi
 contains "unauthenticated proxy URL uses socks5h" "$(cat "$CURL_CALLS")" 'socks5h://fast.example:1080'
 contains "authenticated proxy URL uses credentials" "$(cat "$CURL_CALLS")" 'socks5h://alice:secret@slow.example:2080'

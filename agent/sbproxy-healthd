@@ -23,20 +23,28 @@ trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 
 probe_one() {
   # Arguments: host port user pass type; output: "state latency_ms code".
+  # The reason a probe failed (curl's exit code and its first stderr line,
+  # with the credential blanked) is left in PROBE_ERROR so the UI can show
+  # *why* a proxy is red instead of just that it is.
   host="$1"; port="$2"; user="$3"; pass="$4"; proxy_type="${5:-socks5}"
   [ "$proxy_type" = "http" ] && scheme="http" || scheme="socks5h"
   if [ -n "$user" ]; then px="$scheme://$user:$pass@$host:$port"; else px="$scheme://$host:$port"; fi
+  PROBE_ERROR=""
+  errf="${TMPDIR:-/tmp}/sbproxy-probe.$$"
   # %{http_code} %{time_total}
   res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
-         -w '%{http_code} %{time_total}' "$PROBE_URL" 2>/dev/null)"
+         -w '%{http_code} %{time_total}' "$PROBE_URL" 2>"$errf")"; rc=$?
+  err="$(head -n 1 "$errf" 2>/dev/null | tr -d '\r')"; rm -f "$errf"
+  [ -n "$pass" ] && err="$(printf '%s' "$err" | sed "s|$pass|***|g")"
+  [ "$rc" -ne 0 ] && PROBE_ERROR="curl exit $rc${err:+: $err}"
   code="$(echo "$res" | awk '{print $1}')"
   t="$(echo "$res" | awk '{print $2}')"
-  case "$code" in ''|*[!0-9]*) echo "fail 0 0"; return;; esac
-  echo "$t" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { echo "fail 0 $code"; return; }
+  case "$code" in ''|*[!0-9]*) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="no answer from curl"; echo "fail 0 0"; return;; esac
+  echo "$t" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { [ -n "$PROBE_ERROR" ] || PROBE_ERROR="unreadable curl timing"; echo "fail 0 $code"; return; }
   ms="$(awk -v t="$t" 'BEGIN{printf "%d", (t*1000)+0.5}')"
   case "$code" in
     200|204|301|302) [ "$ms" -gt "$SLOW_MS" ] && echo "slow $ms $code" || echo "ok $ms $code" ;;
-    *) echo "fail 0 ${code:-0}" ;;
+    *) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="probe URL answered HTTP $code through the proxy"; echo "fail 0 ${code:-0}" ;;
   esac
 }
 
@@ -66,11 +74,15 @@ run_once() {
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || continue
     # probe_one emits exactly three whitespace-free fields.
     # shellcheck disable=SC2046
-    set -- $(probe_one "$host" "$port" "$user" "$pass" "$proxy_type")
+    # probe_one writes its output to a file so PROBE_ERROR set inside it is
+    # visible here (a $(...) subshell would lose it).
+    outf="${TMPDIR:-/tmp}/sbproxy-probe-out.$$"
+    probe_one "$host" "$port" "$user" "$pass" "$proxy_type" > "$outf"
+    set -- $(cat "$outf"); rm -f "$outf"
     state="$1"; ms="$2"; code="$3"
-    probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" \
+    probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \
               --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
-              '.[$i] = {state:$s, latency_ms:$ms, code:$c}')"
+              '.[$i] = {state:$s, latency_ms:$ms, code:$c} + (if $e == "" then {} else {error:$e} end)')"
   done < "$CONF"
 
   ts="$(date +%s)"

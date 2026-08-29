@@ -3,6 +3,34 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.12] - 2026-08-29
+
+### Added
+- **Biết vì sao proxy đỏ.** healthd giữ lại lý do curl thất bại (`curl exit N: …`,
+  mật khẩu đã che) trong `error` của mỗi probe; hộp Chi tiết proxy hiện dòng
+  "Lý do". Agent thêm `POST probe_proxy {host,port,user?,pass?,type?}` chạy
+  `scripts/probe-proxy.sh`: curl qua proxy đó ngay lúc bấm, trả về `curl_exit`,
+  `error`, `hint` (whitelist IP / sai user-pass / curl thiếu SOCKS / timeout…)
+  và đuôi transcript curl. Desktop có nút **Test proxy** trong màn hình Pool.
+  Để tách đúng bệnh mà PC không gặp, script còn thử: curl có nói được SOCKS
+  không, TCP tới host:port có mở không (không bắt tay SOCKS), router ra Internet
+  trực tiếp được không, IP public của router, và đuôi `logread` của sing-box về
+  proxy đó — rồi trả `verdict`: `blocked` (nhà cung cấp whitelist IP → cần thêm
+  IP public vừa đo), `auth`, `socks-refused`, `curl-no-socks`, `wan-down`, `ok`.
+- **Chẩn đoán "vào được Wi-Fi mà không có Internet".** Nút **Chẩn đoán** ở
+  thanh sửa SSID (desktop) gọi `GET diagnose_ssid&idx=N` → `scripts/diagnose-ssid.sh`
+  đi một vòng đường đi gói tin: wifi-iface, địa chỉ bridge, lease DHCP,
+  bridge-nf, bảng/chain/vmap/rule tproxy nft, ip rule fwmark + bảng route, tiến
+  trình/cổng nghe/config sing-box, probe proxy (kèm verdict ở trên), log sing-box,
+  conntrack. `verdict` nêu mắt xích hỏng đầu tiên; báo cáo hiện trong cửa sổ
+  copy được và ghi nguyên văn vào log console.
+- **Thêm proxy là tự kiểm tra ngay.** Sau khi lưu pool (kể cả luồng "thêm proxy
+  và phân phối thiết bị"), console chạy `probe_proxy` cho từng proxy mới; kết quả
+  từng slot ghi vào log, proxy nào không đi được từ router thì mở ngay cửa sổ
+  báo cáo với kết luận (`blocked`/`auth`/…) — không phải chờ device treo mới biết.
+- Mở màn hình Pool ghi vào log console trạng thái health của SSID kèm lý do
+  fail và danh sách slot, để gửi thư mục log là đủ để chẩn đoán từ xa.
+
 ## [0.5.11] - 2026-08-28
 
 ### Added

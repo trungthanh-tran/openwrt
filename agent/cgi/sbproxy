@@ -16,6 +16,8 @@
 # POST ?action=rollback      body=json {name?} -> rollback
 # POST ?action=uninstall     -> remove project-managed configuration
 # GET  ?action=health_now    -> run an immediate health probe
+# GET  ?action=diagnose_ssid&idx=N -> walk the data path of one SSID (wifi, bridge, dhcp, nft, routing, sing-box, proxy) and name the broken link
+# POST ?action=probe_proxy   body json {host,port,user?,pass?,type?} -> curl through that proxy now, with the reason it fails
 # GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status + interface list
 # POST ?action=set_gateway   body json {interface} -> pin the expected uplink ("" = automatic)
 # POST ?action=switch_gateway body json {interface} -> make that interface the uplink (route metrics) and pin it
@@ -469,6 +471,49 @@ case "$ACTION" in
     rm -f "$ENV_TMP"
     json_ok "$(jq -n --arg interface "$iface" \
       '{ok:true, interface:$interface, automatic:($interface == "")}')"
+    ;;
+
+  diagnose_ssid)
+    # Read-only walk of one SSID's data path; the answer says which link is
+    # broken so "connected but no Internet" stops being a guessing game.
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    idx="$(query_field idx)"
+    require_valid_idx "$idx"
+    OUT="$(cd "$SB_ROOT" && sh scripts/diagnose-ssid.sh "$idx" 2>/dev/null)"
+    printf '%s' "$OUT" | jq -e 'type == "object" and (.checks | type == "array")' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "diagnose-ssid trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
+    ;;
+
+  probe_proxy)
+    # Diagnose one proxy from the router: the same request healthd makes, but
+    # the answer says why it failed (curl exit, error line, handshake tail).
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    require_json_shape '
+      def integer: if type == "number" then floor == . else false end;
+      def clean:
+        if type != "string" then false
+        else all(explode[]; . >= 32 and (. < 127 or . > 159)) end;
+      (.host | clean) and (.port | integer) and
+      ((has("user") | not) or (.user | clean)) and
+      ((has("pass") | not) or (.pass | clean)) and
+      ((has("type") | not) or (.type == "socks5" or .type == "http"))
+    ' "host/port/user/pass/type sai kiểu hoặc chứa ký tự điều khiển"
+    host="$(jq -r '.host' "$BODY_FILE")"
+    port="$(jq -r '.port' "$BODY_FILE")"
+    user="$(jq -r '.user // ""' "$BODY_FILE")"
+    pass="$(jq -r '.pass // ""' "$BODY_FILE")"
+    proxy_type="$(jq -r '.type // "socks5"' "$BODY_FILE")"
+    case "$host" in ''|*[!A-Za-z0-9._:-]*) json_err "400 Bad Request" "host không hợp lệ" ;; esac
+    [ "${#host}" -le 253 ] || json_err "400 Bad Request" "host dài quá"
+    [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null \
+      || json_err "400 Bad Request" "port không hợp lệ"
+    [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || json_err "400 Bad Request" "user/pass dài quá 255 byte"
+    OUT="$(cd "$SB_ROOT" && sh scripts/probe-proxy.sh "$host" "$port" "$user" "$pass" "$proxy_type" 2>/dev/null)"
+    printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "probe-proxy trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
     ;;
 
   switch_gateway)

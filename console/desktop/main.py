@@ -655,6 +655,17 @@ EN_TRANSLATIONS = {
     'Cài agent riêng — không apply cấu hình': 'Agent-only install — configuration is not applied',
     'Đường ra: dùng {interface}': 'Egress: using {interface}',
     'Đổi đường ra': 'Switch egress',
+    'Test proxy': 'Test proxy',
+    'Chẩn đoán': 'Diagnose',
+    'Tự kiểm tra proxy vừa thêm': 'Auto-test of the proxies just added',
+    'Đã thêm {count} proxy, tất cả đều đi được từ router': 'Added {count} proxies; all of them work from the router',
+    '{failed}/{count} proxy vừa thêm KHÔNG đi được từ router': '{failed}/{count} proxies just added do NOT work from the router',
+    'Proxy vừa thêm bị lỗi': 'Proxies just added have failed',
+    'Đang kiểm tra proxy vừa thêm từ router…': 'Testing the proxies just added from the router…',
+    'Đang chẩn đoán đường đi gói tin trên router…': 'Walking the data path on the router…',
+    'Đang chẩn đoán SSID…': 'Diagnosing the SSID…',
+    'Lý do': 'Reason',
+    'Hãy chọn một proxy trong bảng trước.': 'Select a proxy in the table first.',
     'Hãy chọn một interface cụ thể trong ô Đường ra rồi bấm Đổi đường ra.': 'Pick a specific interface in the Egress box, then click Switch egress.',
     'Đổi đường ra Internet của router sang {interface}?\n\nInterface này nhận ưu tiên cao nhất, các đường ra khác lùi lại phía sau; network trên router sẽ reload. Wi-Fi và proxy không đổi.':
         "Switch the router's Internet egress to {interface}?\n\nThis interface gets the best route priority and every other uplink steps behind it; the router network reloads. Wi-Fi and proxies are unchanged.",
@@ -2258,6 +2269,17 @@ class AgentClient:
         """Pin which interface counts as the uplink; "" means automatic."""
         return self._request("set_gateway", "POST", {"interface": interface}, timeout=30)
 
+    def diagnose_ssid(self, idx: int):
+        """Walk one SSID's data path on the router and get the broken link named."""
+        return self._request("diagnose_ssid", query={"idx": str(idx)}, timeout=90)
+
+    def probe_proxy(self, host, port, user="", password="", proxy_type="socks5"):
+        """Ask the router to curl through one proxy now and explain the result."""
+        return self._request("probe_proxy", "POST", {
+            "host": host, "port": int(port), "user": user or "", "pass": password or "",
+            "type": proxy_type or "socks5",
+        }, timeout=45)
+
     def switch_gateway(self, interface: str):
         """Make `interface` the router's real uplink (route metrics), then pin it."""
         return self._request("switch_gateway", "POST", {"interface": interface}, timeout=60)
@@ -2475,6 +2497,105 @@ def normalize_clients(value) -> list[dict]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, dict)]
+
+
+def format_probe_result(result, language="vi") -> str:
+    """Human-readable summary of a probe_proxy answer, password already blanked by the router."""
+    if not isinstance(result, dict):
+        return str(result)
+    en = language == "en"
+    state = str(result.get("state") or "?")
+    lines = [
+        f"{'Result' if en else 'Kết quả'}: {state.upper()}"
+        f" · HTTP {result.get('code') or 0} · {result.get('latency_ms') or 0} ms"
+        f" · curl exit {result.get('curl_exit', '?')}",
+    ]
+    if result.get("verdict"):
+        lines.append(f"{'VERDICT' if en else 'KẾT LUẬN'}: {result['verdict']}")
+    if result.get("error"):
+        lines.append(f"{'Error' if en else 'Lỗi'}: {result['error']}")
+    if result.get("hint"):
+        lines.append(f"{'Reading' if en else 'Nhận định'}: {result['hint']}")
+    checks = result.get("checks")
+    if isinstance(checks, dict):
+        yes, no = ("yes", "no") if en else ("có", "không")
+        flag = lambda key: yes if checks.get(key) else no  # noqa: E731
+        lines.append(
+            f"{'Checks' if en else 'Kiểm tra'}: "
+            f"curl SOCKS={flag('curl_socks')} · TCP {result.get('host')}:{result.get('port')}={flag('tcp_open')}"
+            f" (curl exit {checks.get('tcp_curl_exit', '?')}) · "
+            f"{'direct Internet' if en else 'Internet trực tiếp'}={flag('direct_internet')} · "
+            f"{'router public IP' if en else 'IP public của router'}={checks.get('public_ip') or '?'}"
+        )
+    singbox_log = str(result.get("singbox_log") or "").strip()
+    if singbox_log:
+        lines.append("sing-box log:\n" + singbox_log)
+    transcript = str(result.get("transcript") or "").strip()
+    if transcript:
+        lines.append(("curl transcript:" if en else "Transcript curl:") + "\n" + transcript)
+    return "\n".join(lines)
+
+
+def format_diagnosis(payload, language="vi") -> str:
+    """Render a diagnose_ssid answer: verdict first, then every link, then the sing-box log."""
+    if not isinstance(payload, dict):
+        return str(payload)
+    en = language == "en"
+    lines = [f"{'VERDICT' if en else 'KẾT LUẬN'}: {payload.get('verdict') or '?'}", ""]
+    checks = payload.get("checks")
+    if isinstance(checks, list):
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+            mark = "ok  " if check.get("ok") else "FAIL"
+            lines.append(f"  {mark}  {check.get('name', '?')} — {check.get('detail', '')}")
+    probe = payload.get("probe")
+    if isinstance(probe, dict) and probe.get("verdict"):
+        lines += ["", ("Proxy probe:" if en else "Test proxy:"), format_probe_result(probe, language)]
+    singbox_log = str(payload.get("singbox_log") or "").strip()
+    if singbox_log:
+        lines += ["", "sing-box log:", singbox_log]
+    return "\n".join(lines)
+
+
+class ReportDialog(tk.Toplevel):
+    """A scrollable, copyable text report; messagebox truncates long output."""
+
+    def __init__(self, parent, title, text, language="vi", palette=None):
+        super().__init__(parent)
+        self.palette = palette or DARK_PALETTE
+        self.title(title)
+        self.transient(parent)
+        self.configure(bg=self.palette["bg"])
+        self.geometry("860x560")
+        body = ttk.Frame(self, style="Card.TFrame", padding=12)
+        body.pack(fill="both", expand=True)
+        box = tk.Text(body, wrap="word", font=("Consolas", 10), bg=self.palette["panel"],
+                      fg=self.palette["text"], insertbackground=self.palette["text"], relief="flat")
+        scroll = ttk.Scrollbar(body, orient="vertical", command=box.yview)
+        box.configure(yscrollcommand=scroll.set)
+        box.insert("1.0", text)
+        box.configure(state="disabled")
+        scroll.pack(side="right", fill="y")
+        box.pack(side="left", fill="both", expand=True)
+        foot = ttk.Frame(self, style="Card.TFrame", padding=(12, 0, 12, 12))
+        foot.pack(fill="x")
+        def copy():
+            self.clipboard_clear(); self.clipboard_append(text)
+        ttk.Button(foot, text="Copy", command=copy).pack(side="left")
+        ttk.Button(foot, text="Đóng" if language != "en" else "Close", command=self.destroy).pack(side="right")
+        self.bind("<Escape>", lambda _e: self.destroy())
+        center_dialog(self)
+
+
+def describe_health(health) -> str:
+    """One line for the log: state, latency, code and the failure reason if any."""
+    if not isinstance(health, dict) or not health:
+        return "no health data"
+    text = f"{health.get('state', '?')} · {health.get('latency_ms', 0)} ms · HTTP {health.get('code', 0)}"
+    if health.get("error"):
+        text += f" · reason: {health['error']}"
+    return text
 
 
 def normalize_health_probes(value) -> dict:
@@ -2892,9 +3013,11 @@ class PoolDialog(tk.Toplevel):
     """Read-only proxy pool view; existing entries are added or removed only."""
 
     def __init__(self, parent, record, proxies, usage, language="en", palette=None,
-                 online_devices=False, health=None):
+                 online_devices=False, health=None, prober=None):
         super().__init__(parent)
         self.language = language
+        # prober(row) -> probe_proxy JSON from the router; None disables the button.
+        self.prober = prober
         self.t = lambda text, **values: translate(text, self.language, **values)
         self.palette = palette or DARK_PALETTE
         self.title(f"{self.t('Pool proxy')} · {record.name}")
@@ -2965,6 +3088,9 @@ class PoolDialog(tk.Toplevel):
                       style="Muted.TLabel").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Xóa proxy chọn", command=self._delete_selected,
                    style="Danger.TButton").pack(side="left", padx=(8, 0))
+        if self.prober is not None:
+            ttk.Button(actions, text="Test proxy", command=self._probe_selected,
+                       style="Primary.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
         ttk.Button(actions, text="Thêm proxy", command=self._submit,
                    style="Warning.TButton").pack(side="right", padx=(0, 8))
@@ -2991,13 +3117,38 @@ class PoolDialog(tk.Toplevel):
         latency = row.get("latency_ms", self.health.get("latency_ms"))
         if latency is not None:
             health = f"{health} ({latency} ms)"
+        reason = row.get("error") or self.health.get("error") or ""
         details = (f"Type: {str(row.get('type') or '').upper()}\n"
                    f"IP: {row.get('host') or '—'}\n"
                    f"Port: {row.get('port') or '—'}\n"
                    f"Username: {row.get('user') or '—'}\n"
                    f"Password: {row.get('pass') or '—'}\n"
-                   f"Health: {health}")
+                   f"Health: {health}"
+                   + (f"\n{self.t('Lý do')}: {reason}" if reason else ""))
         messagebox.showinfo(self.t("Chi tiết proxy"), details, parent=self)
+
+    def _probe_selected(self):
+        """curl through the selected proxy from the router and show why it fails."""
+        selected = self.table.selection()
+        if not selected:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một proxy trong bảng trước."), parent=self)
+            return
+        slot = int(self.table.item(selected[0], "values")[0])
+        row = self.proxies[slot]
+        label = f"{row.get('type') or 'socks5'}:{row.get('host')}:{row.get('port')}"
+        self.config(cursor="watch")
+        self.update_idletasks()
+        try:
+            result = self.prober(row)
+        except Exception as exc:  # AgentError or transport failure
+            self.config(cursor="")
+            log.warning("probe_proxy %s -> %s", label, exc)
+            messagebox.showerror(self.t("Test proxy"), f"{label}\n{exc}", parent=self)
+            return
+        self.config(cursor="")
+        text = format_probe_result(result, self.language)
+        log.info("probe_proxy %s ->\n%s", label, text)
+        messagebox.showinfo(self.t("Test proxy"), f"{label}\n\n{text}", parent=self)
 
     def _delete_selected(self):
         selected = self.table.selection()
@@ -4448,6 +4599,7 @@ class NativeApp:
         ttk.Label(editor, textvariable=self.wifi_selection_var, style="Toolbar.TLabel").pack(side="left", fill="x", expand=True)
         for key, text, command, button_style in (
             ("edit", "Sửa cấu hình", self.edit_wifi, "TButton"),
+            ("diagnose", "Chẩn đoán", self.diagnose_wifi, "Primary.TButton"),
             ("delete", "Xoá SSID", self.delete_wifi, "Danger.TButton"),
         ):
             button = ttk.Button(editor, text=text, command=command, style=button_style, state="disabled")
@@ -5876,6 +6028,34 @@ class NativeApp:
             return None
         return proxies
 
+    def diagnose_wifi(self):
+        """Ask the router why devices on the selected SSID have no Internet.
+
+        The whole report goes to the log file as well as the screen, so the
+        operator can send the log folder instead of retyping it.
+        """
+        record = self.selected_wifi()
+        if not record:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
+            return
+        try:
+            client = self.require_client()
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        def work():
+            self.update_loading("Đang chẩn đoán đường đi gói tin trên router…")
+            return client.diagnose_ssid(record.idx)
+        def done(payload):
+            text = format_diagnosis(payload, self.language)
+            log.info("diagnose idx=%s ssid=%s\n%s", record.idx, record.name, text)
+            self.append_log(f"{self.t('Chẩn đoán')} {record.name} (IDX {record.idx}):\n{text}")
+            verdict = str(payload.get("verdict") or "")
+            self.status_var.set(f"{self.t('Chẩn đoán')} {record.name}: {verdict[:120]}")
+            ReportDialog(self.root, f"{self.t('Chẩn đoán')} · {record.name} · IDX {record.idx}",
+                         text, self.language, self.palette)
+        self.run_task("Đang chẩn đoán SSID…", work, done, show_loading=True, timeout_hint=90)
+
     def open_pool_editor(self):
         if self.block_if_incompatible():
             return
@@ -5891,10 +6071,23 @@ class NativeApp:
             return
         proxies = pool.get("proxies") or []
         usage = pool_slot_usage(self.clients_data, record.idx, len(proxies))
+        health = self.health.get(str(record.idx), self.health.get(record.idx, {}))
+        # The reason a proxy is red goes to the log file, so a screenshot of the
+        # dialog and the log folder together are enough to diagnose remotely.
+        log.info("pool idx=%s ssid=%s proxies=%d health: %s", record.idx, record.name,
+                 len(proxies), describe_health(health))
+        for slot, row in enumerate(proxies):
+            log.info("pool idx=%s slot=%s %s:%s:%s user=%s", record.idx, slot,
+                     row.get("type") or "socks5", row.get("host"), row.get("port"),
+                     "yes" if row.get("user") else "no")
+        client = self.client
+        def prober(row):
+            return client.probe_proxy(row.get("host"), row.get("port"), row.get("user"),
+                                      row.get("pass"), row.get("type") or "socks5")
         dialog = PoolDialog(
             self.root, record, proxies, usage, self.language, self.palette,
             online_devices=self.has_online_devices(record.idx),
-            health=self.health.get(str(record.idx), self.health.get(record.idx, {})),
+            health=health, prober=prober if client else None,
         )
         self.root.wait_window(dialog)
         if dialog.result is None:
@@ -5910,6 +6103,50 @@ class NativeApp:
                 self.delete_pool_slots(record.idx, payload)
             return
         self.apply_pool_text(record.idx, dialog.result)
+
+    def _probe_new_slots(self, client, merged, new_slots):
+        """Test every proxy just added, from the router, right after saving.
+
+        A proxy that is dead on arrival is found here rather than an hour
+        later when a device is pinned to it. Failures never abort the add:
+        the pool is already saved; this only explains it.
+        """
+        results = []
+        for slot in new_slots:
+            row = merged[slot]
+            label = f"{row[0]}:{row[1]}:{row[2]}"
+            try:
+                answer = client.probe_proxy(row[1], row[2], row[3], row[4], row[0] or "socks5")
+            except Exception as exc:  # older agent without probe_proxy, or transport
+                answer = {"state": "unknown", "verdict": f"probe unavailable: {exc}"}
+            results.append((slot, label, answer))
+        return results
+
+    def _report_new_slot_probes(self, idx, results):
+        """Log every probe; open the report window only when something failed."""
+        if not results:
+            return
+        failed = [item for item in results if str(item[2].get("state")) == "fail"]
+        for slot, label, answer in results:
+            text = format_probe_result(answer, self.language)
+            log.info("auto-probe idx=%s slot=%s %s ->\n%s", idx, slot, label, text)
+        summary = "\n".join(
+            f"[{'FAIL' if str(answer.get('state')) != 'ok' else 'ok  '}] slot {slot} {label}: "
+            f"{answer.get('verdict') or answer.get('state')}"
+            for slot, label, answer in results
+        )
+        self.append_log(f"{self.t('Tự kiểm tra proxy vừa thêm')} (IDX {idx}):\n{summary}")
+        if not failed:
+            if all(str(answer.get("state")) == "ok" for _slot, _label, answer in results):
+                self.status_var.set(self.t("Đã thêm {count} proxy, tất cả đều đi được từ router", count=len(results)))
+            return
+        detail = "\n\n".join(
+            f"slot {slot} {label}\n{format_probe_result(answer, self.language)}"
+            for slot, label, answer in failed
+        )
+        self.status_var.set(self.t("{failed}/{count} proxy vừa thêm KHÔNG đi được từ router", failed=len(failed), count=len(results)))
+        ReportDialog(self.root, f"{self.t('Proxy vừa thêm bị lỗi')} · IDX {idx}",
+                     f"{summary}\n\n{detail}", self.language, self.palette)
 
     def add_pool_text(self, idx, text, input_format="auto"):
         rows, dropped = parse_proxy_list(text, limit=POOL_SLOTS_PER_SSID_MAX,
@@ -5935,12 +6172,18 @@ class NativeApp:
             "Các device hiện tại không bị ngắt; proxy mới chỉ được thêm vào pool.",
         ):
             return
-        def done(response):
+        def work():
+            response = client.save_pool(idx, merged)
+            self.update_loading("Đang kiểm tra proxy vừa thêm từ router…")
+            return response, self._probe_new_slots(client, merged, new_slots)
+        def done(result):
+            response, probes = result
             self.pool_cache.pop(idx, None)
             self.pool_counts[idx] = len(merged)
             self.append_log(response.get("log") or self.t("Hoàn tất"))
             self.refresh_clients()
-        self.run_task("Đang thêm proxy…", lambda: client.save_pool(idx, merged), done)
+            self._report_new_slot_probes(idx, probes)
+        self.run_task("Đang thêm proxy…", work, done, show_loading=True, timeout_hint=60)
 
     def delete_pool_slots(self, idx, slots):
         try:
@@ -6111,15 +6354,18 @@ class NativeApp:
 
         def work():
             client.save_pool(idx, merged)
-            return client.assign_proxy(idx, assignments)
+            response = client.assign_proxy(idx, assignments)
+            return response, self._probe_new_slots(client, merged, new_slots)
 
-        def done(response):
+        def done(result):
+            response, probes = result
             self.pool_cache.pop(idx, None)
             if not hasattr(self, "pool_counts"):
                 self.pool_counts = {}
             self.pool_counts[idx] = len(merged)
             self.append_log(response.get("log") or self.t("Hoàn tất"))
             self.refresh_clients()
+            self._report_new_slot_probes(idx, probes)
 
         self.run_task("Đang thêm proxy và phân phối thiết bị…", work, done)
 

@@ -1250,6 +1250,33 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
         self.assertEqual(calls, ["pool", "assign"])
 
+    def test_adding_proxies_tests_each_new_one_from_the_router(self):
+        """A proxy dead on arrival is found now, not when a device is pinned to it."""
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        calls = []
+        instance.client.save_pool.side_effect = lambda *_a: calls.append("pool") or {"ok": True}
+        instance.client.probe_proxy.side_effect = lambda host, port, *_a: calls.append(f"probe:{host}:{port}") or {"state": "ok", "verdict": "ok"}
+        with mock.patch.object(appmod, "ReportDialog") as report:
+            instance.add_proxy_to_selected(text="socks5://3.3.3.3:1080\nhttp://4.4.4.4:8080\n", ask=lambda _rows: True)
+        self.assertEqual(calls[0], "pool")
+        self.assertEqual(sorted(calls[1:]), ["probe:3.3.3.3:1080", "probe:4.4.4.4:8080"])
+        report.assert_not_called()
+
+    def test_a_proxy_that_fails_its_arrival_test_opens_the_report(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        instance.client.probe_proxy.return_value = {"state": "fail", "verdict": "blocked: whitelist", "curl_exit": 7}
+        with mock.patch.object(appmod, "ReportDialog") as report:
+            instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
+        report.assert_called_once()
+        self.assertIn("blocked: whitelist", report.call_args.args[2])
+
+    def test_an_agent_without_probe_proxy_does_not_alarm(self):
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        instance.client.probe_proxy.side_effect = appmod.AgentError("HTTP 400: action không hợp lệ")
+        with mock.patch.object(appmod, "ReportDialog") as report:
+            instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
+        report.assert_not_called()
+
     def test_adding_only_invalid_or_duplicate_proxies_never_touches_router(self):
         instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
         with mock.patch.object(appmod.messagebox, "showwarning"), \

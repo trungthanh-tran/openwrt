@@ -63,6 +63,8 @@ Header bắt buộc: `Authorization: Bearer <token>`. Agent vẫn nhận
 | GET | `health_now` | — | probe ngay 1 lần |
 | GET | `gateway` | — | Route Internet thực tế, interface/device, link, DNS, HTTP latency và `interfaces[]` — toàn bộ interface router đang có (name, device, proto, ipv4, up, default_route, current, proxied) để console cho chọn. Mặc định chấp nhận mọi uplink; `egress_problem` chỉ ra đường ra vòng qua SSID được proxy hoặc lệch interface đã ghim |
 | POST | `set_gateway` | `{interface}` | Chọn interface làm đường ra (`""` = tự động). Lưu vào `/etc/sbproxy/env`; tên chỉ nhận `A-Za-z0-9._-`, tối đa 32 ký tự vì file này được agent source |
+| GET | `diagnose_ssid&idx=N` | — | Đi một vòng đường đi gói tin của SSID: wifi-iface, địa chỉ bridge, lease DHCP, bridge-nf, bảng/chain/vmap/rule tproxy nft, ip rule fwmark + bảng route, tiến trình/cổng nghe/config sing-box, probe proxy, log sing-box, conntrack — và nêu mắt xích hỏng đầu tiên trong `verdict`. `report` là bản chữ |
+| POST | `probe_proxy` | `{host,port,user?,pass?,type?}` | Test một proxy từ router ngay lập tức → `state`, `curl_exit`, `error`, `hint`, đuôi transcript curl (đã che mật khẩu). Dùng khi pool báo `fail` để biết *vì sao*: whitelist IP, sai user/pass, curl thiếu SOCKS |
 | POST | `switch_gateway` | `{interface}` | Đổi đường ra thật: interface được chọn nhận metric 0, các uplink khác lùi về metric 100, reload network rồi ghim như `set_gateway`. Từ chối nếu interface đang down, không có default route, hoặc là bridge SSID proxy |
 | GET | `clients` | — | Client online và thiết bị blocklist offline, kèm band/RSSI/traffic |
 
