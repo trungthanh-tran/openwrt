@@ -3,6 +3,14 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.15] - 2026-08-29
+
+### Fixed
+- `probe-proxy.sh`: phép thử TCP thô dùng `telnet://`, mà curl trên OpenWrt không
+  có (exit 1) nên kết quả "TCP mở/đóng" vô nghĩa. Giờ thử bằng `http://host:port/`:
+  refused / timeout / không phân giải → đóng; mọi phản hồi khác (kể cả SOCKS trả
+  rác) → mở. Verdict `blocked` vì thế dựa trên bằng chứng thật.
+
 ## [0.5.14] - 2026-08-29
 
 ### Fixed

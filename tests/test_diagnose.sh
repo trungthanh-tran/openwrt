@@ -58,7 +58,7 @@ cat > "$BIN/curl" <<'SH'
 proxy=""; url=""
 while [ "$#" -gt 0 ]; do case "$1" in -x) proxy="$2"; shift 2;; -o|-m|-w) shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
 if [ -z "$proxy" ]; then
-  case "$url" in telnet://*) [ "${PROXY_STATE:-ok}" = blocked ] && exit 7; exit 56;; *ipify*) printf '198.51.100.7'; exit 0;; *) printf '204 0.050'; exit 0;; esac
+  case "$url" in http://proxy.example:*) [ "${PROXY_STATE:-ok}" = blocked ] && exit 7; exit 52;; *ipify*) printf '198.51.100.7'; exit 0;; *) printf '204 0.050'; exit 0;; esac
 fi
 case "${PROXY_STATE:-ok}" in
   ok) printf '204 0.120'; exit 0 ;;

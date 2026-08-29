@@ -34,8 +34,9 @@ printf '%s\n' "$proxy" >> "$CURL_CALLS"
 # probe-proxy.sh side checks: plain TCP, direct Internet, public IP.
 if [ -z "$proxy" ]; then
   case "$url" in
-    telnet://offline.example:*) exit 7 ;;
-    telnet://*) exit 56 ;;
+    http://offline.example:*) exit 7 ;;
+    http://slow.example:*) exit 28 ;;
+    http://*.example:*) exit 52 ;;   # a SOCKS port answering HTTP with nothing: open
     *ipify*) [ "${NO_PUBLIC_IP:-0}" = 1 ] && exit 6; printf '203.0.113.9'; exit 0 ;;
     *) [ "${DIRECT_DOWN:-0}" = 1 ] && exit 7; printf '204 0.050'; exit 0 ;;
   esac
@@ -110,6 +111,9 @@ eq "probe: verdict names the IP"      "$(printf '%s' "$out" | jq -r .verdict | g
 out="$(NO_PUBLIC_IP=1 sh "$PROBE" offline.example 5080)"
 eq "probe: no public IP -> verdict still reads" "$(printf '%s' "$out" | jq -r .verdict | grep -c 'add the router public IP')" '1'
 eq "probe: no public IP is empty, not garbage" "$(printf '%s' "$out" | jq -r .checks.public_ip)" ''
+out="$(sh "$PROBE" slow.example 2080)"
+eq "probe: TCP timeout counts as closed" "$(printf '%s' "$out" | jq -r .checks.tcp_open)" 'false'
+eq "probe: TCP check never uses telnet://" "$(grep -c 'curl .*telnet://' "$PROBE")" '0'
 out="$(sh "$PROBE" badcode.example 4080)"
 eq "probe: TCP open + handshake fail is socks-refused" "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'socks-refused'
 out="$(DIRECT_DOWN=1 sh "$PROBE" offline.example 5080)"

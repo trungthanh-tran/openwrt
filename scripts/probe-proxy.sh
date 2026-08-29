@@ -60,9 +60,13 @@ fi
 #    the router otherwise reaches the Internet means the provider blocks the
 #    router's IP (or the port is wrong) — a whitelist problem, not a
 #    credential problem.
+#    A plain http:// request to the proxy port is used rather than telnet://,
+#    which slim curl builds (OpenWrt included) do not carry. A SOCKS server
+#    answers HTTP with garbage or hangs up: that still proves the port opens.
+#    Only "connection refused", "timed out" and "cannot resolve" mean closed.
 tcp_rc=99
-curl -sS -o /dev/null -m 5 "telnet://$host:$port" </dev/null >/dev/null 2>&1; tcp_rc=$?
-case "$tcp_rc" in 0|56|52|8|18) tcp_open=true ;; *) tcp_open=false ;; esac
+curl -sS -o /dev/null -m 5 "http://$host:$port/" >/dev/null 2>&1; tcp_rc=$?
+case "$tcp_rc" in 7|28|6) tcp_open=false ;; *) tcp_open=true ;; esac
 # 3. Does the router reach the Internet without the proxy?
 direct_rc=99
 curl -sS -o /dev/null -m 5 "$PROBE_URL" >/dev/null 2>&1; direct_rc=$?
