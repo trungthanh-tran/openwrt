@@ -78,6 +78,7 @@ run_once() {
     # visible here (a $(...) subshell would lose it).
     outf="${TMPDIR:-/tmp}/sbproxy-probe-out.$$"
     probe_one "$host" "$port" "$user" "$pass" "$proxy_type" > "$outf"
+    # shellcheck disable=SC2046  # three whitespace-free fields, split on purpose
     set -- $(cat "$outf"); rm -f "$outf"
     state="$1"; ms="$2"; code="$3"
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \

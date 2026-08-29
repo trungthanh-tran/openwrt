@@ -100,7 +100,7 @@ elif [ "$curl_socks" = false ]; then
 elif [ "$direct_ok" = false ]; then
   verdict="wan-down: the router cannot reach $PROBE_URL even without the proxy; fix the WAN first"
 elif [ "$tcp_open" = false ]; then
-  verdict="blocked: $host:$port does not accept a TCP connection from the router${public_ip:+ (public IP $public_ip)} although the WAN works — the provider whitelists client IPs or the port is wrong; add ${public_ip:-the router's public IP} to the proxy's allowed IPs"
+  verdict="blocked: $host:$port does not accept a TCP connection from the router${public_ip:+ (public IP $public_ip)} although the WAN works — the provider whitelists client IPs or the port is wrong; add ${public_ip:-the router public IP} to the proxy allowed-IP list"
 else
   case "$transcript" in
     *"authentication failed"*|*"Authentication failed"*|*"407 "*)

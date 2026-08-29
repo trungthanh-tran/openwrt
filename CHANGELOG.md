@@ -3,6 +3,14 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.14] - 2026-08-29
+
+### Fixed
+- CI shellcheck đỏ ở 0.5.13: dấu nháy đơn trong `${public_ip:-…}` của
+  `probe-proxy.sh` (SC1073) và tách từ có chủ ý trong healthd (SC2046). `tests/run.sh`
+  giờ chạy đúng lệnh shellcheck của CI khi máy có shellcheck, nên lỗi lint bị
+  bắt trước khi tag; thêm test cho nhánh verdict khi không lấy được IP public.
+
 ## [0.5.13] - 2026-08-29
 
 ### Fixed

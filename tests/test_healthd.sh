@@ -36,7 +36,7 @@ if [ -z "$proxy" ]; then
   case "$url" in
     telnet://offline.example:*) exit 7 ;;
     telnet://*) exit 56 ;;
-    *ipify*) printf '203.0.113.9'; exit 0 ;;
+    *ipify*) [ "${NO_PUBLIC_IP:-0}" = 1 ] && exit 6; printf '203.0.113.9'; exit 0 ;;
     *) [ "${DIRECT_DOWN:-0}" = 1 ] && exit 7; printf '204 0.050'; exit 0 ;;
   esac
 fi
@@ -107,6 +107,9 @@ eq "probe: direct Internet is seen"   "$(printf '%s' "$out" | jq -r .checks.dire
 eq "probe: public IP is reported"     "$(printf '%s' "$out" | jq -r .checks.public_ip)" '203.0.113.9'
 eq "probe: verdict is blocked"        "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'blocked'
 eq "probe: verdict names the IP"      "$(printf '%s' "$out" | jq -r .verdict | grep -c 203.0.113.9)" '1'
+out="$(NO_PUBLIC_IP=1 sh "$PROBE" offline.example 5080)"
+eq "probe: no public IP -> verdict still reads" "$(printf '%s' "$out" | jq -r .verdict | grep -c 'add the router public IP')" '1'
+eq "probe: no public IP is empty, not garbage" "$(printf '%s' "$out" | jq -r .checks.public_ip)" ''
 out="$(sh "$PROBE" badcode.example 4080)"
 eq "probe: TCP open + handshake fail is socks-refused" "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'socks-refused'
 out="$(DIRECT_DOWN=1 sh "$PROBE" offline.example 5080)"

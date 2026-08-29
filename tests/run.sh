@@ -638,6 +638,19 @@ nomatch "update.ps1 drops old ui path" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE
 match   "make-package.sh ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.sh")" 'README.md VERSION agent config console docs etc scripts'
 match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.ps1")" 'README.md VERSION agent config console docs etc scripts'
 
+echo "== shellcheck (same file list as CI) =="
+if command -v shellcheck >/dev/null 2>&1; then
+  if (cd "$ROOT" && shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh         config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd         agent/sbproxy-assignd agent/sbproxy-dhcp-assign >"$STUB/shellcheck.out" 2>&1); then
+    ok "every shell script passes shellcheck -S warning"
+  else
+    no "shellcheck reports problems: $(head -n 3 "$STUB/shellcheck.out" | tr '
+' ' ')"
+  fi
+else
+  printf '  skip shellcheck is not installed
+'; skip=$((skip + 1))
+fi
+
 echo "== versioning and self-update =="
 project_version="$(tr -d ' \r\n' < "$ROOT/VERSION")"
 match "VERSION is semver or snapshot" "$project_version" '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$'
