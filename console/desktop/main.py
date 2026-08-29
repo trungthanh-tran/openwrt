@@ -6074,12 +6074,18 @@ class NativeApp:
         health = self.health.get(str(record.idx), self.health.get(record.idx, {}))
         # The reason a proxy is red goes to the log file, so a screenshot of the
         # dialog and the log folder together are enough to diagnose remotely.
-        log.info("pool idx=%s ssid=%s proxies=%d health: %s", record.idx, record.name,
-                 len(proxies), describe_health(health))
-        for slot, row in enumerate(proxies):
-            log.info("pool idx=%s slot=%s %s:%s:%s user=%s", record.idx, slot,
-                     row.get("type") or "socks5", row.get("host"), row.get("port"),
-                     "yes" if row.get("user") else "no")
+        try:
+            log.info("pool idx=%s ssid=%s proxies=%d health: %s", record.idx, record.name,
+                     len(proxies), describe_health(health))
+            for slot, row in enumerate(proxies):
+                if not isinstance(row, dict):
+                    log.info("pool idx=%s slot=%s unreadable row %r", record.idx, slot, row)
+                    continue
+                log.info("pool idx=%s slot=%s %s:%s:%s user=%s", record.idx, slot,
+                         row.get("type") or "socks5", row.get("host"), row.get("port"),
+                         "yes" if row.get("user") else "no")
+        except Exception:  # logging must never keep the dialog from opening
+            log.exception("pool idx=%s: could not describe the pool", record.idx)
         client = self.client
         def prober(row):
             return client.probe_proxy(row.get("host"), row.get("port"), row.get("user"),

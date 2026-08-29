@@ -3,6 +3,18 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.16] - 2026-08-29
+
+### Fixed
+- Mở màn hình Pool: đoạn ghi log health/slot không thể ném lỗi chặn mở màn hình
+  nữa (dòng dữ liệu lạ được log và bỏ qua).
+
+### Tests
+- Màn hình Pool: dựng dialog thật trên Tk và kiểm tra đủ dòng/cột với mọi nhánh
+  health (không có / ok / fail kèm lý do), hai ngôn ngữ, nút Test proxy có/không,
+  probe lỗi, pool rỗng — chống hồi quy "bảng proxy trắng". Mở Pool: proxy đi đủ
+  vào dialog, log lý do, dòng lạ không chặn mở.
+
 ## [0.5.15] - 2026-08-29
 
 ### Fixed

@@ -1277,6 +1277,57 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
             instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
         report.assert_not_called()
 
+    # --- opening the pool screen -------------------------------------------
+
+    def open_pool(self, instance, pool=None, health=None):
+        """Open the pool screen with a captured PoolDialog and return its kwargs."""
+        if pool is not None:
+            instance.client.get_pool.return_value = pool
+        instance.health = {} if health is None else health
+        instance.selected_wifi = lambda: appmod.WifiRecord(
+            name="hiki", band="5g", idx=1, wifi_password="password12", host="1.1.1.1", port=1080)
+        instance.require_client = lambda: instance.client
+        instance.has_online_devices = lambda _idx: False
+        instance.root = mock.Mock()
+        captured = {}
+        class Captured:
+            def __init__(self, *args, **kwargs):
+                captured["args"] = args; captured["kwargs"] = kwargs
+                self.result = None
+        with mock.patch.object(appmod, "PoolDialog", Captured):
+            instance.open_pool_editor()
+        return captured
+
+    def test_opening_the_pool_hands_every_proxy_to_the_dialog(self):
+        instance = self.make_instance([])
+        captured = self.open_pool(instance)
+        self.assertEqual([row["host"] for row in captured["args"][2]], ["1.1.1.1", "2.2.2.2"])
+        self.assertIsNotNone(captured["kwargs"]["prober"], "Test proxy needs the router client")
+
+    def test_opening_the_pool_logs_the_health_reason(self):
+        instance = self.make_instance([])
+        health = {"1": {"state": "fail", "latency_ms": 0, "code": 0, "error": "curl exit 7: refused"}}
+        with self.assertLogs("sbproxy", level="INFO") as logs:
+            captured = self.open_pool(instance, health=health)
+        self.assertEqual(captured["kwargs"]["health"]["error"], "curl exit 7: refused")
+        joined = "\n".join(logs.output)
+        self.assertIn("reason: curl exit 7: refused", joined)
+        self.assertIn("slot=1 http:2.2.2.2:8080", joined)
+
+    def test_odd_pool_rows_never_keep_the_screen_from_opening(self):
+        """A malformed row is logged and skipped; the dialog still opens with the data."""
+        instance = self.make_instance([])
+        pool = dict(self.POOL, proxies=[self.POOL["proxies"][0], "garbage", None])
+        captured = self.open_pool(instance, pool=pool)
+        self.assertEqual(len(captured["args"][2]), 3)
+
+    def test_the_pool_screen_probes_through_the_live_client(self):
+        instance = self.make_instance([])
+        instance.client.probe_proxy.return_value = {"state": "ok"}
+        captured = self.open_pool(instance)
+        captured["kwargs"]["prober"]({"host": "9.9.9.9", "port": 1080, "user": "u", "pass": "p", "type": "http"})
+        instance.client.probe_proxy.assert_called_once_with("9.9.9.9", 1080, "u", "p", "http")
+
     def test_adding_only_invalid_or_duplicate_proxies_never_touches_router(self):
         instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
         with mock.patch.object(appmod.messagebox, "showwarning"), \

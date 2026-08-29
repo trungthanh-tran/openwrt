@@ -456,5 +456,114 @@ class SetupWizardGuiTests(unittest.TestCase):
         self.assertIsNone(app.pending_provision)
 
 
+class PoolDialogGuiTests(unittest.TestCase):
+    """The proxy-pool screen must list every slot, whatever health/prober it gets.
+
+    A blank table here is the bug an operator sees as "list proxy bị trắng":
+    every branch that feeds the rows (health present/absent/with a reason,
+    prober present/absent, both languages) is rendered and counted.
+    """
+
+    PROXIES = [
+        {"type": "socks5", "host": "81.22.139.101", "port": 12323, "user": "u1", "pass": "p1", "label": ""},
+        {"type": "socks5", "host": "81.22.139.145", "port": 12323, "user": "u1", "pass": "p1", "label": "b"},
+        {"type": "http", "host": "194.152.155.14", "port": 8080, "user": "", "pass": "", "label": ""},
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.root = tk.Tk()
+            cls.root.withdraw()
+        except tk.TclError as exc:
+            raise unittest.SkipTest(f"Tk display unavailable: {exc}")
+        # ttk styles the dialog relies on are registered by the app.
+        with mock.patch.object(appmod, "load_connection", return_value=(appmod.DEFAULT_BASE, "")), \
+             mock.patch.object(appmod, "load_preferences", return_value=("en", "dark")), \
+             mock.patch.object(appmod.NativeApp, "connect"):
+            cls.app = appmod.NativeApp(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "root"):
+            cls.root.destroy()
+
+    def record(self):
+        return appmod.WifiRecord(name="hiki", band="5g", idx=1, wifi_password="password12",
+                                 host="81.22.139.101", port=12323)
+
+    def open(self, proxies=None, usage=(0, 1, 0), language="en", health=None, prober=None):
+        # A withdrawn root cannot take a grab; the dialog itself is unchanged.
+        with mock.patch.object(tk.Toplevel, "grab_set"):
+            dialog = appmod.PoolDialog(self.root, self.record(),
+                                       self.PROXIES if proxies is None else proxies,
+                                       list(usage), language, appmod.DARK_PALETTE,
+                                       health=health, prober=prober)
+        self.root.update_idletasks()
+        self.addCleanup(dialog.destroy)
+        return dialog
+
+    def rows(self, dialog):
+        return [dialog.table.item(item, "values") for item in dialog.table.get_children("")]
+
+    def test_every_slot_is_listed_with_its_columns(self):
+        dialog = self.open()
+        rows = self.rows(dialog)
+        self.assertEqual(len(rows), 3, "the pool table must not come up blank")
+        self.assertEqual([r[0] for r in rows], ("0", "1", "2") and ["0", "1", "2"])
+        self.assertEqual(rows[0][1], "socks5:81.22.139.101:12323")
+        self.assertEqual(rows[2][1], "http:194.152.155.14:8080")
+        self.assertEqual(rows[0][3:7], ("81.22.139.101", "12323", "u1", "p1"))
+        self.assertEqual([r[8] for r in rows], ["0", "1", "0"])
+
+    def test_rows_render_without_any_health_data(self):
+        dialog = self.open(health=None)
+        rows = self.rows(dialog)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][7], "—")
+
+    def test_rows_render_with_a_failing_health_and_its_reason(self):
+        health = {"state": "fail", "latency_ms": 0, "code": 0, "error": "curl exit 7: refused"}
+        dialog = self.open(health=health)
+        rows = self.rows(dialog)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][7], "fail 0ms")
+        dialog.table.selection_set(dialog.table.get_children("")[0])
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            dialog._show_detail()
+        self.assertIn("Reason: curl exit 7: refused", info.call_args.args[1])
+
+    def test_rows_render_in_vietnamese_too(self):
+        dialog = self.open(language="vi", health={"state": "ok", "latency_ms": 120})
+        rows = self.rows(dialog)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[1][7], "ok 120ms")
+
+    def test_test_proxy_button_follows_the_prober(self):
+        self.assertNotIn("Test proxy", widget_texts(self.open(prober=None)))
+        seen = []
+        dialog = self.open(prober=lambda row: seen.append(row) or {"state": "fail", "verdict": "blocked: x"})
+        self.assertIn("Test proxy", widget_texts(dialog))
+        dialog.table.selection_set(dialog.table.get_children("")[2])
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            dialog._probe_selected()
+        self.assertEqual(seen[0]["host"], "194.152.155.14")
+        self.assertIn("VERDICT: blocked: x", info.call_args.args[1])
+        # The probe never blanks the table.
+        self.assertEqual(len(self.rows(dialog)), 3)
+
+    def test_a_probe_error_is_shown_not_raised(self):
+        dialog = self.open(prober=lambda row: (_ for _ in ()).throw(appmod.AgentError("HTTP 400: nope")))
+        dialog.table.selection_set(dialog.table.get_children("")[0])
+        with mock.patch.object(appmod.messagebox, "showerror") as error:
+            dialog._probe_selected()
+        self.assertIn("HTTP 400: nope", error.call_args.args[1])
+        self.assertEqual(len(self.rows(dialog)), 3)
+
+    def test_an_empty_pool_renders_an_empty_table_not_an_error(self):
+        dialog = self.open(proxies=[], usage=[])
+        self.assertEqual(self.rows(dialog), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
