@@ -819,6 +819,21 @@ out="$(run_agent_pkg 'action=update' "$TMP/not-a-package.bin")"
 eq "a real non-package is still refused" "$(json_value "$out" '.ok')" 'false'
 contains "the refusal reports what arrived" "$(json_value "$out" '.log')" 'bytes, first bytes:'
 
+# uhttpd answers 403 to a CGI that others cannot execute. The agent's own CGI
+# process may run with a restrictive umask, and the deployed files are created
+# fresh when a destination is missing, so the modes must not depend on it.
+echo "== agent self-update under a restrictive umask =="
+rm -f "$TMP/deploy/sbproxy" "$TMP/deploy/sbproxy-healthd" "$TMP/deploy/init-healthd"
+make_pkg 0.5.1 "$TMP/pkg-0.5.1.tar.gz"
+out="$( (umask 077; run_agent_pkg 'action=update' "$TMP/pkg-0.5.1.tar.gz") )"
+eq "update under umask 077 still applies"      "$(json_value "$out" '.ok')" 'true'
+mode_of() { ls -l "$1" | cut -c1-10; }
+eq "deployed CGI is executable by everyone"   "$(mode_of "$TMP/deploy/sbproxy")" '-rwxr-xr-x'
+eq "deployed healthd is executable by everyone" "$(mode_of "$TMP/deploy/sbproxy-healthd")" '-rwxr-xr-x'
+eq "deployed init script is executable by everyone" "$(mode_of "$TMP/deploy/init-healthd")" '-rwxr-xr-x'
+eq "code tree CGI is executable by everyone"  "$(mode_of "$SB2/agent/cgi/sbproxy")" '-rwxr-xr-x'
+eq "code tree scripts are executable by everyone" "$(mode_of "$SB2/scripts/apply.sh")" '-rwxr-xr-x'
+
 echo ""
 printf 'AGENT TOTAL: pass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

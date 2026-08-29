@@ -61,7 +61,7 @@ TOKEN="$(cat /etc/sbproxy/token)"
 log "4) CGI -> /www/cgi-bin/sbproxy"
 mkdir -p /www/cgi-bin
 cp "$AGENT/cgi/sbproxy" /www/cgi-bin/sbproxy
-chmod +x /www/cgi-bin/sbproxy
+chmod 755 /www/cgi-bin/sbproxy
 
 log "5) UI self-host -> /www/sbproxy/index.html"
 mkdir -p /www/sbproxy
@@ -70,18 +70,18 @@ cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
 log "6) Health daemon -> /usr/sbin/ + procd"
 mkdir -p /usr/libexec
 cp "$AGENT/sbproxy-dhcp-assign" /usr/libexec/sbproxy-dhcp-assign
-chmod +x /usr/libexec/sbproxy-dhcp-assign
+chmod 755 /usr/libexec/sbproxy-dhcp-assign
 cp "$AGENT/sbproxy-healthd" /usr/sbin/sbproxy-healthd
-chmod +x /usr/sbin/sbproxy-healthd
+chmod 755 /usr/sbin/sbproxy-healthd
 cp "$AGENT/init.d/sbproxy-healthd" /etc/init.d/sbproxy-healthd
-chmod +x /etc/init.d/sbproxy-healthd
+chmod 755 /etc/init.d/sbproxy-healthd
 /etc/init.d/sbproxy-healthd enable
 /etc/init.d/sbproxy-healthd restart
 
 cp "$AGENT/sbproxy-assignd" /usr/sbin/sbproxy-assignd
-chmod +x /usr/sbin/sbproxy-assignd
+chmod 755 /usr/sbin/sbproxy-assignd
 cp "$AGENT/init.d/sbproxy-assignd" /etc/init.d/sbproxy-assignd
-chmod +x /etc/init.d/sbproxy-assignd
+chmod 755 /etc/init.d/sbproxy-assignd
 /etc/init.d/sbproxy-assignd enable
 /etc/init.d/sbproxy-assignd restart
 

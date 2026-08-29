@@ -20,6 +20,11 @@
 # Environment overrides (for tests/development machines): SB_ROOT, CGI_DEST, UI_DEST,
 #   HEALTHD_DEST, HEALTHD_INIT_DEST, SB_NO_SERVICE=1.
 set -eu
+# Files written here are executed by uhttpd, which refuses a CGI that others
+# cannot execute (403 Forbidden). A `chmod +x` honours the caller's umask and,
+# under the agent's own CGI process, can leave the file 0700; so the umask is
+# pinned and the modes below are spelled out.
+umask 022
 
 die() { echo "self-update: $*" >&2; exit 1; }
 log() { echo "self-update: $*"; }
@@ -197,7 +202,7 @@ fi
 
 # ---- overwrite SB_ROOT ----
 cp -r "$NEW_ROOT"/. "$SB_ROOT"/ || die "failed to copy files into $SB_ROOT"
-chmod +x "$SB_ROOT"/scripts/*.sh "$SB_ROOT/agent/cgi/sbproxy" \
+chmod 755 "$SB_ROOT"/scripts/*.sh "$SB_ROOT/agent/cgi/sbproxy" \
   "$SB_ROOT/agent/sbproxy-healthd" "$SB_ROOT/agent/install-agent.sh" 2>/dev/null || true
 
 # ---- redeploy the agent/UI (skip components whose destinations do not exist) ----
@@ -207,7 +212,7 @@ HEALTHD_DEST="${HEALTHD_DEST:-/usr/sbin/sbproxy-healthd}"
 HEALTHD_INIT_DEST="${HEALTHD_INIT_DEST:-/etc/init.d/sbproxy-healthd}"
 deploy() { # src dest
   [ -d "$(dirname "$2")" ] || return 0
-  cp "$1" "$2" && chmod +x "$2" 2>/dev/null || true
+  cp "$1" "$2" && chmod 755 "$2" 2>/dev/null || true
   log "deploy $2"
 }
 deploy "$SB_ROOT/agent/cgi/sbproxy" "$CGI_DEST"

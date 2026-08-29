@@ -3,6 +3,16 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.13] - 2026-08-29
+
+### Fixed
+- Nâng cấp agent từ console xong thì agent trả `HTTP 403 Forbidden`. uhttpd từ
+  chối CGI thiếu bit thực thi cho *others*; `chmod +x` trong `self-update.sh`
+  và `install-agent.sh` phụ thuộc `umask` của tiến trình gọi — chạy dưới CGI
+  của chính agent có thể chỉ còn `u+x`. Giờ `self-update.sh` và action `update`
+  đặt `umask 022`, mọi file deploy được `chmod 755` tường minh. Router đang kẹt
+  403: `chmod 755 /www/cgi-bin/sbproxy` hoặc Post-flash setup → cài lại agent.
+
 ## [0.5.12] - 2026-08-29
 
 ### Added

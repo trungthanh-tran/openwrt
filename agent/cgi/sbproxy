@@ -378,6 +378,9 @@ case "$ACTION" in
     ;;
 
   update)
+    # The package is unpacked and redeployed by this very process; its umask
+    # must not strip the execute bits uhttpd needs on the new CGI.
+    umask 022
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
     [ -s "$BODY_FILE" ] || json_err "400 Bad Request" "body rỗng — cần package .tar.gz/.zip"
     force_flag=""
