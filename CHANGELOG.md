@@ -3,6 +3,13 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.19] - 2026-08-30
+
+### Tests
+- `tests/test_reset_parity.py`: chạy hàm Reset thật của web (Node) và desktop
+  trên cùng một fixture, so từng lời gọi agent và cả các guard (từ chối cảnh
+  báo, gõ sai chữ, gõ đúng bất kể hoa/thường) để hai bản không bao giờ lệch nhau.
+
 ## [0.5.18] - 2026-08-30
 
 ### Added
