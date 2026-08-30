@@ -324,6 +324,7 @@
       <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
       <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
       <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
+      <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
       <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
     </span>
     <button class="btn ghost" id="exportConf">Tải wifi-socks.conf</button>
@@ -576,7 +577,7 @@
     "(để trống nếu mở UI ngay từ router)": "(leave empty when the UI is served by the router)",
     "(in ra bởi install-agent.sh)": "(printed by install-agent.sh)", "Ngắt": "Disconnect", "Đóng": "Close", "Kết nối": "Connect",
     "Tạo backup ngay": "Create backup now", "Đường ra": "Egress", "Đường ra Internet": "Internet egress",
-    "Kiểm tra lại": "Check again", "Đổi đường ra": "Switch egress", "Thiết bị đang kết nối": "Connected devices", "Làm mới": "Refresh",
+    "Kiểm tra lại": "Check again", "Đổi đường ra": "Switch egress", "Reset toàn bộ": "Reset everything", "Thiết bị đang kết nối": "Connected devices", "Làm mới": "Refresh",
     "Bản đang chạy trên router": "Version running on router", "File package": "Package file",
     "Cho phép hạ version (force)": "Allow version downgrade (force)", "Kết quả": "Result",
     "IP / Tên máy": "IP / Hostname", "Thời gian kết nối": "Connected", "Vào (in)": "Received", "Ra (out)": "Sent", "Sóng": "Signal",
@@ -603,6 +604,7 @@
     "Tải wifi-socks.conf từ router": "Download wifi-socks.conf from the router",
     "Backup & Rollback trên router": "Back up and roll back the router",
     "Xem và đổi đường ra Internet của router": "View and switch the router's Internet egress",
+    "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
     "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package"
   };
 
@@ -851,6 +853,54 @@
       return api("apply", "POST", {});
     }).then(d => { showLog("apply.sh", d); poll(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+  // ---- Reset: back to zero SSIDs on the router -------------------------------
+  // Kick every online device, empty every pool, write an empty wifi-socks.conf,
+  // apply. Destructive, so a default-deny confirm AND a typed word are required.
+  const RESET_WORD = "RESET";
+  function resetEverything() {
+    if (!agent.connected) return;
+    const count = ssids.length;
+    if (!confirm(pick(
+        `WARNING · RESET EVERYTHING\n\nDelete ALL ${count} SSIDs and their proxy pools, kick every connected device, then apply to the router.\n\nEvery sbproxy-managed Wi-Fi disappears immediately and every device loses its connection. The router keeps a pre-apply backup for a manual rollback. This cannot be undone here.`,
+        `CẢNH BÁO · RESET TOÀN BỘ\n\nXoá TẤT CẢ ${count} SSID và pool proxy, đá mọi thiết bị đang kết nối, rồi apply lên router.\n\nMọi Wi-Fi do sbproxy quản lý biến mất ngay; mọi thiết bị mất kết nối. Router giữ một backup pre-apply để rollback bằng tay. Không hoàn tác được ở đây.`))) return;
+    const typed = prompt(pick(`Type ${RESET_WORD} to confirm wiping the whole configuration:`,
+                              `Gõ ${RESET_WORD} để xác nhận xoá toàn bộ cấu hình:`), "");
+    if ((typed || "").trim().toUpperCase() !== RESET_WORD) { toast(pick("Reset cancelled.", "Đã huỷ reset.")); return; }
+    const idxs = ssids.map(s => s.idx);
+    const skipped = [];
+    let kicked = 0;
+    toast(pick("Step 1/4 · Kicking devices…", "Bước 1/4 · Đá thiết bị…"));
+    api("clients").then(d => {
+      const online = ((d && d.clients) || []).filter(c => c && c.online && c.mac);
+      return online.reduce((chain, c) => chain.then(() =>
+        api("kick", "POST", { idx: c.idx, mac: c.mac }).then(() => { kicked++; }).catch(e => skipped.push(`${c.mac}: ${e.message || e}`))
+      ), Promise.resolve());
+    }).then(() => {
+      toast(pick("Step 2/4 · Emptying proxy pools…", "Bước 2/4 · Xoá pool proxy…"));
+      return idxs.reduce((chain, idx) => chain.then(() =>
+        api("save_pool", "POST", { idx, proxies: [] }).catch(e => skipped.push(`pool idx=${idx}: ${e.message || e}`))
+      ), Promise.resolve());
+    }).then(() => {
+      toast(pick("Step 3/4 · Writing the empty configuration…", "Bước 3/4 · Ghi cấu hình rỗng…"));
+      const before = ssids; ssids = []; const emptyConf = genConf(); ssids = before;
+      return api("dryrun_conf", "POST", emptyConf, true).then(dr => {
+        if (!dr || !dr.ok) throw new Error((dr && dr.log) || pick("dry-run failed", "dry-run lỗi"));
+        return api("save_conf", "POST", emptyConf, true);
+      });
+    }).then(sv => {
+      if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
+      toast(pick("Step 4/4 · Applying…", "Bước 4/4 · Apply…"));
+      return api("apply", "POST", {});
+    }).then(d => {
+      if (!d || !d.ok) throw new Error((d && d.log) || pick("apply failed", "apply lỗi"));
+      ssids = []; save(); render();
+      const summary = pick(`RESET done: kicked ${kicked} devices, removed ${count} SSIDs and pools, apply succeeded.`,
+                           `RESET xong: đã đá ${kicked} thiết bị, xoá ${count} SSID và pool, apply thành công.`)
+        + (skipped.length ? "\n" + pick(`${skipped.length} minor errors were skipped:`, `Bỏ qua ${skipped.length} lỗi nhỏ:`) + "\n" + skipped.slice(0, 10).join("\n") : "");
+      showLog(pick("Reset everything", "Reset toàn bộ"), { ok: true, log: summary + "\n\n" + (d.log || "") });
+      poll();
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
   }
   function pullFromRouter() {
     api("get_conf", "GET", null, "resp").then(txt => {
@@ -1408,6 +1458,7 @@
   $("upCancel").onclick = () => $("upBackdrop").classList.remove("show");
   $("upBackdrop").onclick = e => { if (e.target.id === "upBackdrop") $("upBackdrop").classList.remove("show"); };
   $("gwBtn").onclick = openGateway;
+  $("resetAllBtn").onclick = resetEverything;
   $("gwRefresh").onclick = loadGateway;
   $("gwSwitch").onclick = switchGateway;
   $("gwClose").onclick = () => $("gwBackdrop").classList.remove("show");

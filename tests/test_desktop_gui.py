@@ -58,6 +58,11 @@ class DesktopGuiSmokeTests(unittest.TestCase):
         self.app._rebuild_ui()
         self.root.update_idletasks()
 
+    def test_the_reset_button_is_on_the_wifi_toolbar_in_both_languages(self):
+        for language, label in (("en", "Reset everything"), ("vi", "Reset toàn bộ")):
+            self.set_mode(language, "dark")
+            self.assertIn(label, widget_texts(self.root))
+
     def test_all_language_theme_combinations_render(self):
         for language in ("en", "vi"):
             for theme in ("dark", "light"):

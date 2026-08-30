@@ -657,6 +657,17 @@ EN_TRANSLATIONS = {
     'Đổi đường ra': 'Switch egress',
     'Test proxy': 'Test proxy',
     'Chẩn đoán': 'Diagnose',
+    'Reset toàn bộ': 'Reset everything',
+    'Xoá TẤT CẢ {count} SSID, {pools} pool proxy và đá {devices} thiết bị đang kết nối, rồi apply lên router.':
+        'Delete ALL {count} SSIDs and {pools} proxy pools, kick {devices} connected devices, then apply to the router.',
+    'Mọi Wi-Fi do sbproxy quản lý sẽ biến mất ngay lập tức; mọi thiết bị mất kết nối. Router giữ một backup pre-apply để rollback bằng tay. Không hoàn tác được từ app.':
+        'Every sbproxy-managed Wi-Fi disappears immediately and every device loses its connection. The router keeps a pre-apply backup for a manual rollback. This cannot be undone from the app.',
+    'Gõ {word} để xác nhận xoá toàn bộ cấu hình:': 'Type {word} to confirm wiping the whole configuration:',
+    'Đã huỷ reset.': 'Reset cancelled.',
+    'Đang reset toàn bộ…': 'Resetting everything…',
+    'RESET xong: đã đá {kicked} thiết bị, xoá {count} SSID và pool, apply thành công.':
+        'RESET done: kicked {kicked} devices, removed {count} SSIDs and pools, apply succeeded.',
+    'Bỏ qua {n} lỗi nhỏ:': '{n} minor errors were skipped:',
     'Tự kiểm tra proxy vừa thêm': 'Auto-test of the proxies just added',
     'Đã thêm {count} proxy, tất cả đều đi được từ router': 'Added {count} proxies; all of them work from the router',
     '{failed}/{count} proxy vừa thêm KHÔNG đi được từ router': '{failed}/{count} proxies just added do NOT work from the router',
@@ -4558,6 +4569,8 @@ class NativeApp:
             ("Đẩy cấu hình & Apply", self.save_apply, "Success.TButton"),
         ]:
             ttk.Button(bar, text=text, command=command, style=button_style).pack(side="left", padx=(0, 7))
+        ttk.Button(bar, text="Reset toàn bộ", command=self.reset_everything,
+                   style="Danger.TButton").pack(side="right")
         columns = {"idx": "IDX", "name": "SSID", "band": "Band", "subnet": "Subnet", "mac": "BSSID / Provider", "proxy_count": "Số proxy", "devices": "Device kết nối", "isolate": "Isolate", "webrtc": "WebRTC"}
         self.wifi_column_titles = columns.copy()
         self.wifi_tree = self._tree(tab, columns, {"idx": 50, "name": 150, "band": 55, "subnet": 130, "mac": 220, "proxy_count": 90, "devices": 115, "isolate": 70, "webrtc": 75})
@@ -5624,6 +5637,88 @@ class NativeApp:
             lambda: client.rotate_mac(record.idx, selected_oui),
             done,
         )
+
+    RESET_WORD = "RESET"
+
+    def reset_everything(self, confirm=None):
+        """Wipe the router back to zero SSIDs: kick every device, empty every
+        pool, write an empty wifi-socks.conf, apply.
+
+        Destructive and not undoable from the app (the router keeps a
+        pre-apply backup), so the operator must type RESET, not just click.
+        """
+        if self.block_if_incompatible():
+            return
+        try:
+            client = self.require_client()
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        records = list(self.records)
+        clients = [item for item in self.clients_data if isinstance(item, dict)]
+        online = [item for item in clients if item.get("online") and item.get("mac")]
+        if confirm is None:
+            def confirm():
+                if not self.confirm_important(
+                    "Reset toàn bộ",
+                    self.t("Xoá TẤT CẢ {count} SSID, {pools} pool proxy và đá {devices} thiết bị đang kết nối, rồi apply lên router.",
+                           count=len(records), pools=len(records), devices=len(online)),
+                    self.t("Mọi Wi-Fi do sbproxy quản lý sẽ biến mất ngay lập tức; mọi thiết bị mất kết nối. Router giữ một backup pre-apply để rollback bằng tay. Không hoàn tác được từ app."),
+                ):
+                    return False
+                typed = simpledialog.askstring(
+                    self.t("Reset toàn bộ"),
+                    self.t("Gõ {word} để xác nhận xoá toàn bộ cấu hình:", word=self.RESET_WORD),
+                    parent=self.root,
+                )
+                return (typed or "").strip().upper() == self.RESET_WORD
+        if not confirm():
+            self.append_log(self.t("Đã huỷ reset."))
+            return
+        empty_conf = render_conf([])
+
+        def work():
+            self.update_loading("Bước 1/4 · Đá thiết bị…" if self.language != "en" else "Step 1/4 · Kicking devices…")
+            kicked, failed = 0, []
+            for item in online:
+                try:
+                    client.client_action("kick", int(item.get("idx") or 0), str(item["mac"]))
+                    kicked += 1
+                except Exception as exc:  # a device that already left is not a reason to stop
+                    failed.append(f"{item['mac']}: {exc}")
+            self.update_loading("Bước 2/4 · Xoá pool proxy…" if self.language != "en" else "Step 2/4 · Emptying proxy pools…")
+            for record in records:
+                try:
+                    client.save_pool(record.idx, [])
+                except Exception as exc:
+                    failed.append(f"pool idx={record.idx}: {exc}")
+            self.update_loading("Bước 3/4 · Ghi cấu hình rỗng…" if self.language != "en" else "Step 3/4 · Writing the empty configuration…")
+            dryrun = client.dryrun_conf(empty_conf)
+            if not dryrun.get("ok", False):
+                raise AgentError(dryrun.get("log") or "Dry-run thất bại")
+            client.save_conf(empty_conf)
+            self.update_loading("Bước 4/4 · Apply…" if self.language != "en" else "Step 4/4 · Applying…")
+            result = client.apply()
+            if not result.get("ok", False):
+                raise AgentError(result.get("log") or "Apply thất bại")
+            return kicked, failed, result
+
+        def done(payload):
+            kicked, failed, result = payload
+            self.records = []
+            self.pool_cache = {}
+            self.pool_counts = {}
+            self.append_log(result.get("log") or "")
+            summary = self.t("RESET xong: đã đá {kicked} thiết bị, xoá {count} SSID và pool, apply thành công.",
+                             kicked=kicked, count=len(records))
+            if failed:
+                summary += "\n" + self.t("Bỏ qua {n} lỗi nhỏ:", n=len(failed)) + "\n" + "\n".join(failed[:10])
+            self.append_log(summary)
+            self.status_var.set(summary.splitlines()[0])
+            log.info("reset: kicked=%s ssids=%s failed=%s", kicked, len(records), failed)
+            self.root.after(5000, self.refresh_all)
+
+        self.run_task("Đang reset toàn bộ…", work, done, show_loading=True, timeout_hint=240)
 
     def save_apply(self):
         if self.block_if_incompatible():

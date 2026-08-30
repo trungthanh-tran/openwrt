@@ -3,6 +3,15 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.18] - 2026-08-30
+
+### Added
+- Nút **Reset toàn bộ** (desktop: thanh công cụ Wi-Fi; web: **⟲ Reset toàn bộ**
+  trong thanh công cụ khi đã kết nối agent): đá mọi thiết bị đang
+  kết nối, xoá mọi pool proxy, ghi `wifi-socks.conf` rỗng rồi apply. Có cảnh báo
+  mặc-định-từ-chối và phải gõ `RESET` mới chạy; thiết bị đã rời mạng không làm
+  hỏng quy trình; apply lỗi thì danh sách trên app giữ nguyên.
+
 ## [0.5.17] - 2026-08-30
 
 ### Fixed

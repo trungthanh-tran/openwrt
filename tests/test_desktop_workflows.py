@@ -1493,6 +1493,92 @@ VIETNAMESE_ONLY = set("ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậ�
                       "óòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
 
 
+class ResetEverythingTests(unittest.TestCase):
+    """The reset button must warn, require the typed word, and then do all four steps in order."""
+
+    def make_instance(self):
+        instance = bare_app("vi")
+        instance.client = mock.Mock()
+        instance.client.dryrun_conf.return_value = {"ok": True}
+        instance.client.save_conf.return_value = {"ok": True, "saved": True}
+        instance.client.apply.return_value = {"ok": True, "log": "APPLY COMPLETE"}
+        instance.client.save_pool.return_value = {"ok": True}
+        instance.client.client_action.return_value = {"ok": True}
+        instance.records = [
+            appmod.WifiRecord(name="a", band="5g", idx=1, wifi_password="password12", host="1.1.1.1", port=1080),
+            appmod.WifiRecord(name="b", band="2g", idx=2, wifi_password="password12", host="2.2.2.2", port=1080),
+        ]
+        instance.clients_data = [
+            {"idx": 1, "mac": "aa:bb:cc:dd:ee:01", "online": True},
+            {"idx": 2, "mac": "aa:bb:cc:dd:ee:02", "online": True},
+            {"idx": 2, "mac": "aa:bb:cc:dd:ee:03", "online": False},
+        ]
+        instance.pool_cache = {1: {}}
+        instance.pool_counts = {1: 3}
+        instance.block_if_incompatible = lambda: False
+        instance.append_log = mock.Mock()
+        instance.refresh_all = mock.Mock()
+        instance.root = FakeRoot(immediate=True)
+        instance.hide_loading = mock.Mock()
+        instance.update_loading = mock.Mock()
+        synchronous_run_task(instance)
+        return instance
+
+    def test_the_reset_needs_the_warning_and_the_typed_word(self):
+        instance = self.make_instance()
+        instance.confirm_important = mock.Mock(return_value=True)
+        with mock.patch.object(appmod.simpledialog, "askstring", return_value="nope"):
+            instance.reset_everything()
+        instance.client.apply.assert_not_called()
+        instance.client.client_action.assert_not_called()
+        self.assertEqual(len(instance.records), 2)
+        instance.confirm_important = mock.Mock(return_value=False)
+        with mock.patch.object(appmod.simpledialog, "askstring") as ask:
+            instance.reset_everything()
+        ask.assert_not_called()
+        instance.client.apply.assert_not_called()
+
+    def test_the_reset_kicks_empties_writes_and_applies_in_order(self):
+        instance = self.make_instance()
+        calls = []
+        instance.client.client_action.side_effect = lambda action, idx, mac: calls.append(f"kick:{idx}:{mac}") or {"ok": True}
+        instance.client.save_pool.side_effect = lambda idx, rows: calls.append(f"pool:{idx}:{len(rows)}") or {"ok": True}
+        instance.client.dryrun_conf.side_effect = lambda content: calls.append("dryrun") or {"ok": True}
+        instance.client.save_conf.side_effect = lambda content: calls.append(f"save:{content.count(chr(10))}") or {"ok": True}
+        instance.client.apply.side_effect = lambda: calls.append("apply") or {"ok": True, "log": "APPLY COMPLETE"}
+        instance.confirm_important = mock.Mock(return_value=True)
+        with mock.patch.object(appmod.simpledialog, "askstring", return_value=" reset "):
+            instance.reset_everything()
+        self.assertEqual(calls, [
+            "kick:1:aa:bb:cc:dd:ee:01", "kick:2:aa:bb:cc:dd:ee:02",   # only online devices
+            "pool:1:0", "pool:2:0",
+            "dryrun", "save:2",                                        # header lines only, no rows
+            "apply",
+        ])
+        self.assertEqual(instance.records, [])
+        self.assertEqual(instance.pool_counts, {})
+        self.assertIn("RESET xong", instance.status_var.get())
+
+    def test_a_device_that_already_left_does_not_stop_the_reset(self):
+        instance = self.make_instance()
+        instance.client.client_action.side_effect = appmod.AgentError("HTTP 404: not associated")
+        instance.confirm_important = mock.Mock(return_value=True)
+        with mock.patch.object(appmod.simpledialog, "askstring", return_value="RESET"):
+            instance.reset_everything()
+        instance.client.apply.assert_called_once()
+        logged = "\n".join(str(c.args[0]) for c in instance.append_log.call_args_list)
+        self.assertIn("Bỏ qua 2 lỗi nhỏ", logged)
+
+    def test_a_failed_apply_keeps_the_local_list(self):
+        instance = self.make_instance()
+        instance.client.apply.return_value = {"ok": False, "log": "nft failed"}
+        instance.confirm_important = mock.Mock(return_value=True)
+        with mock.patch.object(appmod.simpledialog, "askstring", return_value="RESET"),              self.assertRaises(appmod.AgentError):
+            instance.reset_everything()   # the synchronous runner surfaces the task error
+        self.assertEqual(len(instance.records), 2)
+        self.assertEqual(instance.pool_counts, {1: 3})
+
+
 class ProxyButtonStateTests(unittest.TestCase):
     """The add-proxy action follows the current device selection."""
 

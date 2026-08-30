@@ -807,6 +807,13 @@ match "web console defaults to English" "$web_console" '<html lang="en">'
 match "web console translates icon-prefixed labels" "$web_console" 'function translatePhrase\(vi\)'
 match "web console translates blocks with inline markup" "$web_console" 'const EN_HTML = \{'
 match "web console leaves the mixed-content note to updateConnHint" "$web_console" 'id="mixedNote" data-i18n-skip'
+match "web console has the reset button"            "$web_console" 'id="resetAllBtn"'
+match "web reset requires the typed word"           "$web_console" 'toUpperCase\(\) !== RESET_WORD'
+match "web reset kicks only online devices"         "$web_console" 'filter\(c => c && c.online && c.mac\)'
+match "web reset empties every pool"                "$web_console" 'api\("save_pool", "POST", \{ idx, proxies: \[\] \}\)'
+match "web reset dry-runs before saving the empty conf" "$web_console" 'api\("dryrun_conf", "POST", emptyConf, true\)'
+match "web reset applies last"                      "$web_console" 'return api\("apply", "POST", \{\}\);'
+match "web reset label is translated"               "$web_console" '"Reset toàn bộ": "Reset everything"'
 
 echo ""
 printf 'TOTAL: pass=%d  fail=%d  skip=%d\n' "$pass" "$fail" "$skip"
