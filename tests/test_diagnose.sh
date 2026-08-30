@@ -65,6 +65,16 @@ case "${PROXY_STATE:-ok}" in
   *) echo "curl: (7) Failed to connect to proxy.example port 1080: Connection refused" >&2; exit 7 ;;
 esac
 SH
+# uci: the sing-box service flag, driven by SINGBOX_ENABLED.
+cat > "$BIN/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+case "$2" in
+  sing-box.main) exit 0 ;;
+  sing-box.main.enabled) echo "${SINGBOX_ENABLED:-1}"; exit 0 ;;
+esac
+exit 1
+SH
 # sing-box binary for singbox_check.
 cat > "$BIN/sing-box" <<'SH'
 #!/bin/sh
@@ -105,6 +115,9 @@ out="$(run env BRNF_PATH=/nonexistent IP_RULE=0)"
 eq "no fwmark rule -> ip_rule"         "$(field "$out" .verdict | cut -d: -f1)" "ip_rule"
 out="$(run env BRNF_PATH=/nonexistent SINGBOX_RUNNING=0)"
 eq "sing-box down -> singbox_process"  "$(field "$out" .verdict | cut -d: -f1)" "singbox_process"
+out="$(run env BRNF_PATH=/nonexistent SINGBOX_ENABLED=0 SINGBOX_RUNNING=0)"
+eq "service disabled -> singbox_service first" "$(field "$out" .verdict | cut -d: -f1)" "singbox_service"
+eq "service verdict tells the uci fix"  "$(field "$out" .verdict | grep -c 'sing-box.main.enabled=1')" "1"
 out="$(run env BRNF_PATH=/nonexistent SINGBOX_LISTEN=0)"
 eq "no listener -> singbox_listen"     "$(field "$out" .verdict | cut -d: -f1)" "singbox_listen"
 out="$(run env BRNF_PATH=/nonexistent PROXY_STATE=blocked)"

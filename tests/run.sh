@@ -638,6 +638,58 @@ nomatch "update.ps1 drops old ui path" "$(sed -n '/tar -czf/,/if (\$LASTEXITCODE
 match   "make-package.sh ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.sh")" 'README.md VERSION agent config console docs etc scripts'
 match   "make-package.ps1 ships VERSION for the downgrade guard" "$(cat "$ROOT/pc/make-package.ps1")" 'README.md VERSION agent config console docs etc scripts'
 
+echo "== sing-box service: enabled flag and start verification =="
+# The OpenWrt package ships enabled=0; apply must flip it and then prove the
+# process came up, otherwise a silent no-op leaves every SSID without Internet.
+match "apply enables the sing-box service" "$apply_script" 'ensure_singbox_service'
+match "apply verifies sing-box came up"    "$apply_script" 'verify_singbox_running'
+apply_order="$(grep -n 'ensure_singbox_service\|/etc/init.d/sing-box restart\|verify_singbox_running' "$ROOT/scripts/apply.sh" | cut -d: -f2- | tr -d ' ' | tr '\n' ' ')"
+eq "apply orders enable -> restart -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" verify_singbox_running '
+match "install-deps enables the sing-box service" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_service'
+match "doctor reports a disabled sing-box service" "$(cat "$ROOT/scripts/doctor.sh")" 'enabled=0: the init script never starts sing-box'
+SBS="$STUB/sbs"; mkdir -p "$SBS/bin"
+cat > "$SBS/bin/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$SBS_LOG"
+case "$1:$2" in
+  get:sing-box.main) exit 0 ;;
+  get:sing-box.main.enabled) printf '%s\n' "${SBS_ENABLED:-0}" ;;
+  get:sing-box.main.conffile) printf '%s\n' "${SBS_CONFFILE:-}" ;;
+esac
+exit 0
+SH
+cat > "$SBS/bin/pgrep" <<'SH'
+#!/bin/sh
+[ "${SBS_RUNNING:-0}" = 1 ]
+SH
+cat > "$SBS/bin/logread" <<'SH'
+#!/bin/sh
+echo "daemon.err sing-box: FATAL[0000] start service: open /etc/sing-box/config.json: no such file"
+SH
+chmod +x "$SBS"/bin/*
+SBS_LOG="$SBS/uci.log"; export SBS_LOG
+: > "$SBS_LOG"
+( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_ENABLED=0 sh -c '. "$0/scripts/lib.sh"; ensure_singbox_service' "$ROOT" ) >/dev/null 2>&1
+eq "a disabled service is enabled"         "$(grep -c 'uci set sing-box.main.enabled=1' "$SBS_LOG")" "1"
+eq "the service is pointed at our config"  "$(grep -c 'uci set sing-box.main.conffile=/etc/sing-box/config.json' "$SBS_LOG")" "1"
+eq "the change is committed"               "$(grep -c 'uci commit sing-box' "$SBS_LOG")" "1"
+: > "$SBS_LOG"
+( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json sh -c '. "$0/scripts/lib.sh"; ensure_singbox_service' "$ROOT" ) >/dev/null 2>&1
+eq "an enabled service is left alone"      "$(grep -c 'uci set' "$SBS_LOG")" "0"
+: > "$SBS_LOG"
+( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" DRYRUN=1 SBS_ENABLED=0 sh -c '. "$0/scripts/lib.sh"; ensure_singbox_service' "$ROOT" ) >/dev/null 2>&1
+eq "dry-run changes nothing"               "$(grep -c 'uci set' "$SBS_LOG")" "0"
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=0 SINGBOX_START_WAIT=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+eq "a sing-box that never comes up fails apply" "$verify_rc" "1"
+match "the failure names sing-box"          "$verify_out" 'sing-box did not start'
+match "the failure carries the sing-box log" "$verify_out" 'FATAL\[0000\]'
+match "the failure names the disabled flag"  "$verify_out" 'enabled=0'
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+eq "a running sing-box passes"              "$verify_rc" "0"
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=0 DRYRUN=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+eq "dry-run does not wait for a process"    "$verify_rc" "0"
+
 echo "== shellcheck (same file list as CI) =="
 if command -v shellcheck >/dev/null 2>&1; then
   if (cd "$ROOT" && shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh         config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd         agent/sbproxy-assignd agent/sbproxy-dhcp-assign >"$STUB/shellcheck.out" 2>&1); then

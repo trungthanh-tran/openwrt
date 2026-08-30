@@ -1007,6 +1007,46 @@ ensure_singbox_compat_env() {
   log "Inserted the compatibility environment into $initf"
 }
 
+# The OpenWrt sing-box package ships /etc/config/sing-box with
+# `option enabled '0'`, and its init script returns from start_service without
+# starting anything while that flag is 0. `/etc/init.d/sing-box enable` only
+# adds the boot symlink, so on a freshly flashed router `restart` succeeds
+# silently and nothing listens on the TPROXY ports: the WAN works and every
+# proxied SSID is dead. Turn the flag on and point the service at our file.
+ensure_singbox_service() {
+  command -v uci >/dev/null 2>&1 || return 0
+  uci -q get sing-box.main >/dev/null 2>&1 || return 0   # not the UCI-driven package
+  _sbs_changed=0
+  if [ "$(uci -q get sing-box.main.enabled 2>/dev/null)" != "1" ]; then
+    run "uci set sing-box.main.enabled=1"; _sbs_changed=1
+  fi
+  _sbs_conf="${SINGBOX_CONF:-/etc/sing-box/config.json}"
+  if [ "$(uci -q get sing-box.main.conffile 2>/dev/null)" != "$_sbs_conf" ]; then
+    run "uci set sing-box.main.conffile='$_sbs_conf'"; _sbs_changed=1
+  fi
+  if [ "$_sbs_changed" = 1 ]; then
+    run "uci commit sing-box"
+    log "Enabled the sing-box service in /etc/config/sing-box (it ships disabled)."
+  fi
+}
+
+# After `/etc/init.d/sing-box restart`, prove the process is up. A silent
+# failure here is the worst kind: apply reports success and the SSIDs hang.
+verify_singbox_running() {
+  [ "${DRYRUN:-0}" = "1" ] && return 0
+  _vsr_wait="${SINGBOX_START_WAIT:-6}"
+  while [ "$_vsr_wait" -gt 0 ]; do
+    pgrep -f sing-box >/dev/null 2>&1 && { log "sing-box is running."; return 0; }
+    sleep 1; _vsr_wait=$((_vsr_wait - 1))
+  done
+  warn "sing-box is NOT running after restart. Recent log:"
+  command -v logread >/dev/null 2>&1 && logread -e sing-box 2>/dev/null | tail -n 15 >&2
+  if [ "$(uci -q get sing-box.main.enabled 2>/dev/null)" = "0" ]; then
+    warn "/etc/config/sing-box still has enabled=0."
+  fi
+  die "sing-box did not start; every proxied SSID would have no Internet. Fix the cause above and re-run apply."
+}
+
 # ---------------------------------------------------------------------------
 # Generate /etc/sing-box/config.json
 # ---------------------------------------------------------------------------

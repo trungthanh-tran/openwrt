@@ -39,8 +39,10 @@ if [ -f "$SB_ROOT/etc/init.d/sbproxy" ]; then
   log "Installed /etc/init.d/sbproxy"
 fi
 
-# Enable sing-box at boot.
+# Enable sing-box at boot, and in /etc/config/sing-box, which ships with
+# enabled=0 and makes the init script a no-op until it is flipped.
 [ -f /etc/init.d/sing-box ] && run "/etc/init.d/sing-box enable" || warn "/etc/init.d/sing-box was not found"
+ensure_singbox_service
 
 # Register project files that standard OpenWrt sysupgrade backups must preserve.
 log "Registering files in /etc/sysupgrade.conf (to preserve sbproxy configuration during backup/upgrades)..."

@@ -109,6 +109,13 @@ else
 fi
 
 # --- 8. sing-box is running and listening on this SSID's TPROXY port -------------
+if command -v uci >/dev/null 2>&1 && uci -q get sing-box.main >/dev/null 2>&1; then
+  if [ "$(uci -q get sing-box.main.enabled 2>/dev/null)" = "1" ]; then
+    add "singbox_service" true "service enabled in /etc/config/sing-box"
+  else
+    add "singbox_service" false "/etc/config/sing-box has enabled=0, so '/etc/init.d/sing-box restart' starts nothing; re-run apply (0.5.17+) or: uci set sing-box.main.enabled=1; uci commit sing-box; /etc/init.d/sing-box restart"
+  fi
+fi
 if pgrep -f sing-box >/dev/null 2>&1; then
   add "singbox_process" true "sing-box is running (pid $(pgrep -f sing-box | head -n1))"
   if netstat -ln 2>/dev/null | grep -q ":$tp "; then

@@ -3,6 +3,20 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [0.5.17] - 2026-08-30
+
+### Fixed
+- **Sau khi flash firmware, sing-box không bao giờ chạy — WAN thông nhưng mọi
+  SSID proxy mất mạng.** Gói `sing-box` của OpenWrt ship `/etc/config/sing-box`
+  với `option enabled '0'`; init script `start_service` trả về ngay khi cờ này
+  là 0, nên `/etc/init.d/sing-box restart` thành công… mà không khởi động gì.
+  Script chỉ chạy `sing-box enable` (symlink boot) nên console báo
+  `singbox=stopped` từ lần connect đầu tiên. Giờ `apply.sh` và
+  `install-deps.sh` đặt `sing-box.main.enabled=1` + `conffile`, và sau restart
+  `apply.sh` **xác nhận tiến trình lên** (chờ tối đa 6 s); không lên thì apply
+  báo lỗi kèm 15 dòng log sing-box thay vì "APPLY COMPLETE" giả. `doctor.sh` và
+  `diagnose_ssid` có thêm mục `singbox_service`.
+
 ## [0.5.16] - 2026-08-29
 
 ### Fixed

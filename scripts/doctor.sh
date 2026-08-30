@@ -53,6 +53,10 @@ fi
 
 sec "sing-box"
 if pgrep -f 'sing-box' >/dev/null 2>&1; then ok "process is running"; else bad "NOT running"; fi
+if uci -q get sing-box.main >/dev/null 2>&1; then
+  if [ "$(uci -q get sing-box.main.enabled)" = "1" ]; then ok "service is enabled in /etc/config/sing-box"
+  else bad "/etc/config/sing-box has enabled=0: the init script never starts sing-box (apply.sh fixes this)"; fi
+fi
 if [ -f /etc/sing-box/config.json ]; then
   if ( singbox_check /etc/sing-box/config.json ) >/dev/null 2>&1; then ok "configuration is valid (sing-box check)"; else bad "configuration is invalid (sing-box check)"; fi
   grep -q '"fakeip"' /etc/sing-box/config.json && ok "fake-IP DNS is present in the configuration" || wn "fakeip block not found in the configuration"
