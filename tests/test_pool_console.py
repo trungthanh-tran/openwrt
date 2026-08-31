@@ -274,6 +274,10 @@ class ProxyDisplayTests(unittest.TestCase):
     def test_a_row_missing_its_port_still_renders(self):
         self.assertEqual(app.proxy_display({"host": "1.2.3.4"}), "1.2.3.4")
 
+    def test_proxy_password_is_masked_for_display(self):
+        self.assertEqual(app.masked_password("secretpass"), "****")
+        self.assertEqual(app.masked_password(""), "—")
+
 
 class ClientProxyTextTests(unittest.TestCase):
     """The Proxy column has to distinguish four states, not just two."""

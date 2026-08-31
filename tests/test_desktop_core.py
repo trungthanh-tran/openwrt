@@ -281,7 +281,16 @@ class AgentClientRequestTests(unittest.TestCase):
                     self.client._request("status")
 
     def test_malformed_json_is_rejected(self):
-        with mock.patch.object(app, "urlopen", return_value=FakeResponse(b"not-json")), self.assertRaisesRegex(app.AgentError, "JSON"):
+        with mock.patch.object(app, "urlopen", return_value=FakeResponse(b"not-json")), self.assertRaisesRegex(app.AgentError, "JSON: not-json"):
+            self.client.status()
+
+    def test_html_response_identifies_broken_cgi_endpoint(self):
+        raw = b"<!DOCTYPE html><html><title>Not Found</title></html>"
+        with mock.patch.object(app, "urlopen", return_value=FakeResponse(raw)), self.assertRaisesRegex(app.AgentError, "HTML.*CGI"):
+            self.client.status()
+
+    def test_empty_response_is_identified(self):
+        with mock.patch.object(app, "urlopen", return_value=FakeResponse(b"\r\n")), self.assertRaisesRegex(app.AgentError, "empty|r.ng"):
             self.client.status()
 
     def test_non_object_json_is_rejected(self):

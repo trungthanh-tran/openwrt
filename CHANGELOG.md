@@ -3,6 +3,17 @@
 Theo [Keep a Changelog](https://keepachangelog.com/) và [SemVer](https://semver.org/).
 Ngày theo định dạng YYYY-MM-DD.
 
+## [Unreleased]
+
+## [0.5.20] - 2026-08-31
+
+### Fixed
+- Agent không còn trả HTTP 200 với body rỗng/không hợp lệ khi `jq` không dựng được
+  payload `status`; lỗi nội bộ giờ luôn được trả về dưới dạng JSON. Console cũng phân
+  biệt phản hồi HTML, phản hồi rỗng và text lỗi để chỉ đúng endpoint CGI bị hỏng.
+- Mật khẩu proxy trong bảng Pool và hộp Chi tiết proxy luôn được che thành `****`;
+  giá trị thật chỉ được giữ nội bộ để lưu cấu hình và kiểm tra proxy.
+
 ## [0.5.19] - 2026-08-30
 
 ### Tests

@@ -236,7 +236,7 @@ case "$ACTION" in
         pool_base=13000; pool_stride=256
         ;;
     esac
-    json_ok "$(jq -n --argjson ssids "$S" --argjson health "$H" \
+    STATUS_JSON="$(jq -n --argjson ssids "$S" --argjson health "$H" \
                      --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
                      --argjson net_base "$net_base" --argjson tproxy_port_base "$tproxy_base" \
                      --argjson bssid_limit "$bssid_limit" \
@@ -246,7 +246,11 @@ case "$ACTION" in
         meta:{singbox_running:$running, applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
               bssid_limit:$bssid_limit,
-              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}')"
+              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}' 2>/dev/null)" \
+      || json_err "500 Internal Server Error" "không dựng được JSON trạng thái"
+    printf '%s' "$STATUS_JSON" | jq -e 'type == "object"' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "JSON trạng thái không hợp lệ"
+    json_ok "$STATUS_JSON"
     ;;
 
   get_conf)

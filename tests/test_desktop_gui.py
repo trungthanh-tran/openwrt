@@ -518,7 +518,8 @@ class PoolDialogGuiTests(unittest.TestCase):
         self.assertEqual([r[0] for r in rows], ("0", "1", "2") and ["0", "1", "2"])
         self.assertEqual(rows[0][1], "socks5:81.22.139.101:12323")
         self.assertEqual(rows[2][1], "http:194.152.155.14:8080")
-        self.assertEqual(rows[0][3:7], ("81.22.139.101", "12323", "u1", "p1"))
+        self.assertEqual(rows[0][3:7], ("81.22.139.101", "12323", "u1", "****"))
+        self.assertEqual(rows[2][6], "—")
         self.assertEqual([r[8] for r in rows], ["0", "1", "0"])
 
     def test_rows_render_without_any_health_data(self):
@@ -537,6 +538,8 @@ class PoolDialogGuiTests(unittest.TestCase):
         with mock.patch.object(appmod.messagebox, "showinfo") as info:
             dialog._show_detail()
         self.assertIn("Reason: curl exit 7: refused", info.call_args.args[1])
+        self.assertIn("Password: ****", info.call_args.args[1])
+        self.assertNotIn("p1", info.call_args.args[1])
 
     def test_rows_render_in_vietnamese_too(self):
         dialog = self.open(language="vi", health={"state": "ok", "latency_ms": 120})

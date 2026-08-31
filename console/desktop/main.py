@@ -1203,6 +1203,11 @@ def proxy_display(row) -> str:
     return host
 
 
+def masked_password(value) -> str:
+    """Display whether a proxy password exists without exposing its value."""
+    return "****" if value else "—"
+
+
 def client_proxy_text(item, language: str = "vi") -> str:
     """The Proxy column for one device.
 
@@ -2243,7 +2248,15 @@ class AgentClient:
         try:
             payload = json.loads(decoded)
         except json.JSONDecodeError as exc:
-            raise AgentError("Agent trả dữ liệu không phải JSON") from exc
+            compact = " ".join(decoded.split())
+            if compact.lstrip().lower().startswith(("<!doctype html", "<html")):
+                detail = "Agent endpoint trả HTML thay vì JSON; kiểm tra CGI /cgi-bin/sbproxy trên router"
+            elif not compact:
+                detail = "Agent trả phản hồi rỗng thay vì JSON"
+            else:
+                detail = f"Agent trả dữ liệu không phải JSON: {redact(compact[:240])}"
+            log.warning("agent %s %s invalid JSON response: %s", method, action, detail)
+            raise AgentError(detail) from exc
         if not isinstance(payload, dict):
             raise AgentError("Agent trả JSON không phải object")
         if payload.get("ok") is False:
@@ -3065,7 +3078,7 @@ class PoolDialog(tk.Toplevel):
                 row_health = f"{row_health} {latency}ms"
             table.insert("", "end", values=(
                 position, proxy_display(row), row.get("type", ""), row.get("host", "—"),
-                row.get("port", "—"), row.get("user", "—"), row.get("pass", "—"),
+                row.get("port", "—"), row.get("user", "—"), masked_password(row.get("pass")),
                 row_health, count,
             ))
         table.pack(fill="both", expand=True)
@@ -3133,7 +3146,7 @@ class PoolDialog(tk.Toplevel):
                    f"IP: {row.get('host') or '—'}\n"
                    f"Port: {row.get('port') or '—'}\n"
                    f"Username: {row.get('user') or '—'}\n"
-                   f"Password: {row.get('pass') or '—'}\n"
+                   f"Password: {masked_password(row.get('pass'))}\n"
                    f"Health: {health}"
                    + (f"\n{self.t('Lý do')}: {reason}" if reason else ""))
         messagebox.showinfo(self.t("Chi tiết proxy"), details, parent=self)
