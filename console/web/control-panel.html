@@ -274,8 +274,7 @@
   .live-badge.on { display: inline-flex; color: var(--good); background: var(--good-soft); border-color: transparent; }
   .live-badge.on .dot { animation: pulse 1.6s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
-  #liveTools { display: none; gap: 8px; }
-  #liveTools.on { display: flex; }
+  #liveTools { display: flex; gap: 8px; }
   /* health pill */
   .hp { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
   .hp.okp { color: var(--good); background: var(--good-soft); border-color: transparent; }
@@ -317,7 +316,7 @@
   .side-nav .btn.primary { background: linear-gradient(160deg, var(--accent-2), var(--accent)); color: #04231f; }
   .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
   .main { flex: 1 1 auto; min-width: 0; }
-  #liveTools { display: none; }
+  #liveTools { display: flex; }
   #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
   #menuBtn { display: none; font-size: 15px; }
   @media (max-width: 920px) {
