@@ -1912,6 +1912,8 @@
     const de = e.target.getAttribute("data-del");
     const zp = e.target.getAttribute("data-zap");
     const dg = e.target.getAttribute("data-diag");
+    const po = e.target.getAttribute("data-pool");
+    if (po) return openPool(parseInt(po, 10));
     if (dg) return diagnoseSsid(parseInt(dg, 10));
     if (zp) return zapSock(ssids.find(x => x.id === zp));
     if (ed) return openModal(ed);
