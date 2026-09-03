@@ -836,6 +836,7 @@
 
   /** @type {Array} */
   let ssids = load();
+  let configDirty = false;
   let editId = null;
   let curTab = "conf";
 
@@ -938,7 +939,22 @@
              "Version agent khác version UI — cân nhắc dùng ⬆ Cập nhật") : "";
   }
 
-  function startPoll() { stopPoll(); poll(); agent.timer = setInterval(poll, 8000); }
+  function refreshConfFromRouter() {
+    // Do not overwrite a form while the operator is editing it.
+    if (configDirty || document.getElementById("backdrop").classList.contains("show")) return;
+    api("get_conf", "GET", null, "resp").then(txt => {
+      if (txt != null) { parseConfInto(txt); render(); }
+    }).catch(() => {});
+  }
+  function startPoll() {
+    stopPoll();
+    poll();
+    refreshConfFromRouter();
+    agent.timer = setInterval(() => {
+      poll();
+      refreshConfFromRouter();
+    }, 30000);
+  }
   function stopPoll() { if (agent.timer) clearInterval(agent.timer); agent.timer = null; }
   function poll() {
     api("status").then(d => {
@@ -1098,7 +1114,7 @@
     api("save_conf", "POST", genConf(), true).then(sv => {
       if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
       return api("apply", "POST", {});
-    }).then(d => { showLog("apply.sh", d); poll(); })
+    }).then(d => { configDirty = false; showLog("apply.sh", d); poll(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   // ---- Reset: back to zero SSIDs on the router -------------------------------
@@ -1150,7 +1166,7 @@
       return api("apply", "POST", {});
     }).then(d => {
       if (!d || !d.ok) throw new Error((d && d.log) || pick("apply failed", "apply lỗi"));
-      ssids = []; save(); render();
+      ssids = []; configDirty = false; save(); render();
       const summary = pick(`RESET done: kicked ${kicked} devices, removed ${count} SSIDs and pools, apply succeeded.`,
                            `RESET xong: đã đá ${kicked} thiết bị, xoá ${count} SSID và pool, apply thành công.`)
         + (skipped.length ? "\n" + pick(`${skipped.length} minor errors were skipped:`, `Bỏ qua ${skipped.length} lỗi nhỏ:`) + "\n" + skipped.slice(0, 10).join("\n") : "");
@@ -1625,6 +1641,7 @@
     const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked, mac_oui };
     if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
+    configDirty = true;
     const wasEditing = !!editId;
     closeModal(); render(); toast(wasEditing ? pick("Updated", "Đã cập nhật") : pick("Wi-Fi added", "Đã thêm WiFi"));
   }
@@ -1651,6 +1668,7 @@
   // ---- import ----
   function parseConfInto(txt) {
     const rows = [];
+    const seenIdx = new Set();
     txt.split(/\r?\n/).forEach(line => {
       const l = line.trim();
       if (!l || l.startsWith("#")) return;
@@ -1658,6 +1676,10 @@
       if (p.length < 4) return;
       const idx = parseInt(p[2], 10);
       if (!isFinite(idx)) return;
+      // The router accepts one row per idx. Ignore stale duplicate rows when
+      // importing/pulling so a later push cannot reproduce them in the UI.
+      if (seenIdx.has(idx)) return;
+      seenIdx.add(idx);
       rows.push({
         id: "s" + idx + "_" + rows.length,
         name: p[0].trim(), band: (p[1] || "2g").trim(), idx,
@@ -1667,13 +1689,15 @@
         mac_oui: (p[10] || "").trim(), proxy_type: (p[11] || "socks5").trim().toLowerCase()
       });
     });
-    if (rows.length) ssids = rows;
+    ssids = rows;
+    configDirty = false;
     return rows.length;
   }
   function importConf() {
     const txt = prompt(pick("Paste the contents of wifi-socks.conf:", "Dán nội dung wifi-socks.conf:"));
     if (!txt) return;
     const n = parseConfInto(txt);
+    configDirty = true;
     if (!n) return toast(pick("No valid Wi-Fi rows were found.", "Không đọc được dòng WiFi nào."));
     render(); toast(pick(`Imported ${n} Wi-Fi row(s)`, `Đã nhập ${n} WiFi`));
   }
@@ -1722,7 +1746,7 @@
   $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
   $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
   $("copyBtn").onclick = () => copy(TABS[curTab].gen());
-  $("clearBtn").onclick = () => { if (confirm(pick("Remove all Wi-Fi entries from the console? (This does not change the router.)", "Xoá toàn bộ WiFi khỏi console? (không đụng tới router)"))) { ssids = []; render(); } };
+  $("clearBtn").onclick = () => { if (confirm(pick("Remove all Wi-Fi entries from the console? (This does not change the router.)", "Xoá toàn bộ WiFi khỏi console? (không đụng tới router)"))) { ssids = []; configDirty = true; render(); } };
 
   // live mode events
   $("connBtn").onclick = () => {
@@ -1795,9 +1819,9 @@
     if (du) {
       const s = ssids.find(x => x.id === du);
       const clone = { ...s, id: "s" + Date.now(), idx: nextIdx(), name: s.name + "-copy" };
-      ssids.push(clone); render(); toast(pick("Duplicated", "Đã nhân bản"));
+      ssids.push(clone); configDirty = true; render(); toast(pick("Duplicated", "Đã nhân bản"));
     }
-    if (de) { const s = ssids.find(x => x.id === de); if (confirm(pick(`Delete Wi-Fi "${s.name}"?`, `Xoá WiFi "${s.name}"?`))) { ssids = ssids.filter(x => x.id !== de); render(); } }
+    if (de) { const s = ssids.find(x => x.id === de); if (confirm(pick(`Delete Wi-Fi "${s.name}"?`, `Xoá WiFi "${s.name}"?`))) { ssids = ssids.filter(x => x.id !== de); configDirty = true; render(); } }
   };
 
   document.getElementById("outTabs").onclick = e => {

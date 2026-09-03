@@ -118,7 +118,7 @@ body_has_nul() {
     od -An -tu1 "$BODY_FILE" 2>/dev/null \
       | awk '{for (i=1; i<=NF; i++) if ($i == 0) found=1} END {exit found ? 0 : 1}'
   elif have hexdump; then
-    hexdump -v -e '/1 "%u\n"' "$BODY_FILE" 2>/dev/null | grep -qx '0'
+    hexdump -v -e '1/1 "%u\n"' "$BODY_FILE" 2>/dev/null | grep -qx '0'
   else
     return 2
   fi
@@ -160,7 +160,8 @@ webauth_valid_user() {
   return 0
 }
 webauth_write() { # user pass -> writes the account file
-  wa_salt="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n\r')"
+  # BusyBox builds may omit od; hexdump is already present on supported images.
+  wa_salt="$(head -c 12 /dev/urandom | hexdump -v -e '12/1 "%02x"' 2>/dev/null)"
   [ -n "$wa_salt" ] || json_err "500 Internal Server Error" "không sinh được salt"
   mkdir -p "$(dirname "$WEBAUTH_FILE")" 2>/dev/null
   ( umask 077; printf '%s:%s:%s\n' "$1" "$wa_salt" "$(webauth_hash "$wa_salt" "$2")" > "$WEBAUTH_FILE" ) \
