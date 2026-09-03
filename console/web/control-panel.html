@@ -1407,6 +1407,12 @@
       box.innerHTML = list.map(c => {
         const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
         const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
+        const proxy = c.pool_size > 0
+          ? `${c.proxy_state === "pinned" ? "slot " + c.slot + " · " : "chưa gán · "}${esc(c.proxy_host || "pool")}`
+          : pick("single proxy", "proxy đơn");
+        const proxyBtn = c.pool_size > 0
+          ? `<button class="iconbtn" data-proxy="${esc(c.mac)}" data-idx="${c.idx}">${pick("Proxy", "Đổi proxy")}</button>`
+          : "";
         const act = c.banned
           ? `<button class="btn ghost" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ ${pick("Unblock", "Bỏ cấm")}</button>`
           : `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Temporary disconnect (the device may reconnect)", "Ngắt tạm (thiết bị có thể nối lại)")}">⏏ ${pick("Disconnect", "Kick")}</button>
@@ -1419,6 +1425,7 @@
           <td class="mono">${fmtBytes(c.rx_bytes)}</td>
           <td class="mono">${fmtBytes(c.tx_bytes)}</td>
           <td class="mono sub">${esc(sig)}</td>
+          <td class="mono sub">${proxy} ${proxyBtn}</td>
           <td><div class="rowbtns">${act}</div></td>
         </tr>`;
       }).join("");
@@ -1426,6 +1433,22 @@
       $("devRows").innerHTML = `<tr><td colspan="8"><span class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</span></td></tr>`;
     });
   }
+  function changeClientProxy(idx, mac) {
+    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), { headers: { "Authorization": `Bearer ${agent.token}` } }).then(r => r.json())
+      .then(d => {
+        const pool = (d && d.proxies) || [];
+        if (!pool.length) throw new Error(pick("This SSID has no proxy pool.", "SSID này chưa có proxy pool."));
+        const choices = pool.map((p, i) => `${i}: ${p.host}:${p.port}${p.label ? " (" + p.label + ")" : ""}`).join("\n");
+        const answer = prompt(pick("Choose proxy slot (type 'none' to unpin):\n", "Chọn slot proxy (gõ 'none' để bỏ ghim):\n") + choices);
+        if (answer == null) return;
+        const value = answer.trim().toLowerCase();
+        const slot = value === "none" ? "none" : Number(value);
+        if (slot !== "none" && (!Number.isInteger(slot) || slot < 0 || slot >= pool.length)) throw new Error(pick("Invalid proxy slot.", "Slot proxy không hợp lệ."));
+        return api("assign_proxy", "POST", { idx, assignments: [{ mac, slot }] });
+      }).then(d => { if (d) { toast(pick("Proxy changed ✓", "Đã đổi proxy ✓")); loadDevices(); } })
+      .catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
+  }
+
   function deviceAction(action, idx, mac) {
     const verb = action === "kick" ? pick("Disconnect (temporary)", "Kick (ngắt tạm)")
       : action === "ban" ? pick("Block (persistent)", "Cấm (chặn lâu dài)")
@@ -1777,7 +1800,9 @@
     const k = e.target.getAttribute("data-kick");
     const b = e.target.getAttribute("data-ban");
     const u = e.target.getAttribute("data-unban");
+    const p = e.target.getAttribute("data-proxy");
     const idx = parseInt(e.target.getAttribute("data-idx"), 10);
+    if (p) return changeClientProxy(idx, p);
     if (k) return deviceAction("kick", idx, k);
     if (b) return deviceAction("ban", idx, b);
     if (u) return deviceAction("unban", idx, u);
