@@ -336,6 +336,9 @@
     --bs-btn-focus-box-shadow: 0 0 0 3px var(--ring);
   }
   .btn.primary { --bs-btn-hover-color: #04231f; --bs-btn-active-color: #04231f; }
+  /* Proxy endpoints are managed in the batch pool dialog, not one-by-one. */
+  #backdrop .field:has(#f_proxy_type), #backdrop .field:has(#f_host),
+  #backdrop .field:has(#f_user), #backdrop #probeBtn { display: none; }
 </style>
 </head>
 <body>
@@ -1678,7 +1681,7 @@
     $("f_band").value = s ? s.band : "2g";
     $("f_idx").value = s ? s.idx : nextIdx();
     $("f_key").value = s ? s.key : "";
-    $("f_host").value = s ? s.host : "";
+    $("f_host").value = s ? s.host : "127.0.0.1";
     $("f_proxy_type").value = s ? (s.proxy_type || "socks5") : "socks5";
     $("f_proxy_compact").value = "";
     $("f_port").value = s ? s.port : "1080";
