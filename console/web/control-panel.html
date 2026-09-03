@@ -593,6 +593,24 @@
   </div>
 </div>
 
+<!-- Proxy pool modal -->
+<div class="backdrop" id="poolBackdrop">
+  <div class="modal" style="max-width: 760px;">
+    <h2>Proxy pool · <span id="poolTitle"></span></h2>
+    <div class="form">
+      <div class="conn-status">Mỗi dòng một proxy: <code>host:port:user:password</code>. Thay đổi pool không reload Wi‑Fi.</div>
+      <div class="logbox" id="poolRows">Đang tải…</div>
+      <textarea id="poolInput" rows="5" placeholder="176.116.132.71:43137:user:pass"></textarea>
+    </div>
+    <div class="foot">
+      <button class="btn ghost danger" id="poolClear">Xóa pool</button>
+      <button class="btn ghost" id="poolRebalance">Rebalance client</button>
+      <button class="btn ghost" id="poolClose">Đóng</button>
+      <button class="btn primary" id="poolSave">Thêm vào pool</button>
+    </div>
+  </div>
+</div>
+
 <!-- Update modal -->
 <div class="backdrop" id="upBackdrop">
   <div class="modal">
@@ -1387,6 +1405,54 @@
     const s = ssids.find(x => x.idx === idx);
     return s ? s.name : "w" + idx;
   }
+  let activePoolIdx = 0;
+  let activePool = [];
+  function openPool(idx) {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    activePoolIdx = idx;
+    $("poolTitle").textContent = ssidNameByIdx(idx) + " · idx " + idx;
+    $("poolInput").value = "";
+    $("poolBackdrop").classList.add("show");
+    loadPool();
+  }
+  function loadPool() {
+    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(activePoolIdx), { headers: { "Authorization": `Bearer ${agent.token}` } })
+      .then(r => r.json()).then(d => {
+        if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
+        activePool = d.proxies || [];
+        $("poolRows").textContent = activePool.length
+          ? activePool.map((p, i) => `${i}: ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""}`).join("\n")
+          : pick("Pool is empty.", "Pool đang trống.");
+      }).catch(e => { $("poolRows").textContent = e.message || e; });
+  }
+  function savePoolRows(rows) {
+    return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "save_pool failed");
+      activePool = rows; loadPool(); toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
+    });
+  }
+  function closePool() { $("poolBackdrop").classList.remove("show"); }
+  function addPoolLines() {
+    const lines = $("poolInput").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const added = lines.map(line => {
+      const p = line.split(":");
+      if (p.length < 2) throw new Error("Proxy phải có dạng host:port:user:password");
+      return { type: "socks5", host: p.shift(), port: Number(p.shift()), user: p.shift() || "", pass: p.join(":") };
+    });
+    if (added.some(p => !p.host || !Number.isInteger(p.port) || p.port < 1 || p.port > 65535)) throw new Error("Proxy không hợp lệ");
+    savePoolRows(activePool.concat(added)).then(() => { $("poolInput").value = ""; }).catch(e => toast("Lỗi: " + e.message));
+  }
+  function clearPool() {
+    if (confirm(pick("Delete this proxy pool?", "Xóa pool proxy này?"))) savePoolRows([]).catch(e => toast("Lỗi: " + e.message));
+  }
+  function rebalancePoolClients() {
+    api("clients").then(d => {
+      const macs = (d.clients || []).filter(c => c.idx === activePoolIdx && c.online && c.mac).map(c => c.mac);
+      if (!macs.length) throw new Error(pick("No online clients on this SSID.", "SSID này không có client online."));
+      return api("rebalance", "POST", { idx: activePoolIdx, macs });
+    }).then(() => { toast(pick("Clients rebalanced ✓", "Đã rebalance client ✓")); loadDevices(); }).catch(e => toast("Lỗi: " + e.message));
+  }
+
   function openDevices() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("devBackdrop").classList.add("show");
@@ -1514,6 +1580,7 @@
         <td>${s.isolate ? '<span class="chip on"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
         <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
         <td>${healthCell(s.idx)}</td>
+        <td><button class="iconbtn" data-pool="${s.idx}">${pick("Pool", "Pool")}</button></td>
         <td><div class="rowbtns">
           ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="${pick("Change SOCKS without reloading Wi-Fi; open sessions may drop", "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn")}">⚡</button>` : ""}
           ${agent.connected ? `<button class="iconbtn" data-diag="${s.idx}" title="${pick("Diagnose this Wi-Fi's data path on the router", "Chẩn đoán đường đi dữ liệu của WiFi này trên router")}">🩺</button>` : ""}
@@ -1796,6 +1863,11 @@
   $("devClose").onclick = closeDevices;
   $("devRefresh").onclick = loadDevices;
   $("devBackdrop").onclick = e => { if (e.target.id === "devBackdrop") closeDevices(); };
+  $("poolClose").onclick = closePool;
+  $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
+  $("poolSave").onclick = addPoolLines;
+  $("poolClear").onclick = clearPool;
+  $("poolRebalance").onclick = rebalancePoolClients;
   $("devRows").onclick = e => {
     const k = e.target.getAttribute("data-kick");
     const b = e.target.getAttribute("data-ban");
