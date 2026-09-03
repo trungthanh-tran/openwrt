@@ -609,6 +609,7 @@
     </div>
     <div class="foot">
       <button class="btn ghost danger" id="poolClear">Xóa pool</button>
+      <button class="btn ghost" id="poolTest">Test proxy</button>
       <button class="btn ghost" id="poolRebalance">Rebalance client</button>
       <button class="btn ghost" id="poolClose">Đóng</button>
       <button class="btn primary" id="poolSave">Thêm vào pool</button>
@@ -1412,6 +1413,7 @@
   }
   let activePoolIdx = 0;
   let activePool = [];
+  const poolStatus = {};
   let poolExpanded = false;
   function openPool(idx) {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
@@ -1454,9 +1456,10 @@
             user: current.user || "", pass: current.pass || "", label: "current"
           }];
         }
+        Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
         const shown = poolExpanded ? activePool : activePool.slice(0, 2);
         $("poolRows").textContent = shown.length
-          ? shown.map((p, i) => `${i}: ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""}`).join("\n")
+          ? shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${poolStatus[p.slot] || "chưa test"}`).join("\n")
           : pick("Pool is empty.", "Pool đang trống.");
         $("poolMore").hidden = activePool.length <= 2;
         $("poolMore").textContent = poolExpanded ? "Thu gọn" : "Xem thêm";
