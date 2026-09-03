@@ -1427,6 +1427,13 @@
       .then(r => r.json()).then(d => {
         if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
         activePool = d.proxies || [];
+        if (!activePool.length) {
+          const current = ssids.find(s => s.idx === activePoolIdx);
+          if (current && current.host && current.port) activePool = [{
+            type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
+            user: current.user || "", pass: current.pass || "", label: "current"
+          }];
+        }
         $("poolMore").hidden = activePool.length <= 2;
         $("poolMore").textContent = poolExpanded ? "Thu gọn" : "Xem thêm";
         $("poolRows").textContent = activePool.length
@@ -1440,6 +1447,13 @@
       .then(r => r.json()).then(d => {
         if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
         activePool = d.proxies || [];
+        if (!activePool.length) {
+          const current = ssids.find(s => s.idx === activePoolIdx);
+          if (current && current.host && current.port) activePool = [{
+            type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
+            user: current.user || "", pass: current.pass || "", label: "current"
+          }];
+        }
         const shown = poolExpanded ? activePool : activePool.slice(0, 2);
         $("poolRows").textContent = shown.length
           ? shown.map((p, i) => `${i}: ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""}`).join("\n")
