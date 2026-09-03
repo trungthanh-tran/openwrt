@@ -246,6 +246,44 @@ contains "every other action still demands the bearer" "$out" 'Status: 401 Unaut
 sh "$WEBAUTH" disable >/dev/null
 out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"secret-pass-1"}')"
 contains "webauth disable turns password login off" "$out" 'Status: 403 Forbidden'
+
+echo "== first-run setup and password change =="
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"whatever1"}')"
+eq "login without an account flags setup_required" "$(json_value "$out" '.setup_required')" 'true'
+out="$(run_agent GET 'action=login_state')"
+contains "login_state needs no auth" "$out" 'Status: 200 OK'
+eq "and reports no account" "$(json_value "$out" '.account_configured')" 'false'
+out="$(run_agent POST 'action=setup_account' '' '{"user":"bad name","pass":"longenough1"}')"
+contains "setup refuses a bad username" "$out" 'Status: 400 Bad Request'
+out="$(run_agent POST 'action=setup_account' '' '{"user":"chief","pass":"short"}')"
+contains "setup refuses a short password" "$out" 'Status: 400 Bad Request'
+out="$(run_agent POST 'action=setup_account' '' '{"user":"chief","pass":"first-pass-1"}')"
+contains "the FIRST account is created without auth" "$out" 'Status: 200 OK'
+eq "and setup returns the API token" "$(json_value "$out" '.token')" 'agent-test-token'
+eq "and echoes the username" "$(json_value "$out" '.user')" 'chief'
+out="$(run_agent GET 'action=login_state')"
+eq "login_state now reports an account" "$(json_value "$out" '.account_configured')" 'true'
+out="$(run_agent POST 'action=setup_account' '' '{"user":"evil","pass":"evil-pass-1"}')"
+contains "a SECOND setup is always refused" "$out" 'Status: 403 Forbidden'
+eq "and the account is untouched" "$(sh "$WEBAUTH" show)" 'chief'
+out="$(run_agent POST 'action=login' '' '{"user":"chief","pass":"first-pass-1"}')"
+contains "the created account can log in" "$out" 'Status: 200 OK'
+
+out="$(run_agent POST 'action=change_password' '' '{"old_pass":"first-pass-1","new_pass":"second-pass-2"}')"
+contains "change_password without a bearer is 401" "$out" 'Status: 401 Unauthorized'
+out="$(auth_run POST 'action=change_password' '{"old_pass":"wrong-pass","new_pass":"second-pass-2"}')"
+contains "a wrong current password is refused" "$out" 'Status: 401 Unauthorized'
+out="$(auth_run POST 'action=change_password' '{"old_pass":"first-pass-1","new_pass":"short"}')"
+contains "a short new password is refused" "$out" 'Status: 400 Bad Request'
+out="$(auth_run POST 'action=change_password' '{"old_pass":"first-pass-1","new_pass":"second-pass-2"}')"
+contains "the password changes with the current one in hand" "$out" 'Status: 200 OK'
+out="$(run_agent POST 'action=login' '' '{"user":"chief","pass":"second-pass-2"}')"
+contains "the new password logs in" "$out" 'Status: 200 OK'
+out="$(run_agent POST 'action=login' '' '{"user":"chief","pass":"first-pass-1"}')"
+contains "the old password no longer does" "$out" 'Status: 401 Unauthorized'
+not_contains "no cleartext password reaches the account file" "$(cat "$WEBAUTH_FILE")" 'second-pass-2'
+sh "$WEBAUTH" disable >/dev/null
+rm -f "$WEBAUTH_LOCK_FILE"
 unset LOGIN_FAIL_DELAY
 
 echo "== agent status and read-only endpoints =="

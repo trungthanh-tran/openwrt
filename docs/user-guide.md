@@ -35,8 +35,9 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
    - **Bản Web:** vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
    - **Bản Desktop:** Windows mở `sbproxy-console.exe`; Linux/macOS chạy `./sbproxy-console` (mỗi nền tảng có file build riêng, tự chứa đủ mọi thứ).
 2. Đăng nhập rồi bấm **Kết nối**:
-   - **Bản Web:** nhập **tên đăng nhập / mật khẩu** riêng của sbproxy (quản trị
-     viên cấp; in ra khi cài agent). Token chỉ còn nằm trong mục *Nâng cao* —
+   - **Bản Web:** nhập **tên đăng nhập / mật khẩu** riêng của sbproxy (tạo ở
+     lần mở web đầu tiên — router chưa có tài khoản thì trang tự mở form tạo).
+     Token chỉ còn nằm trong mục *Nâng cao* —
      chi tiết xem [web-console.md](web-console.md). Mở từ router thì để trống
      *Base URL*.
    - **Bản Desktop:** nhập *Router* = `http://<IP-router>` (ví dụ

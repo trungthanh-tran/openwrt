@@ -251,13 +251,15 @@ Cho UI áp config trực tiếp + health-check latency realtime.
 ```sh
 cd /root/sbproxy
 sh agent/install-agent.sh
-# → cài curl/jq, tạo /etc/sbproxy/token, tạo tài khoản web (admin + mật khẩu
-#   ngẫu nhiên, in ra cuối), đặt CGI /www/cgi-bin/sbproxy, self-host UI
-#   /www/sbproxy/ (+ Bootstrap offline), chạy daemon sbproxy-healthd.
+# → cài curl/jq, tạo /etc/sbproxy/token, đặt CGI /www/cgi-bin/sbproxy,
+#   self-host UI /www/sbproxy/ (+ Bootstrap offline), chạy daemon
+#   sbproxy-healthd. Tài khoản web KHÔNG tạo ở đây (trừ khi truyền
+#   SBPROXY_WEB_USER/SBPROXY_WEB_PASS) — lần đầu mở web sẽ yêu cầu tạo.
 ```
-Mở `http://<router>/sbproxy/` → **🔌 Kết nối router** → đăng nhập bằng
-**tài khoản web riêng của sbproxy** (in ra khi cài; đổi mật khẩu bằng
-`sbproxy-webauth set <user>`, tắt bằng `sbproxy-webauth disable` — chi tiết
+Mở `http://<router>/sbproxy/` — lần đầu trang yêu cầu **tạo tài khoản quản
+trị đầu tiên**, các lần sau đăng nhập bằng tài khoản đó (đổi mật khẩu ngay
+trong UI bằng nút **🔑 Đổi mật khẩu**, hoặc `sbproxy-webauth set <user>`; tắt
+đăng nhập mật khẩu bằng `sbproxy-webauth disable` — chi tiết
 [web-console.md](web-console.md)). Token vẫn dùng được ở mục *Nâng cao* và cho
 app desktop. Cấu hình daemon ở `/etc/sbproxy/env`:
 

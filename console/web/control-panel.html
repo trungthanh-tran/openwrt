@@ -515,7 +515,8 @@
           <input type="password" id="c_pass" class="mono" autocomplete="current-password">
         </div>
       </div>
-      <div class="derived">Tài khoản riêng của sbproxy, in ra khi cài agent; đổi trên router bằng lệnh sbproxy-webauth.</div>
+      <div class="derived">Tài khoản riêng của sbproxy, tạo ở lần mở web đầu tiên; đổi trong UI hoặc bằng lệnh sbproxy-webauth trên router.</div>
+      <button class="btn ghost" id="cpBtn" hidden style="justify-self:start">🔑 Đổi mật khẩu</button>
       <details>
         <summary class="derived">Nâng cao: URL khác hoặc token trực tiếp</summary>
         <div class="field" style="margin-top:10px">
@@ -619,6 +620,64 @@
   </div>
 </div>
 
+<!-- First-run account setup modal -->
+<div class="backdrop" id="setupBackdrop">
+  <div class="modal">
+    <h2>Tạo tài khoản quản trị đầu tiên</h2>
+    <div class="form">
+      <div class="conn-status" id="setupStatus">Router chưa có tài khoản web. Tạo tài khoản đầu tiên để đăng nhập.</div>
+      <div class="field">
+        <label>Tên đăng nhập <span class="req">*</span> <span class="derived">(1-32 ký tự chữ, số, . _ -)</span></label>
+        <input type="text" id="su_user" class="mono" value="admin" autocomplete="username">
+      </div>
+      <div class="field two">
+        <div>
+          <label>Mật khẩu <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
+          <input type="password" id="su_pass" class="mono" autocomplete="new-password">
+        </div>
+        <div>
+          <label>Nhập lại mật khẩu <span class="req">*</span></label>
+          <input type="password" id="su_pass2" class="mono" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="err" id="su_err"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="setupCancel">Đóng</button>
+      <button class="btn primary" id="setupGo">Tạo tài khoản</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change-password modal -->
+<div class="backdrop" id="cpBackdrop">
+  <div class="modal">
+    <h2>Đổi mật khẩu</h2>
+    <div class="form">
+      <div class="conn-status" id="cpStatus">Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.</div>
+      <div class="field">
+        <label>Mật khẩu hiện tại <span class="req">*</span></label>
+        <input type="password" id="cp_old" class="mono" autocomplete="current-password">
+      </div>
+      <div class="field two">
+        <div>
+          <label>Mật khẩu mới <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
+          <input type="password" id="cp_new" class="mono" autocomplete="new-password">
+        </div>
+        <div>
+          <label>Nhập lại mật khẩu mới <span class="req">*</span></label>
+          <input type="password" id="cp_new2" class="mono" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="err" id="cp_err"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="cpCancel">Đóng</button>
+      <button class="btn primary" id="cpGo">Đổi mật khẩu</button>
+    </div>
+  </div>
+</div>
+
 <!-- Log modal -->
 <div class="backdrop" id="logBackdrop">
   <div class="modal">
@@ -653,8 +712,16 @@
     "Huỷ": "Cancel", "Lưu": "Save", "Kết nối agent trên router": "Connect to the router agent",
     "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.": "Not connected. Log in with the sbproxy account.",
     "Tên đăng nhập": "Username", "Mật khẩu": "Password", "Đăng xuất": "Log out",
-    "Tài khoản riêng của sbproxy, in ra khi cài agent; đổi trên router bằng lệnh sbproxy-webauth.": "The dedicated sbproxy account, printed when the agent is installed; change it on the router with sbproxy-webauth.",
+    "Tài khoản riêng của sbproxy, tạo ở lần mở web đầu tiên; đổi trong UI hoặc bằng lệnh sbproxy-webauth trên router.": "The dedicated sbproxy account, created on the first visit; change it in the UI or with sbproxy-webauth on the router.",
     "Nâng cao: URL khác hoặc token trực tiếp": "Advanced: a different URL or a raw token",
+    "Tạo tài khoản quản trị đầu tiên": "Create the first admin account",
+    "Router chưa có tài khoản web. Tạo tài khoản đầu tiên để đăng nhập.": "The router has no web account yet. Create the first one to log in.",
+    "(1-32 ký tự chữ, số, . _ -)": "(1-32 characters: letters, digits, . _ -)",
+    "Nhập lại mật khẩu": "Repeat the password", "Tạo tài khoản": "Create account",
+    "Đổi mật khẩu": "Change password",
+    "Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.": "Change the sbproxy web account password. The current password is required.",
+    "Mật khẩu hiện tại": "Current password", "Mật khẩu mới": "New password",
+    "Nhập lại mật khẩu mới": "Repeat the new password",
     "Cấu hình": "Configuration",
     "(để trống nếu mở UI ngay từ router)": "(leave empty when the UI is served by the router)",
     "(in ra bởi install-agent.sh)": "(printed by install-agent.sh)", "Ngắt": "Disconnect", "Đóng": "Close", "Kết nối": "Connect",
@@ -893,6 +960,60 @@
     });
   }
 
+  // Bootstrap actions the CGI accepts without a Bearer header.
+  function postUnauthed(action, body) {
+    return fetch(apiUrl(action), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(r => r.json());
+  }
+  // ---- first-run: the router has no web account yet ------------------------
+  function openSetup() {
+    $("su_err").textContent = "";
+    $("su_pass").value = ""; $("su_pass2").value = "";
+    if (!$("su_user").value.trim()) $("su_user").value = "admin";
+    $("setupBackdrop").classList.add("show");
+    $("su_user").focus();
+  }
+  function submitSetup() {
+    const user = $("su_user").value.trim();
+    const pass = $("su_pass").value;
+    const err = m => { $("su_err").textContent = m; };
+    if (!/^[A-Za-z0-9._-]{1,32}$/.test(user)) return err(pick("Username must be 1-32 characters of letters, digits, . _ -", "Tên đăng nhập phải 1-32 ký tự chữ, số, . _ -"));
+    if (pass.length < 8) return err(pick("The password needs at least 8 characters.", "Mật khẩu phải có ít nhất 8 ký tự."));
+    if (pass !== $("su_pass2").value) return err(pick("The two passwords do not match.", "Hai mật khẩu không khớp."));
+    postUnauthed("setup_account", { user, pass }).then(d => {
+      if (!d || !d.ok || !d.token) throw new Error((d && d.error) || pick("could not create the account", "không tạo được tài khoản"));
+      agent.token = d.token; agent.user = d.user || user;
+      localStorage.setItem("sbproxy.agent.token", agent.token);
+      localStorage.setItem("sbproxy.agent.user", agent.user);
+      $("su_pass").value = ""; $("su_pass2").value = "";
+      $("setupBackdrop").classList.remove("show");
+      toast(pick("Account created ✓", "Đã tạo tài khoản ✓"));
+      finishConnect();
+    }).catch(e => err(String(e.message || e)));
+  }
+  // ---- change the web account password (Bearer + current password) ---------
+  function openChangePassword() {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    $("cp_err").textContent = "";
+    $("cp_old").value = ""; $("cp_new").value = ""; $("cp_new2").value = "";
+    $("cpBackdrop").classList.add("show");
+    $("cp_old").focus();
+  }
+  function submitChangePassword() {
+    const oldPass = $("cp_old").value;
+    const newPass = $("cp_new").value;
+    const err = m => { $("cp_err").textContent = m; };
+    if (newPass.length < 8) return err(pick("The new password needs at least 8 characters.", "Mật khẩu mới phải có ít nhất 8 ký tự."));
+    if (newPass !== $("cp_new2").value) return err(pick("The two passwords do not match.", "Hai mật khẩu không khớp."));
+    api("change_password", "POST", { old_pass: oldPass, new_pass: newPass }).then(d => {
+      if (!d || !d.ok) throw new Error((d && d.error) || pick("could not change the password", "không đổi được mật khẩu"));
+      $("cp_old").value = ""; $("cp_new").value = ""; $("cp_new2").value = "";
+      $("cpBackdrop").classList.remove("show");
+      toast(pick("Password changed ✓", "Đã đổi mật khẩu ✓"));
+    }).catch(e => err(String(e.message || e)));
+  }
   // Two ways in: the dedicated sbproxy username/password (the CGI trades it
   // for the token via action=login), or a raw token under "Advanced".
   function connect() {
@@ -903,10 +1024,13 @@
     const typedToken = document.getElementById("c_token").value.trim();
     if (user || pass) {
       setConnStatus(pick("Logging in…", "Đang đăng nhập…"));
-      fetch(apiUrl("login"), {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user, pass })
-      }).then(r => r.json()).then(d => {
+      postUnauthed("login", { user, pass }).then(d => {
+        if (d && d.setup_required) {
+          // No account exists yet: first-run setup instead of a dead end.
+          document.getElementById("connBackdrop").classList.remove("show");
+          openSetup();
+          return;
+        }
         if (!d || !d.ok || !d.token) throw new Error((d && d.error) || pick("login failed", "đăng nhập lỗi"));
         agent.token = d.token; agent.user = d.user || user;
         localStorage.setItem("sbproxy.agent.token", agent.token);
@@ -1603,6 +1727,7 @@
   // live mode events
   $("connBtn").onclick = () => {
     $("c_base").value = agent.base; $("c_token").value = agent.token; $("c_user").value = agent.user;
+    $("cpBtn").hidden = !agent.connected;
     if (!agent.connected) setConnStatus(pick("Not connected. Log in with the sbproxy account.", "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy."));
     $("connBackdrop").classList.add("show");
   };
@@ -1611,6 +1736,13 @@
   $("logoutBtn").onclick = logout;
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
   $("probeBtn").onclick = probeFromForm;
+  $("setupGo").onclick = submitSetup;
+  $("setupCancel").onclick = () => $("setupBackdrop").classList.remove("show");
+  $("setupBackdrop").onclick = e => { if (e.target.id === "setupBackdrop") $("setupBackdrop").classList.remove("show"); };
+  $("cpBtn").onclick = openChangePassword;
+  $("cpGo").onclick = submitChangePassword;
+  $("cpCancel").onclick = () => $("cpBackdrop").classList.remove("show");
+  $("cpBackdrop").onclick = e => { if (e.target.id === "cpBackdrop") $("cpBackdrop").classList.remove("show"); };
   $("connCancel").onclick = () => $("connBackdrop").classList.remove("show");
   $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") $("connBackdrop").classList.remove("show"); };
   $("pushApplyBtn").onclick = pushApply;
@@ -1693,7 +1825,14 @@
   // Reconnect automatically when a token is already stored.
   function initAgent() {
     updateLiveUI();
-    if (!agent.token) return;
+    if (!agent.token) {
+      // First run: when the router has no web account at all, open the
+      // setup form right away instead of a login that can only fail.
+      fetch(apiUrl("login_state")).then(r => r.json()).then(d => {
+        if (d && d.ok && d.account_configured === false) openSetup();
+      }).catch(() => {});
+      return;
+    }
     api("status").then(d => {
       if (d && d.ok) {
         agent.connected = true; agent.health = (d.health && d.health.probes) || {};

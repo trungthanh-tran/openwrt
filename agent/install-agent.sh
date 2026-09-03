@@ -62,17 +62,20 @@ log "3b) Web console account -> /etc/sbproxy/webauth"
 cp "$AGENT/sbproxy-webauth" /usr/sbin/sbproxy-webauth
 chmod 755 /usr/sbin/sbproxy-webauth
 # A dedicated username/password for the web UI, separate from the router's
-# root account. Kept across reinstalls; override with SBPROXY_WEB_USER /
-# SBPROXY_WEB_PASS, or change later with: sbproxy-webauth set <user>
-WEB_USER="${SBPROXY_WEB_USER:-admin}"
-WEB_PASS="${SBPROXY_WEB_PASS:-}"
+# root account, kept across reinstalls. By default NO account is created here:
+# the first visit to the web UI asks the operator to create it (the CGI's
+# setup_account only works while no account exists). Non-interactive
+# provisioning can still pre-create one through SBPROXY_WEB_USER /
+# SBPROXY_WEB_PASS; change it later with: sbproxy-webauth set <user>
+WEB_USER=""
 WEB_PASS_SHOWN=""
-if [ ! -s /etc/sbproxy/webauth ]; then
-  [ -n "$WEB_PASS" ] || WEB_PASS="$(head -c 9 /dev/urandom | hexdump -v -e '/1 "%02x"')"
+if [ -s /etc/sbproxy/webauth ]; then
+  WEB_USER="$(/usr/sbin/sbproxy-webauth show 2>/dev/null || echo "?")"
+elif [ -n "${SBPROXY_WEB_USER:-}" ] || [ -n "${SBPROXY_WEB_PASS:-}" ]; then
+  WEB_USER="${SBPROXY_WEB_USER:-admin}"
+  WEB_PASS="${SBPROXY_WEB_PASS:-$(head -c 9 /dev/urandom | hexdump -v -e '/1 "%02x"')}"
   printf '%s\n' "$WEB_PASS" | /usr/sbin/sbproxy-webauth set "$WEB_USER" -
   WEB_PASS_SHOWN="$WEB_PASS"
-else
-  WEB_USER="$(/usr/sbin/sbproxy-webauth show 2>/dev/null || echo "?")"
 fi
 
 log "4) CGI -> /www/cgi-bin/sbproxy"
@@ -115,6 +118,13 @@ done
 /etc/init.d/uhttpd reload 2>/dev/null || true
 
 IP="$(uci -q get network.lan.ipaddr || echo 192.168.8.1)"
+if [ -n "$WEB_USER" ]; then
+  WEB_LOGIN_1="user: $WEB_USER"
+  WEB_LOGIN_2="pass: ${WEB_PASS_SHOWN:-(unchanged — reset with: sbproxy-webauth set $WEB_USER)}"
+else
+  WEB_LOGIN_1="no account yet — the FIRST visit to the UI asks you to create it"
+  WEB_LOGIN_2="(or create one now: sbproxy-webauth set admin)"
+fi
 cat <<EOF
 
 ============================================================
@@ -122,8 +132,8 @@ cat <<EOF
  UI (open FROM THE ROUTER using http to avoid mixed content):
      http://$IP/sbproxy/
  WEB LOGIN (username/password dedicated to sbproxy):
-     user: $WEB_USER
-     pass: ${WEB_PASS_SHOWN:-(unchanged — reset with: sbproxy-webauth set $WEB_USER)}
+     $WEB_LOGIN_1
+     $WEB_LOGIN_2
  API:
      http://$IP/cgi-bin/sbproxy?action=status
  TOKEN (used by the desktop app; the web UI gets it by logging in):
@@ -132,7 +142,7 @@ cat <<EOF
  SECURITY:
   - Only expose this on the management LAN/VLAN. DO NOT expose it to the WAN.
   - Keep the token secret. To rotate it, delete /etc/sbproxy/token and run this script again.
-  - Change the web password any time with: sbproxy-webauth set $WEB_USER
+  - Change the web password in the UI (Đổi mật khẩu) or with: sbproxy-webauth set <user>
     Disable password login entirely with:  sbproxy-webauth disable
   - Test: curl -H "Authorization: Bearer \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
 ============================================================

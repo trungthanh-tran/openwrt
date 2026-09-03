@@ -25,20 +25,32 @@ http://<router-ip>/sbproxy/          (e.g. http://192.168.8.1/sbproxy/)
 The web console has its **own username/password**, separate from the router's
 root account, and no token has to be pasted by hand.
 
-### When is the account created?
+### When is the account created? (first-run setup)
 
-`agent/install-agent.sh` creates the account **once** at agent install time
-(reinstalling never overwrites an existing account):
+**On the first visit to the web UI.** While the router has no account, the
+page opens the **"Create the first admin account"** form by itself (default
+user `admin`; password ≥ 8 characters, typed twice) — creating it logs you in
+immediately. On the agent side, `setup_account` **only works while no account
+exists**: once one is there, every creation attempt is refused (403), so
+nobody can "create over" it; the only recovery path is SSH
+(`sbproxy-webauth`).
 
-- default user: `admin` (override with the `SBPROXY_WEB_USER` env var)
-- password: randomly generated and **printed at the end of the install**
-  (or pre-set it with `SBPROXY_WEB_PASS`)
+Unattended provisioning can still pre-create the account through environment
+variables when running `install-agent.sh`:
 
+```sh
+SBPROXY_WEB_USER=admin SBPROXY_WEB_PASS='your-password' sh agent/install-agent.sh
 ```
- WEB LOGIN (username/password dedicated to sbproxy):
-     user: admin
-     pass: 3fa91c2b7e6d0a45f1
-```
+
+### Changing the password
+
+- **In the UI**: 🔌 Connect router → the **🔑 Change password** button (shown
+  when connected) → enter the current password and the new one (twice). It
+  requires both the logged-in token **and** the current password, so a browser
+  that only holds the stored token cannot take over the account. A wrong
+  current password is delayed ~1 s and logged to syslog.
+- **On the router (SSH)**: `sbproxy-webauth set <user>` — also the recovery
+  path for a forgotten password.
 
 ### Logging in on the page
 
@@ -67,8 +79,8 @@ sbproxy-webauth disable            # turn password login off (token only)
   to disk**.
 - Passwords must be at least 8 characters.
 - **Forgot the password**: SSH to the router and run
-  `sbproxy-webauth set admin`, or `rm /etc/sbproxy/webauth` and re-run
-  `install-agent.sh`.
+  `sbproxy-webauth set admin`; or `sbproxy-webauth disable` and reopen the
+  web UI — the page asks to create a new account like on the first run.
 
 ### Brute-force protection
 
@@ -133,7 +145,8 @@ APIs — only the UI is missing; use the desktop app for those.
 
 | Symptom | Cause / fix |
 |---|---|
-| `403 — password login is not enabled` | The router has no `/etc/sbproxy/webauth` (old agent, or the file was removed). SSH: `sbproxy-webauth set admin`, or use a token under Advanced. |
+| `403 — no web account yet` (`setup_required`) | The router has no `/etc/sbproxy/webauth`: the page opens the **Create the first admin account** form by itself. If the form does not appear: SSH `sbproxy-webauth set admin`, or use a token under Advanced. |
+| `401 — wrong current password` (change password) | Re-enter the password in use; forgotten → SSH `sbproxy-webauth set <user>`. |
 | `401 — wrong username or password` | Double-check; the password was printed at agent install time. Forgot it → `sbproxy-webauth set admin`. |
 | `429 — too many wrong passwords` | Wait 5 minutes, or SSH and delete `/tmp/sbproxy-weblock`. |
 | Plain unstyled page, no polished sidebar | `/www/sbproxy/assets/bootstrap.min.css` is missing — re-run `install-agent.sh` or a self-update. The page still works. |

@@ -25,20 +25,30 @@ http://<ip-router>/sbproxy/          (ví dụ: http://192.168.8.1/sbproxy/)
 Web console có **username/password riêng**, không dùng tài khoản root của
 router và không phải dán token thủ công.
 
-### Tài khoản được tạo khi nào?
+### Tài khoản được tạo khi nào? (first-run setup)
 
-`agent/install-agent.sh` tạo tài khoản **một lần** khi cài agent (cài lại
-không ghi đè tài khoản cũ):
+**Ở lần mở web đầu tiên.** Khi router chưa có tài khoản, trang tự mở form
+**"Tạo tài khoản quản trị đầu tiên"** (user mặc định `admin`; mật khẩu ≥ 8 ký
+tự, nhập 2 lần) — tạo xong là đăng nhập luôn. Phía agent, action
+`setup_account` **chỉ chạy được khi chưa có tài khoản nào**: đã có tài khoản
+thì mọi yêu cầu tạo đều bị từ chối (403), nên không ai "tạo đè" được; đường
+khôi phục duy nhất là SSH (`sbproxy-webauth`).
 
-- user mặc định: `admin` (đổi bằng biến môi trường `SBPROXY_WEB_USER`)
-- password: sinh ngẫu nhiên và **in ra ở cuối màn hình cài đặt**
-  (hoặc tự đặt trước bằng `SBPROXY_WEB_PASS`)
+Cài đặt tự động (không cần mở web) vẫn có thể tạo sẵn tài khoản bằng biến môi
+trường khi chạy `install-agent.sh`:
 
+```sh
+SBPROXY_WEB_USER=admin SBPROXY_WEB_PASS='mat-khau-cua-ban' sh agent/install-agent.sh
 ```
- WEB LOGIN (username/password dedicated to sbproxy):
-     user: admin
-     pass: 3fa91c2b7e6d0a45f1
-```
+
+### Đổi mật khẩu
+
+- **Trong UI**: 🔌 Kết nối router → nút **🔑 Đổi mật khẩu** (hiện khi đã kết
+  nối) → nhập mật khẩu hiện tại + mật khẩu mới (2 lần). Cần cả token đang
+  đăng nhập **lẫn** mật khẩu hiện tại, nên trình duyệt chỉ giữ token không tự
+  chiếm được tài khoản. Sai mật khẩu hiện tại bị chờ ~1 giây và ghi syslog.
+- **Trên router (SSH)**: `sbproxy-webauth set <user>` — đây cũng là cách
+  khôi phục khi quên mật khẩu.
 
 ### Đăng nhập trên trang
 
@@ -66,8 +76,9 @@ sbproxy-webauth disable            # tắt đăng nhập mật khẩu (chỉ cò
   `user:salt:sha256(salt:password)` — **mật khẩu thật không bao giờ được ghi
   ra đĩa**.
 - Mật khẩu tối thiểu 8 ký tự.
-- **Quên mật khẩu**: SSH vào router và chạy `sbproxy-webauth set admin`,
-  hoặc chạy lại `install-agent.sh` sau khi `rm /etc/sbproxy/webauth`.
+- **Quên mật khẩu**: SSH vào router và chạy `sbproxy-webauth set admin`;
+  hoặc `sbproxy-webauth disable` rồi mở lại web — trang sẽ yêu cầu tạo tài
+  khoản mới như lần đầu.
 
 ### Chống dò mật khẩu
 
@@ -131,7 +142,8 @@ chỉ là chưa có UI; dùng bản desktop cho các thao tác đó.
 
 | Hiện tượng | Nguyên nhân / cách xử lý |
 |---|---|
-| `403 — đăng nhập bằng mật khẩu chưa bật` | Router chưa có `/etc/sbproxy/webauth` (agent cũ hoặc bị xoá). SSH: `sbproxy-webauth set admin`, hoặc dùng token ở mục Nâng cao. |
+| `403 — chưa có tài khoản web` (`setup_required`) | Router chưa có `/etc/sbproxy/webauth`: trang sẽ tự mở form **Tạo tài khoản quản trị đầu tiên**. Nếu không thấy form: SSH `sbproxy-webauth set admin`, hoặc dùng token ở mục Nâng cao. |
+| `401 — mật khẩu hiện tại không đúng` (đổi mật khẩu) | Nhập lại mật khẩu đang dùng; quên → SSH `sbproxy-webauth set <user>`. |
 | `401 — sai tên đăng nhập hoặc mật khẩu` | Kiểm tra lại; mật khẩu in ra lúc cài agent. Quên → `sbproxy-webauth set admin`. |
 | `429 — sai mật khẩu quá 5 lần` | Chờ 5 phút, hoặc SSH xoá `/tmp/sbproxy-weblock`. |
 | Trang trắng kiểu chữ đơn giản, không có sidebar đẹp | Thiếu `/www/sbproxy/assets/bootstrap.min.css` — chạy lại `install-agent.sh` hoặc `self-update`. Trang vẫn dùng được. |

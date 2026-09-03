@@ -30,6 +30,15 @@ Ngày theo định dạng YYYY-MM-DD.
 - Tài liệu mới [docs/web-console.md](docs/web-console.md) (+ bản EN): đăng
   nhập và quản lý tài khoản, bố cục màn hình, bảng map tính năng
   desktop ↔ web theo từng action agent, khắc phục sự cố.
+- **Tạo tài khoản đầu tiên và đổi mật khẩu ngay trên web.** Router chưa có
+  tài khoản: trang tự mở form "Tạo tài khoản quản trị đầu tiên" (action mới
+  `setup_account`, chỉ chạy khi chưa có tài khoản; `login` trả
+  `setup_required:true`; `login_state` cho UI biết trạng thái). Nút
+  **🔑 Đổi mật khẩu** trong hộp Kết nối (action `change_password`, cần cả
+  Bearer token lẫn mật khẩu hiện tại; sai bị chờ ~1 s + ghi syslog).
+  `install-agent.sh` không tự sinh tài khoản ngẫu nhiên nữa — lần mở web đầu
+  tiên tạo tài khoản; provisioning tự động vẫn tạo sẵn được qua
+  `SBPROXY_WEB_USER`/`SBPROXY_WEB_PASS`.
 
 ### Fixed
 Đợt rà soát regression 0.5.9 → 0.5.19:

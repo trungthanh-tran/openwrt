@@ -7,7 +7,13 @@
 # web console username/password (see sbproxy-webauth) for the token.
 #
 # POST ?action=login         body json {user,pass} -> {ok,token,user}; throttled and
-#                               locked for 5 minutes after 5 wrong passwords
+#                               locked for 5 minutes after 5 wrong passwords;
+#                               403 + setup_required:true while no account exists
+# GET  ?action=login_state   -> {ok,account_configured} (unauthenticated, read-only)
+# POST ?action=setup_account body json {user,pass} -> create the FIRST web account
+#                               and return {ok,token,user}; 403 once one exists
+# POST ?action=change_password body json {old_pass,new_pass,user?} -> rotate the web
+#                               account password (Bearer + current password required)
 # GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}} — meta carries
 #                               the effective settings.sh values a console needs
 # GET  ?action=get_conf      -> wifi-socks.conf as text/plain
@@ -127,19 +133,40 @@ have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu package
 ACTION="$(echo "$QUERY_STRING" | sed -n 's/.*\(^\|&\)action=\([a-z_]*\).*/\2/p')"
 
 # ---- auth ----
-# action=login is the web console's entry point: it trades the dedicated
-# username/password (sbproxy-webauth) for this token, so it is the one action
-# allowed through without a Bearer header. It still needs the token to exist,
-# because a successful login returns it.
+# Three actions bootstrap the login itself and are allowed through without a
+# Bearer header: login (trade the web account for the token), setup_account
+# (create the FIRST account — refused once one exists), and login_state (does
+# an account exist, so the UI knows to open login or first-run setup). They
+# still need the token to exist, because login/setup return it.
 TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null)"
 [ -n "$TOKEN" ] || json_err "500 Internal Server Error" "chưa có token (chạy install-agent.sh)"
-if [ "$ACTION" != "login" ]; then
-  REQUEST_TOKEN="${HTTP_X_SB_TOKEN:-}"
-  case "${HTTP_AUTHORIZATION:-}" in
-    Bearer\ *) [ -n "$REQUEST_TOKEN" ] || REQUEST_TOKEN="${HTTP_AUTHORIZATION#Bearer }" ;;
-  esac
-  [ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
-fi
+WEBAUTH_FILE="${WEBAUTH_FILE:-/etc/sbproxy/webauth}"
+case "$ACTION" in
+  login|setup_account|login_state) : ;;
+  *)
+    REQUEST_TOKEN="${HTTP_X_SB_TOKEN:-}"
+    case "${HTTP_AUTHORIZATION:-}" in
+      Bearer\ *) [ -n "$REQUEST_TOKEN" ] || REQUEST_TOKEN="${HTTP_AUTHORIZATION#Bearer }" ;;
+    esac
+    [ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
+    ;;
+esac
+
+# Shared by login / setup_account / change_password.
+webauth_hash() { printf '%s:%s' "$1" "$2" | sha256sum | awk '{print $1}'; }
+webauth_valid_user() {
+  [ "${#1}" -ge 1 ] && [ "${#1}" -le 32 ] || return 1
+  case "$1" in *[!A-Za-z0-9._-]*) return 1 ;; esac
+  return 0
+}
+webauth_write() { # user pass -> writes the account file
+  wa_salt="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n\r')"
+  [ -n "$wa_salt" ] || json_err "500 Internal Server Error" "không sinh được salt"
+  mkdir -p "$(dirname "$WEBAUTH_FILE")" 2>/dev/null
+  ( umask 077; printf '%s:%s:%s\n' "$1" "$wa_salt" "$(webauth_hash "$wa_salt" "$2")" > "$WEBAUTH_FILE" ) \
+    || json_err "500 Internal Server Error" "không ghi được $WEBAUTH_FILE"
+  chmod 600 "$WEBAUTH_FILE" 2>/dev/null || true
+}
 BODY_FILE=""
 TMP_CONF=""
 cleanup() {
@@ -233,9 +260,14 @@ case "$ACTION" in
     # the window has passed. Success clears the counter.
     [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
     require_json_object
-    WEBAUTH_FILE="${WEBAUTH_FILE:-/etc/sbproxy/webauth}"
-    [ -s "$WEBAUTH_FILE" ] \
-      || json_err "403 Forbidden" "đăng nhập bằng mật khẩu chưa bật — chạy 'sbproxy-webauth set <user>' trên router (hoặc dùng token)"
+    if [ ! -s "$WEBAUTH_FILE" ]; then
+      # setup_required tells the web console to open the first-run form
+      # instead of a dead-end error.
+      hdr "403 Forbidden" "application/json"
+      jq -n '{ok:false, setup_required:true,
+              error:"chưa có tài khoản web — hãy tạo tài khoản đầu tiên (hoặc: sbproxy-webauth set <user> trên router, hoặc dùng token)"}'
+      exit 0
+    fi
     LOCK_FILE="${WEBAUTH_LOCK_FILE:-/tmp/sbproxy-weblock}"
     LOGIN_MAX_FAILS="${LOGIN_MAX_FAILS:-5}"
     LOGIN_FAIL_WINDOW="${LOGIN_FAIL_WINDOW:-300}"
@@ -263,6 +295,59 @@ case "$ACTION" in
     logger -t sbproxy "web login failed (user '$req_user')" 2>/dev/null || true
     sleep "${LOGIN_FAIL_DELAY:-1}" 2>/dev/null || true
     json_err "401 Unauthorized" "sai tên đăng nhập hoặc mật khẩu"
+    ;;
+
+  login_state)
+    # Unauthenticated, read-only: does a web account exist at all? The UI
+    # opens the login form or the first-run setup form based on this.
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    configured=false; [ -s "$WEBAUTH_FILE" ] && configured=true
+    json_ok "$(jq -n --argjson c "$configured" '{ok:true, account_configured:$c}')"
+    ;;
+
+  setup_account)
+    # Create the FIRST web account. Only works while no account exists, so it
+    # is not a brute-force target; once a file is there this always refuses
+    # and the CLI (sbproxy-webauth) is the recovery path.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    [ ! -s "$WEBAUTH_FILE" ] \
+      || json_err "403 Forbidden" "đã có tài khoản web — hãy đăng nhập; đổi mật khẩu trong UI hoặc bằng sbproxy-webauth"
+    req_user="$(jq_r '.user // ""' "$BODY_FILE")"
+    req_pass="$(jq_r '.pass // ""' "$BODY_FILE")"
+    webauth_valid_user "$req_user" || json_err "400 Bad Request" "tên đăng nhập phải 1-32 ký tự A-Za-z0-9._-"
+    [ "${#req_pass}" -ge 8 ] || json_err "400 Bad Request" "mật khẩu phải có ít nhất 8 ký tự"
+    [ "${#req_pass}" -le 255 ] || json_err "400 Bad Request" "mật khẩu dài quá 255 ký tự"
+    webauth_write "$req_user" "$req_pass"
+    logger -t sbproxy "web account created (user '$req_user')" 2>/dev/null || true
+    json_ok "$(jq -n --arg token "$TOKEN" --arg user "$req_user" '{ok:true, token:$token, user:$user}')"
+    ;;
+
+  change_password)
+    # Authenticated (Bearer), and the current password is required on top:
+    # a browser that only holds the stored token cannot silently take over
+    # the account.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    [ -s "$WEBAUTH_FILE" ] \
+      || json_err "403 Forbidden" "chưa có tài khoản web — hãy tạo tài khoản đầu tiên"
+    old_pass="$(jq_r '.old_pass // ""' "$BODY_FILE")"
+    new_pass="$(jq_r '.new_pass // ""' "$BODY_FILE")"
+    IFS=: read -r acc_user acc_salt acc_hash < "$WEBAUTH_FILE" || true
+    if [ -z "${acc_user:-}" ] || [ -z "${acc_hash:-}" ] \
+       || [ "$(webauth_hash "${acc_salt:-}" "$old_pass")" != "$acc_hash" ]; then
+      logger -t sbproxy "web change_password refused: wrong current password" 2>/dev/null || true
+      sleep "${LOGIN_FAIL_DELAY:-1}" 2>/dev/null || true
+      json_err "401 Unauthorized" "mật khẩu hiện tại không đúng"
+    fi
+    req_user="$(jq_r '.user // ""' "$BODY_FILE")"
+    [ -n "$req_user" ] || req_user="$acc_user"
+    webauth_valid_user "$req_user" || json_err "400 Bad Request" "tên đăng nhập phải 1-32 ký tự A-Za-z0-9._-"
+    [ "${#new_pass}" -ge 8 ] || json_err "400 Bad Request" "mật khẩu mới phải có ít nhất 8 ký tự"
+    [ "${#new_pass}" -le 255 ] || json_err "400 Bad Request" "mật khẩu mới dài quá 255 ký tự"
+    webauth_write "$req_user" "$new_pass"
+    logger -t sbproxy "web account password changed (user '$req_user')" 2>/dev/null || true
+    json_ok "$(jq -n --arg user "$req_user" '{ok:true, user:$user}')"
     ;;
 
   status)

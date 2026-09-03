@@ -103,9 +103,10 @@ cd /root/sbproxy
 sh agent/install-agent.sh
 ```
 
-Open `http://<router>/sbproxy/`, leave Base URL empty, and log in with the
-dedicated sbproxy web account (default user `admin`; the password is printed at
-install time — manage it with `sbproxy-webauth set|show|disable`, see
+Open `http://<router>/sbproxy/` and leave Base URL empty. On the first visit
+the page asks you to **create the first admin account**; afterwards log in
+with it (change the password in the UI via **🔑 Change password**, or with
+`sbproxy-webauth set|show|disable` over SSH — see
 [web-console.en.md](web-console.en.md)). A raw token still works under
 *Advanced* and for the desktop app. The token is a shared bearer secret with
 full control; the web account is one login mapped to it, not a role system.
