@@ -1276,6 +1276,22 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         with mock.patch.object(appmod, "ReportDialog") as report:
             instance.add_proxy_to_selected(text="5.5.5.5:1080", ask=lambda _rows: True)
         report.assert_not_called()
+        # An untested proxy is reported as untested, never as [FAIL].
+        self.assertIn("chưa test được", instance.status_var.get())
+        logged = "\n".join(str(c.args[0]) for c in instance.append_log.call_args_list)
+        self.assertIn("[??", logged)
+        self.assertNotIn("[FAIL", logged)
+
+    def test_the_arrival_test_is_capped_not_unbounded(self):
+        """256 pasted proxies must not hold the loading screen for an hour."""
+        instance = self.make_instance([self.device("aa:bb:cc:dd:ee:01")])
+        text = "\n".join(f"10.9.0.{n}:1080" for n in range(1, 13))  # 12 new proxies
+        instance.client.probe_proxy.return_value = {"state": "ok", "verdict": "ok"}
+        with mock.patch.object(appmod, "ReportDialog") as report:
+            instance.add_proxy_to_selected(text=text, ask=lambda _rows: True)
+        self.assertEqual(instance.client.probe_proxy.call_count, appmod.AUTO_PROBE_MAX)
+        report.assert_not_called()
+        self.assertIn("chưa test được", instance.status_var.get())
 
     # --- opening the pool screen -------------------------------------------
 
@@ -1315,11 +1331,14 @@ class ProxyPoolWorkflowTests(unittest.TestCase):
         self.assertIn("slot=1 http:2.2.2.2:8080", joined)
 
     def test_odd_pool_rows_never_keep_the_screen_from_opening(self):
-        """A malformed row is logged and skipped; the dialog still opens with the data."""
+        """A malformed row becomes a placeholder; the dialog still opens, and
+        every row it receives is a dict it can call .get() on (a raw string
+        used to crash the real dialog after the logging was hardened)."""
         instance = self.make_instance([])
         pool = dict(self.POOL, proxies=[self.POOL["proxies"][0], "garbage", None])
         captured = self.open_pool(instance, pool=pool)
         self.assertEqual(len(captured["args"][2]), 3)
+        self.assertTrue(all(isinstance(row, dict) for row in captured["args"][2]))
 
     def test_the_pool_screen_probes_through_the_live_client(self):
         instance = self.make_instance([])
@@ -1508,6 +1527,9 @@ class ResetEverythingTests(unittest.TestCase):
             appmod.WifiRecord(name="a", band="5g", idx=1, wifi_password="password12", host="1.1.1.1", port=1080),
             appmod.WifiRecord(name="b", band="2g", idx=2, wifi_password="password12", host="2.2.2.2", port=1080),
         ]
+        # The reset derives what it wipes from the router's conf, not from the
+        # local list; the mock router carries the same two SSIDs.
+        instance.client.get_conf.return_value = appmod.render_conf(instance.records)
         instance.clients_data = [
             {"idx": 1, "mac": "aa:bb:cc:dd:ee:01", "online": True},
             {"idx": 2, "mac": "aa:bb:cc:dd:ee:02", "online": True},

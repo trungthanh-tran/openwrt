@@ -664,12 +664,14 @@ EN_TRANSLATIONS = {
         'Every sbproxy-managed Wi-Fi disappears immediately and every device loses its connection. The router keeps a pre-apply backup for a manual rollback. This cannot be undone from the app.',
     'Gõ {word} để xác nhận xoá toàn bộ cấu hình:': 'Type {word} to confirm wiping the whole configuration:',
     'Đã huỷ reset.': 'Reset cancelled.',
+    'Không đọc được cấu hình từ router: {error}': 'Cannot read the router configuration: {error}',
     'Đang reset toàn bộ…': 'Resetting everything…',
     'RESET xong: đã đá {kicked} thiết bị, xoá {count} SSID và pool, apply thành công.':
         'RESET done: kicked {kicked} devices, removed {count} SSIDs and pools, apply succeeded.',
     'Bỏ qua {n} lỗi nhỏ:': '{n} minor errors were skipped:',
     'Tự kiểm tra proxy vừa thêm': 'Auto-test of the proxies just added',
     'Đã thêm {count} proxy, tất cả đều đi được từ router': 'Added {count} proxies; all of them work from the router',
+    'Đã thêm {count} proxy; {n} chưa test được (agent cũ hoặc quá giới hạn tự test)': 'Added {count} proxies; {n} could not be tested (old agent, or past the auto-test cap)',
     '{failed}/{count} proxy vừa thêm KHÔNG đi được từ router': '{failed}/{count} proxies just added do NOT work from the router',
     'Proxy vừa thêm bị lỗi': 'Proxies just added have failed',
     'Đang kiểm tra proxy vừa thêm từ router…': 'Testing the proxies just added from the router…',
@@ -1189,6 +1191,10 @@ def split_devices_evenly(devices, slots: int, seed=None) -> dict:
 
 
 POOL_SLOTS_PER_SSID_MAX = 256
+# How many freshly added proxies are auto-probed from the router right after a
+# save. Each probe costs seconds; anything beyond the cap is listed as
+# untested rather than holding the loading screen for an hour.
+AUTO_PROBE_MAX = 8
 
 
 def proxy_display(row) -> str:
@@ -3160,19 +3166,48 @@ class PoolDialog(tk.Toplevel):
         slot = int(self.table.item(selected[0], "values")[0])
         row = self.proxies[slot]
         label = f"{row.get('type') or 'socks5'}:{row.get('host')}:{row.get('port')}"
+        if getattr(self, "_probing", False):
+            return
+        self._probing = True
         self.config(cursor="watch")
         self.update_idletasks()
-        try:
-            result = self.prober(row)
-        except Exception as exc:  # AgentError or transport failure
-            self.config(cursor="")
-            log.warning("probe_proxy %s -> %s", label, exc)
-            messagebox.showerror(self.t("Test proxy"), f"{label}\n{exc}", parent=self)
-            return
-        self.config(cursor="")
-        text = format_probe_result(result, self.language)
-        log.info("probe_proxy %s ->\n%s", label, text)
-        messagebox.showinfo(self.t("Test proxy"), f"{label}\n\n{text}", parent=self)
+
+        # The probe takes 15-45 s of curl on the router; running it on the Tk
+        # main thread froze the whole app ("Not Responding"). The thread only
+        # computes; every widget call is marshalled back through after().
+        def deliver(kind, payload):
+            self._probing = False
+            try:
+                self.config(cursor="")
+            except tk.TclError:  # the dialog was closed while probing
+                return
+            if kind == "err":
+                log.warning("probe_proxy %s -> %s", label, payload)
+                messagebox.showerror(self.t("Test proxy"), f"{label}\n{payload}", parent=self)
+                return
+            text = format_probe_result(payload, self.language)
+            log.info("probe_proxy %s ->\n%s", label, text)
+            messagebox.showinfo(self.t("Test proxy"), f"{label}\n\n{text}", parent=self)
+
+        outcome = {}
+
+        def work():
+            try:
+                outcome["value"] = ("ok", self.prober(row))
+            except Exception as exc:  # AgentError or transport failure
+                outcome["value"] = ("err", exc)
+
+        def poll():  # Tk is not thread-safe: only the main thread touches it
+            if "value" not in outcome:
+                try:
+                    self.after(120, poll)
+                except tk.TclError:
+                    pass
+                return
+            deliver(*outcome["value"])
+
+        threading.Thread(target=work, daemon=True, name="pool-probe").start()
+        self.after(120, poll)
 
     def _delete_selected(self):
         selected = self.table.selection()
@@ -5667,7 +5702,15 @@ class NativeApp:
         except AgentError as exc:
             self._task_error(exc)
             return
-        records = list(self.records)
+        # The ROUTER is the source of truth for what gets wiped: derive the
+        # warning numbers and the pool list from wifi-socks.conf as it is on
+        # the router right now, never from a possibly stale local list (the
+        # web console once wiped a router while announcing "0 SSIDs").
+        try:
+            records = parse_conf(client.get_conf())
+        except Exception as exc:
+            self._task_error(AgentError(self.t("Không đọc được cấu hình từ router: {error}", error=exc)))
+            return
         clients = [item for item in self.clients_data if isinstance(item, dict)]
         online = [item for item in clients if item.get("online") and item.get("mac")]
         if confirm is None:
@@ -6198,6 +6241,12 @@ class NativeApp:
         def prober(row):
             return client.probe_proxy(row.get("host"), row.get("port"), row.get("user"),
                                       row.get("pass"), row.get("type") or "socks5")
+        # The dialog calls row.get() on every slot; a non-dict row from a
+        # broken agent must render as a placeholder, not crash the window
+        # (slot numbers must stay aligned with `usage`, so substitute rather
+        # than drop).
+        proxies = [row if isinstance(row, dict) else {"type": "socks5", "host": "?", "port": ""}
+                   for row in proxies]
         dialog = PoolDialog(
             self.root, record, proxies, usage, self.language, self.palette,
             online_devices=self.has_online_devices(record.idx),
@@ -6226,32 +6275,58 @@ class NativeApp:
         the pool is already saved; this only explains it.
         """
         results = []
-        for slot in new_slots:
+        for position, slot in enumerate(new_slots):
             row = merged[slot]
             label = f"{row[0]}:{row[1]}:{row[2]}"
-            try:
-                answer = client.probe_proxy(row[1], row[2], row[3], row[4], row[0] or "socks5")
-            except Exception as exc:  # older agent without probe_proxy, or transport
-                answer = {"state": "unknown", "verdict": f"probe unavailable: {exc}"}
+            # Each probe costs seconds on the router; a 256-proxy paste must
+            # not hold the loading screen for an hour. Everything past the cap
+            # is reported as untested instead of probed.
+            if position >= AUTO_PROBE_MAX:
+                answer = {"state": "skipped",
+                          "verdict": f"not auto-tested (only the first {AUTO_PROBE_MAX} are); use Test proxy in the Pool screen"}
+            else:
+                try:
+                    answer = client.probe_proxy(row[1], row[2], row[3], row[4], row[0] or "socks5")
+                except Exception as exc:  # older agent without probe_proxy, or transport
+                    answer = {"state": "unknown", "verdict": f"probe unavailable: {exc}"}
             results.append((slot, label, answer))
         return results
+
+    @staticmethod
+    def _probe_outcome(answer):
+        """One predicate for every surface: ok / ?? (not tested) / FAIL."""
+        state = str(answer.get("state"))
+        if state in ("ok", "slow"):
+            return "ok"
+        if state == "fail":
+            return "FAIL"
+        # unknown, skipped, or anything an odd agent invents: not tested is
+        # not the same as broken — never raise the failure dialog over it.
+        return "??"
 
     def _report_new_slot_probes(self, idx, results):
         """Log every probe; open the report window only when something failed."""
         if not results:
             return
-        failed = [item for item in results if str(item[2].get("state")) == "fail"]
+        # The same predicate decides the [tag], the FAIL dialog, and the status
+        # line — three different tests once disagreed and showed an untested
+        # proxy as [FAIL] with no dialog and a stale status bar.
+        failed = [item for item in results if self._probe_outcome(item[2]) == "FAIL"]
+        untested = [item for item in results if self._probe_outcome(item[2]) == "??"]
         for slot, label, answer in results:
             text = format_probe_result(answer, self.language)
             log.info("auto-probe idx=%s slot=%s %s ->\n%s", idx, slot, label, text)
         summary = "\n".join(
-            f"[{'FAIL' if str(answer.get('state')) != 'ok' else 'ok  '}] slot {slot} {label}: "
+            f"[{self._probe_outcome(answer):<4}] slot {slot} {label}: "
             f"{answer.get('verdict') or answer.get('state')}"
             for slot, label, answer in results
         )
         self.append_log(f"{self.t('Tự kiểm tra proxy vừa thêm')} (IDX {idx}):\n{summary}")
         if not failed:
-            if all(str(answer.get("state")) == "ok" for _slot, _label, answer in results):
+            if untested:
+                self.status_var.set(self.t("Đã thêm {count} proxy; {n} chưa test được (agent cũ hoặc quá giới hạn tự test)",
+                                           count=len(results), n=len(untested)))
+            else:
                 self.status_var.set(self.t("Đã thêm {count} proxy, tất cả đều đi được từ router", count=len(results)))
             return
         detail = "\n\n".join(

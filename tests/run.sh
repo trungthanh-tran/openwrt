@@ -367,6 +367,10 @@ match "Agent install preserves an existing token" "$agent_install" 'if \[ ! -s /
 match "Agent install protects token permissions" "$agent_install" 'chmod 600 /etc/sbproxy/token'
 match "Agent install deploys native CGI" "$agent_install" 'cp "\$AGENT/cgi/sbproxy" /www/cgi-bin/sbproxy'
 match "Agent install deploys self-hosted web console" "$agent_install" 'control-panel\.html" /www/sbproxy/index\.html'
+match "Agent install ships the offline UI assets" "$agent_install" 'cp "\$SB_ROOT/console/web/assets/"\* /www/sbproxy/assets/'
+match "Agent install deploys the webauth helper" "$agent_install" 'cp "\$AGENT/sbproxy-webauth" /usr/sbin/sbproxy-webauth'
+match "Agent install creates the web account once" "$agent_install" 'if \[ ! -s /etc/sbproxy/webauth \]'
+match "Agent install keeps the webauth helper across sysupgrade" "$agent_install" '/usr/sbin/sbproxy-webauth; do'
 match "Agent install enables health daemon" "$agent_install" '/etc/init\.d/sbproxy-healthd enable'
 match "Agent install persists files across sysupgrade" "$agent_install" '/etc/sysupgrade\.conf'
 desktop_py="$(cat "$ROOT/console/desktop/main.py")"
@@ -643,8 +647,11 @@ echo "== sing-box service: enabled flag and start verification =="
 # process came up, otherwise a silent no-op leaves every SSID without Internet.
 match "apply enables the sing-box service" "$apply_script" 'ensure_singbox_service'
 match "apply verifies sing-box came up"    "$apply_script" 'verify_singbox_running'
-apply_order="$(grep -n 'ensure_singbox_service\|/etc/init.d/sing-box restart\|verify_singbox_running' "$ROOT/scripts/apply.sh" | cut -d: -f2- | tr -d ' ' | tr '\n' ' ')"
-eq "apply orders enable -> restart -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" verify_singbox_running '
+# The verify must come AFTER the Wi-Fi is brought back: dying between the
+# sing-box restart and `wifi reload` left every SSID down (and the operator
+# without a management path) whenever sing-box could not start.
+apply_order="$(grep -n 'ensure_singbox_service\|/etc/init.d/sing-box restart\|verify_singbox_running\|recover_wifi_networks' "$ROOT/scripts/apply.sh" | cut -d: -f2- | tr -d ' ' | tr '\n' ' ')"
+eq "apply orders enable -> restart -> wifi recovery -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" recover_wifi_networks verify_singbox_running '
 match "install-deps enables the sing-box service" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_service'
 match "doctor reports a disabled sing-box service" "$(cat "$ROOT/scripts/doctor.sh")" 'enabled=0: the init script never starts sing-box'
 SBS="$STUB/sbs"; mkdir -p "$SBS/bin"
@@ -692,7 +699,7 @@ eq "dry-run does not wait for a process"    "$verify_rc" "0"
 
 echo "== shellcheck (same file list as CI) =="
 if command -v shellcheck >/dev/null 2>&1; then
-  if (cd "$ROOT" && shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh         config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd         agent/sbproxy-assignd agent/sbproxy-dhcp-assign >"$STUB/shellcheck.out" 2>&1); then
+  if (cd "$ROOT" && shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh         config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd         agent/sbproxy-assignd agent/sbproxy-dhcp-assign agent/sbproxy-webauth >"$STUB/shellcheck.out" 2>&1); then
     ok "every shell script passes shellcheck -S warning"
   else
     no "shellcheck reports problems: $(head -n 3 "$STUB/shellcheck.out" | tr '
@@ -814,6 +821,36 @@ match "web reset empties every pool"                "$web_console" 'api\("save_p
 match "web reset dry-runs before saving the empty conf" "$web_console" 'api\("dryrun_conf", "POST", emptyConf, true\)'
 match "web reset applies last"                      "$web_console" 'return api\("apply", "POST", \{\}\);'
 match "web reset label is translated"               "$web_console" '"Reset toàn bộ": "Reset everything"'
+match "web console loads Bootstrap offline"         "$web_console" 'href="assets/bootstrap\.min\.css"'
+match "web console has an AdminLTE-style sidebar"   "$web_console" 'class="sidebar" id="sidebar"'
+match "web console logs in with username/password"  "$web_console" 'id="c_user"'
+match "web login posts to the login action"         "$web_console" 'apiUrl\("login"\)'
+match "web console can log out"                     "$web_console" 'id="logoutBtn"'
+match "web console keeps the raw-token fallback"    "$web_console" 'id="c_token"'
+match "web console can diagnose one SSID"           "$web_console" 'api\("diagnose_ssid&idx=" \+ idx\)'
+match "web console can probe a proxy from the form" "$web_console" 'api\("probe_proxy", "POST"'
+[ -s "$ROOT/console/web/assets/bootstrap.min.css" ] \
+  && ok "offline Bootstrap asset is present" || no "offline Bootstrap asset is present"
+match "agent has the login action"                  "$agent_cgi" '  login\)'
+match "agent login is the only unauthenticated action" "$agent_cgi" 'if \[ "\$ACTION" != "login" \]; then'
+match "agent login throttles and locks failures"    "$agent_cgi" '429 Too Many Requests'
+match "self-update redeploys the UI assets"         "$selfupdate" 'console/web/assets'
+match "self-update redeploys the webauth helper"    "$selfupdate" 'agent/sbproxy-webauth'
+
+echo "== regression guards: masking, switch-gateway, reset source of truth =="
+swgw="$(cat "$ROOT/scripts/switch-gateway.sh")"
+match "switch-gateway defaults an empty change list to []" "$swgw" "changed_json='\[\]'"
+match "switch-gateway reverts staged uci changes on failure" "$swgw" 'uci revert network'
+match "switch-gateway skips ubus-only interfaces" "$swgw" 'uci -q get "network\.\$other" >/dev/null 2>&1 \|\| continue'
+match "agent keeps switch-gateway stderr out of the JSON" "$agent_cgi" '2>"\$SWGW_ERRF"'
+for masked in scripts/probe-proxy.sh scripts/lib.sh agent/sbproxy-healthd; do
+  match "$masked masks secrets literally, never through sed" "$(cat "$ROOT/$masked")" 'mask_secret\(\)'
+  nomatch "$masked no longer feeds the password to sed" "$(cat "$ROOT/$masked")" 'sed "s\|\$pass'
+done
+nomatch "diagnose-ssid no longer feeds the password to sed" "$(cat "$ROOT/scripts/diagnose-ssid.sh")" 'sed "s\|\$pass'
+match "web reset pulls the conf from the router first" "$web_console" 'api\("get_conf", "GET", null, "resp"\)\.then\(conf'
+match "desktop reset pulls the conf from the router first" "$desktop_main" 'records = parse_conf\(client\.get_conf\(\)\)'
+match "desktop caps the arrival auto-probe" "$desktop_main" 'AUTO_PROBE_MAX = 8'
 
 echo ""
 printf 'TOTAL: pass=%d  fail=%d  skip=%d\n' "$pass" "$fail" "$skip"

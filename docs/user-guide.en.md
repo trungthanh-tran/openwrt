@@ -23,9 +23,11 @@ HTML/WebView/WebView2. It protects the saved token with Windows DPAPI, or with
 1. Connect through the trusted management LAN.
 2. Open the console — web: `http://<router>/sbproxy/` (GL-MT6000 default
    `http://192.168.8.1/sbproxy/`); desktop: launch `sbproxy-console.exe`.
-3. Paste the administrator-provided token and connect. Web
-   build opened from the router: leave Base URL empty. Desktop build: set Base
-   URL to `http://<router-ip>`.
+3. Log in and connect. Web build: enter the dedicated sbproxy
+   **username/password** (printed at agent install time; the raw token moved
+   under *Advanced* — see [web-console.en.md](web-console.en.md)); opened from
+   the router, leave Base URL empty. Desktop build: set Base URL to
+   `http://<router-ip>` and paste the administrator-provided token.
 4. A successful desktop connection loads configuration, clients, backups, and
    sing-box status from the router.
 

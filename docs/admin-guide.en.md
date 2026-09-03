@@ -103,7 +103,12 @@ cd /root/sbproxy
 sh agent/install-agent.sh
 ```
 
-Open `http://<router>/sbproxy/`, leave Base URL empty, and supply `/etc/sbproxy/token`. The token is a shared bearer secret with full control; there are no per-user accounts or roles.
+Open `http://<router>/sbproxy/`, leave Base URL empty, and log in with the
+dedicated sbproxy web account (default user `admin`; the password is printed at
+install time — manage it with `sbproxy-webauth set|show|disable`, see
+[web-console.en.md](web-console.en.md)). A raw token still works under
+*Advanced* and for the desktop app. The token is a shared bearer secret with
+full control; the web account is one login mapped to it, not a role system.
 
 Rotate a suspected token by deleting it and reinstalling the agent:
 

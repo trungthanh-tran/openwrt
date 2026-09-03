@@ -58,14 +58,33 @@ fi
 chmod 600 /etc/sbproxy/token
 TOKEN="$(cat /etc/sbproxy/token)"
 
+log "3b) Web console account -> /etc/sbproxy/webauth"
+cp "$AGENT/sbproxy-webauth" /usr/sbin/sbproxy-webauth
+chmod 755 /usr/sbin/sbproxy-webauth
+# A dedicated username/password for the web UI, separate from the router's
+# root account. Kept across reinstalls; override with SBPROXY_WEB_USER /
+# SBPROXY_WEB_PASS, or change later with: sbproxy-webauth set <user>
+WEB_USER="${SBPROXY_WEB_USER:-admin}"
+WEB_PASS="${SBPROXY_WEB_PASS:-}"
+WEB_PASS_SHOWN=""
+if [ ! -s /etc/sbproxy/webauth ]; then
+  [ -n "$WEB_PASS" ] || WEB_PASS="$(head -c 9 /dev/urandom | hexdump -v -e '/1 "%02x"')"
+  printf '%s\n' "$WEB_PASS" | /usr/sbin/sbproxy-webauth set "$WEB_USER" -
+  WEB_PASS_SHOWN="$WEB_PASS"
+else
+  WEB_USER="$(/usr/sbin/sbproxy-webauth show 2>/dev/null || echo "?")"
+fi
+
 log "4) CGI -> /www/cgi-bin/sbproxy"
 mkdir -p /www/cgi-bin
 cp "$AGENT/cgi/sbproxy" /www/cgi-bin/sbproxy
 chmod 755 /www/cgi-bin/sbproxy
 
-log "5) UI self-host -> /www/sbproxy/index.html"
-mkdir -p /www/sbproxy
+log "5) UI self-host -> /www/sbproxy/ (index.html + offline Bootstrap assets)"
+mkdir -p /www/sbproxy/assets
 cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
+cp "$SB_ROOT/console/web/assets/"* /www/sbproxy/assets/ 2>/dev/null \
+  || echo "  warning: console/web/assets/ was not found — the UI falls back to its built-in styling"
 
 log "6) Health daemon -> /usr/sbin/ + procd"
 mkdir -p /usr/libexec
@@ -87,7 +106,8 @@ chmod 755 /etc/init.d/sbproxy-assignd
 
 # Preserve agent files across standard OpenWrt backups and upgrades.
 for p in /etc/sbproxy/ /www/cgi-bin/sbproxy /www/sbproxy/ /usr/sbin/sbproxy-healthd /etc/init.d/sbproxy-healthd \
-         /usr/sbin/sbproxy-assignd /etc/init.d/sbproxy-assignd /usr/libexec/sbproxy-dhcp-assign; do
+         /usr/sbin/sbproxy-assignd /etc/init.d/sbproxy-assignd /usr/libexec/sbproxy-dhcp-assign \
+         /usr/sbin/sbproxy-webauth; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 
@@ -101,14 +121,19 @@ cat <<EOF
  AGENT INSTALLATION COMPLETE.
  UI (open FROM THE ROUTER using http to avoid mixed content):
      http://$IP/sbproxy/
+ WEB LOGIN (username/password dedicated to sbproxy):
+     user: $WEB_USER
+     pass: ${WEB_PASS_SHOWN:-(unchanged — reset with: sbproxy-webauth set $WEB_USER)}
  API:
      http://$IP/cgi-bin/sbproxy?action=status
- TOKEN (paste into the "Connect router" field in the UI):
+ TOKEN (used by the desktop app; the web UI gets it by logging in):
      $TOKEN
 ------------------------------------------------------------
  SECURITY:
   - Only expose this on the management LAN/VLAN. DO NOT expose it to the WAN.
   - Keep the token secret. To rotate it, delete /etc/sbproxy/token and run this script again.
+  - Change the web password any time with: sbproxy-webauth set $WEB_USER
+    Disable password login entirely with:  sbproxy-webauth disable
   - Test: curl -H "Authorization: Bearer \$TOKEN" http://$IP/cgi-bin/sbproxy?action=status
 ============================================================
 EOF

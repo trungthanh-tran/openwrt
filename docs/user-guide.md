@@ -34,9 +34,13 @@ Mỗi mạng WiFi bạn tạo sẽ gắn với một **SOCKS5** riêng — thi�
 1. Mở console:
    - **Bản Web:** vào `http://<địa-chỉ-router>/sbproxy/` (MT6000 mặc định: `http://192.168.8.1/sbproxy/`).
    - **Bản Desktop:** Windows mở `sbproxy-console.exe`; Linux/macOS chạy `./sbproxy-console` (mỗi nền tảng có file build riêng, tự chứa đủ mọi thứ).
-2. Nhập token quản trị viên cấp rồi bấm **Kết nối**:
-   - Bản Web mở từ router: để trống ô *Base URL*.
-   - Bản Desktop: nhập *Router* = `http://<IP-router>` (ví dụ `http://192.168.8.1`).
+2. Đăng nhập rồi bấm **Kết nối**:
+   - **Bản Web:** nhập **tên đăng nhập / mật khẩu** riêng của sbproxy (quản trị
+     viên cấp; in ra khi cài agent). Token chỉ còn nằm trong mục *Nâng cao* —
+     chi tiết xem [web-console.md](web-console.md). Mở từ router thì để trống
+     *Base URL*.
+   - **Bản Desktop:** nhập *Router* = `http://<IP-router>` (ví dụ
+     `http://192.168.8.1`) và token quản trị viên cấp.
 3. Kết nối thành công: thanh trạng thái báo sing-box đang chạy; cấu hình, thiết bị và backup được nạp từ router.
 
 Khung **Internet Gateway** phía trên các tab cho biết đường ra thực tế

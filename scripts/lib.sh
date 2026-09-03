@@ -15,6 +15,21 @@ log()  { printf '[sbproxy] %s\n' "$*" >&2; }
 warn() { printf '[sbproxy][WARN] %s\n' "$*" >&2; }
 die()  { printf '[sbproxy][ERR] %s\n' "$*" >&2; exit 1; }
 
+# Replace every literal occurrence of $2 in $1 with ***. Never mask with sed:
+# the secret is data, but sed reads it as a regex and as part of the s|||
+# command, so `|`, `[`, `&` or `;` in a real password broke the masking or
+# leaked the cleartext. awk index() compares plain bytes only.
+mask_secret() { # text secret -> masked text
+  if [ -z "$2" ]; then printf '%s' "$1"; return; fi
+  printf '%s' "$1" | S="$2" awk '
+    { line = $0; masked = ""
+      while ((i = index(line, ENVIRON["S"])) > 0) {
+        masked = masked substr(line, 1, i - 1) "***"
+        line = substr(line, i + length(ENVIRON["S"]))
+      }
+      print masked line }'
+}
+
 # DRYRUN=1 prints mutating commands instead of executing them.
 run() {
   # shellcheck disable=SC2294  # Commands are intentionally stored as strings for DRYRUN logging.

@@ -1,0 +1,82 @@
+#!/bin/sh
+# sbproxy-webauth — manage the web console account (username + password).
+# The self-hosted web UI trades these credentials for the API token through
+# the CGI action ?action=login; the token itself never has to be typed.
+#
+#   sbproxy-webauth set <user> [password|-]   create or replace the account
+#                                             ('-' or no password: read stdin)
+#   sbproxy-webauth check <user> <password>   exit 0 when the pair is valid
+#   sbproxy-webauth show                      print the configured username
+#   sbproxy-webauth disable                   remove the account (login refused)
+#
+# Storage ($WEBAUTH_FILE, default /etc/sbproxy/webauth), a single line:
+#   user:salt:sha256("salt:password")
+# Root-only (0600); the password itself is never written anywhere.
+set -u
+
+WEBAUTH_FILE="${WEBAUTH_FILE:-/etc/sbproxy/webauth}"
+
+die() { printf 'sbproxy-webauth: %s\n' "$*" >&2; exit 1; }
+
+hash_pass() { # salt password
+  printf '%s:%s' "$1" "$2" | sha256sum | awk '{print $1}'
+}
+
+valid_user() {
+  [ "${#1}" -ge 1 ] && [ "${#1}" -le 32 ] || return 1
+  case "$1" in *[!A-Za-z0-9._-]*) return 1 ;; esac
+  return 0
+}
+
+case "${1:-}" in
+  set)
+    user="${2:-}"
+    valid_user "$user" || die "username must be 1-32 characters of A-Za-z0-9._-"
+    pass="${3:-}"
+    if [ -z "$pass" ] || [ "$pass" = "-" ]; then
+      # From a terminal ask quietly; from a pipe just read the line.
+      if [ -t 0 ]; then
+        printf 'New password for %s: ' "$user" >&2
+        stty -echo 2>/dev/null || true
+        IFS= read -r pass
+        stty echo 2>/dev/null || true
+        printf '\n' >&2
+      else
+        IFS= read -r pass
+      fi
+    fi
+    [ "${#pass}" -ge 8 ] || die "password must be at least 8 characters"
+    [ "${#pass}" -le 255 ] || die "password is longer than 255 characters"
+    # ':' inside the password is fine — reads only split the first two fields.
+    salt="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n\r')"
+    [ -n "$salt" ] || die "could not generate a salt"
+    dir="$(dirname "$WEBAUTH_FILE")"
+    mkdir -p "$dir" || die "cannot create $dir"
+    umask 077
+    printf '%s:%s:%s\n' "$user" "$salt" "$(hash_pass "$salt" "$pass")" > "$WEBAUTH_FILE" \
+      || die "cannot write $WEBAUTH_FILE"
+    chmod 600 "$WEBAUTH_FILE" 2>/dev/null || true
+    printf 'web console account set: %s\n' "$user"
+    ;;
+  check)
+    user="${2:-}"; pass="${3:-}"
+    [ -s "$WEBAUTH_FILE" ] || exit 1
+    IFS=: read -r acc_user acc_salt acc_hash < "$WEBAUTH_FILE" || exit 1
+    [ -n "$acc_user" ] && [ -n "$acc_salt" ] && [ -n "$acc_hash" ] || exit 1
+    [ "$user" = "$acc_user" ] || exit 1
+    [ "$(hash_pass "$acc_salt" "$pass")" = "$acc_hash" ] || exit 1
+    exit 0
+    ;;
+  show)
+    [ -s "$WEBAUTH_FILE" ] || die "no web console account is configured"
+    cut -d: -f1 "$WEBAUTH_FILE"
+    ;;
+  disable)
+    rm -f "$WEBAUTH_FILE"
+    printf 'web console login disabled (token login still works)\n'
+    ;;
+  *)
+    printf 'usage: sbproxy-webauth set <user> [password|-] | check <user> <password> | show | disable\n' >&2
+    exit 2
+    ;;
+esac

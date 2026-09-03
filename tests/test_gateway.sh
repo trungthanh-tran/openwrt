@@ -177,7 +177,11 @@ cat > "$STUB/uci" <<'SH'
 [ "$1" = "-q" ] && shift
 printf 'uci %s\n' "$*" >> "$UCI_LOG"
 case "$1" in
-  get) case "$2" in network.wwan.metric) echo 20 ;; *) exit 1 ;; esac ;;
+  get) case "$2" in
+    network.wwan.metric) echo 20 ;;
+    network.wan|network.wwan) echo interface ;;   # section-existence checks
+    *) exit 1 ;;
+  esac ;;
 esac
 exit 0
 SH
@@ -202,6 +206,82 @@ eq "the proxied bridge is left alone" "$(grep -c 'network.w1' "$UCI_LOG")" "0"
 eq "network is committed"            "$(grep -c 'uci commit network' "$UCI_LOG")" "1"
 eq "the choice is pinned"            "$(grep -c '^GATEWAY_EXPECTED_INTERFACE=wwan$' "$SWITCH_ENV")" "1"
 eq "other env keys survive"          "$(grep -c '^FOO=1$' "$SWITCH_ENV")" "1"
+
+echo "== switch-gateway: already-correct metrics mean an empty change list, not an error =="
+# wan already sits behind (metric 100), wwan already leads (metric 0): nothing
+# to stage. The empty list used to hit `jq --argjson changed ""` (a jq usage
+# error) and answer a false failure on a router that was already right.
+cat > "$STUB/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$UCI_LOG"
+case "$1" in
+  get) case "$2" in
+    network.wan.metric) echo 100 ;;
+    network.wwan.metric) echo 0 ;;
+    network.wan|network.wwan) echo interface ;;
+    *) exit 1 ;;
+  esac ;;
+esac
+exit 0
+SH
+chmod +x "$STUB/uci"
+: > "$UCI_LOG"
+out="$(UBUS_DUMP="$SWITCH_DUMP" \
+       UBUS_STATUS_wwan='{"interface":"wwan","l3_device":"phy0-sta0","up":true,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" wwan 2>/dev/null)"
+eq "a no-op switch still succeeds"   "$(field "$out" .ok)" "true"
+eq "and reports an empty changed list" "$(field "$out" '.changed | length')" "0"
+eq "nothing is committed"            "$(grep -c 'uci commit' "$UCI_LOG")" "0"
+
+echo "== switch-gateway: dynamic interfaces and staged changes =="
+# An interface that exists only in ubus (no uci section) cannot carry a
+# metric; it is skipped, never a reason to abort the switch.
+cat > "$STUB/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$UCI_LOG"
+case "$1" in
+  get) case "$2" in
+    network.wwan|network.wwan.metric) [ "$2" = network.wwan ] && echo interface; [ "$2" = network.wwan.metric ] && echo 20 ;;
+    *) exit 1 ;;   # wan has NO uci section at all
+  esac ;;
+esac
+exit 0
+SH
+chmod +x "$STUB/uci"
+: > "$UCI_LOG"
+out="$(UBUS_DUMP="$SWITCH_DUMP" \
+       UBUS_STATUS_wwan='{"interface":"wwan","l3_device":"phy0-sta0","up":true,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" wwan 2>/dev/null)"
+eq "a ubus-only uplink is skipped, not fatal" "$(field "$out" .ok)" "true"
+eq "no metric is forced onto it"     "$(grep -c 'uci set network.wan' "$UCI_LOG")" "0"
+eq "the choice still takes metric 0" "$(grep -c 'uci set network.wwan.metric=0' "$UCI_LOG")" "1"
+
+# A uci failure mid-flight reverts whatever was staged: the next unrelated
+# `uci commit network` must not flush half a switch.
+cat > "$STUB/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$UCI_LOG"
+case "$1" in
+  get) case "$2" in
+    network.wan|network.wwan) echo interface ;;
+    network.wwan.metric) echo 20 ;;
+    *) exit 1 ;;
+  esac ;;
+  set) case "$2" in network.wwan.metric=0) exit 1 ;; esac ;;
+esac
+exit 0
+SH
+chmod +x "$STUB/uci"
+: > "$UCI_LOG"
+out="$(UBUS_DUMP="$SWITCH_DUMP" \
+       UBUS_STATUS_wwan='{"interface":"wwan","l3_device":"phy0-sta0","up":true,'"$DEFROUTE"'}' \
+       ENV_FILE="$SWITCH_ENV" NETWORK_RELOAD=true sh "$ROOT/scripts/switch-gateway.sh" wwan 2>/dev/null)"
+eq "a failed uci set answers ok:false" "$(field "$out" .ok)" "false"
+eq "and the staged changes are reverted" "$(grep -c 'uci revert network' "$UCI_LOG")" "1"
+eq "and nothing is committed"        "$(grep -c 'uci commit' "$UCI_LOG")" "0"
 
 echo "== switch-gateway: refusals =="
 out="$(UBUS_DUMP="$SWITCH_DUMP" UBUS_STATUS_lan='{"interface":"lan","l3_device":"br-lan","up":true}' \

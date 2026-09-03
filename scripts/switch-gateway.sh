@@ -43,21 +43,28 @@ others="$(printf '%s' "$dump" | jq -r --arg want "$want" '
     | select(([ (.route // [])[] | select(((.target // "") == "0.0.0.0") and ((.mask // 0) == 0)) ] | length) > 0)
     | .interface ] | .[]' 2>/dev/null)"
 
+# A failure after `uci set` must not leave half-staged metrics behind: the
+# next unrelated `uci commit network` would flush them.
+fail_revert() { uci revert network 2>/dev/null || true; fail "$1"; }
+
 changed=""
 for other in $others; do
+  # Interfaces that exist only in ubus (dynamic: vpn, hotplug modems) have no
+  # uci section to carry a metric — skip them instead of failing the switch.
+  uci -q get "network.$other" >/dev/null 2>&1 || continue
   current="$(uci -q get "network.$other.metric" 2>/dev/null || true)"
   if [ -z "$current" ] || [ "$current" -lt "$FALLBACK_METRIC" ] 2>/dev/null; then
-    uci set "network.$other.metric=$FALLBACK_METRIC" || fail "cannot set metric on $other"
+    uci set "network.$other.metric=$FALLBACK_METRIC" || fail_revert "cannot set metric on $other"
     changed="$changed $other"
   fi
 done
 current="$(uci -q get "network.$want.metric" 2>/dev/null || true)"
 if [ -n "$current" ] && [ "$current" != "0" ]; then
-  uci set "network.$want.metric=0" || fail "cannot set metric on $want"
+  uci set "network.$want.metric=0" || fail_revert "cannot set metric on $want"
   changed="$changed $want"
 fi
 if [ -n "$changed" ]; then
-  uci commit network || fail "uci commit failed"
+  uci commit network || fail_revert "uci commit failed"
   $NETWORK_RELOAD >/dev/null 2>&1 || fail "network reload failed"
 fi
 
@@ -70,6 +77,11 @@ tmp="$ENV_FILE.$$"
 } > "$tmp" 2>/dev/null && cat "$tmp" > "$ENV_FILE" 2>/dev/null || { rm -f "$tmp"; fail "cannot write $ENV_FILE"; }
 rm -f "$tmp"
 
+# `jq -R` on empty input prints nothing at all, and an empty --argjson value
+# is a jq usage error — a router already on the right uplink would answer a
+# false failure. Default the empty case to [] explicitly.
+changed_json="$(printf '%s' "${changed# }" | jq -R 'split(" ") | map(select(. != ""))')"
+[ -n "$changed_json" ] || changed_json='[]'
 jq -n --arg interface "$want" --arg device "$device" \
-  --argjson changed "$(printf '%s' "${changed# }" | jq -R 'split(" ") | map(select(. != ""))')" \
+  --argjson changed "$changed_json" \
   '{ok:true, interface:$interface, device:$device, changed:$changed}'

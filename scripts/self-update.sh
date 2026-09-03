@@ -219,6 +219,17 @@ deploy "$SB_ROOT/agent/cgi/sbproxy" "$CGI_DEST"
 if [ -d "$(dirname "$UI_DEST")" ]; then
   cp "$SB_ROOT/console/web/control-panel.html" "$UI_DEST"
   log "deploy $UI_DEST"
+  # Offline Bootstrap and any other static files the UI references.
+  if [ -d "$SB_ROOT/console/web/assets" ]; then
+    mkdir -p "$(dirname "$UI_DEST")/assets"
+    cp "$SB_ROOT/console/web/assets/"* "$(dirname "$UI_DEST")/assets/" 2>/dev/null \
+      && log "deploy $(dirname "$UI_DEST")/assets" \
+      || log "warning: no UI assets were deployed"
+  fi
+fi
+WEBAUTH_DEST="${WEBAUTH_DEST:-/usr/sbin/sbproxy-webauth}"
+if [ -f "$SB_ROOT/agent/sbproxy-webauth" ]; then
+  deploy "$SB_ROOT/agent/sbproxy-webauth" "$WEBAUTH_DEST"
 fi
 deploy "$SB_ROOT/agent/sbproxy-healthd" "$HEALTHD_DEST"
 deploy "$SB_ROOT/agent/init.d/sbproxy-healthd" "$HEALTHD_INIT_DEST"

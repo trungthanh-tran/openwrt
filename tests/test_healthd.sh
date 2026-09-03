@@ -47,6 +47,8 @@ case "$proxy" in
   *edge.example*) printf '302 0.800' ;;
   *badcode.example*) printf '500 0.050' ;;
   *offline.example*) echo "curl: (7) Failed to connect to offline.example port 5080: Connection refused (user secret:hunter2)" >&2; exit 7 ;;
+  *maskh.example*) echo "curl: (7) denied for se[cr*t.x" >&2; exit 7 ;;
+  *hostile.example*) echo "curl: (7) auth failed for p|a[ss*.x at hostile.example" >&2; exit 7 ;;
   *nan.example*) printf '204 NaN' ;;
   *garbled.example*) printf 'garbled output' ;;
   *) printf '301 0.010' ;;
@@ -62,6 +64,7 @@ Edge|2g|3|password12|edge.example|3080|||1|1
 BadCode|2g|4|password12|badcode.example|4080|||1|1
 Offline|5g|5|password12|offline.example|5080|carol|hunter2|1|1
 Http|2g|6|password12|http.example|6080|bob|pw|1|1||http
+Mask|2g|12|password12|maskh.example|7080|u|se[cr*t.x|1|1
 
 EOF
 
@@ -78,7 +81,7 @@ export PATH="$BIN:$PATH"
 export PROBE_URL='https://probe.example/204' PROBE_TIMEOUT=3 SLOW_MS=800
 if sh "$HEALTHD" --once; then ok "--once succeeds"; else no "--once succeeds"; fi
 if jq -e . "$HEALTH_FILE" >/dev/null 2>&1; then ok "health output is valid JSON"; else no "health output is valid JSON"; fi
-eq "all configured probes emitted" "$(jq '.probes | length' "$HEALTH_FILE")" '6'
+eq "all configured probes emitted" "$(jq '.probes | length' "$HEALTH_FILE")" '7'
 eq "204 below threshold is ok" "$(jq -r '.probes["1"].state' "$HEALTH_FILE")" 'ok'
 eq "latency rounds to milliseconds" "$(jq -r '.probes["1"].latency_ms' "$HEALTH_FILE")" '100'
 eq "latency above threshold is slow" "$(jq -r '.probes["2"].state' "$HEALTH_FILE")" 'slow'
@@ -90,6 +93,10 @@ eq "curl transport failure code defaults zero" "$(jq -r '.probes["5"].code' "$HE
 eq "the failure reason is kept"  "$(jq -r '.probes["5"].error' "$HEALTH_FILE" | cut -c1-40)" 'curl exit 7: curl: (7) Failed to connect'
 eq "the password is blanked in the reason" "$(jq -r '.probes["5"].error' "$HEALTH_FILE" | grep -c hunter2)" '0'
 eq "a bad HTTP code explains itself" "$(jq -r '.probes["4"].error' "$HEALTH_FILE")" 'probe URL answered HTTP 500 through the proxy'
+# The password is masked as a literal string, never as a sed pattern: `[`
+# used to abort the masking (empty reason) and `.`/`*` leaked the cleartext.
+eq "a regex-metachar password is still blanked" "$(jq -r '.probes["12"].error' "$HEALTH_FILE" | grep -cF 'se[cr*t.x')" '0'
+eq "and the reason survives with the mask in place" "$(jq -r '.probes["12"].error' "$HEALTH_FILE" | grep -cF 'denied for ***')" '1'
 eq "a healthy probe carries no error" "$(jq -r '.probes["1"] | has("error")' "$HEALTH_FILE")" 'false'
 
 echo "== probe-proxy.sh: one proxy, with the reason =="
@@ -108,6 +115,9 @@ eq "probe: direct Internet is seen"   "$(printf '%s' "$out" | jq -r .checks.dire
 eq "probe: public IP is reported"     "$(printf '%s' "$out" | jq -r .checks.public_ip)" '203.0.113.9'
 eq "probe: verdict is blocked"        "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'blocked'
 eq "probe: verdict names the IP"      "$(printf '%s' "$out" | jq -r .verdict | grep -c 203.0.113.9)" '1'
+out="$(sh "$PROBE" hostile.example 1080 u 'p|a[ss*.x' socks5)"
+eq "probe: a metachar password never leaks"    "$(printf '%s' "$out" | jq -r '.error + .transcript' | grep -cF 'p|a[ss*.x')" '0'
+eq "probe: masking replaces, not erases"       "$(printf '%s' "$out" | jq -r .transcript | grep -cF 'auth failed for ***')" '1'
 out="$(NO_PUBLIC_IP=1 sh "$PROBE" offline.example 5080)"
 eq "probe: no public IP -> verdict still reads" "$(printf '%s' "$out" | jq -r .verdict | grep -c 'add the router public IP')" '1'
 eq "probe: no public IP is empty, not garbage" "$(printf '%s' "$out" | jq -r .checks.public_ip)" ''

@@ -19,6 +19,21 @@ PUBLIC_IP_URL="${PUBLIC_IP_URL:-https://api.ipify.org}"
 command -v jq >/dev/null 2>&1 || { echo '{"ok":false,"error":"missing jq"}'; exit 1; }
 out() { jq -n "$@"; }
 
+# Replace every literal occurrence of $2 in $1 with ***. sed is the wrong tool
+# here: the password is data, but sed reads it as a regex AND as part of the
+# s||| command, so `|`, `[`, `&`, `;` in a real password broke the masking or
+# leaked the cleartext (and could even smuggle sed commands).
+mask_secret() { # text secret -> masked text
+  if [ -z "$2" ]; then printf '%s' "$1"; return; fi
+  printf '%s' "$1" | S="$2" awk '
+    { line = $0; masked = ""
+      while ((i = index(line, ENVIRON["S"])) > 0) {
+        masked = masked substr(line, 1, i - 1) "***"
+        line = substr(line, i + length(ENVIRON["S"]))
+      }
+      print masked line }'
+}
+
 host="${1:-}"; port="${2:-}"; user="${3:-}"; pass="${4:-}"; proxy_type="${5:-socks5}"
 [ -n "$host" ] && [ -n "$port" ] || { out '{ok:false,error:"host and port are required"}'; exit 1; }
 case "$host" in *[!A-Za-z0-9._:-]*) out '{ok:false,error:"invalid host"}'; exit 1;; esac
@@ -33,7 +48,7 @@ errf="${TMPDIR:-/tmp}/sbproxy-probe-proxy.$$"
 res="$(curl -v -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
        -w '%{http_code} %{time_total}' "$PROBE_URL" 2>"$errf")"; rc=$?
 transcript="$(tail -n 25 "$errf" 2>/dev/null | tr -d '\r')"; rm -f "$errf"
-if [ -n "$pass" ]; then transcript="$(printf '%s' "$transcript" | sed "s|$pass|***|g")"; fi
+transcript="$(mask_secret "$transcript" "$pass")"
 err="$(printf '%s\n' "$transcript" | grep -m1 '^curl:' || true)"
 [ -n "$err" ] || err="$(printf '%s\n' "$transcript" | grep -m1 -i 'denied\|refused\|timed out\|auth' || true)"
 
@@ -78,7 +93,7 @@ case "$public_ip" in *[!0-9a-fA-F.:]*) public_ip="" ;; esac
 singbox_log=""
 command -v logread >/dev/null 2>&1 && \
   singbox_log="$(logread -e sing-box 2>/dev/null | grep -F "$host" | tail -n 8 | tr -d '\r')"
-[ -n "$pass" ] && [ -n "$singbox_log" ] && singbox_log="$(printf '%s' "$singbox_log" | sed "s|$pass|***|g")"
+singbox_log="$(mask_secret "$singbox_log" "$pass")"
 
 # A one-line reading a person can act on.
 hint=""
@@ -104,7 +119,7 @@ elif [ "$curl_socks" = false ]; then
 elif [ "$direct_ok" = false ]; then
   verdict="wan-down: the router cannot reach $PROBE_URL even without the proxy; fix the WAN first"
 elif [ "$tcp_open" = false ]; then
-  verdict="blocked: $host:$port does not accept a TCP connection from the router${public_ip:+ (public IP $public_ip)} although the WAN works — the provider whitelists client IPs or the port is wrong; add ${public_ip:-the router public IP} to the proxy allowed-IP list"
+  verdict="blocked: $host:$port does not answer a plain TCP request from the router${public_ip:+ (public IP $public_ip)} although the WAN works — usually the provider whitelists client IPs or the port is wrong; add ${public_ip:-the router public IP} to the proxy allowed-IP list. (A timeout here can also be a SOCKS server waiting silently for a handshake — if the port is known-open, suspect the credentials or the proxy type instead.)"
 else
   case "$transcript" in
     *"authentication failed"*|*"Authentication failed"*|*"407 "*)

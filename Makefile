@@ -1,5 +1,5 @@
 # Developer task runner. These run on a workstation or CI, never on the router.
-LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd
+LINT_FILES := scripts/*.sh tests/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd agent/sbproxy-webauth
 
 .PHONY: help lint test check version package
 

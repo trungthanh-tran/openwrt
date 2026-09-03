@@ -201,6 +201,53 @@ contains "legacy token remains supported" "$out" 'Status: 200 OK'
 out="$(auth_run GET 'x=1&action=does_not_exist&y=2')"
 contains "invalid action is 400" "$out" 'Status: 400 Bad Request'
 
+echo "== web login (dedicated username/password -> token) =="
+WEBAUTH="$ROOT/agent/sbproxy-webauth"
+export WEBAUTH_FILE="$TMP/webauth" WEBAUTH_LOCK_FILE="$TMP/weblock" LOGIN_FAIL_DELAY=0
+
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"whatever1"}')"
+contains "login without an account file is 403" "$out" 'Status: 403 Forbidden'
+contains "and the refusal names sbproxy-webauth" "$out" 'sbproxy-webauth'
+
+printf 'secret-pass-1\n' | sh "$WEBAUTH" set admin - >/dev/null
+eq "webauth stores one user:salt:hash line" \
+  "$(awk -F: 'NF == 3 && $1 == "admin" && length($3) == 64 { print "ok" }' "$WEBAUTH_FILE")" "ok"
+not_contains "the password itself is never written to disk" "$(cat "$WEBAUTH_FILE")" 'secret-pass-1'
+eq "webauth check accepts the right password" "$(sh "$WEBAUTH" check admin secret-pass-1 >/dev/null 2>&1; echo $?)" "0"
+eq "webauth check rejects a wrong password" "$(sh "$WEBAUTH" check admin wrong-pass >/dev/null 2>&1; echo $?)" "1"
+eq "webauth show prints the username" "$(sh "$WEBAUTH" show)" "admin"
+eq "webauth refuses a short password" "$(printf 'short\n' | sh "$WEBAUTH" set admin - >/dev/null 2>&1; echo $?)" "1"
+
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"secret-pass-1"}')"
+contains "login with the right password is 200" "$out" 'Status: 200 OK'
+eq "and returns the API token" "$(json_value "$out" '.token')" 'agent-test-token'
+eq "and echoes the username" "$(json_value "$out" '.user')" 'admin'
+if [ ! -f "$WEBAUTH_LOCK_FILE" ]; then ok "success leaves no failure counter"; else no "success leaves no failure counter"; fi
+
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"wrong-pass"}')"
+contains "wrong password is 401" "$out" 'Status: 401 Unauthorized'
+out="$(run_agent POST 'action=login' '' '{"user":"someone","pass":"secret-pass-1"}')"
+contains "wrong username is 401 too" "$out" 'Status: 401 Unauthorized'
+run_agent POST 'action=login' '' '{"user":"admin","pass":"wrong-pass"}' >/dev/null
+run_agent POST 'action=login' '' '{"user":"admin","pass":"wrong-pass"}' >/dev/null
+run_agent POST 'action=login' '' '{"user":"admin","pass":"wrong-pass"}' >/dev/null
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"secret-pass-1"}')"
+contains "five failures lock login even with the right password" "$out" 'Status: 429 Too Many Requests'
+rm -f "$WEBAUTH_LOCK_FILE"
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"secret-pass-1"}')"
+contains "an expired window lifts the lock" "$out" 'Status: 200 OK'
+
+out="$(run_agent GET 'action=login')"
+contains "login requires POST" "$out" 'Status: 405 Method Not Allowed'
+out="$(run_agent POST 'action=login' '' 'not-json')"
+contains "login rejects a non-JSON body" "$out" 'Status: 400 Bad Request'
+out="$(run_agent GET 'action=status')"
+contains "every other action still demands the bearer" "$out" 'Status: 401 Unauthorized'
+sh "$WEBAUTH" disable >/dev/null
+out="$(run_agent POST 'action=login' '' '{"user":"admin","pass":"secret-pass-1"}')"
+contains "webauth disable turns password login off" "$out" 'Status: 403 Forbidden'
+unset LOGIN_FAIL_DELAY
+
 echo "== agent status and read-only endpoints =="
 cat > "$CONF" <<'EOF'
 # secret fields must never be returned by status

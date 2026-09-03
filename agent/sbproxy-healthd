@@ -21,30 +21,56 @@ command -v curl >/dev/null 2>&1 || { echo "healthd: curl is missing"; exit 1; }
 
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 
+# Replace every literal occurrence of $2 in $1 with ***. Never mask with sed:
+# the password is data, but sed reads it as a regex and as part of the s|||
+# command, so `|`, `[`, `&` or `;` in a real password broke the masking or
+# leaked the cleartext. awk index() compares plain bytes only.
+mask_secret() { # text secret -> masked text
+  if [ -z "$2" ]; then printf '%s' "$1"; return; fi
+  printf '%s' "$1" | S="$2" awk '
+    { line = $0; masked = ""
+      while ((i = index(line, ENVIRON["S"])) > 0) {
+        masked = masked substr(line, 1, i - 1) "***"
+        line = substr(line, i + length(ENVIRON["S"]))
+      }
+      print masked line }'
+}
+
 probe_one() {
-  # Arguments: host port user pass type; output: "state latency_ms code".
-  # The reason a probe failed (curl's exit code and its first stderr line,
-  # with the credential blanked) is left in PROBE_ERROR so the UI can show
-  # *why* a proxy is red instead of just that it is.
+  # Arguments: host port user pass type. Answers through globals so nothing
+  # depends on a writable /tmp: PROBE_STATE PROBE_MS PROBE_CODE, plus
+  # PROBE_ERROR — why the probe failed (curl exit + first stderr line, with
+  # the credential blanked) so the UI shows *why* a proxy is red.
   host="$1"; port="$2"; user="$3"; pass="$4"; proxy_type="${5:-socks5}"
   [ "$proxy_type" = "http" ] && scheme="http" || scheme="socks5h"
   if [ -n "$user" ]; then px="$scheme://$user:$pass@$host:$port"; else px="$scheme://$host:$port"; fi
-  PROBE_ERROR=""
+  PROBE_ERROR=""; PROBE_STATE=fail; PROBE_MS=0; PROBE_CODE=0
+  # curl's stderr goes to a scratch file when one can be made; on a full or
+  # read-only /tmp the probe still runs, only the error detail is lost.
   errf="${TMPDIR:-/tmp}/sbproxy-probe.$$"
-  # %{http_code} %{time_total}
-  res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
-         -w '%{http_code} %{time_total}' "$PROBE_URL" 2>"$errf")"; rc=$?
-  err="$(head -n 1 "$errf" 2>/dev/null | tr -d '\r')"; rm -f "$errf"
-  [ -n "$pass" ] && err="$(printf '%s' "$err" | sed "s|$pass|***|g")"
+  err=""
+  if : > "$errf" 2>/dev/null; then
+    # %{http_code} %{time_total}
+    res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
+           -w '%{http_code} %{time_total}' "$PROBE_URL" 2>"$errf")"; rc=$?
+    err="$(head -n 1 "$errf" 2>/dev/null | tr -d '\r')"; rm -f "$errf"
+    err="$(mask_secret "$err" "$pass")"
+  else
+    res="$(curl -sS -o /dev/null -m "$PROBE_TIMEOUT" -x "$px" \
+           -w '%{http_code} %{time_total}' "$PROBE_URL" 2>/dev/null)"; rc=$?
+  fi
   [ "$rc" -ne 0 ] && PROBE_ERROR="curl exit $rc${err:+: $err}"
   code="$(echo "$res" | awk '{print $1}')"
   t="$(echo "$res" | awk '{print $2}')"
-  case "$code" in ''|*[!0-9]*) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="no answer from curl"; echo "fail 0 0"; return;; esac
-  echo "$t" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { [ -n "$PROBE_ERROR" ] || PROBE_ERROR="unreadable curl timing"; echo "fail 0 $code"; return; }
+  case "$code" in ''|*[!0-9]*) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="no answer from curl"; return;; esac
+  PROBE_CODE="$code"
+  echo "$t" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { [ -n "$PROBE_ERROR" ] || PROBE_ERROR="unreadable curl timing"; return; }
   ms="$(awk -v t="$t" 'BEGIN{printf "%d", (t*1000)+0.5}')"
   case "$code" in
-    200|204|301|302) [ "$ms" -gt "$SLOW_MS" ] && echo "slow $ms $code" || echo "ok $ms $code" ;;
-    *) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="probe URL answered HTTP $code through the proxy"; echo "fail 0 ${code:-0}" ;;
+    200|204|301|302)
+      PROBE_MS="$ms"
+      if [ "$ms" -gt "$SLOW_MS" ]; then PROBE_STATE=slow; else PROBE_STATE=ok; fi ;;
+    *) [ -n "$PROBE_ERROR" ] || PROBE_ERROR="probe URL answered HTTP $code through the proxy" ;;
   esac
 }
 
@@ -72,15 +98,10 @@ run_once() {
     case "$port" in ''|*[!0-9]*) continue;; esac
     [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || continue
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || continue
-    # probe_one emits exactly three whitespace-free fields.
-    # shellcheck disable=SC2046
-    # probe_one writes its output to a file so PROBE_ERROR set inside it is
-    # visible here (a $(...) subshell would lose it).
-    outf="${TMPDIR:-/tmp}/sbproxy-probe-out.$$"
-    probe_one "$host" "$port" "$user" "$pass" "$proxy_type" > "$outf"
-    # shellcheck disable=SC2046  # three whitespace-free fields, split on purpose
-    set -- $(cat "$outf"); rm -f "$outf"
-    state="$1"; ms="$2"; code="$3"
+    # probe_one answers through globals — no subshell, no temp file, so the
+    # result and PROBE_ERROR stay bound to THIS proxy even when /tmp is full.
+    probe_one "$host" "$port" "$user" "$pass" "$proxy_type"
+    state="$PROBE_STATE"; ms="$PROBE_MS"; code="$PROBE_CODE"
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \
               --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
               '.[$i] = {state:$s, latency_ms:$ms, code:$c} + (if $e == "" then {} else {error:$e} end)')"

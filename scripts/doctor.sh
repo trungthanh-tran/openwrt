@@ -104,6 +104,8 @@ sec "Agent LAN"
 [ -s /etc/sbproxy/token ] && ok "token exists" || wn "token is missing (run agent/install-agent.sh)"
 [ -x /www/cgi-bin/sbproxy ] && ok "CGI is installed (/www/cgi-bin/sbproxy)" || wn "CGI is not installed"
 [ -f /www/sbproxy/index.html ] && ok "self-hosted Web UI is installed" || wn "self-hosted Web UI is not installed"
+[ -f /www/sbproxy/assets/bootstrap.min.css ] && ok "Web UI offline assets are installed" || wn "Web UI assets are missing (re-run install-agent.sh)"
+[ -s /etc/sbproxy/webauth ] && ok "web console account is configured" || wn "web password login is off (sbproxy-webauth set <user>)"
 pgrep -f uhttpd >/dev/null 2>&1 && ok "uhttpd is running" || wn "uhttpd is not running"
 [ -x /usr/sbin/sbproxy-healthd ] && ok "healthd is installed" || wn "healthd is not installed"
 

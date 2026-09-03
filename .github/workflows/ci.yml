@@ -20,4 +20,4 @@ jobs:
         run: sh tests/run-all.sh
 
       - name: Shellcheck
-        run: shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd agent/sbproxy-assignd agent/sbproxy-dhcp-assign
+        run: shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd agent/sbproxy-assignd agent/sbproxy-dhcp-assign agent/sbproxy-webauth

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import time
 import tkinter as tk
 import unittest
 from unittest import mock
@@ -547,6 +548,16 @@ class PoolDialogGuiTests(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[1][7], "ok 120ms")
 
+    def pump_until(self, dialog, predicate, timeout=5.0):
+        """The probe now runs off the Tk thread; process events until it lands."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            dialog.update()
+            if predicate():
+                return
+            time.sleep(0.02)
+        self.fail("the probe result never arrived on the Tk thread")
+
     def test_test_proxy_button_follows_the_prober(self):
         self.assertNotIn("Test proxy", widget_texts(self.open(prober=None)))
         seen = []
@@ -555,6 +566,7 @@ class PoolDialogGuiTests(unittest.TestCase):
         dialog.table.selection_set(dialog.table.get_children("")[2])
         with mock.patch.object(appmod.messagebox, "showinfo") as info:
             dialog._probe_selected()
+            self.pump_until(dialog, lambda: info.called)
         self.assertEqual(seen[0]["host"], "194.152.155.14")
         self.assertIn("VERDICT: blocked: x", info.call_args.args[1])
         # The probe never blanks the table.
@@ -565,6 +577,7 @@ class PoolDialogGuiTests(unittest.TestCase):
         dialog.table.selection_set(dialog.table.get_children("")[0])
         with mock.patch.object(appmod.messagebox, "showerror") as error:
             dialog._probe_selected()
+            self.pump_until(dialog, lambda: error.called)
         self.assertIn("HTTP 400: nope", error.call_args.args[1])
         self.assertEqual(len(self.rows(dialog)), 3)
 

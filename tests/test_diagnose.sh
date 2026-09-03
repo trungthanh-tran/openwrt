@@ -128,6 +128,30 @@ out="$(run env BRNF_PATH=/nonexistent SINGBOX_LOG='ERROR dial tcp: connection re
 eq "sing-box errors -> singbox_log"    "$(field "$out" .verdict | cut -d: -f1)" "singbox_log"
 eq "password is blanked in the log"    "$(field "$out" .singbox_log | grep -c hunter2)" "0"
 
+echo "== diagnose: a padded conf row still parses field-by-field =="
+# Trimming the idx column used to make awk rebuild the row with spaces, so
+# every later cut -d'|' saw ONE field: wrong host/port, and the Wi-Fi key and
+# proxy password leaking verbatim into the report.
+printf 'hiki|5g| 1 |password12|proxy.example| 1080 |u|hunter2|1|1||socks5\n' > "$SB/config/wifi-socks.conf"
+out="$(run env BRNF_PATH=/nonexistent)"
+eq "padded idx is still found"          "$(field "$out" .ssid)" "hiki"
+eq "host and port parse correctly"      "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "config") | .detail' | grep -c 'proxy.example:1080')" "1"
+eq "the wifi key never enters the report" "$(field "$out" .report | grep -c password12)" "0"
+eq "the proxy password never enters the report" "$(field "$out" .report | grep -c hunter2)" "0"
+eq "the padded row still ends healthy"  "$(field "$out" .verdict | cut -d: -f1)" "ok"
+printf 'hiki|5g|1|password12|proxy.example|1080|u|hunter2|1|1||socks5\n' > "$SB/config/wifi-socks.conf"
+
+echo "== diagnose: a pool carries the SSID; the conf proxy is only the fallback =="
+printf '1|socks5|pool1.example|2080|pu|pp|lbl\n1|socks5|pool2.example|2081|||\n' > "$SB/config/proxy-pools.conf"
+out="$(run env BRNF_PATH=/nonexistent PROXY_STATE=blocked)"
+eq "a dead conf proxy is not the verdict"  "$(field "$out" .verdict | cut -d: -f1)" "pool_proxy"
+eq "the conf check explains the demotion"  "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "proxy") | .detail' | grep -c 'pool slot')" "1"
+eq "slot 0 is probed and named"            "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "pool_proxy") | .detail' | grep -c 'pool1.example:2080')" "1"
+out="$(run env BRNF_PATH=/nonexistent)"
+eq "a healthy pool keeps the ok verdict"   "$(field "$out" .verdict | cut -d: -f1)" "ok"
+eq "pool slots are counted"                "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "pool") | .detail' | grep -c '2 pool slot')" "1"
+rm -f "$SB/config/proxy-pools.conf"
+
 echo "== diagnose: unknown idx =="
 out="$(cd "$SB" && sh scripts/diagnose-ssid.sh 7 2>/dev/null)"
 eq "unknown idx -> config verdict"     "$(field "$out" .verdict | cut -d: -f1)" "config"

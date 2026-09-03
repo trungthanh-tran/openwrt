@@ -3,7 +3,11 @@
 # Endpoint:  http://<router>/cgi-bin/sbproxy?action=<...>
 # Authentication: Authorization: Bearer <token>, matching /etc/sbproxy/token.
 # X-SB-Token remains supported on HTTP servers that forward custom CGI headers.
+# The one unauthenticated action is login (below): it exchanges the dedicated
+# web console username/password (see sbproxy-webauth) for the token.
 #
+# POST ?action=login         body json {user,pass} -> {ok,token,user}; throttled and
+#                               locked for 5 minutes after 5 wrong passwords
 # GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}} — meta carries
 #                               the effective settings.sh values a console needs
 # GET  ?action=get_conf      -> wifi-socks.conf as text/plain
@@ -119,17 +123,23 @@ have jq || { hdr "500 Internal Server Error" "text/plain"; echo "thiếu package
 # ---- CORS preflight ----
 [ "$REQUEST_METHOD" = "OPTIONS" ] && { hdr "204 No Content" "text/plain"; exit 0; }
 
-# ---- auth ----
-TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null)"
-[ -n "$TOKEN" ] || json_err "500 Internal Server Error" "chưa có token (chạy install-agent.sh)"
-REQUEST_TOKEN="${HTTP_X_SB_TOKEN:-}"
-case "${HTTP_AUTHORIZATION:-}" in
-  Bearer\ *) [ -n "$REQUEST_TOKEN" ] || REQUEST_TOKEN="${HTTP_AUTHORIZATION#Bearer }" ;;
-esac
-[ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
-
 # ---- parse action ----
 ACTION="$(echo "$QUERY_STRING" | sed -n 's/.*\(^\|&\)action=\([a-z_]*\).*/\2/p')"
+
+# ---- auth ----
+# action=login is the web console's entry point: it trades the dedicated
+# username/password (sbproxy-webauth) for this token, so it is the one action
+# allowed through without a Bearer header. It still needs the token to exist,
+# because a successful login returns it.
+TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null)"
+[ -n "$TOKEN" ] || json_err "500 Internal Server Error" "chưa có token (chạy install-agent.sh)"
+if [ "$ACTION" != "login" ]; then
+  REQUEST_TOKEN="${HTTP_X_SB_TOKEN:-}"
+  case "${HTTP_AUTHORIZATION:-}" in
+    Bearer\ *) [ -n "$REQUEST_TOKEN" ] || REQUEST_TOKEN="${HTTP_AUTHORIZATION#Bearer }" ;;
+  esac
+  [ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
+fi
 BODY_FILE=""
 TMP_CONF=""
 cleanup() {
@@ -216,6 +226,45 @@ ssids_json() {
 }
 
 case "$ACTION" in
+  login)
+    # Trade the web console account for the API token. Wrong passwords are
+    # slowed down and counted in a sliding window: after LOGIN_MAX_FAILS
+    # failures within LOGIN_FAIL_WINDOW seconds the action answers 429 until
+    # the window has passed. Success clears the counter.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    WEBAUTH_FILE="${WEBAUTH_FILE:-/etc/sbproxy/webauth}"
+    [ -s "$WEBAUTH_FILE" ] \
+      || json_err "403 Forbidden" "đăng nhập bằng mật khẩu chưa bật — chạy 'sbproxy-webauth set <user>' trên router (hoặc dùng token)"
+    LOCK_FILE="${WEBAUTH_LOCK_FILE:-/tmp/sbproxy-weblock}"
+    LOGIN_MAX_FAILS="${LOGIN_MAX_FAILS:-5}"
+    LOGIN_FAIL_WINDOW="${LOGIN_FAIL_WINDOW:-300}"
+    now="$(date +%s)"
+    first=0; fails=0
+    if [ -f "$LOCK_FILE" ]; then
+      read -r first fails < "$LOCK_FILE" 2>/dev/null || true
+      case "$first" in ''|*[!0-9]*) first=0; fails=0 ;; esac
+      case "$fails" in ''|*[!0-9]*) fails=0 ;; esac
+      if [ "$((now - first))" -gt "$LOGIN_FAIL_WINDOW" ]; then rm -f "$LOCK_FILE"; first=0; fails=0; fi
+    fi
+    [ "$fails" -lt "$LOGIN_MAX_FAILS" ] \
+      || json_err "429 Too Many Requests" "sai mật khẩu quá $LOGIN_MAX_FAILS lần — thử lại sau $((LOGIN_FAIL_WINDOW / 60)) phút"
+    req_user="$(jq_r '.user // ""' "$BODY_FILE")"
+    req_pass="$(jq_r '.pass // ""' "$BODY_FILE")"
+    IFS=: read -r acc_user acc_salt acc_hash < "$WEBAUTH_FILE" || true
+    req_hash="$(printf '%s:%s' "${acc_salt:-}" "$req_pass" | sha256sum | awk '{print $1}')"
+    if [ -n "${acc_user:-}" ] && [ -n "${acc_hash:-}" ] \
+       && [ "$req_user" = "$acc_user" ] && [ "$req_hash" = "$acc_hash" ]; then
+      rm -f "$LOCK_FILE"
+      json_ok "$(jq -n --arg token "$TOKEN" --arg user "$acc_user" '{ok:true, token:$token, user:$user}')"
+    fi
+    [ "$fails" -gt 0 ] || first="$now"
+    ( umask 077; printf '%s %s\n' "$first" "$((fails + 1))" > "$LOCK_FILE" 2>/dev/null ) || true
+    logger -t sbproxy "web login failed (user '$req_user')" 2>/dev/null || true
+    sleep "${LOGIN_FAIL_DELAY:-1}" 2>/dev/null || true
+    json_err "401 Unauthorized" "sai tên đăng nhập hoặc mật khẩu"
+    ;;
+
   status)
     S="$(ssids_json)"; [ -n "$S" ] || S="[]"
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
@@ -538,10 +587,15 @@ case "$ACTION" in
       *[!A-Za-z0-9_.-]*) json_err "400 Bad Request" "tên interface chỉ được dùng chữ, số, . _ -" ;;
     esac
     [ "${#iface}" -le 32 ] || json_err "400 Bad Request" "tên interface dài quá 32 ký tự"
-    OUT="$(cd "$SB_ROOT" && ENV_FILE="$ENV_FILE" sh scripts/switch-gateway.sh "$iface" 2>&1)"; RC=$?
+    # stdout only carries the script's JSON; stderr (uci/netifd warnings) is
+    # kept apart so a noisy-but-successful switch is not reported as a 500.
+    SWGW_ERRF="${TMPDIR:-/tmp}/sbproxy-swgw-err.$$"
+    OUT="$(cd "$SB_ROOT" && ENV_FILE="$ENV_FILE" sh scripts/switch-gateway.sh "$iface" 2>"$SWGW_ERRF")"; RC=$?
+    SWGW_STDERR="$(head -c 500 "$SWGW_ERRF" 2>/dev/null | tr -d '\r')"; rm -f "$SWGW_ERRF"
     if [ "$RC" -ne 0 ]; then
       detail="$(printf '%s' "$OUT" | jq -r '.error // empty' 2>/dev/null)"
-      json_err "400 Bad Request" "không đổi được đường ra: ${detail:-$OUT}"
+      [ -n "$detail" ] || detail="${OUT:-$SWGW_STDERR}"
+      json_err "400 Bad Request" "không đổi được đường ra: $detail"
     fi
     printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1       || json_err "500 Internal Server Error" "switch-gateway trả dữ liệu không hợp lệ"
     json_ok "$OUT"

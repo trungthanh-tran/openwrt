@@ -25,7 +25,11 @@ add() {  # add <name> <true|false> <detail>
 tail_txt() { tr -d '\r' | tail -n "$1"; }
 
 # --- 1. the SSID exists in wifi-socks.conf --------------------------------
-row="$(awk -F'|' -v want="$idx" '!/^[[:space:]]*(#|$)/ { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $3); if ($3 == want) { print; exit } }' "$CONF" 2>/dev/null)"
+# Trim a COPY of the idx field: touching $3 itself makes awk rebuild $0 with
+# spaces as separators, which used to hand every later cut -d'|' the whole
+# row (wrong host/port, and the Wi-Fi key and proxy password leaking into
+# the report) whenever the idx column carried padding.
+row="$(awk -F'|' -v want="$idx" '!/^[[:space:]]*(#|$)/ { t = $3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", t); if (t == want) { print; exit } }' "$CONF" 2>/dev/null)"
 if [ -z "$row" ]; then
   add "config" false "no row with idx $idx in $CONF"
   jq -n --argjson c "$checks" --arg v "$verdict" '{ok:true, idx:'"$idx"', checks:$c, verdict:$v}'; exit 0
@@ -135,17 +139,43 @@ if [ -f /etc/sing-box/config.json ]; then
 fi
 
 # --- 9. the proxy itself, from the router ------------------------------------------
+# When the SSID runs a pool, the pool slots carry the traffic and the conf
+# proxy is only the fallback — a dead fallback must not become the verdict.
+# Probe the conf proxy always, but let it fail the walk only when it is the
+# proxy actually in use; with a pool, probe slot 0 as the representative.
+npool="$(pool_count "$idx" 2>/dev/null || echo 0)"; npool="${npool:-0}"
 probe="$(sh "$SB_ROOT/scripts/probe-proxy.sh" "$host" "$port" "$user" "$pass" "$ptype" 2>/dev/null)"
 pverdict="$(printf '%s' "$probe" | jq -r '.verdict // ""' 2>/dev/null)"
 pstate="$(printf '%s' "$probe" | jq -r '.state // "fail"' 2>/dev/null)"
-if [ "$pstate" = ok ]; then add "proxy" true "$pverdict"; else add "proxy" false "${pverdict:-probe failed}"; fi
-npool="$(pool_count "$idx" 2>/dev/null || echo 0)"
-[ "${npool:-0}" -gt 0 ] && add "pool" true "$npool pool slot(s) on ports $(pool_port "$idx" 0)..$(pool_port "$idx" $((npool - 1))) (test each with Test proxy)"
+if [ "$pstate" = ok ]; then
+  add "proxy" true "$pverdict"
+elif [ "$npool" -gt 0 ]; then
+  add "proxy" true "conf fallback proxy fails (${pverdict:-probe failed}) — not the verdict: $npool pool slot(s) carry this SSID's traffic"
+else
+  add "proxy" false "${pverdict:-probe failed}"
+fi
+if [ "$npool" -gt 0 ]; then
+  slot0="$(pool_rows "$idx" | head -n 1)"
+  s_type="$(printf '%s' "$slot0" | cut -d'|' -f2)"
+  s_host="$(printf '%s' "$slot0" | cut -d'|' -f3 | tr -d ' ')"
+  s_port="$(printf '%s' "$slot0" | cut -d'|' -f4 | tr -d ' ')"
+  s_user="$(printf '%s' "$slot0" | cut -d'|' -f5)"
+  s_pass="$(printf '%s' "$slot0" | cut -d'|' -f6)"
+  sprobe="$(sh "$SB_ROOT/scripts/probe-proxy.sh" "$s_host" "$s_port" "$s_user" "$s_pass" "${s_type:-socks5}" 2>/dev/null)"
+  sverdict="$(printf '%s' "$sprobe" | jq -r '.verdict // ""' 2>/dev/null)"
+  sstate="$(printf '%s' "$sprobe" | jq -r '.state // "fail"' 2>/dev/null)"
+  if [ "$sstate" = ok ]; then
+    add "pool_proxy" true "slot 0 ($s_host:$s_port) works: $sverdict"
+  else
+    add "pool_proxy" false "slot 0 ($s_host:$s_port) fails: ${sverdict:-probe failed} — test the remaining $((npool - 1)) slot(s) with Test proxy"
+  fi
+  add "pool" true "$npool pool slot(s) on ports $(pool_port "$idx" 0)..$(pool_port "$idx" $((npool - 1)))"
+fi
 
 # --- 10. what sing-box has been saying ------------------------------------------------
 sblog=""
 command -v logread >/dev/null 2>&1 && sblog="$(logread -e sing-box 2>/dev/null | tail_txt 25)"
-[ -n "$pass" ] && [ -n "$sblog" ] && sblog="$(printf '%s' "$sblog" | sed "s|$pass|***|g")"
+sblog="$(mask_secret "$sblog" "$pass")"
 if printf '%s' "$sblog" | grep -qi 'FATAL\|panic\|dial.*error\|connection refused\|i/o timeout'; then
   add "singbox_log" false "sing-box log shows errors (see singbox_log)"
 else

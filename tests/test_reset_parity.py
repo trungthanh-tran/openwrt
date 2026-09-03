@@ -38,7 +38,12 @@ CLIENTS = [
     {"idx": 2, "mac": "aa:bb:cc:dd:ee:02", "online": True},
     {"idx": 2, "mac": "aa:bb:cc:dd:ee:03", "online": False},
 ]
+# Both fronts must pull the conf from the router FIRST and derive the warning
+# numbers and the pool list from it — never from their local (possibly stale
+# or empty) SSID list, which once let a fresh browser wipe a router while
+# announcing "0 SSIDs" and emptying no pools.
 EXPECTED = [
+    "conf:pull",
     "kick:1:aa:bb:cc:dd:ee:01",
     "kick:2:aa:bb:cc:dd:ee:02",
     "pool:1:0",
@@ -47,6 +52,7 @@ EXPECTED = [
     "save:empty-conf",
     "apply",
 ]
+REFUSED = ["conf:pull"]  # the read happens before the warning; nothing mutates
 
 
 def conf_shape(text: str) -> str:
@@ -67,7 +73,10 @@ def web_reset_source() -> str:
 NODE_HARNESS = r"""
 const calls = [];
 const fixture = %(fixture)s;
-let ssids = fixture.ssids.map(s => ({ ...s }));
+// The router's conf (what get_conf returns) always reflects fixture.ssids;
+// the browser's local list may deliberately differ (fixture.localSsids).
+const routerConf = "# header\n" + fixture.ssids.map(s => `${s.name}|5g|${s.idx}`).join("\n") + (fixture.ssids.length ? "\n" : "");
+let ssids = (fixture.localSsids !== undefined ? fixture.localSsids : fixture.ssids).map(s => ({ ...s }));
 const agent = { connected: true };
 const pick = (en, vi) => vi;
 const toast = () => {};
@@ -86,6 +95,7 @@ function shape(text) {
 }
 function api(action, method, body) {
   switch (action) {
+    case "get_conf": calls.push("conf:pull"); return Promise.resolve(routerConf);
     case "clients": return Promise.resolve({ ok: true, clients: fixture.clients });
     case "kick": calls.push(`kick:${body.idx}:${body.mac}`); return Promise.resolve({ ok: true });
     case "save_pool": calls.push(`pool:${body.idx}:${body.proxies.length}`); return Promise.resolve({ ok: true });
@@ -101,8 +111,10 @@ setTimeout(() => console.log(JSON.stringify({ calls, ssids: ssids.length })), 50
 """
 
 
-def run_web(confirm=True, typed="RESET"):
+def run_web(confirm=True, typed="RESET", local_ssids=None):
     fixture = {"ssids": SSIDS, "clients": CLIENTS, "confirm": confirm, "typed": typed}
+    if local_ssids is not None:
+        fixture["localSsids"] = local_ssids
     script = NODE_HARNESS % {"fixture": json.dumps(fixture), "source": web_reset_source()}
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "reset.js")
@@ -113,20 +125,22 @@ def run_web(confirm=True, typed="RESET"):
 
 # --- desktop ------------------------------------------------------------------
 
-def run_desktop(confirm=True, typed="RESET"):
+def run_desktop(confirm=True, typed="RESET", local_records=None):
     instance = bare_app("vi")
     calls = []
+    router_records = [
+        appmod.WifiRecord(name=s["name"], band="5g", idx=s["idx"], wifi_password="password12",
+                          host="1.1.1.1", port=1080) for s in SSIDS
+    ]
     client = mock.Mock()
+    client.get_conf.side_effect = lambda: calls.append("conf:pull") or appmod.render_conf(router_records)
     client.client_action.side_effect = lambda action, idx, mac: calls.append(f"{action}:{idx}:{mac}") or {"ok": True}
     client.save_pool.side_effect = lambda idx, rows: calls.append(f"pool:{idx}:{len(rows)}") or {"ok": True}
     client.dryrun_conf.side_effect = lambda content: calls.append(f"dryrun:{conf_shape(content)}") or {"ok": True}
     client.save_conf.side_effect = lambda content: calls.append(f"save:{conf_shape(content)}") or {"ok": True}
     client.apply.side_effect = lambda: calls.append("apply") or {"ok": True, "log": "APPLY COMPLETE"}
     instance.client = client
-    instance.records = [
-        appmod.WifiRecord(name=s["name"], band="5g", idx=s["idx"], wifi_password="password12",
-                          host="1.1.1.1", port=1080) for s in SSIDS
-    ]
+    instance.records = list(router_records) if local_records is None else list(local_records)
     instance.clients_data = [dict(c) for c in CLIENTS]
     instance.pool_cache, instance.pool_counts = {}, {}
     instance.block_if_incompatible = lambda: False
@@ -160,9 +174,18 @@ class ResetParityTests(unittest.TestCase):
         for typed in ("", "nope", "RESE", None):
             with self.subTest(typed=typed):
                 web, desktop = run_web(typed=typed), run_desktop(typed=typed)
-                self.assertEqual(web["calls"], [])
-                self.assertEqual(desktop["calls"], [])
+                self.assertEqual(web["calls"], REFUSED)
+                self.assertEqual(desktop["calls"], REFUSED)
                 self.assertEqual((web["ssids"], desktop["ssids"]), (2, 2))
+
+    def test_reset_acts_on_router_state_not_the_local_list(self):
+        """A fresh browser (empty localStorage) or a stale desktop list must
+        still wipe everything the ROUTER has — the exact regression where an
+        empty local list produced 'Delete ALL 0 SSIDs' and skipped the pools."""
+        web = run_web(local_ssids=[])
+        self.assertEqual(web["calls"], EXPECTED)
+        desktop = run_desktop(local_records=[])
+        self.assertEqual(desktop["calls"], EXPECTED)
 
     def test_both_fronts_accept_the_word_case_and_space_insensitively(self):
         for typed in (" reset ", "Reset", "RESET\n"):
@@ -171,8 +194,8 @@ class ResetParityTests(unittest.TestCase):
                 self.assertEqual(run_desktop(typed=typed)["calls"], EXPECTED)
 
     def test_both_fronts_stop_at_a_declined_warning_before_asking_the_word(self):
-        self.assertEqual(run_web(confirm=False)["calls"], [])
-        self.assertEqual(run_desktop(confirm=False)["calls"], [])
+        self.assertEqual(run_web(confirm=False)["calls"], REFUSED)
+        self.assertEqual(run_desktop(confirm=False)["calls"], REFUSED)
 
     def test_both_fronts_carry_the_same_warning_facts(self):
         """Counts of SSIDs, pools and devices, the backup note, and 'cannot be undone'."""

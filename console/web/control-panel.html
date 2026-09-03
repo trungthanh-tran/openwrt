@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>sbproxy Console</title>
+<!-- Bootstrap is served offline by the router (/sbproxy/assets/); no CDN, no
+     Internet needed. The page's own stylesheet below loads after it on
+     purpose: it wins every property both of them set. -->
+<link rel="stylesheet" href="assets/bootstrap.min.css">
 <style>
   :root {
     --bg: #f2f4f8;
@@ -77,6 +81,8 @@
   }
 
   * { box-sizing: border-box; }
+  /* .btn/.chip set their own display, which beats the UA's [hidden] rule. */
+  [hidden] { display: none !important; }
   body {
     margin: 0; background: var(--bg); background-image: var(--bg-grad); background-repeat: no-repeat;
     color: var(--text);
@@ -90,7 +96,7 @@
   header.top {
     position: sticky; top: 0; z-index: 40;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    margin: 0 -20px 20px; padding: 12px 20px;
+    margin: 0; padding: 12px 20px;
     background: var(--glass); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
     border-bottom: 1px solid var(--border);
   }
@@ -228,7 +234,7 @@
   .field.two > div { display: grid; gap: 5px; }
   label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
   label .req { color: var(--crit); }
-  input[type=text], input[type=number], select {
+  input[type=text], input[type=password], input[type=number], select {
     font-family: var(--sans); font-size: 13.5px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
     background: var(--panel-2); color: var(--text); width: 100%;
     transition: border-color .15s, box-shadow .15s;
@@ -288,20 +294,91 @@
   .rbitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
   .rbitem .nm { font-family: var(--mono); font-size: 12.5px; }
   .rbitem .nm small { color: var(--text-faint); display: block; font-size: 11px; }
+
+  /* ---- AdminLTE-style shell: fixed left sidebar + top navbar + content.
+     The grid/utility base comes from the offline Bootstrap loaded above. ---- */
+  .layout { display: flex; min-height: 100vh; align-items: stretch; }
+  .sidebar {
+    width: 236px; flex: none; display: flex; flex-direction: column;
+    background: var(--panel); border-right: 1px solid var(--border);
+    padding: 14px 10px 10px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .side-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 12px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+  .side-brand b { font-size: 15px; letter-spacing: -.2px; display: block; }
+  .side-brand small { display: block; color: var(--text-dim); font-size: 11px; }
+  .side-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-faint); font-weight: 700; padding: 12px 10px 4px; }
+  .side-nav { display: flex; flex-direction: column; gap: 2px; }
+  .side-nav .btn {
+    width: 100%; justify-content: flex-start; text-align: left;
+    border-color: transparent; background: transparent; box-shadow: none; padding: 8px 10px;
+  }
+  .side-nav .btn:hover { background: var(--panel-2); border-color: transparent; box-shadow: none; }
+  .side-nav .btn.danger:hover { color: var(--crit); }
+  .side-nav .btn.primary { background: linear-gradient(160deg, var(--accent-2), var(--accent)); color: #04231f; }
+  .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
+  .main { flex: 1 1 auto; min-width: 0; }
+  #liveTools { display: none; }
+  #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
+  #menuBtn { display: none; font-size: 15px; }
+  @media (max-width: 920px) {
+    #menuBtn { display: inline-block; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; height: auto; z-index: 70;
+               transform: translateX(-110%); transition: transform .18s ease; box-shadow: var(--shadow-pop); }
+    .layout.side-open .sidebar { transform: none; }
+  }
+
+  /* Bootstrap defines .btn/.modal/.toast too; these keep its component rules
+     from bleeding into this page's widgets of the same name. */
+  .backdrop > .modal { display: block; position: relative; height: auto; z-index: auto; overflow-y: auto; }
+  #toast { width: auto; border: 0; }
+  .btn {
+    --bs-btn-hover-color: var(--text); --bs-btn-hover-bg: transparent; --bs-btn-hover-border-color: var(--border-strong);
+    --bs-btn-active-color: var(--text); --bs-btn-active-bg: transparent; --bs-btn-active-border-color: var(--border-strong);
+    --bs-btn-focus-box-shadow: 0 0 0 3px var(--ring);
+  }
+  .btn.primary { --bs-btn-hover-color: #04231f; --bs-btn-active-color: #04231f; }
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<div class="layout" id="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-brand">
+      <div class="logo">sb</div>
+      <div><b>sbproxy</b><small>Multi-WiFi → SOCKS5</small></div>
+    </div>
+    <nav class="side-nav">
+      <div class="side-group">Cấu hình</div>
+      <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
+      <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
+      <button class="btn ghost" id="exportConf">⭳ Tải wifi-socks.conf</button>
+      <button class="btn ghost" id="exportJson">⭳ Tải JSON</button>
+      <button class="btn ghost danger" id="clearBtn">✕ Xoá hết</button>
+      <span id="liveTools">
+        <div class="side-group">Router</div>
+        <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
+        <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
+        <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
+        <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
+        <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
+        <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
+        <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
+      </span>
+    </nav>
+    <div class="side-foot">sbproxy Console</div>
+  </aside>
+
+  <div class="main">
   <header class="top">
     <div class="brand">
-      <div class="logo">sb</div>
+      <button class="iconbtn" id="menuBtn" title="Mở / đóng menu">☰</button>
       <div>
         <h1>sbproxy Console</h1>
-        <p>Multi-WiFi → SOCKS5 · GL-MT6000 / OpenWrt · <span id="verLine" class="mono"></span></p>
+        <p>GL-MT6000 / OpenWrt · <span id="verLine" class="mono"></span></p>
       </div>
     </div>
     <div class="hdr-actions">
+      <span class="chip" id="whoami" hidden></span>
       <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
       <select class="language-select" id="languageSelect" aria-label="Language">
         <option value="en">English</option>
@@ -312,25 +389,8 @@
     </div>
   </header>
 
+  <div class="wrap">
   <section class="stats" id="stats"></section>
-
-  <div class="toolbar">
-    <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
-    <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
-    <div class="spacer"></div>
-    <span id="liveTools">
-      <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
-      <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
-      <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
-      <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
-      <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
-      <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
-      <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
-    </span>
-    <button class="btn ghost" id="exportConf">Tải wifi-socks.conf</button>
-    <button class="btn ghost" id="exportJson">Tải JSON</button>
-    <button class="btn ghost danger" id="clearBtn">Xoá hết</button>
-  </div>
 
   <div class="tablecard">
     <div class="tablescroll">
@@ -363,7 +423,9 @@
     <pre class="code" id="outCode"></pre>
     <div class="hint" id="applyHint"></div>
   </div>
-</div>
+  </div><!-- /.wrap -->
+  </div><!-- /.main -->
+</div><!-- /.layout -->
 
 <!-- Modal -->
 <div class="backdrop" id="backdrop">
@@ -430,6 +492,7 @@
       <div class="err" id="f_err"></div>
     </div>
     <div class="foot">
+      <button class="btn ghost" id="probeBtn" style="margin-right:auto" title="Test proxy đang nhập từ router (không cần lưu trước)">🧪 Test proxy</button>
       <button class="btn ghost" id="cancelBtn">Huỷ</button>
       <button class="btn primary" id="saveBtn">Lưu</button>
     </div>
@@ -441,18 +504,33 @@
   <div class="modal">
     <h2>Kết nối agent trên router</h2>
     <div class="form">
-      <div class="conn-status" id="connStatus">Chưa kết nối. Nhập token rồi bấm “Kết nối”.</div>
-      <div class="field">
-        <label>Agent base URL <span class="derived">(để trống nếu mở UI ngay từ router)</span></label>
-        <input type="text" id="c_base" class="mono" placeholder="(same-origin)  hoặc  http://192.168.1.1">
+      <div class="conn-status" id="connStatus">Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.</div>
+      <div class="field two">
+        <div>
+          <label>Tên đăng nhập <span class="req">*</span></label>
+          <input type="text" id="c_user" class="mono" placeholder="admin" autocomplete="username">
+        </div>
+        <div>
+          <label>Mật khẩu <span class="req">*</span></label>
+          <input type="password" id="c_pass" class="mono" autocomplete="current-password">
+        </div>
       </div>
-      <div class="field">
-        <label>Token <span class="req">*</span> <span class="derived">(in ra bởi install-agent.sh)</span></label>
-        <input type="text" id="c_token" class="mono" placeholder="vd 3f9a1c...">
-      </div>
+      <div class="derived">Tài khoản riêng của sbproxy, in ra khi cài agent; đổi trên router bằng lệnh sbproxy-webauth.</div>
+      <details>
+        <summary class="derived">Nâng cao: URL khác hoặc token trực tiếp</summary>
+        <div class="field" style="margin-top:10px">
+          <label>Agent base URL <span class="derived">(để trống nếu mở UI ngay từ router)</span></label>
+          <input type="text" id="c_base" class="mono" placeholder="(same-origin)  hoặc  http://192.168.1.1">
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Token <span class="derived">(in ra bởi install-agent.sh)</span></label>
+          <input type="text" id="c_token" class="mono" placeholder="vd 3f9a1c...">
+        </div>
+      </details>
       <div class="derived" id="mixedNote" data-i18n-skip>Mixed-content: nếu mở UI qua https (bản web), trình duyệt sẽ chặn gọi router http → hãy mở <b>http://&lt;router&gt;/sbproxy/</b> hoặc dùng bản Desktop (.exe).</div>
     </div>
     <div class="foot">
+      <button class="btn ghost danger" id="logoutBtn">Đăng xuất</button>
       <button class="btn ghost" id="disconnectBtn">Ngắt</button>
       <button class="btn ghost" id="connCancel">Đóng</button>
       <button class="btn primary" id="connectBtn">Kết nối</button>
@@ -573,7 +651,11 @@
     "Mật khẩu WiFi": "Wi-Fi password", "(≥ 8 ký tự)": "(≥ 8 characters)", "Cổng": "Port",
     "(trống nếu không auth)": "(empty when authentication is disabled)", "Cách ly client": "Isolate clients", "Chặn WebRTC": "Block WebRTC",
     "Huỷ": "Cancel", "Lưu": "Save", "Kết nối agent trên router": "Connect to the router agent",
-    "Chưa kết nối. Nhập token rồi bấm “Kết nối”.": "Not connected. Enter the token and click “Connect”.",
+    "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.": "Not connected. Log in with the sbproxy account.",
+    "Tên đăng nhập": "Username", "Mật khẩu": "Password", "Đăng xuất": "Log out",
+    "Tài khoản riêng của sbproxy, in ra khi cài agent; đổi trên router bằng lệnh sbproxy-webauth.": "The dedicated sbproxy account, printed when the agent is installed; change it on the router with sbproxy-webauth.",
+    "Nâng cao: URL khác hoặc token trực tiếp": "Advanced: a different URL or a raw token",
+    "Cấu hình": "Configuration",
     "(để trống nếu mở UI ngay từ router)": "(leave empty when the UI is served by the router)",
     "(in ra bởi install-agent.sh)": "(printed by install-agent.sh)", "Ngắt": "Disconnect", "Đóng": "Close", "Kết nối": "Connect",
     "Tạo backup ngay": "Create backup now", "Đường ra": "Egress", "Đường ra Internet": "Internet egress",
@@ -605,7 +687,9 @@
     "Backup & Rollback trên router": "Back up and roll back the router",
     "Xem và đổi đường ra Internet của router": "View and switch the router's Internet egress",
     "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
-    "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package"
+    "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package",
+    "Mở / đóng menu": "Open / close the menu",
+    "Test proxy đang nhập từ router (không cần lưu trước)": "Test the entered proxy from the router (no need to save first)"
   };
 
   // Labels carry a leading icon ("＋ Thêm WiFi"); the map is keyed on the words
@@ -722,6 +806,7 @@
   const agent = {
     base: localStorage.getItem("sbproxy.agent.base") || "",
     token: localStorage.getItem("sbproxy.agent.token") || "",
+    user: localStorage.getItem("sbproxy.agent.user") || "",
     connected: false, health: {}, timer: null, version: ""
   };
   const apiUrl = a => (agent.base || "") + "/cgi-bin/sbproxy?action=" + a;
@@ -768,6 +853,9 @@
   function updateLiveUI() {
     document.getElementById("liveBadge").classList.toggle("on", agent.connected);
     document.getElementById("liveTools").classList.toggle("on", agent.connected);
+    const who = document.getElementById("whoami");
+    who.hidden = !(agent.connected && agent.user);
+    who.textContent = agent.user ? "👤 " + agent.user : "";
     renderVersion();
   }
   function renderVersion() {
@@ -805,12 +893,36 @@
     });
   }
 
+  // Two ways in: the dedicated sbproxy username/password (the CGI trades it
+  // for the token via action=login), or a raw token under "Advanced".
   function connect() {
     agent.base = document.getElementById("c_base").value.trim().replace(/\/$/, "");
-    agent.token = document.getElementById("c_token").value.trim();
-    if (!agent.token) return setConnStatus(pick("Token is required.", "Thiếu token."), "bad");
     localStorage.setItem("sbproxy.agent.base", agent.base);
+    const user = document.getElementById("c_user").value.trim();
+    const pass = document.getElementById("c_pass").value;
+    const typedToken = document.getElementById("c_token").value.trim();
+    if (user || pass) {
+      setConnStatus(pick("Logging in…", "Đang đăng nhập…"));
+      fetch(apiUrl("login"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user, pass })
+      }).then(r => r.json()).then(d => {
+        if (!d || !d.ok || !d.token) throw new Error((d && d.error) || pick("login failed", "đăng nhập lỗi"));
+        agent.token = d.token; agent.user = d.user || user;
+        localStorage.setItem("sbproxy.agent.token", agent.token);
+        localStorage.setItem("sbproxy.agent.user", agent.user);
+        document.getElementById("c_pass").value = "";
+        finishConnect();
+      }).catch(err => setConnStatus(pick("Cannot log in: ", "Không đăng nhập được: ") + err.message, "bad"));
+      return;
+    }
+    if (!typedToken) return setConnStatus(pick("Enter the username and password (or a token under Advanced).",
+                                               "Nhập tên đăng nhập và mật khẩu (hoặc token trong mục Nâng cao)."), "bad");
+    agent.token = typedToken;
     localStorage.setItem("sbproxy.agent.token", agent.token);
+    finishConnect();
+  }
+  function finishConnect() {
     setConnStatus(pick("Connecting…", "Đang kết nối…"));
     api("status").then(d => {
       if (!d || !d.ok) throw new Error((d && d.error) || pick("bad response", "phản hồi lỗi"));
@@ -827,6 +939,17 @@
     agent.connected = false; stopPoll(); updateLiveUI(); renderRows();
     if (typeof closeDevices === "function") closeDevices();
     setConnStatus(pick("Disconnected.", "Đã ngắt kết nối."));
+  }
+  // Log out = disconnect AND forget the stored token/username, so the next
+  // person at this browser has to know the sbproxy password.
+  function logout() {
+    localStorage.removeItem("sbproxy.agent.token");
+    localStorage.removeItem("sbproxy.agent.user");
+    agent.token = ""; agent.user = "";
+    document.getElementById("c_token").value = "";
+    document.getElementById("c_pass").value = "";
+    disconnect();
+    setConnStatus(pick("Logged out.", "Đã đăng xuất."));
   }
 
   function updateConnHint() {
@@ -860,14 +983,23 @@
   const RESET_WORD = "RESET";
   function resetEverything() {
     if (!agent.connected) return;
-    const count = ssids.length;
+    // The ROUTER is the source of truth for what gets wiped. This browser's
+    // localStorage list may be empty or stale (a fresh browser once showed
+    // "Delete ALL 0 SSIDs", skipped every pool, and still wiped the router),
+    // so pull wifi-socks.conf first and derive the numbers from it.
+    api("get_conf", "GET", null, "resp").then(conf => {
+      const rows = String(conf || "").split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith("#"));
+      const idxs = rows.map(l => parseInt(l.split("|")[2], 10)).filter(n => isFinite(n));
+      resetWithRouterState(idxs.length, idxs);
+    }).catch(err => toast(pick("Cannot read the router configuration: ", "Không đọc được cấu hình từ router: ") + (err.message || err)));
+  }
+  function resetWithRouterState(count, idxs) {
     if (!confirm(pick(
         `WARNING · RESET EVERYTHING\n\nDelete ALL ${count} SSIDs and their proxy pools, kick every connected device, then apply to the router.\n\nEvery sbproxy-managed Wi-Fi disappears immediately and every device loses its connection. The router keeps a pre-apply backup for a manual rollback. This cannot be undone here.`,
         `CẢNH BÁO · RESET TOÀN BỘ\n\nXoá TẤT CẢ ${count} SSID và pool proxy, đá mọi thiết bị đang kết nối, rồi apply lên router.\n\nMọi Wi-Fi do sbproxy quản lý biến mất ngay; mọi thiết bị mất kết nối. Router giữ một backup pre-apply để rollback bằng tay. Không hoàn tác được ở đây.`))) return;
     const typed = prompt(pick(`Type ${RESET_WORD} to confirm wiping the whole configuration:`,
                               `Gõ ${RESET_WORD} để xác nhận xoá toàn bộ cấu hình:`), "");
     if ((typed || "").trim().toUpperCase() !== RESET_WORD) { toast(pick("Reset cancelled.", "Đã huỷ reset.")); return; }
-    const idxs = ssids.map(s => s.idx);
     const skipped = [];
     let kicked = 0;
     toast(pick("Step 1/4 · Kicking devices…", "Bước 1/4 · Đá thiết bị…"));
@@ -916,6 +1048,44 @@
     api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "", type: s.proxy_type || "socks5" })
       .then(d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+
+  // ---- diagnostics: the same tools the desktop app has ----
+  // Walk the data path of one SSID on the router and name the broken link.
+  function diagnoseSsid(idx) {
+    if (!agent.connected) return;
+    toast(pick("Diagnosing… (this can take up to a minute)", "Đang chẩn đoán… (có thể mất tới một phút)"));
+    api("diagnose_ssid&idx=" + idx).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || pick("diagnose failed", "chẩn đoán lỗi"));
+      const lines = [];
+      if (d.verdict) lines.push(pick("Verdict: ", "Kết luận: ") + d.verdict);
+      if (d.report) lines.push("", d.report);
+      if (d.singbox_log) lines.push("", "sing-box log:", d.singbox_log);
+      showLog(pick("Diagnose Wi-Fi", "Chẩn đoán WiFi") + " idx=" + idx,
+              { ok: true, log: lines.join("\n") || JSON.stringify(d, null, 2) });
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+  // Probe the proxy currently typed in the edit form, from the router, and
+  // show why it fails (curl exit, handshake tail) instead of a bare "fail".
+  function probeFromForm() {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    const host = $("f_host").value.trim();
+    const port = parseInt($("f_port").value, 10);
+    if (!host || !isFinite(port)) { $("f_err").textContent = pick("Enter the proxy host and port first.", "Nhập host và cổng proxy trước."); return; }
+    toast(pick("Testing the proxy from the router…", "Đang test proxy từ router…"));
+    api("probe_proxy", "POST", {
+      host, port, user: $("f_user").value.trim(), pass: $("f_pass").value, type: $("f_proxy_type").value
+    }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || pick("probe failed", "probe lỗi"));
+      const lines = [host + ":" + port + " (" + $("f_proxy_type").value + ")"];
+      lines.push(pick("State: ", "Trạng thái: ") + (d.state || "?") + (d.latency_ms ? " · " + d.latency_ms + "ms" : ""));
+      if (d.verdict) lines.push(pick("Verdict: ", "Kết luận: ") + d.verdict);
+      if (d.error) lines.push(pick("Reason: ", "Lý do: ") + d.error);
+      if (d.hint) lines.push(pick("Hint: ", "Gợi ý: ") + d.hint);
+      if (d.public_ip) lines.push(pick("Public IP through the proxy: ", "IP công khai qua proxy: ") + d.public_ip);
+      if (d.transcript) lines.push("", d.transcript);
+      showLog(pick("Proxy test", "Test proxy"), { ok: d.state === "ok" || d.state === "slow", log: lines.join("\n") });
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
   // ---- self-update ----
@@ -1184,6 +1354,7 @@
         <td>${healthCell(s.idx)}</td>
         <td><div class="rowbtns">
           ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="${pick("Change SOCKS without reloading Wi-Fi; open sessions may drop", "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn")}">⚡</button>` : ""}
+          ${agent.connected ? `<button class="iconbtn" data-diag="${s.idx}" title="${pick("Diagnose this Wi-Fi's data path on the router", "Chẩn đoán đường đi dữ liệu của WiFi này trên router")}">🩺</button>` : ""}
           <button class="iconbtn" data-edit="${s.id}">${pick("Edit", "Sửa")}</button>
           <button class="iconbtn" data-dup="${s.id}">⧉</button>
           <button class="iconbtn del" data-del="${s.id}">✕</button>
@@ -1288,6 +1459,7 @@
     $("f_webrtc").checked = s ? !!s.webrtc : true;
     $("f_vendor").value = s ? (s.mac_oui || "") : "";
     $("f_err").textContent = "";
+    $("probeBtn").hidden = !agent.connected;
     updateDerived();
     $("backdrop").classList.add("show");
     $("f_name").focus();
@@ -1430,12 +1602,15 @@
 
   // live mode events
   $("connBtn").onclick = () => {
-    $("c_base").value = agent.base; $("c_token").value = agent.token;
-    if (!agent.connected) setConnStatus(pick("Not connected. Enter the token and click “Connect”.", "Chưa kết nối. Nhập token rồi bấm “Kết nối”."));
+    $("c_base").value = agent.base; $("c_token").value = agent.token; $("c_user").value = agent.user;
+    if (!agent.connected) setConnStatus(pick("Not connected. Log in with the sbproxy account.", "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy."));
     $("connBackdrop").classList.add("show");
   };
   $("connectBtn").onclick = connect;
   $("disconnectBtn").onclick = disconnect;
+  $("logoutBtn").onclick = logout;
+  $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
+  $("probeBtn").onclick = probeFromForm;
   $("connCancel").onclick = () => $("connBackdrop").classList.remove("show");
   $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") $("connBackdrop").classList.remove("show"); };
   $("pushApplyBtn").onclick = pushApply;
@@ -1481,6 +1656,8 @@
     const du = e.target.getAttribute("data-dup");
     const de = e.target.getAttribute("data-del");
     const zp = e.target.getAttribute("data-zap");
+    const dg = e.target.getAttribute("data-diag");
+    if (dg) return diagnoseSsid(parseInt(dg, 10));
     if (zp) return zapSock(ssids.find(x => x.id === zp));
     if (ed) return openModal(ed);
     if (du) {

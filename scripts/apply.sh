@@ -104,9 +104,13 @@ run "/etc/init.d/firewall reload"
 run "/etc/init.d/sbproxy restart"
 ensure_singbox_service
 run "/etc/init.d/sing-box restart"
-verify_singbox_running
 run "wifi reload"
 recover_wifi_networks
+# Verify sing-box only after Wi-Fi is back up: when sing-box cannot start,
+# the apply must fail loudly, but with the SSIDs broadcasting (unproxied
+# clients are held by nftables anyway) — dying before `wifi reload` used to
+# leave every SSID down AND the operator without a management path.
+verify_singbox_running
 
 log "APPLY COMPLETE. Run the test scripts described in docs/TESTING.md."
 log "If networking is lost or an error occurs: scripts/rollback.sh (see docs/ROLLBACK.md)"

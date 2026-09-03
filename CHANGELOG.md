@@ -5,6 +5,74 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Web console trên router có đăng nhập riêng.** `install-agent.sh` tạo tài
+  khoản (mặc định `admin` + mật khẩu ngẫu nhiên, in ra cuối màn hình cài; ghi
+  đè bằng `SBPROXY_WEB_USER`/`SBPROXY_WEB_PASS`); lệnh mới `sbproxy-webauth`
+  (set/show/check/disable) quản lý tài khoản trong `/etc/sbproxy/webauth`
+  (salt + SHA-256, không lưu mật khẩu thật). Agent có action `login` — action
+  duy nhất không cần Bearer — đổi user/pass lấy token, chờ ~1 s mỗi lần sai và
+  khoá 5 phút sau 5 lần sai (429). Hộp Kết nối trên web đăng nhập bằng
+  user/pass (token chuyển thành mục "Nâng cao"), hiện 👤 tài khoản trên thanh
+  trên và có nút Đăng xuất (quên token + tài khoản trong trình duyệt).
+- **Giao diện web kiểu AdminLTE nhẹ trên Bootstrap offline.** Bootstrap
+  5.3.3 (`console/web/assets/bootstrap.min.css`) được deploy vào
+  `/www/sbproxy/assets/` — không CDN, router không có Internet vẫn hiển thị
+  đúng; thiếu assets thì trang tự chạy bằng stylesheet dựng sẵn. Bố cục mới:
+  sidebar trái (nhóm Cấu hình + nhóm Router khi đã kết nối), thanh trên
+  (menu ☰ cho mobile, phiên bản, tài khoản, Live, ngôn ngữ, theme). Toàn bộ
+  id/logic JS giữ nguyên nên hành vi và các test parity không đổi.
+- **Web bắt kịp desktop hai công cụ chẩn đoán**: nút 🩺 trên từng dòng WiFi
+  (`diagnose_ssid` — chỉ ra mắt xích hỏng trên đường dữ liệu) và nút
+  🧪 Test proxy trong form Thêm/Sửa WiFi (`probe_proxy` — test proxy đang
+  nhập từ router, kèm lý do fail). `self-update.sh` deploy thêm
+  `assets/` và `sbproxy-webauth` khi cập nhật.
+- Tài liệu mới [docs/web-console.md](docs/web-console.md) (+ bản EN): đăng
+  nhập và quản lý tài khoản, bố cục màn hình, bảng map tính năng
+  desktop ↔ web theo từng action agent, khắc phục sự cố.
+
+### Fixed
+Đợt rà soát regression 0.5.9 → 0.5.19:
+- **`apply.sh` chết trước khi Wi-Fi kịp lên lại**: khi sing-box không start
+  được, `verify_singbox_running` từng `die` trước `wifi reload` +
+  `recover_wifi_networks`, để mọi SSID biến mất và có thể mất luôn đường quản
+  trị. Giờ Wi-Fi được khôi phục trước, apply vẫn báo lỗi to và rõ sau đó.
+- **Che mật khẩu trong log/transcript không còn dùng sed**: mật khẩu chứa
+  `|`/`[` từng làm sed lỗi (mất transcript, verdict sai), chứa `.`/`*` thì lộ
+  cleartext, và một mật khẩu dạng lệnh sed có thể ghi file tuỳ ý. Thay bằng
+  `mask_secret` (awk `index()`, so khớp literal) tại probe-proxy, diagnose-ssid,
+  healthd và lib.sh.
+- **Web Reset toàn bộ lấy trạng thái từ router**: trình duyệt mới (localStorage
+  rỗng) từng hiện "Xoá TẤT CẢ 0 SSID", bỏ trống bước xoá pool nhưng vẫn wipe
+  router. Cả web lẫn desktop giờ kéo `get_conf` từ router trước, đếm và xoá
+  pool theo đúng cấu hình thật; test parity so khớp cả bước này.
+- **`diagnose-ssid.sh` parse hỏng khi cột idx có khoảng trắng đệm**: awk rebuild
+  cả dòng làm mọi `cut -d'|'` đọc sai field và lộ wifi key + proxy pass vào
+  report. Giờ trim trên bản sao của field. Thêm: khi SSID chạy pool, proxy
+  fallback trong conf chết không còn thành verdict — probe slot 0 của pool
+  (`pool_proxy`) thay thế; verdict "blocked" nói rõ khả năng SOCKS server im
+  lặng chờ handshake (nghi sai credentials/loại proxy khi port chắc chắn mở).
+- **`switch-gateway.sh`**: router chỉ có một uplink (không có gì để đổi) từng
+  trả 400 giả vì `jq --argjson changed ""`; `uci set` lỗi giữa chừng để lại
+  thay đổi staged (bị flush bởi lần `uci commit network` sau); interface chỉ có
+  trong ubus (không có section uci) làm cả thao tác thất bại. Giờ: danh sách
+  rỗng → `[]`, lỗi → `uci revert network`, interface động → bỏ qua. CGI tách
+  stderr khỏi stdout nên warning của uci không biến thao tác thành công thành
+  lỗi 500 nữa.
+- **Desktop — Test proxy không còn treo app**: probe chạy ở thread nền, kết quả
+  trả về main thread qua `after()`; app không còn "Not Responding" 15–45 s.
+- **Desktop — proxy chưa test không còn bị dán nhãn [FAIL]**: một predicate
+  duy nhất (`ok`/`??`/`FAIL`) quyết định nhãn, hộp cảnh báo và status bar;
+  trạng thái `unknown`/`skipped` hiện `[??]`, không mở dialog lỗi.
+- **Desktop — auto-probe proxy vừa thêm có giới hạn** (8 proxy đầu): dán 256
+  proxy không còn giữ màn hình loading cả giờ; phần còn lại ghi rõ "chưa test".
+- **Desktop — màn hình Pool không crash với dòng dữ liệu lạ**: row không phải
+  dict được thay bằng placeholder (giữ nguyên số slot) thay vì làm dialog
+  không mở được.
+- **healthd bớt phụ thuộc /tmp**: kết quả probe trả qua biến (không còn file
+  tạm cho output), /tmp đầy/read-only chỉ mất chi tiết lỗi chứ không làm probe
+  fail giả hay gán nhầm lỗi sang proxy khác.
+
 ## [0.5.20] - 2026-08-31
 
 ### Fixed
