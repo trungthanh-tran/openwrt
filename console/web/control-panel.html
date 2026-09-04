@@ -580,6 +580,7 @@
     <h2>Thiết bị đang kết nối</h2>
     <div class="form">
       <div class="conn-status" id="devHint" data-i18n-html="devHint">Danh sách client theo từng WiFi. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
+      <input id="devSearch" type="search" placeholder="Tìm MAC, IP, tên máy hoặc SSID…">
       <div class="tablescroll">
         <table style="min-width: 720px;">
           <thead><tr>
@@ -1527,7 +1528,12 @@
   function loadDevices() {
     api("clients").then(d => {
       const box = $("devRows");
-      const list = (d && d.clients) || [];
+      const query = $("devSearch").value.trim().toLowerCase();
+      const list = ((d && d.clients) || []).filter(c => !query || [c.mac, c.ip, c.host, c.ssid, ssidNameByIdx(c.idx)].some(v => String(v || "").toLowerCase().includes(query)));
+      if (list.length === 0) {
+        box.innerHTML = `<tr><td colspan="9" class="sub">${pick("No connected or blocked devices.", "Không có client online hoặc bị block.")}</td></tr>`;
+        return;
+      }
       if (!d || !d.ok) throw new Error((d && d.error) || pick("error", "lỗi"));
       if (!list.length) { box.innerHTML = '<tr><td colspan="8" class="sub">${pick("No connected devices.", "Không có thiết bị nào đang kết nối.")}</td></tr>'; return; }
       box.innerHTML = list.map(c => {
@@ -1921,6 +1927,7 @@
   $("devicesBtn").onclick = openDevices;
   $("devClose").onclick = closeDevices;
   $("devRefresh").onclick = loadDevices;
+  $("devSearch").oninput = loadDevices;
   $("devBackdrop").onclick = e => { if (e.target.id === "devBackdrop") closeDevices(); };
   $("poolClose").onclick = closePool;
   $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
