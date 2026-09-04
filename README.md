@@ -106,7 +106,7 @@ There is no cloud control. Use a trusted management LAN or self-managed VPN. Nev
 
 - [Desktop console user guide](docs/desktop-user-guide.en.md) — daily use of the app
 - [User guide](docs/user-guide.en.md) — daily use of the browser console
-- [Router-hosted web console](docs/web-console.en.md) — login with the dedicated sbproxy account, layout, and the desktop ↔ web feature map
+- [Router-hosted web console](docs/web-console.en.md) — bring up a router from scratch without the .exe, connect, update, daily use, and the desktop ↔ web feature map
 - [Administrator guide](docs/admin-guide.en.md) — every step with its script
 - [Testing](docs/TESTING.en.md) · [Rollback](docs/ROLLBACK.en.md) · [Debugging](docs/DEBUGGING.en.md)
 

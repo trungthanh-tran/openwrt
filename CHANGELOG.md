@@ -26,6 +26,12 @@ Ngày theo định dạng YYYY-MM-DD.
 - `tests/test_clients.sh` (38 assert) cho `clients.sh`, cùng một khối trong
   `tests/run.sh` khoá lại từng tính năng web trong bảng parity của
   [docs/web-console.md](docs/web-console.md).
+- [docs/web-console.md](docs/web-console.md) (+ bản EN) thêm hai chương:
+  **Khởi tạo router từ đầu (5 bước)** — đúng chuỗi lệnh mà file exe chạy qua
+  SSH, dành cho người không dùng exe, kèm bảng xử lý khi hỏng giữa chừng — và
+  **Cập nhật** (từ web bằng package, từ máy tính qua `pc/update.sh`, hoặc
+  `self-update.sh` ngay trên router; những gì được giữ nguyên; vì sao phải
+  bấm Đẩy & Áp sau đó).
 
 - **Web console trên router có đăng nhập riêng.** `install-agent.sh` tạo tài
   khoản (mặc định `admin` + mật khẩu ngẫu nhiên, in ra cuối màn hình cài; ghi

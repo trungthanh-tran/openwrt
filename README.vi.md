@@ -145,7 +145,7 @@ CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước 
 **Vận hành**
 - **[docs/desktop-user-guide.md](docs/desktop-user-guide.md) — Hướng dẫn NGƯỜI DÙNG bản desktop (.exe): dùng app hằng ngày, không cần dòng lệnh.**
 - [docs/user-guide.md](docs/user-guide.md) — hướng dẫn người dùng bản console web trong trình duyệt
-- [docs/web-console.md](docs/web-console.md) — web console chạy ngay trên router: đăng nhập bằng tài khoản sbproxy riêng, bố cục màn hình, bảng map tính năng desktop ↔ web
+- [docs/web-console.md](docs/web-console.md) — web console chạy ngay trên router: **khởi tạo router từ đầu không cần file exe**, kết nối/đăng nhập, cập nhật, dùng hằng ngày, bảng map tính năng desktop ↔ web
 - [docs/admin-guide.md](docs/admin-guide.md) — hướng dẫn QUẢN TRỊ theo bước, kèm script tương ứng
 - [docs/TESTING.md](docs/TESTING.md) — kiểm tra IP đúng sock, DNS leak, WebRTC, cách ly client
 - [docs/ROLLBACK.md](docs/ROLLBACK.md) — khôi phục khi lỗi (nhiều mức)

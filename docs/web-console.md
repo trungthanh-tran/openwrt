@@ -1,4 +1,4 @@
-# Web console trên router — đăng nhập, giao diện, và map tính năng với bản desktop
+# Web console trên router — khởi tạo, kết nối, cập nhật và sử dụng
 
 > Bản tiếng Anh: [web-console.en.md](web-console.en.md)
 
@@ -20,7 +20,117 @@ http://<ip-router>/sbproxy/          (ví dụ: http://192.168.8.1/sbproxy/)
   repo) + thư mục `assets/`. `install-agent.sh` và `self-update.sh` tự deploy
   cả hai vào `/www/sbproxy/`.
 
-## 1. Đăng nhập — tài khoản riêng của sbproxy
+## 1. Khởi tạo router từ đầu (5 bước)
+
+Phần này dành cho người **không dùng file .exe**: từ một router vừa flash đến
+lúc mở được web console. Bản desktop làm toàn bộ những việc này giúp bạn trong
+một màn hình — nếu có sẵn file exe thì đi theo
+[QUICKSTART.md](QUICKSTART.md) (4 bước) sẽ nhanh hơn; các lệnh dưới đây là
+**chính xác những gì file exe chạy qua SSH**.
+
+> **Trước khi bắt đầu**: cắm **LAN dây** từ máy tính vào router (đường cứu hộ
+> nếu WiFi hỏng giữa chừng), và **tải backup về máy** nếu router đang chạy gì
+> đó — backup nằm trên router sẽ mất khi flash.
+
+### Bước 1 — Flash firmware và đặt mật khẩu root
+
+Hai việc này phải làm tay vì có rủi ro vật lý (chọn sai image là brick router).
+Làm theo **Bước 2 và Bước 3** của [QUICKSTART.md](QUICKSTART.md).
+
+Kiểm tra xong bước này bằng: `ssh root@192.168.8.1` — đăng nhập được là đạt.
+
+> IP quản trị: firmware GL.iNet mặc định `192.168.8.1`; OpenWrt vanilla vừa
+> flash thường là `192.168.1.1`. Dùng đúng IP thực tế ở các bước sau.
+
+### Bước 2 — Đưa mã nguồn lên router
+
+Từ máy tính có sẵn mã nguồn (thư mục repo này):
+
+```sh
+sh pc/update.sh --host 192.168.8.1          # Linux/macOS/Git Bash
+```
+```powershell
+pc\update.ps1 -Host 192.168.8.1             # Windows PowerShell
+```
+
+Lệnh này đóng gói repo, đẩy lên `/root/sbproxy` và **giữ nguyên**
+`wifi-socks.conf` + `settings.sh` nếu router đã có.
+
+Chỉ có file package (`sbproxy-update-<version>.tar.gz`) thì làm tay:
+
+```sh
+scp sbproxy-update-*.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 'mkdir -p /root/sbproxy && tar xzf /tmp/sbproxy-update-*.tar.gz -C /root/sbproxy'
+```
+
+### Bước 3 — Kiểm tra phần cứng (chỉ đọc, không đổi gì)
+
+```sh
+ssh root@192.168.8.1
+cd /root/sbproxy
+sh scripts/preflight.sh
+```
+
+Đọc hai mục quan trọng:
+
+- **Radio ↔ băng tần**: nếu `radio0` không phải 2.4 GHz, sửa `RADIO_2G` /
+  `RADIO_5G` trong `config/settings.sh`.
+- **valid interface combinations**: số AP tối đa mỗi radio. Số SSID định tạo
+  phải ≤ số này.
+
+Đặt luôn mã quốc gia trong `config/settings.sh` (bắt buộc):
+`WIFI_COUNTRY="VN"`.
+
+### Bước 4 — Cài và khởi tạo (3 lệnh)
+
+```sh
+cd /root/sbproxy
+# Cấu hình rỗng: SSID sẽ thêm từ web console sau, không cần soạn tay.
+grep '^#' config/wifi-socks.conf.example > config/wifi-socks.conf
+sh scripts/install-deps.sh      # nftables, sing-box, ip-full, iw-full… + init script
+sh scripts/apply.sh             # tự backup trước, rồi áp cấu hình
+sh agent/install-agent.sh       # CGI + web console + healthd + assignd
+```
+
+`install-deps.sh` là bước lâu nhất (vài phút, router phải ra được Internet để
+tải gói). Cả bốn lệnh đều **chạy lại được nhiều lần** — phần nào đã xong sẽ
+được bỏ qua.
+
+Cuối màn hình `install-agent.sh` in ra địa chỉ web console và ghi rõ rằng
+**tài khoản sẽ được tạo ở lần mở web đầu tiên**.
+
+### Bước 5 — Mở web console và tạo tài khoản
+
+Mở `http://192.168.8.1/sbproxy/` → trang tự hiện form **"Tạo tài khoản quản
+trị đầu tiên"** → đặt user (mặc định `admin`) và mật khẩu ≥ 8 ký tự → xong là
+vào thẳng màn hình điều khiển.
+
+Từ đây thêm WiFi và proxy hoàn toàn trong trình duyệt: xem
+[§5.1 Thêm và áp một WiFi mới](#51-thêm-và-áp-một-wifi-mới).
+
+### Kiểm tra sau khi cài
+
+```sh
+sh scripts/doctor.sh        # báo cáo trạng thái toàn hệ thống, chỉ đọc
+```
+
+Nối một thiết bị vào SSID vừa tạo rồi kiểm tra:
+`https://ipinfo.io/ip` phải ra IP của proxy tương ứng, và `nslookup
+example.com` phải trả IP trong dải `198.18.0.0/15` (fake-IP). Danh sách kiểm
+tra đầy đủ: [TESTING.md](TESTING.md).
+
+### Nếu hỏng giữa chừng
+
+| Hiện tượng | Xử lý |
+|---|---|
+| `ssh` không vào được | Sai IP, chưa đặt mật khẩu root, hoặc SSH chưa bật. |
+| `install-deps.sh` dừng khi tải gói | Router chưa ra được Internet (cần WAN). Kiểm tra uplink rồi chạy lại. |
+| `preflight.sh` báo sai mapping radio | Sửa `RADIO_2G`/`RADIO_5G` trong `config/settings.sh` đúng như preflight gợi ý. |
+| `apply.sh` báo lỗi | Router **đã tự backup trước khi áp**: `sh scripts/rollback.sh` để quay lại. Xem [ROLLBACK.md](ROLLBACK.md). |
+| Mất mạng sau khi áp | Vào bằng LAN dây rồi `sh scripts/rollback.sh`. |
+| Muốn gỡ sạch | `sh scripts/uninstall.sh`. |
+
+## 2. Kết nối và đăng nhập — tài khoản riêng của sbproxy
 
 Web console có **username/password riêng**, không dùng tài khoản root của
 router và không phải dán token thủ công.
@@ -100,7 +210,64 @@ sbproxy-webauth disable            # tắt đăng nhập mật khẩu (chỉ cò
 - Token API vẫn là chìa khoá gốc (desktop dùng trực tiếp). Đổi token: xoá
   `/etc/sbproxy/token` rồi chạy lại `install-agent.sh`.
 
-## 2. Bố cục màn hình
+## 3. Cập nhật
+
+Có ba đường cập nhật, dùng cái nào tuỳ chỗ bạn đang đứng.
+
+### 3.1 Từ web console (không cần SSH)
+
+Cách thông thường cho người vận hành:
+
+1. Trên máy có mã nguồn, tạo package: `make package` (hoặc
+   `sh pc/make-package.sh`) → ra file `sbproxy-update-<version>.tar.gz`.
+2. Web console → **⬆ Cập nhật** → chọn file → **⬆ Cập nhật**.
+
+Router **tự backup trước**, kiểm tra package hợp lệ, **chặn hạ version** (trừ
+khi tick *Cho phép hạ version*), rồi thay mã nguồn và deploy lại CGI, giao
+diện web, `sbproxy-webauth`, healthd.
+
+**Được giữ nguyên**: `wifi-socks.conf`, `proxy-pools.conf`, `settings.sh`
+(khoá mới của phiên bản mới được *thêm* vào, giá trị bạn đặt không bị ghi đè),
+token, tài khoản web, danh sách cấm, ghim proxy và lịch sử thiết bị.
+
+**Cập nhật KHÔNG reload WiFi.** Cấu hình chỉ thực sự đổi khi bạn bấm
+**⇪ Đẩy & Áp** sau đó.
+
+### 3.2 Từ máy tính qua SSH
+
+Khi bạn đang sửa mã nguồn và muốn đẩy thẳng:
+
+```sh
+sh pc/update.sh --host 192.168.8.1            # chỉ đẩy code
+sh pc/update.sh --host 192.168.8.1 --apply    # đẩy code rồi chạy apply.sh luôn
+```
+
+Mặc định giữ nguyên `wifi-socks.conf` và `settings.sh` trên router; thêm
+`--with-settings` nếu thực sự muốn thay `settings.sh`.
+
+Sau khi đẩy code mới mà agent/giao diện web chưa đổi theo, chạy lại
+`sh agent/install-agent.sh` trên router (không đụng tới token, tài khoản hay
+cấu hình đang chạy).
+
+### 3.3 Ngay trên router
+
+```sh
+cd /root/sbproxy
+sh scripts/self-update.sh /tmp/sbproxy-update-<version>.tar.gz
+```
+
+Đây chính là script mà nút **⬆ Cập nhật** gọi, nên hành vi giống hệt mục 3.1.
+
+### Sau khi cập nhật
+
+- Thanh trên hiện `v<UI> · agent v<agent>`. Hai số **khác nhau** thì dòng này
+  chuyển màu vàng — nghĩa là trình duyệt còn giữ bản UI cũ: tải lại trang
+  (Ctrl+F5) là hết.
+- Muốn chắc chắn: **🗂 Backup / Rollback → 💾 Tạo backup ngay** trước khi cập
+  nhật, và **⭳ Về máy** trước khi nâng cấp *firmware* (backup nằm trên router
+  sẽ mất nếu reflash).
+
+## 4. Bố cục màn hình
 
 | Vùng | Nội dung |
 |---|---|
@@ -109,9 +276,9 @@ sbproxy-webauth disable            # tắt đăng nhập mật khẩu (chỉ cò
 | **Thanh trên** | ☰ menu (mobile) · phiên bản UI/agent · 👤 tài khoản · Live · ngôn ngữ · 🔌 Kết nối · ◐ Theme |
 | **Nội dung** | Thẻ thống kê (số WiFi, BSSID theo băng, SOCKS, cách ly/WebRTC) · bảng WiFi (health, sparkline, ⚡ đổi sock, 🩺 chẩn đoán, 🎲 đổi MAC, pool, sửa/nhân bản/xoá) · tab xem trước `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
 
-## 3. Dùng hằng ngày
+## 5. Dùng hằng ngày
 
-### 3.1 Thêm và áp một WiFi mới
+### 5.1 Thêm và áp một WiFi mới
 
 1. **＋ Thêm WiFi** → điền tên, băng tần, idx, mật khẩu WiFi (≥ 8 ký tự) và
    proxy. Ô **Nhập nhanh proxy** nhận `host:port:user:password`, bấm **Tách**
@@ -122,14 +289,14 @@ sbproxy-webauth disable            # tắt đăng nhập mật khẩu (chỉ cò
    dry-run → ghi conf → apply. Dry-run hỏng thì cấu hình đang chạy **không bị
    đụng tới**.
 
-### 3.2 Đổi proxy nhanh, không reload WiFi
+### 5.2 Đổi proxy nhanh, không reload WiFi
 
 - **⚡** trên hàng WiFi: đổi SOCKS của riêng SSID đó (`set_sock`). WiFi không
   reload, chỉ phiên đang mở có thể gián đoạn.
 - **🎲**: cấp BSSID/MAC ngẫu nhiên mới cho SSID đó, chọn được hãng (OUI) như
   bản desktop. WiFi này reload nên **mọi thiết bị trên nó phải kết nối lại**.
 
-### 3.3 Pool proxy cho một SSID
+### 5.3 Pool proxy cho một SSID
 
 Mở bằng nút **pool** trên hàng WiFi.
 
@@ -145,7 +312,7 @@ Mở bằng nút **pool** trên hàng WiFi.
 - **Xóa pool**: xoá sạch pool của SSID này.
 - **Rebalance client**: chia đều thiết bị đang online của SSID lên các slot.
 
-### 3.4 Màn hình Thiết bị
+### 5.4 Màn hình Thiết bị
 
 Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang kết nối:
 
@@ -176,7 +343,7 @@ Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang k
 > định 400 máy (`SEEN_MAX` trong `config/settings.sh`), máy cũ nhất bị loại
 > trước.
 
-### 3.5 Đường ra Internet
+### 5.5 Đường ra Internet
 
 - **Đổi đường ra**: chọn interface rồi bấm — interface đó nhận metric tốt nhất,
   các đường khác lùi lại, network reload. WiFi và proxy không đổi.
@@ -185,7 +352,7 @@ Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang k
   sai lệch.
 - **Tự động**: bỏ ghim, chấp nhận bất kỳ đường ra nào default route đang dùng.
 
-### 3.6 Backup, cập nhật, reset
+### 5.6 Backup, cập nhật, reset
 
 - **🗂 Backup / Rollback**: tạo backup (có hỏi nhãn, chỉ nhận chữ/số/`. _ -`),
   **⭳ Về máy** (tải file backup về máy tính — làm việc này **trước khi flash
@@ -194,7 +361,7 @@ Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang k
 - **⟲ Reset toàn bộ**: đá mọi thiết bị, xoá mọi SSID và pool, apply. Đọc cấu
   hình thật từ router trước khi cảnh báo, và phải gõ `RESET` mới chạy.
 
-## 4. Map tính năng: desktop (.exe) ↔ web console
+## 6. Map tính năng: desktop (.exe) ↔ web console
 
 Cả hai bản nói chuyện với **cùng một agent CGI** trên router, nên tính năng là
 tương đương trừ vài mục ghi chú dưới đây.
@@ -233,7 +400,7 @@ log cục bộ, và các chế độ dòng lệnh (`--provision`, `--probe`).
 `tests/run.sh` có một khối kiểm tra riêng khoá lại từng dòng "✅" ở cột web
 trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 
-## 4. Khắc phục sự cố
+## 7. Khắc phục sự cố
 
 | Hiện tượng | Nguyên nhân / cách xử lý |
 |---|---|

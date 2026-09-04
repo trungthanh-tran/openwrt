@@ -1,4 +1,4 @@
-# The router-hosted web console — login, layout, and the desktop feature map
+# The router-hosted web console — bring-up, connecting, updating and daily use
 
 > Vietnamese version: [web-console.md](web-console.md)
 
@@ -20,7 +20,118 @@ http://<router-ip>/sbproxy/          (e.g. http://192.168.8.1/sbproxy/)
   repo) plus the `assets/` folder. Both `install-agent.sh` and
   `self-update.sh` deploy them to `/www/sbproxy/`.
 
-## 1. Login — a dedicated sbproxy account
+## 1. Bringing up a router from scratch (5 steps)
+
+This chapter is for people **not using the .exe**: from a freshly flashed
+router to an open web console. The desktop console does all of it for you in
+one screen — with the exe at hand, [QUICKSTART.en.md](QUICKSTART.en.md) (4
+steps) is faster; the commands below are **exactly what the exe runs over
+SSH**.
+
+> **Before you start**: connect a **wired LAN** cable from the PC to the
+> router (the rescue path if Wi-Fi breaks halfway), and **download a backup**
+> if the router is already running something — backups kept on the router are
+> lost when it is flashed.
+
+### Step 1 — Flash the firmware and set the root password
+
+Both are manual because they carry physical risk (the wrong image bricks the
+router). Follow **steps 2 and 3** of [QUICKSTART.en.md](QUICKSTART.en.md).
+
+This step is done when `ssh root@192.168.8.1` logs in.
+
+> Management IP: GL.iNet firmware defaults to `192.168.8.1`; a freshly flashed
+> vanilla OpenWrt is usually `192.168.1.1`. Use the real one below.
+
+### Step 2 — Put the code on the router
+
+From a PC that has this repository:
+
+```sh
+sh pc/update.sh --host 192.168.8.1          # Linux/macOS/Git Bash
+```
+```powershell
+pc\update.ps1 -Host 192.168.8.1             # Windows PowerShell
+```
+
+This packs the repo, uploads it to `/root/sbproxy` and **preserves**
+`wifi-socks.conf` and `settings.sh` if the router already has them.
+
+With only a package file (`sbproxy-update-<version>.tar.gz`):
+
+```sh
+scp sbproxy-update-*.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 'mkdir -p /root/sbproxy && tar xzf /tmp/sbproxy-update-*.tar.gz -C /root/sbproxy'
+```
+
+### Step 3 — Check the hardware (read-only, changes nothing)
+
+```sh
+ssh root@192.168.8.1
+cd /root/sbproxy
+sh scripts/preflight.sh
+```
+
+Two lines matter:
+
+- **Radio ↔ band**: if `radio0` is not the 2.4 GHz one, fix `RADIO_2G` /
+  `RADIO_5G` in `config/settings.sh`.
+- **valid interface combinations**: the real maximum number of APs per radio.
+  Plan for that many SSIDs or fewer.
+
+Set the country code in `config/settings.sh` too (required):
+`WIFI_COUNTRY="VN"`.
+
+### Step 4 — Install and initialise (3 commands)
+
+```sh
+cd /root/sbproxy
+# An empty configuration: SSIDs are added from the web console later.
+grep '^#' config/wifi-socks.conf.example > config/wifi-socks.conf
+sh scripts/install-deps.sh      # nftables, sing-box, ip-full, iw-full… + the init script
+sh scripts/apply.sh             # backs up first, then applies
+sh agent/install-agent.sh       # CGI + web console + healthd + assignd
+```
+
+`install-deps.sh` takes the longest (a few minutes; the router needs Internet
+to fetch packages). All four commands are **safe to re-run** — whatever is
+already done is skipped.
+
+`install-agent.sh` prints the web console address at the end and says that the
+**account will be created on the first visit**.
+
+### Step 5 — Open the web console and create the account
+
+Open `http://192.168.8.1/sbproxy/` → the page opens the **"Create the first
+admin account"** form by itself → pick a user (default `admin`) and a password
+of at least 8 characters → you land straight in the console.
+
+From here Wi-Fi and proxies are added entirely in the browser: see
+[§5.1 Add a Wi-Fi and apply it](#51-add-a-wi-fi-and-apply-it).
+
+### Verifying the install
+
+```sh
+sh scripts/doctor.sh        # full read-only status report
+```
+
+Join a device to the new SSID and check that `https://ipinfo.io/ip` returns
+the proxy's address and `nslookup example.com` answers inside
+`198.18.0.0/15` (fake-IP). The full checklist is in
+[TESTING.en.md](TESTING.en.md).
+
+### When something breaks
+
+| Symptom | Fix |
+|---|---|
+| `ssh` will not connect | Wrong IP, no root password set, or SSH disabled. |
+| `install-deps.sh` stops fetching packages | The router has no Internet (it needs the WAN). Fix the uplink and re-run. |
+| `preflight.sh` reports the wrong radio mapping | Set `RADIO_2G`/`RADIO_5G` in `config/settings.sh` as preflight suggests. |
+| `apply.sh` fails | The router **backed up before applying**: `sh scripts/rollback.sh` restores it. See [ROLLBACK.en.md](ROLLBACK.en.md). |
+| Networking is lost after applying | Get in over the wired LAN and run `sh scripts/rollback.sh`. |
+| Remove everything | `sh scripts/uninstall.sh`. |
+
+## 2. Connecting and logging in — a dedicated sbproxy account
 
 The web console has its **own username/password**, separate from the router's
 root account, and no token has to be pasted by hand.
@@ -103,7 +214,65 @@ sbproxy-webauth disable            # turn password login off (token only)
   directly). To rotate it: delete `/etc/sbproxy/token` and re-run
   `install-agent.sh`.
 
-## 2. Screen layout
+## 3. Updating
+
+Three update paths; which one you use depends on where you are standing.
+
+### 3.1 From the web console (no SSH)
+
+The normal path for an operator:
+
+1. On a machine with the source, build a package: `make package` (or
+   `sh pc/make-package.sh`) → `sbproxy-update-<version>.tar.gz`.
+2. Web console → **⬆ Update** → choose the file → **⬆ Update**.
+
+The router **backs up first**, validates the package, **refuses a downgrade**
+(unless *Allow version downgrade* is ticked), then replaces the code and
+redeploys the CGI, the web UI, `sbproxy-webauth` and healthd.
+
+**Preserved**: `wifi-socks.conf`, `proxy-pools.conf`, `settings.sh` (keys new
+to the new version are *added*; your values are never overwritten), the token,
+the web account, the blocklist, proxy pins and the device history.
+
+**Updating does NOT reload Wi-Fi.** The configuration only changes when you
+press **⇪ Push & Apply** afterwards.
+
+### 3.2 From a PC over SSH
+
+While working on the source and pushing straight to a router:
+
+```sh
+sh pc/update.sh --host 192.168.8.1            # upload the code
+sh pc/update.sh --host 192.168.8.1 --apply    # upload, then run apply.sh
+```
+
+`wifi-socks.conf` and `settings.sh` on the router are preserved by default;
+add `--with-settings` only when you really mean to replace `settings.sh`.
+
+If the agent or the web UI does not follow the new code, run
+`sh agent/install-agent.sh` on the router again — it leaves the token, the
+account and the running configuration alone.
+
+### 3.3 On the router itself
+
+```sh
+cd /root/sbproxy
+sh scripts/self-update.sh /tmp/sbproxy-update-<version>.tar.gz
+```
+
+This is the script the **⬆ Update** button calls, so it behaves exactly like
+§3.1.
+
+### After an update
+
+- The top bar shows `v<UI> · agent v<agent>`. When the two differ the line
+  turns amber — the browser is still holding the old UI: reload the page
+  (Ctrl+F5).
+- To be safe: **🗂 Backup / Rollback → 💾 Create a backup now** before
+  updating, and **⭳ Download** before a *firmware* upgrade (backups kept on
+  the router are lost in a reflash).
+
+## 4. Screen layout
 
 | Area | Contents |
 |---|---|
@@ -112,9 +281,9 @@ sbproxy-webauth disable            # turn password login off (token only)
 | **Top bar** | ☰ menu (mobile) · UI/agent version · 👤 account · Live · language · 🔌 Connect · ◐ Theme |
 | **Content** | Stat cards (Wi-Fi count, BSSIDs per band, distinct SOCKS, isolation/WebRTC) · Wi-Fi table (health, sparkline, ⚡ change SOCKS, 🩺 diagnose, 🎲 rotate MAC, pool, edit/duplicate/delete) · preview tabs for `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
 
-## 3. Day-to-day use
+## 5. Day-to-day use
 
-### 3.1 Add a Wi-Fi and apply it
+### 5.1 Add a Wi-Fi and apply it
 
 1. **＋ Add Wi-Fi** → fill in the name, band, idx, Wi-Fi password (≥ 8
    characters) and the proxy. The **Quick proxy input** field accepts
@@ -125,7 +294,7 @@ sbproxy-webauth disable            # turn password login off (token only)
    dry-run → write the config → apply. A failed dry-run leaves the running
    configuration **untouched**.
 
-### 3.2 Change a proxy without reloading Wi-Fi
+### 5.2 Change a proxy without reloading Wi-Fi
 
 - **⚡** on a Wi-Fi row changes that SSID's SOCKS endpoint (`set_sock`). The
   Wi-Fi is not reloaded; only open sessions may drop.
@@ -133,7 +302,7 @@ sbproxy-webauth disable            # turn password login off (token only)
   like the desktop app. This Wi-Fi reloads, so **every device on it
   reconnects**.
 
-### 3.3 The proxy pool of one SSID
+### 5.3 The proxy pool of one SSID
 
 Open it with the **pool** button on a Wi-Fi row.
 
@@ -151,7 +320,7 @@ Open it with the **pool** button on a Wi-Fi row.
 - **Rebalance clients** spreads this SSID's online devices evenly over the
   slots.
 
-### 3.4 The Devices screen
+### 5.4 The Devices screen
 
 The list holds **every machine that has ever joined**, not only the ones
 associated right now:
@@ -184,7 +353,7 @@ associated right now:
 > handful of flash writes per device. The default cap is 400 devices
 > (`SEEN_MAX` in `config/settings.sh`); the least recently seen go first.
 
-### 3.5 Internet egress
+### 5.5 Internet egress
 
 - **Switch egress**: pick an interface — it gets the best metric, every other
   uplink steps behind it, and the network reloads. Wi-Fi and proxies are
@@ -194,7 +363,7 @@ associated right now:
   the mismatch.
 - **Automatic** unpins it again: whatever the default route uses is accepted.
 
-### 3.6 Backup, update, reset
+### 5.6 Backup, update, reset
 
 - **🗂 Backup / Rollback**: create a backup (it asks for a label, letters,
   digits and `. _ -` only), **⭳ Download** it to your computer (do this
@@ -204,7 +373,7 @@ associated right now:
   apply. It reads the real configuration from the router before warning you,
   and only runs after you type `RESET`.
 
-## 4. Feature map: desktop (.exe) ↔ web console
+## 6. Feature map: desktop (.exe) ↔ web console
 
 Both fronts talk to the **same agent CGI** on the router, so features are
 equivalent except where noted.
@@ -243,7 +412,7 @@ opening a local log folder, and the command-line modes (`--provision`,
 `--probe`). `tests/run.sh` carries a block that pins every "✅" in the web
 column above, so removing one of these features turns the suite red.
 
-## 4. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
