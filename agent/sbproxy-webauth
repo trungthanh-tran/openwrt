@@ -22,6 +22,20 @@ hash_pass() { # salt password
   printf '%s:%s' "$1" "$2" | sha256sum | awk '{print $1}'
 }
 
+# Random hex from N bytes of /dev/urandom. Images differ in which byte dumper
+# they carry — some BusyBox builds ship hexdump without od, some the reverse,
+# and a silently empty salt would leave every password hashed against "" — so
+# try both and keep a filter-only path as the last resort.
+rand_hex() { # bytes
+  if command -v hexdump >/dev/null 2>&1; then
+    head -c "$1" /dev/urandom | hexdump -v -e '/1 "%02x"'
+  elif command -v od >/dev/null 2>&1; then
+    head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n\r'
+  else
+    head -c "$(( $1 * 64 ))" /dev/urandom | tr -dc 'a-f0-9' | cut -c "1-$(( $1 * 2 ))"
+  fi
+}
+
 valid_user() {
   [ "${#1}" -ge 1 ] && [ "${#1}" -le 32 ] || return 1
   case "$1" in *[!A-Za-z0-9._-]*) return 1 ;; esac
@@ -48,8 +62,7 @@ case "${1:-}" in
     [ "${#pass}" -ge 8 ] || die "password must be at least 8 characters"
     [ "${#pass}" -le 255 ] || die "password is longer than 255 characters"
     # ':' inside the password is fine — reads only split the first two fields.
-    # BusyBox builds may omit od; hexdump is already present on supported images.
-    salt="$(head -c 12 /dev/urandom | hexdump -v -e '12/1 "%02x"' 2>/dev/null)"
+    salt="$(rand_hex 12)"
     [ -n "$salt" ] || die "could not generate a salt"
     dir="$(dirname "$WEBAUTH_FILE")"
     mkdir -p "$dir" || die "cannot create $dir"

@@ -293,6 +293,15 @@
   .rbitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
   .rbitem .nm { font-family: var(--mono); font-size: 12.5px; }
   .rbitem .nm small { color: var(--text-faint); display: block; font-size: 11px; }
+  /* Device filters: one wrapping row of controls above the table. */
+  .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .filterbar input[type=search] { flex: 1 1 200px; min-width: 160px; }
+  .filterbar select { width: auto; min-width: 120px; }
+  /* A device that is not associated right now stays readable but recedes. */
+  tbody tr.dim td { opacity: .62; }
+  tbody tr.dim:hover td { opacity: 1; }
+  thead th[data-sort] { cursor: pointer; user-select: none; }
+  thead th[data-sort]:hover { color: var(--text); }
 
   /* ---- AdminLTE-style shell: fixed left sidebar + top navbar + content.
      The grid/utility base comes from the offline Bootstrap loaded above. ---- */
@@ -553,6 +562,8 @@
     </div>
     <div class="foot">
       <button class="btn ghost" id="gwRefresh">Kiểm tra lại</button>
+      <button class="btn ghost" id="gwPin" title="Ghi nhớ interface đang chọn là đường ra mong đợi">📌 Ghim</button>
+      <button class="btn ghost" id="gwAuto" title="Bỏ ghim: chấp nhận đường ra mà default route đang dùng">Tự động</button>
       <button class="btn ghost" id="gwClose">Đóng</button>
       <button class="btn primary" id="gwSwitch">Đổi đường ra</button>
     </div>
@@ -577,21 +588,42 @@
 <!-- Devices modal -->
 <div class="backdrop" id="devBackdrop">
   <div class="modal" style="max-width: 860px;">
-    <h2>Thiết bị đang kết nối</h2>
+    <h2>Thiết bị</h2>
     <div class="form">
-      <div class="conn-status" id="devHint" data-i18n-html="devHint">Danh sách client theo từng WiFi. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
-      <input id="devSearch" type="search" placeholder="Tìm MAC, IP, tên máy hoặc SSID…">
+      <div class="conn-status" id="devHint" data-i18n-html="devHint">Mọi máy đã từng vào WiFi, kèm trạng thái. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
+      <div class="filterbar">
+        <input id="devSearch" type="search" placeholder="Tìm MAC, IP, tên máy hoặc SSID…">
+        <select id="devSsidFilter"><option value="">WiFi: tất cả</option></select>
+        <select id="devStateFilter">
+          <option value="">Trạng thái: tất cả</option>
+          <option value="online">Đang kết nối</option>
+          <option value="offline">Đã ngắt</option>
+          <option value="blocked">Bị cấm</option>
+        </select>
+        <label class="tg"><input type="checkbox" id="devAuto" checked> Tự làm mới</label>
+        <select id="devInterval">
+          <option value="5">5s</option>
+          <option value="10" selected>10s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+        </select>
+      </div>
+      <div class="sub" id="devSummary">—</div>
       <div class="tablescroll">
-        <table style="min-width: 720px;">
+        <table style="min-width: 900px;">
           <thead><tr>
-            <th>WiFi</th><th>MAC</th><th>IP / Tên máy</th><th>Thời gian kết nối</th>
-            <th>Vào (in)</th><th>Ra (out)</th><th>Sóng</th><th></th>
+            <th data-sort="idx">WiFi</th><th data-sort="mac">MAC</th><th data-sort="ip">IP / Tên máy</th>
+            <th data-sort="status">Trạng thái</th><th data-sort="rx_bytes">Vào (in)</th>
+            <th data-sort="tx_bytes">Ra (out)</th><th data-sort="signal_dbm">Sóng</th>
+            <th data-sort="slot">Proxy</th><th></th>
           </tr></thead>
-          <tbody id="devRows"><tr><td colspan="8" class="sub">Đang tải…</td></tr></tbody>
+          <tbody id="devRows"><tr><td colspan="9" class="sub">Đang tải…</td></tr></tbody>
         </table>
       </div>
     </div>
     <div class="foot">
+      <button class="btn ghost" id="devBan">⛔ Chặn MAC…</button>
+      <button class="btn ghost" id="devCsv">⭳ Xuất CSV</button>
       <button class="btn ghost" id="devRefresh">↻ Làm mới</button>
       <button class="btn primary" id="devClose">Đóng</button>
     </div>
@@ -603,9 +635,26 @@
   <div class="modal" style="max-width: 760px;">
     <h2>Proxy pool · <span id="poolTitle"></span></h2>
     <div class="form">
-      <div class="conn-status">Mỗi dòng một proxy: <code>host:port:user:password</code>. Thay đổi pool không reload Wi‑Fi.</div>
+      <div class="conn-status">Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.</div>
       <div class="logbox" id="poolRows">Đang tải…</div>
       <button class="btn ghost" id="poolMore" hidden>Xem thêm</button>
+      <div class="filterbar">
+        <select id="poolFormat" title="Định dạng của nhà cung cấp proxy">
+          <option value="auto">Tự động nhận dạng</option>
+          <option value="hpup">host:port:user:pass</option>
+          <option value="uphp">user:pass@host:port</option>
+          <option value="hp">host:port</option>
+          <option value="csv">host,port,user,pass</option>
+          <option value="semi">host;port;user;pass</option>
+          <option value="url">socks5://user:pass@host:port</option>
+        </select>
+        <select id="poolType" title="Loại proxy cho các dòng vừa dán">
+          <option value="socks5">SOCKS5</option>
+          <option value="http">HTTP</option>
+        </select>
+        <input id="poolSlots" type="text" placeholder="Slot cần xoá: 0,2,5" style="flex:1 1 160px">
+        <button class="btn ghost danger" id="poolDelete">Xoá slot đã nhập</button>
+      </div>
       <textarea id="poolInput" rows="5" placeholder="176.116.132.71:43137:user:pass"></textarea>
     </div>
     <div class="foot">
@@ -743,6 +792,13 @@
     "(1-32 ký tự chữ, số, . _ -)": "(1-32 characters: letters, digits, . _ -)",
     "Nhập lại mật khẩu": "Repeat the password", "Tạo tài khoản": "Create account",
     "Đổi mật khẩu": "Change password",
+    "Bị cấm": "Blocked", "Chặn MAC…": "Block a MAC…", "Xuất CSV": "Export CSV",
+    "Trạng thái": "Status", "Trạng thái: tất cả": "Status: all", "WiFi: tất cả": "Wi-Fi: all",
+    "Tự làm mới": "Auto refresh", "Đang kết nối": "Connected", "Đã ngắt": "Disconnected",
+    "Tự động": "Automatic", "Tự động nhận dạng": "Detect automatically",
+    "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Changing the pool does not reload Wi‑Fi.",
+    "Xoá slot đã nhập": "Delete the listed slots", "Thêm vào pool": "Add to the pool",
+    "Xóa pool": "Delete the pool", "Xem thêm": "Show more",
     "Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.": "Change the sbproxy web account password. The current password is required.",
     "Mật khẩu hiện tại": "Current password", "Mật khẩu mới": "New password",
     "Nhập lại mật khẩu mới": "Repeat the new password",
@@ -780,7 +836,12 @@
     "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
     "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package",
     "Mở / đóng menu": "Open / close the menu",
-    "Test proxy đang nhập từ router (không cần lưu trước)": "Test the entered proxy from the router (no need to save first)"
+    "Test proxy đang nhập từ router (không cần lưu trước)": "Test the entered proxy from the router (no need to save first)",
+    "Ghi nhớ interface đang chọn là đường ra mong đợi": "Remember the selected interface as the expected uplink",
+    "Bỏ ghim: chấp nhận đường ra mà default route đang dùng": "Unpin: accept whichever uplink the default route uses",
+    "Định dạng của nhà cung cấp proxy": "The proxy provider's line format",
+    "Loại proxy cho các dòng vừa dán": "Proxy type for the pasted lines",
+    "Đổi BSSID/MAC ngẫu nhiên cho WiFi này (client phải nối lại)": "New random BSSID/MAC for this Wi-Fi (clients must reconnect)"
   };
 
   // Labels carry a leading icon ("＋ Thêm WiFi"); the map is keyed on the words
@@ -1134,9 +1195,18 @@
     if (!agent.connected) return;
     if (!confirm(pick("Write the current wifi-socks.conf to the router and run apply.sh (reloads Wi-Fi)?",
                       "Ghi wifi-socks.conf hiện tại lên router rồi chạy apply.sh (reload WiFi)?"))) return;
-    toast(pick("Pushing and applying…", "Đang đẩy & áp…"));
-    api("save_conf", "POST", genConf(), true).then(sv => {
+    const conf = genConf();
+    // Dry-run before writing, the way the desktop console does: a config the
+    // router rejects is caught while the live one is still in place, instead
+    // of being written first and blowing up during apply.
+    toast(pick("Step 1/3 · Dry-run…", "Bước 1/3 · Dry-run…"));
+    api("dryrun_conf", "POST", conf, true).then(dr => {
+      if (!dr || !dr.ok) throw new Error((dr && (dr.log || dr.error)) || pick("dry-run failed", "dry-run lỗi"));
+      toast(pick("Step 2/3 · Writing the config…", "Bước 2/3 · Ghi cấu hình…"));
+      return api("save_conf", "POST", conf, true);
+    }).then(sv => {
       if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
+      toast(pick("Step 3/3 · Applying…", "Bước 3/3 · Apply…"));
       return api("apply", "POST", {});
     }).then(d => { configDirty = false; showLog("apply.sh", d); poll(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
@@ -1325,6 +1395,29 @@
       }).join("");
     }).catch(e => { state.textContent = String(e); box.innerHTML = ""; });
   }
+  // Pinning is not switching: set_gateway only records which uplink the health
+  // check should expect, so a router that drifts onto another one is reported
+  // as wrong. An empty name means "accept whatever the default route uses".
+  function pinGateway() {
+    const picked = document.querySelector('input[name="gwIface"]:checked');
+    const name = picked ? picked.value : "";
+    const label = name || pick("automatic", "tự động");
+    if (!confirm(pick(`Expect ${label} as the uplink from now on? Nothing is switched; only the health check's expectation changes.`,
+                      `Từ giờ coi ${label} là đường ra mong đợi? Không đổi gì trên router, chỉ đổi kỳ vọng của phần kiểm tra.`))) return;
+    api("set_gateway", "POST", { interface: name }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "set_gateway failed");
+      toast(pick(`Uplink expectation: ${label}`, `Đường ra mong đợi: ${label}`));
+      loadGateway();
+    }).catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
+  }
+  function unpinGateway() {
+    if (!confirm(pick("Stop expecting a specific uplink (automatic)?", "Bỏ ghim đường ra (để tự động)?"))) return;
+    api("set_gateway", "POST", { interface: "" }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "set_gateway failed");
+      toast(pick("Uplink expectation: automatic", "Đường ra mong đợi: tự động"));
+      loadGateway();
+    }).catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
+  }
   function switchGateway() {
     const picked = document.querySelector('input[name="gwIface"]:checked');
     if (!picked) { toast(pick("Pick an interface first.", "Hãy chọn một interface trước.")); return; }
@@ -1365,8 +1458,14 @@
     }).catch(err => { box.innerHTML = `<div class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</div>`; });
   }
   function backupNow() {
+    // The label ends up in the snapshot's directory name, so it is restricted
+    // to the characters the router-side script accepts.
+    const answer = prompt(pick("Backup label (letters, digits, . _ - only):", "Nhãn backup (chỉ chữ, số, . _ -):"), "web");
+    if (answer == null) return;
+    const label = answer.trim() || "web";
+    if (!/^[A-Za-z0-9._-]+$/.test(label)) return toast(pick("Invalid label.", "Nhãn không hợp lệ."));
     toast(pick("Creating a backup…", "Đang tạo backup…"));
-    api("backup", "POST", { label: "ui" }).then(d => { showLog("backup.sh", d); loadBackups(); })
+    api("backup", "POST", { label }).then(d => { showLog("backup.sh", d); loadBackups(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   function downloadBackup(name) {
@@ -1415,6 +1514,18 @@
   let activePoolIdx = 0;
   let activePool = [];
   const poolStatus = {};
+  // The pool list is plain text, so its words go through pick() like every
+  // other runtime string, and one formatter keeps the four places that draw a
+  // slot from drifting apart.
+  const poolWord = {
+    untested: () => pick("not tested", "chưa test"),
+    testing: () => pick("testing", "đang test"),
+    more: () => pick("Show more", "Xem thêm"),
+    less: () => pick("Show less", "Thu gọn")
+  };
+  const poolLine = (p, i, status) =>
+    `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}` +
+    `${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${status}`;
   let poolExpanded = false;
   function openPool(idx) {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
@@ -1424,25 +1535,6 @@
     $("poolInput").value = "";
     $("poolBackdrop").classList.add("show");
     loadPool();
-  }
-  function loadPool() {
-    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(activePoolIdx), { headers: { "Authorization": `Bearer ${agent.token}` } })
-      .then(r => r.json()).then(d => {
-        if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
-        activePool = d.proxies || [];
-        if (!activePool.length) {
-          const current = ssids.find(s => s.idx === activePoolIdx);
-          if (current && current.host && current.port) activePool = [{
-            slot: 0, type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
-            user: current.user || "", pass: current.pass || "", label: "current"
-          }];
-        }
-        $("poolMore").hidden = activePool.length <= 2;
-        $("poolMore").textContent = poolExpanded ? "Thu gọn" : "Xem thêm";
-        $("poolRows").textContent = activePool.length
-          ? activePool.map((p, i) => `${i}: ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""}`).join("\n")
-          : pick("Pool is empty.", "Pool đang trống.");
-      }).catch(e => { $("poolRows").textContent = e.message || e; });
   }
   // Render only two pool entries until the operator asks for the full list.
   function loadPool() {
@@ -1460,23 +1552,23 @@
         Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
         const shown = poolExpanded ? activePool : activePool.slice(0, 2);
         $("poolRows").textContent = shown.length
-          ? shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${poolStatus[p.slot] || "chưa test"}`).join("\n")
+          ? shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n")
           : pick("Pool is empty.", "Pool đang trống.");
         $("poolMore").hidden = activePool.length <= 2;
-        $("poolMore").textContent = poolExpanded ? "Thu gọn" : "Xem thêm";
+        $("poolMore").textContent = poolExpanded ? poolWord.less() : poolWord.more();
       }).catch(e => { $("poolRows").textContent = e.message || e; });
   }
   function testAllPool() {
     if (!activePool.length) return toast(pick("Pool is empty.", "Pool đang trống."));
-    activePool.forEach(p => { poolStatus[p.slot] = "đang test"; });
-    $("poolRows").textContent = activePool.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · đang test`).join("\n");
+    activePool.forEach(p => { poolStatus[p.slot] = poolWord.testing(); });
+    $("poolRows").textContent = activePool.map((p, i) => poolLine(p, i, poolWord.testing())).join("\n");
     Promise.all(activePool.map(p =>
       api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
         .then(d => { poolStatus[p.slot] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
         .catch(() => { poolStatus[p.slot] = "FAIL"; })
     )).then(() => {
       const shown = poolExpanded ? activePool : activePool.slice(0, 2);
-      $("poolRows").textContent = shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · ${poolStatus[p.slot] || "chưa test"}`).join("\n");
+      $("poolRows").textContent = shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n");
     });
   }
   function savePoolRows(rows) {
@@ -1485,85 +1577,275 @@
       activePool = rows;
       poolExpanded = false;
       const shown = activePool.slice(0, 2);
-      $("poolRows").textContent = shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · chưa test`).join("\n");
+      $("poolRows").textContent = shown.map((p, i) => poolLine(p, i, poolWord.untested())).join("\n");
       $("poolMore").hidden = activePool.length <= 2;
-      $("poolMore").textContent = "Xem thêm";
+      $("poolMore").textContent = poolWord.more();
       toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
       loadPool();
     });
   }
   function closePool() { $("poolBackdrop").classList.remove("show"); }
+  // Providers hand out proxy lists in a handful of shapes; the desktop console
+  // accepts all of them, so this one does too. Returns null for a line that
+  // does not fit the chosen format, so the caller can report it by number.
+  function parseProxyLine(line, format) {
+    const cleaned = line.replace(/^\s*(socks5h?|https?):\/\//i, (m) => m).trim();
+    const url = cleaned.match(/^(socks5h?|https?):\/\/(?:([^:@\/]*):([^@\/]*)@)?([^:\/@]+):(\d+)\/?$/i);
+    const build = (host, port, user, pass, type) => {
+      const p = Number(port);
+      if (!host || !Number.isInteger(p) || p < 1 || p > 65535) return null;
+      return { type: type || $("poolType").value || "socks5", host: host.trim(), port: p,
+               user: (user || "").trim(), pass: pass || "" };
+    };
+    const bySep = (sep) => {
+      const parts = cleaned.split(sep);
+      if (parts.length < 2) return null;
+      // user and password may themselves contain the separator only for ':'
+      // in the host:port:user:pass shape, where everything after the third
+      // field belongs to the password.
+      const host = parts[0], port = parts[1];
+      const user = parts[2] || "";
+      const pass = parts.length > 3 ? parts.slice(3).join(sep) : "";
+      return build(host, port, user, pass);
+    };
+    switch (format) {
+      case "url": return url ? build(url[4], url[5], url[2], url[3], /^http/i.test(url[1]) ? "http" : "socks5") : null;
+      case "uphp": {
+        const m = cleaned.match(/^([^:@]*):([^@]*)@([^:]+):(\d+)$/);
+        return m ? build(m[3], m[4], m[1], m[2]) : null;
+      }
+      case "hp": {
+        const m = cleaned.match(/^([^:]+):(\d+)$/);
+        return m ? build(m[1], m[2], "", "") : null;
+      }
+      case "csv": return bySep(",");
+      case "semi": return bySep(";");
+      case "hpup": return bySep(":");
+      default: {  // auto: try each shape, most specific first
+        if (url) return parseProxyLine(line, "url");
+        if (/^[^:@]*:[^@]*@[^:]+:\d+$/.test(cleaned)) return parseProxyLine(line, "uphp");
+        if (cleaned.includes(",")) return parseProxyLine(line, "csv");
+        if (cleaned.includes(";")) return parseProxyLine(line, "semi");
+        return parseProxyLine(line, "hpup");
+      }
+    }
+  }
   function addPoolLines() {
     const lines = $("poolInput").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-    const added = lines.map(line => {
-      const p = line.split(":");
-      if (p.length < 2) throw new Error("Proxy phải có dạng host:port:user:password");
-      return { type: "socks5", host: p.shift(), port: Number(p.shift()), user: p.shift() || "", pass: p.join(":") };
+    if (!lines.length) return toast(pick("Paste at least one proxy.", "Hãy dán ít nhất một proxy."));
+    const format = $("poolFormat").value;
+    const added = [], dropped = [];
+    lines.forEach((line, i) => {
+      const row = parseProxyLine(line, format);
+      if (row) added.push(row); else dropped.push(`${i + 1}: ${line}`);
     });
-    if (added.some(p => !p.host || !Number.isInteger(p.port) || p.port < 1 || p.port > 65535)) throw new Error("Proxy không hợp lệ");
-    savePoolRows(activePool.concat(added)).then(() => { $("poolInput").value = ""; }).catch(e => toast("Lỗi: " + e.message));
+    if (dropped.length) {
+      // Unparsable lines are named rather than silently swallowed.
+      const detail = dropped.slice(0, 10).join("\n");
+      if (!added.length) return showLog(pick("Unreadable proxy lines", "Dòng proxy không đọc được"),
+                                        { ok: false, log: detail });
+      if (!confirm(pick(`${dropped.length} line(s) could not be read and will be skipped:\n${detail}\n\nAdd the other ${added.length}?`,
+                        `${dropped.length} dòng không đọc được và sẽ bị bỏ qua:\n${detail}\n\nVẫn thêm ${added.length} dòng còn lại?`))) return;
+    }
+    savePoolRows(activePool.concat(added)).then(() => { $("poolInput").value = ""; }).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
+  }
+  // Remove named slots instead of the whole pool. Slot numbers are positions in
+  // proxy-pools.conf, and devices are pinned by position, so the ones still in
+  // use are refused rather than quietly repointing someone's device.
+  function deletePoolSlots() {
+    const raw = $("poolSlots").value.trim();
+    if (!raw) return toast(pick("Enter the slots to remove, e.g. 0,2,5", "Nhập slot cần xoá, ví dụ 0,2,5"));
+    const slots = [...new Set(raw.split(/[\s,]+/).filter(Boolean).map(Number))];
+    if (slots.some(n => !Number.isInteger(n) || n < 0 || n >= activePool.length)) {
+      return toast(pick("Invalid slot number.", "Số slot không hợp lệ."));
+    }
+    api("clients").then(d => {
+      const inUse = ((d && d.clients) || []).filter(c => c.idx === activePoolIdx && c.online && slots.includes(c.slot));
+      if (inUse.length) throw new Error(pick(
+        `Slot(s) still used by ${inUse.length} online device(s): ${inUse.map(c => c.mac).join(", ")}`,
+        `Slot đang được ${inUse.length} thiết bị online dùng: ${inUse.map(c => c.mac).join(", ")}`));
+      if (!confirm(pick(`Remove ${slots.length} proxy slot(s) from this pool?`,
+                        `Xoá ${slots.length} slot proxy khỏi pool này?`))) return null;
+      return savePoolRows(activePool.filter((_p, i) => !slots.includes(i)));
+    }).then(r => { if (r !== null) $("poolSlots").value = ""; })
+      .catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
   }
   function clearPool() {
-    if (confirm(pick("Delete this proxy pool?", "Xóa pool proxy này?"))) savePoolRows([]).catch(e => toast("Lỗi: " + e.message));
+    if (confirm(pick("Delete this proxy pool?", "Xóa pool proxy này?"))) savePoolRows([]).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
   }
   function rebalancePoolClients() {
     api("clients").then(d => {
       const macs = (d.clients || []).filter(c => c.idx === activePoolIdx && c.online && c.mac).map(c => c.mac);
       if (!macs.length) throw new Error(pick("No online clients on this SSID.", "SSID này không có client online."));
       return api("rebalance", "POST", { idx: activePoolIdx, macs });
-    }).then(() => { toast(pick("Clients rebalanced ✓", "Đã rebalance client ✓")); loadDevices(); }).catch(e => toast("Lỗi: " + e.message));
+    }).then(() => { toast(pick("Clients rebalanced ✓", "Đã rebalance client ✓")); loadDevices(); }).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
   }
+
+  // The device table keeps the last payload so filtering, sorting and CSV
+  // export never have to re-ask the router.
+  let devicesData = [];
+  let devSort = { key: "", desc: false };
+  const DEV_COLS = 9;
 
   function openDevices() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("devBackdrop").classList.add("show");
     loadDevices();
-    clearInterval(devTimer);
-    devTimer = setInterval(loadDevices, 8000);
+    scheduleDeviceRefresh();
   }
   function closeDevices() {
     $("devBackdrop").classList.remove("show");
     clearInterval(devTimer); devTimer = null;
   }
+  function scheduleDeviceRefresh() {
+    clearInterval(devTimer); devTimer = null;
+    if (!$("devAuto").checked) return;
+    const every = Math.max(5, parseInt($("devInterval").value, 10) || 10);
+    devTimer = setInterval(loadDevices, every * 1000);
+  }
+  // status is what the router decided; the duration beside it is what makes it
+  // actionable ("blocked", "active for 3m", "last seen 2h ago").
+  function deviceStatusCell(c) {
+    if (c.banned) return `<span class="chip warnhue on"><span class="dot"></span>${pick("blocked", "bị cấm")}</span>`;
+    if (c.online) return `<span class="chip on"><span class="dot"></span>${pick("active", "đang kết nối")} ${fmtDuration(c.connected_s)}</span>`;
+    const idle = c.inactive_s != null
+      ? pick(`idle ${fmtDuration(c.inactive_s)}`, `đã ngắt ${fmtDuration(c.inactive_s)}`)
+      : pick("seen before", "từng kết nối");
+    return `<span class="chip">${esc(idle)}</span>`;
+  }
+  function visibleDevices() {
+    const query = $("devSearch").value.trim().toLowerCase();
+    const ssidPick = $("devSsidFilter").value;
+    const state = $("devStateFilter").value;
+    let list = devicesData.filter(c => {
+      if (query && ![c.mac, c.ip, c.host, c.ssid, ssidNameByIdx(c.idx)]
+          .some(v => String(v || "").toLowerCase().includes(query))) return false;
+      if (ssidPick !== "" && String(c.idx) !== ssidPick) return false;
+      if (state === "online" && !c.online) return false;
+      if (state === "blocked" && !c.banned) return false;
+      if (state === "offline" && (c.online || c.banned)) return false;
+      return true;
+    });
+    if (devSort.key) {
+      const key = devSort.key;
+      list = list.slice().sort((a, b) => {
+        const av = a[key], bv = b[key];
+        const cmp = (typeof av === "number" && typeof bv === "number")
+          ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""));
+        return devSort.desc ? -cmp : cmp;
+      });
+    }
+    return list;
+  }
+  function renderDevices() {
+    const box = $("devRows");
+    const list = visibleDevices();
+    const online = devicesData.filter(c => c.online).length;
+    const blocked = devicesData.filter(c => c.banned).length;
+    const traffic = devicesData.reduce((n, c) => n + (Number(c.rx_bytes) || 0) + (Number(c.tx_bytes) || 0), 0);
+    $("devSummary").textContent = pick(
+      `${list.length} shown · ${online} online · ${blocked} blocked · ${devicesData.length} known · ${fmtBytes(traffic)} total`,
+      `Hiện ${list.length} · ${online} đang kết nối · ${blocked} bị cấm · ${devicesData.length} đã từng vào · ${fmtBytes(traffic)} lưu lượng`);
+    if (!list.length) {
+      box.innerHTML = `<tr><td colspan="${DEV_COLS}" class="sub">${pick("No device matches the filter.", "Không có thiết bị nào khớp bộ lọc.")}</td></tr>`;
+      return;
+    }
+    box.innerHTML = list.map(c => {
+      const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
+      const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
+      const proxy = c.pool_size > 0
+        ? `${c.proxy_state === "pinned" ? "slot " + c.slot + " · " : pick("unpinned · ", "chưa gán · ")}${esc(c.proxy_host || "pool")}`
+        : pick("single proxy", "proxy đơn");
+      const proxyBtn = c.pool_size > 0
+        ? `<button class="iconbtn" data-proxy="${esc(c.mac)}" data-idx="${c.idx}">${pick("Proxy", "Đổi proxy")}</button>`
+        : "";
+      const act = (c.banned
+        ? `<button class="iconbtn" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ ${pick("Unblock", "Bỏ cấm")}</button>`
+        : (c.online
+            ? `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Temporary disconnect (the device may reconnect)", "Ngắt tạm (thiết bị có thể nối lại)")}">⏏ ${pick("Disconnect", "Kick")}</button>`
+            : "") +
+          `<button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Persistently block this MAC", "Chặn MAC lâu dài")}">⛔ ${pick("Block", "Cấm")}</button>`)
+        + `<button class="iconbtn" data-detail="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Details", "Chi tiết")}">ℹ</button>`;
+      return `<tr${c.online ? "" : ' class="dim"'}>
+        <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}</td>
+        <td class="mono">${esc(c.mac)}</td>
+        <td class="mono sub">${esc(ipHost)}</td>
+        <td>${deviceStatusCell(c)}</td>
+        <td class="mono">${fmtBytes(c.rx_bytes)}</td>
+        <td class="mono">${fmtBytes(c.tx_bytes)}</td>
+        <td class="mono sub">${esc(sig)}</td>
+        <td class="mono sub">${proxy} ${proxyBtn}</td>
+        <td><div class="rowbtns">${act}</div></td>
+      </tr>`;
+    }).join("");
+  }
   function loadDevices() {
     api("clients").then(d => {
-      const box = $("devRows");
-      const query = $("devSearch").value.trim().toLowerCase();
-      const list = ((d && d.clients) || []).filter(c => !query || [c.mac, c.ip, c.host, c.ssid, ssidNameByIdx(c.idx)].some(v => String(v || "").toLowerCase().includes(query)));
-      if (list.length === 0) {
-        box.innerHTML = `<tr><td colspan="9" class="sub">${pick("No connected or blocked devices.", "Không có client online hoặc bị block.")}</td></tr>`;
-        return;
-      }
+      // The ok check comes first: an error payload has no clients, and reading
+      // "no devices" when the agent actually failed hides the real problem.
       if (!d || !d.ok) throw new Error((d && d.error) || pick("error", "lỗi"));
-      if (!list.length) { box.innerHTML = '<tr><td colspan="8" class="sub">${pick("No connected devices.", "Không có thiết bị nào đang kết nối.")}</td></tr>'; return; }
-      box.innerHTML = list.map(c => {
-        const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
-        const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
-        const proxy = c.pool_size > 0
-          ? `${c.proxy_state === "pinned" ? "slot " + c.slot + " · " : "chưa gán · "}${esc(c.proxy_host || "pool")}`
-          : pick("single proxy", "proxy đơn");
-        const proxyBtn = c.pool_size > 0
-          ? `<button class="iconbtn" data-proxy="${esc(c.mac)}" data-idx="${c.idx}">${pick("Proxy", "Đổi proxy")}</button>`
-          : "";
-        const act = c.banned
-          ? `<button class="btn ghost" data-unban="${esc(c.mac)}" data-idx="${c.idx}">✓ ${pick("Unblock", "Bỏ cấm")}</button>`
-          : `<button class="iconbtn" data-kick="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Temporary disconnect (the device may reconnect)", "Ngắt tạm (thiết bị có thể nối lại)")}">⏏ ${pick("Disconnect", "Kick")}</button>
-             <button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Persistently block this MAC", "Chặn MAC lâu dài")}">⛔ ${pick("Block", "Cấm")}</button>`;
-        return `<tr>
-          <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}${c.banned ? ` <span class="chip warnhue on">${pick("blocked", "cấm")}</span>` : ""}</td>
-          <td class="mono">${esc(c.mac)}</td>
-          <td class="mono sub">${esc(ipHost)}</td>
-          <td class="mono">${fmtDuration(c.connected_s)}</td>
-          <td class="mono">${fmtBytes(c.rx_bytes)}</td>
-          <td class="mono">${fmtBytes(c.tx_bytes)}</td>
-          <td class="mono sub">${esc(sig)}</td>
-          <td class="mono sub">${proxy} ${proxyBtn}</td>
-          <td><div class="rowbtns">${act}</div></td>
-        </tr>`;
-      }).join("");
+      devicesData = (d.clients || []).filter(c => c && c.mac);
+      const chosen = $("devSsidFilter").value;
+      const seen = [...new Set(devicesData.map(c => c.idx))].sort((a, b) => a - b);
+      $("devSsidFilter").innerHTML = `<option value="">${pick("Wi-Fi: all", "WiFi: tất cả")}</option>` +
+        seen.map(i => `<option value="${i}">${esc(ssidNameByIdx(i))} (idx ${i})</option>`).join("");
+      $("devSsidFilter").value = seen.some(i => String(i) === chosen) ? chosen : "";
+      renderDevices();
     }).catch(err => {
-      $("devRows").innerHTML = `<tr><td colspan="8"><span class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</span></td></tr>`;
+      $("devRows").innerHTML = `<tr><td colspan="${DEV_COLS}"><span class="conn-status bad">${pick("Error: ", "Lỗi: ")}${esc(err.message)}</span></td></tr>`;
     });
+  }
+  function deviceDetails(idx, mac) {
+    const c = devicesData.find(x => x.mac === mac && x.idx === idx);
+    if (!c) return;
+    const when = t => t ? new Date(t * 1000).toLocaleString() : "—";
+    const lines = [
+      `${pick("Wi-Fi", "WiFi")}: ${ssidNameByIdx(c.idx)} (idx ${c.idx}${c.band ? " · " + c.band : ""})`,
+      `MAC: ${c.mac}`,
+      `IP: ${c.ip || "—"}`,
+      `${pick("Hostname", "Tên máy")}: ${c.host || "—"}`,
+      `${pick("Status", "Trạng thái")}: ${c.banned ? pick("blocked", "bị cấm") : c.online ? pick("online", "đang kết nối") : pick("offline", "đã ngắt")}`,
+      `${pick("Connected for", "Đã kết nối")}: ${c.online ? fmtDuration(c.connected_s) : "—"}`,
+      `${pick("Idle for", "Ngắt được")}: ${c.inactive_s != null ? fmtDuration(c.inactive_s) : "—"}`,
+      `${pick("First seen", "Lần đầu thấy")}: ${when(c.first_seen)}`,
+      `${pick("Last seen", "Lần cuối thấy")}: ${when(c.last_seen)}`,
+      `${pick("Signal", "Sóng")}: ${c.signal_dbm != null ? c.signal_dbm + " dBm" : "—"}`,
+      `${pick("Received", "Vào")}: ${fmtBytes(c.rx_bytes)} · ${pick("Sent", "Ra")}: ${fmtBytes(c.tx_bytes)}`,
+      `${pick("Proxy", "Proxy")}: ${c.pool_size > 0 ? `${c.proxy_state} ${c.slot != null ? "slot " + c.slot : ""} ${c.proxy_host || ""} ${c.proxy_label ? "(" + c.proxy_label + ")" : ""}` : pick("single proxy (no pool)", "proxy đơn (không dùng pool)")}`,
+      `${pick("Interface", "Interface")}: ${c.ifname || "—"}`
+    ];
+    showLog(pick("Device details", "Chi tiết thiết bị") + " · " + c.mac, { ok: true, log: lines.join("\n") });
+  }
+  function exportDevicesCsv() {
+    const list = visibleDevices();
+    if (!list.length) return toast(pick("Nothing to export.", "Không có gì để xuất."));
+    const cols = ["idx", "ssid", "band", "mac", "ip", "host", "status", "online", "banned",
+                  "connected_s", "inactive_s", "first_seen", "last_seen",
+                  "rx_bytes", "tx_bytes", "signal_dbm", "slot", "proxy_host", "proxy_state"];
+    const cell = v => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = list.map(c => cols.map(k => cell(k === "ssid" ? (c.ssid || ssidNameByIdx(c.idx)) : c[k])).join(","));
+    // The BOM keeps Excel from mangling UTF-8 hostnames.
+    download("sbproxy-devices.csv", "﻿" + cols.join(",") + "\n" + rows.join("\n") + "\n");
+    toast(pick("CSV downloaded ✓", "Đã tải CSV ✓"));
+  }
+  // Block a MAC that is not in the list — a device that has never connected
+  // cannot be selected, but it can still be kept out in advance.
+  function manualBan() {
+    const idxs = ssids.map(s => s.idx).sort((a, b) => a - b);
+    if (!idxs.length) return toast(pick("No Wi-Fi is configured.", "Chưa có WiFi nào."));
+    const idxAnswer = prompt(pick("Block on which Wi-Fi? Enter its idx:\n", "Cấm trên WiFi nào? Nhập idx:\n") +
+      idxs.map(i => `${i}: ${ssidNameByIdx(i)}`).join("\n"), String(idxs[0]));
+    if (idxAnswer == null) return;
+    const idx = parseInt(idxAnswer.trim(), 10);
+    if (!idxs.includes(idx)) return toast(pick("Unknown idx.", "idx không tồn tại."));
+    const macAnswer = prompt(pick("MAC address to block (aa:bb:cc:dd:ee:ff):", "MAC cần cấm (aa:bb:cc:dd:ee:ff):"), "");
+    if (macAnswer == null) return;
+    const mac = macAnswer.trim().toLowerCase().replace(/-/g, ":");
+    if (!/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(mac)) return toast(pick("Invalid MAC address.", "MAC không hợp lệ."));
+    deviceAction("ban", idx, mac);
   }
   function changeClientProxy(idx, mac) {
     fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), { headers: { "Authorization": `Bearer ${agent.token}` } }).then(r => r.json())
@@ -1581,6 +1863,34 @@
       .catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
   }
 
+  // Random MAC: a new BSSID for one SSID, optionally from another vendor's OUI.
+  // The router reloads that Wi-Fi, so every client on it reconnects.
+  function rotateMac(idx) {
+    if (!agent.connected) return;
+    const rec = ssids.find(s => s.idx === idx);
+    const current = rec ? (rec.mac_oui || "") : "";
+    const menu = VENDORS.map((v, i) => `${i}: ${vendorLabel(v)}${v.oui ? " · " + v.oui : ""}`).join("\n");
+    const answer = prompt(pick(
+      `Vendor for the new MAC of "${rec ? rec.name : "w" + idx}" (number, or Enter to keep the current one):\n`,
+      `Hãng cho MAC mới của "${rec ? rec.name : "w" + idx}" (nhập số, Enter để giữ nguyên):\n`) + menu, "");
+    if (answer == null) return;
+    const choice = answer.trim();
+    let oui = current;
+    if (choice !== "") {
+      const n = Number(choice);
+      if (!Number.isInteger(n) || n < 0 || n >= VENDORS.length) return toast(pick("Invalid vendor.", "Hãng không hợp lệ."));
+      oui = VENDORS[n].oui;
+    }
+    if (!confirm(pick(`Give "${rec ? rec.name : "w" + idx}" a new random MAC now? That Wi-Fi reloads and every device on it must reconnect.`,
+                      `Đổi MAC ngẫu nhiên cho "${rec ? rec.name : "w" + idx}" ngay? WiFi đó sẽ reload, mọi thiết bị phải kết nối lại.`))) return;
+    toast(pick("Rotating the MAC…", "Đang đổi MAC…"));
+    api("rotate_mac", "POST", oui ? { idx, oui } : { idx }).then(d => {
+      showLog("rotate-mac.sh idx=" + idx, d);
+      if (rec) { rec.mac_oui = oui; save(); }
+      setTimeout(() => { poll(); render(); }, 4000);
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+
   function deviceAction(action, idx, mac) {
     const verb = action === "kick" ? pick("Disconnect (temporary)", "Kick (ngắt tạm)")
       : action === "ban" ? pick("Block (persistent)", "Cấm (chặn lâu dài)")
@@ -1595,7 +1905,7 @@
     toast(pick(verb + "…", "Đang " + verb.toLowerCase() + "…"));
     api(action, "POST", { idx, mac }).then(d => {
       if (!d || !d.ok) return showLog(verb, d);
-      toast(verb + " ✓"); loadDevices();
+      toast(verb + " ✓"); loadDevices(); poll();
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
@@ -1649,6 +1959,7 @@
         <td><div class="rowbtns">
           ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="${pick("Change SOCKS without reloading Wi-Fi; open sessions may drop", "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn")}">⚡</button>` : ""}
           ${agent.connected ? `<button class="iconbtn" data-diag="${s.idx}" title="${pick("Diagnose this Wi-Fi's data path on the router", "Chẩn đoán đường đi dữ liệu của WiFi này trên router")}">🩺</button>` : ""}
+          ${agent.connected ? `<button class="iconbtn" data-mac="${s.idx}" title="${pick("New random BSSID/MAC for this Wi-Fi (clients reconnect)", "Đổi BSSID/MAC ngẫu nhiên cho WiFi này (client phải nối lại)")}">🎲</button>` : ""}
           <button class="iconbtn" data-edit="${s.id}">${pick("Edit", "Sửa")}</button>
           <button class="iconbtn" data-dup="${s.id}">⧉</button>
           <button class="iconbtn del" data-del="${s.id}">✕</button>
@@ -1927,11 +2238,26 @@
   $("devicesBtn").onclick = openDevices;
   $("devClose").onclick = closeDevices;
   $("devRefresh").onclick = loadDevices;
-  $("devSearch").oninput = loadDevices;
+  // Filtering and sorting work on the payload already in hand; only Refresh
+  // and the timer go back to the router.
+  $("devSearch").oninput = renderDevices;
+  $("devSsidFilter").onchange = renderDevices;
+  $("devStateFilter").onchange = renderDevices;
+  $("devAuto").onchange = scheduleDeviceRefresh;
+  $("devInterval").onchange = scheduleDeviceRefresh;
+  $("devCsv").onclick = exportDevicesCsv;
+  $("devBan").onclick = manualBan;
+  $("devBackdrop").querySelector("thead").onclick = e => {
+    const key = e.target.getAttribute("data-sort");
+    if (!key) return;
+    devSort = { key, desc: devSort.key === key ? !devSort.desc : false };
+    renderDevices();
+  };
   $("devBackdrop").onclick = e => { if (e.target.id === "devBackdrop") closeDevices(); };
   $("poolClose").onclick = closePool;
   $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
   $("poolSave").onclick = addPoolLines;
+  $("poolDelete").onclick = deletePoolSlots;
   $("poolClear").onclick = clearPool;
   $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;
@@ -1941,7 +2267,9 @@
     const b = e.target.getAttribute("data-ban");
     const u = e.target.getAttribute("data-unban");
     const p = e.target.getAttribute("data-proxy");
+    const info = e.target.getAttribute("data-detail");
     const idx = parseInt(e.target.getAttribute("data-idx"), 10);
+    if (info) return deviceDetails(idx, info);
     if (p) return changeClientProxy(idx, p);
     if (k) return deviceAction("kick", idx, k);
     if (b) return deviceAction("ban", idx, b);
@@ -1955,6 +2283,8 @@
   $("gwBtn").onclick = openGateway;
   $("resetAllBtn").onclick = resetEverything;
   $("gwRefresh").onclick = loadGateway;
+  $("gwPin").onclick = pinGateway;
+  $("gwAuto").onclick = unpinGateway;
   $("gwSwitch").onclick = switchGateway;
   $("gwClose").onclick = () => $("gwBackdrop").classList.remove("show");
   $("gwBackdrop").onclick = e => { if (e.target.id === "gwBackdrop") $("gwBackdrop").classList.remove("show"); };
@@ -1978,7 +2308,9 @@
     const zp = e.target.getAttribute("data-zap");
     const dg = e.target.getAttribute("data-diag");
     const po = e.target.getAttribute("data-pool");
+    const mc = e.target.getAttribute("data-mac");
     if (po) return openPool(parseInt(po, 10));
+    if (mc) return rotateMac(parseInt(mc, 10));
     if (dg) return diagnoseSsid(parseInt(dg, 10));
     if (zp) return zapSock(ssids.find(x => x.id === zp));
     if (ed) return openModal(ed);

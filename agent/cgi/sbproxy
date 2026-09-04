@@ -159,9 +159,20 @@ webauth_valid_user() {
   case "$1" in *[!A-Za-z0-9._-]*) return 1 ;; esac
   return 0
 }
+# Random hex from N bytes of /dev/urandom. Images differ in which byte dumper
+# they carry — some BusyBox builds ship hexdump without od, some the reverse,
+# and a silently empty salt would leave every password hashed against "".
+webauth_rand_hex() { # bytes
+  if have hexdump; then
+    head -c "$1" /dev/urandom | hexdump -v -e '/1 "%02x"'
+  elif have od; then
+    head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n\r'
+  else
+    head -c "$(( $1 * 64 ))" /dev/urandom | tr -dc 'a-f0-9' | cut -c "1-$(( $1 * 2 ))"
+  fi
+}
 webauth_write() { # user pass -> writes the account file
-  # BusyBox builds may omit od; hexdump is already present on supported images.
-  wa_salt="$(head -c 12 /dev/urandom | hexdump -v -e '12/1 "%02x"' 2>/dev/null)"
+  wa_salt="$(webauth_rand_hex 12)"
   [ -n "$wa_salt" ] || json_err "500 Internal Server Error" "không sinh được salt"
   mkdir -p "$(dirname "$WEBAUTH_FILE")" 2>/dev/null
   ( umask 077; printf '%s:%s:%s\n' "$1" "$wa_salt" "$(webauth_hash "$wa_salt" "$2")" > "$WEBAUTH_FILE" ) \

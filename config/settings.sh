@@ -115,6 +115,15 @@ BACKUP_DIR="/root/sbproxy-backups"
 # Persistent per-SSID MAC bans (lines: idx|mac). Source of truth re-applied by
 # apply.sh so bans survive re-applies; ban.sh/unban.sh maintain it.
 BANS_FILE="/etc/sbproxy.bans"
+# Devices that have ever connected (lines: idx|mac|first_seen|last_seen|ip|host).
+# clients.sh refreshes the tmpfs copy on every poll — a console polls every few
+# seconds, and writing flash that often would wear it out — and only flushes to
+# the persistent copy when a device is seen for the FIRST time, so history
+# survives a reboot at a handful of writes per new device.
+SEEN_FILE="/tmp/sbproxy.seen"
+SEEN_STORE="/etc/sbproxy.seen"
+# Cap on remembered devices; the oldest last_seen entries are dropped first.
+SEEN_MAX=400
 
 # --- STUN/TURN ports blocked for WebRTC leak mitigation --------------------
 STUN_TCP_PORTS="3478, 3479, 5349, 5350"

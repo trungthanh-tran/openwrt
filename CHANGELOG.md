@@ -6,6 +6,27 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Danh sách thiết bị giờ có lịch sử, không chỉ máy đang kết nối.**
+  `clients.sh` ghi nhớ mọi máy từng vào WiFi và trả thêm `status`
+  (`online` / `blocked` / `offline`), `first_seen`, `last_seen`, `inactive_s`.
+  Kho lịch sử nằm ở `/tmp/sbproxy.seen` (ghi mỗi lần poll, không mòn flash) và
+  chỉ chép sang `/etc/sbproxy.seen` **khi có máy mới lần đầu**, nên sống sót
+  qua reboot/sysupgrade với vài lần ghi flash mỗi máy; giới hạn `SEEN_MAX`
+  (mặc định 400), máy cũ nhất bị loại trước.
+- **Màn hình Thiết bị trên web ngang bằng bản desktop**: cột Trạng thái
+  (`đang kết nối 5p`, `đã ngắt 2g 15p`, `bị cấm`), lọc theo WiFi/trạng thái +
+  tìm kiếm, sắp xếp theo cột, dòng tóm tắt, tự làm mới chọn nhịp
+  (5/10/30/60s), **ℹ Chi tiết** một máy, **⛔ Chặn MAC…** cho MAC chưa từng
+  kết nối, **⭳ Xuất CSV** (UTF-8 có BOM).
+- **Các tính năng desktop còn thiếu đã được port sang web**: 🎲 đổi MAC/BSSID
+  ngẫu nhiên có chọn hãng (`rotate_mac`), 📌 ghim / Tự động cho đường ra
+  (`set_gateway`), xoá slot pool chọn lọc (từ chối slot đang có thiết bị
+  online dùng), nhận 7 định dạng proxy của nhà cung cấp như bản desktop, và
+  hỏi nhãn khi tạo backup.
+- `tests/test_clients.sh` (38 assert) cho `clients.sh`, cùng một khối trong
+  `tests/run.sh` khoá lại từng tính năng web trong bảng parity của
+  [docs/web-console.md](docs/web-console.md).
+
 - **Web console trên router có đăng nhập riêng.** `install-agent.sh` tạo tài
   khoản (mặc định `admin` + mật khẩu ngẫu nhiên, in ra cuối màn hình cài; ghi
   đè bằng `SBPROXY_WEB_USER`/`SBPROXY_WEB_PASS`); lệnh mới `sbproxy-webauth`
@@ -41,6 +62,22 @@ Ngày theo định dạng YYYY-MM-DD.
   `SBPROXY_WEB_USER`/`SBPROXY_WEB_PASS`.
 
 ### Fixed
+- **Bảng Thiết bị trên web bị lệch cột**: header có 8 cột trong khi mỗi hàng
+  render 9 ô (cột Proxy được thêm vào hàng mà quên thêm header). Test đếm số
+  cột header của đúng bảng này để lỗi không lặp lại.
+- Màn hình Thiết bị báo "không có thiết bị" khi agent thật ra trả lỗi: kiểm
+  tra `ok` giờ chạy trước khi đếm danh sách. Bỏ nhánh chết còn sót và bản
+  `loadPool()` trùng lặp.
+- **Đẩy & Áp trên web giờ dry-run trước khi ghi** như bản desktop: cấu hình
+  router bị từ chối sẽ được phát hiện khi cấu hình đang chạy vẫn còn nguyên,
+  thay vì ghi đè rồi mới hỏng lúc apply.
+- Sinh salt cho tài khoản web chạy được trên cả router lẫn workstation: thử
+  `hexdump`, rồi `od`, rồi lọc trực tiếp từ `/dev/urandom` — trước đó image
+  thiếu một trong hai công cụ sẽ nhận salt rỗng.
+- `/etc/sbproxy.bans`, `/etc/sbproxy.assign` và `/etc/sbproxy.seen` được đăng
+  ký vào `/etc/sysupgrade.conf` nên lệnh cấm, ghim proxy và lịch sử thiết bị
+  không mất sau khi nâng cấp firmware.
+
 Đợt rà soát regression 0.5.9 → 0.5.19:
 - **`apply.sh` chết trước khi Wi-Fi kịp lên lại**: khi sing-box không start
   được, `verify_singbox_running` từng `die` trước `wifi reload` +

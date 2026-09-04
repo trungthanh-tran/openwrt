@@ -107,9 +107,94 @@ sbproxy-webauth disable            # tắt đăng nhập mật khẩu (chỉ cò
 | **Sidebar — Cấu hình** | ＋ Thêm WiFi · ⤓ Nhập .conf · ⭳ Tải wifi-socks.conf · ⭳ Tải JSON · ✕ Xoá hết (chỉ xoá trên trình duyệt) |
 | **Sidebar — Router** (hiện khi đã kết nối) | ⇪ Đẩy & Áp · 📱 Thiết bị · ⭳ Tải từ router · 🗂 Backup/Rollback · 🌐 Đường ra · ⬆ Cập nhật · ⟲ Reset toàn bộ |
 | **Thanh trên** | ☰ menu (mobile) · phiên bản UI/agent · 👤 tài khoản · Live · ngôn ngữ · 🔌 Kết nối · ◐ Theme |
-| **Nội dung** | Thẻ thống kê (số WiFi, BSSID theo băng, SOCKS, cách ly/WebRTC) · bảng WiFi (health, sparkline, ⚡ đổi sock, 🩺 chẩn đoán, sửa/nhân bản/xoá) · tab xem trước `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
+| **Nội dung** | Thẻ thống kê (số WiFi, BSSID theo băng, SOCKS, cách ly/WebRTC) · bảng WiFi (health, sparkline, ⚡ đổi sock, 🩺 chẩn đoán, 🎲 đổi MAC, pool, sửa/nhân bản/xoá) · tab xem trước `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
 
-## 3. Map tính năng: desktop (.exe) ↔ web console
+## 3. Dùng hằng ngày
+
+### 3.1 Thêm và áp một WiFi mới
+
+1. **＋ Thêm WiFi** → điền tên, băng tần, idx, mật khẩu WiFi (≥ 8 ký tự) và
+   proxy. Ô **Nhập nhanh proxy** nhận `host:port:user:password`, bấm **Tách**
+   là tự điền vào 4 ô.
+2. Bấm **🧪 Test proxy** (khi đã kết nối router) để thử proxy đó **từ router**
+   trước khi lưu — kết quả nói rõ lý do fail, không chỉ "fail".
+3. **Lưu** → **⇪ Đẩy & Áp lên router**. Quy trình 3 bước giống hệt bản desktop:
+   dry-run → ghi conf → apply. Dry-run hỏng thì cấu hình đang chạy **không bị
+   đụng tới**.
+
+### 3.2 Đổi proxy nhanh, không reload WiFi
+
+- **⚡** trên hàng WiFi: đổi SOCKS của riêng SSID đó (`set_sock`). WiFi không
+  reload, chỉ phiên đang mở có thể gián đoạn.
+- **🎲**: cấp BSSID/MAC ngẫu nhiên mới cho SSID đó, chọn được hãng (OUI) như
+  bản desktop. WiFi này reload nên **mọi thiết bị trên nó phải kết nối lại**.
+
+### 3.3 Pool proxy cho một SSID
+
+Mở bằng nút **pool** trên hàng WiFi.
+
+- **Dán proxy**: mỗi dòng một proxy. Chọn **định dạng nhà cung cấp** (tự động
+  nhận dạng, `host:port:user:pass`, `user:pass@host:port`, `host:port`,
+  `host,port,user,pass`, `host;port;user;pass`, `socks5://user:pass@host:port`)
+  và loại proxy (SOCKS5/HTTP), rồi **Thêm vào pool**. Dòng không đọc được sẽ
+  được liệt kê ra để bạn quyết định, không bị bỏ qua âm thầm.
+- **Test proxy**: thử toàn bộ pool từ router, mỗi slot hiện OK/FAIL.
+- **Xoá slot đã nhập**: gõ số slot (`0,2,5`) rồi bấm. Slot đang có thiết bị
+  online dùng sẽ **bị từ chối** — đúng như bản desktop, tránh việc âm thầm đẩy
+  máy người khác sang proxy lạ.
+- **Xóa pool**: xoá sạch pool của SSID này.
+- **Rebalance client**: chia đều thiết bị đang online của SSID lên các slot.
+
+### 3.4 Màn hình Thiết bị
+
+Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang kết nối:
+
+| Trạng thái | Ý nghĩa |
+|---|---|
+| `đang kết nối 5p 12s` | Đang liên kết, kèm thời lượng phiên hiện tại |
+| `đã ngắt 2g 15p` | Từng vào, hiện không liên kết, kèm thời gian đã rời đi |
+| `bị cấm` | MAC nằm trong danh sách chặn của SSID |
+
+- **Lọc**: theo WiFi, theo trạng thái, và ô tìm kiếm (MAC/IP/tên máy/SSID).
+  Lọc và sắp xếp chạy trên dữ liệu đã tải — không gọi lại router.
+- **Sắp xếp**: bấm vào tiêu đề cột (bấm lần nữa để đảo chiều).
+- **Tự làm mới**: bật/tắt và chọn nhịp 5/10/30/60 giây.
+- **Dòng tóm tắt**: số máy đang hiện / đang kết nối / bị cấm / tổng đã từng vào
+  / tổng lưu lượng.
+- Nút trên mỗi hàng: **Kick** (ngắt tạm, chỉ máy đang online), **Cấm** (chặn
+  MAC lâu dài — reload băng tần đó), **Bỏ cấm**, **Đổi proxy** (chọn slot pool
+  hoặc `none` để bỏ ghim), **ℹ Chi tiết** (IP, tên máy, lần đầu/lần cuối thấy,
+  sóng, lưu lượng, proxy đang ghim, interface).
+- **⛔ Chặn MAC…**: cấm trước một MAC **chưa từng kết nối**.
+- **⭳ Xuất CSV**: xuất đúng những dòng đang hiển thị (UTF-8 có BOM, mở Excel
+  không lỗi font).
+
+> **Lịch sử thiết bị đến từ đâu?** Router ghi mỗi lần thấy máy vào
+> `/tmp/sbproxy.seen` (RAM, ghi mỗi lần poll nên không mòn flash) và chỉ chép
+> sang `/etc/sbproxy.seen` **khi có máy mới lần đầu** — nên lịch sử sống sót
+> qua reboot và qua sysupgrade với vài lần ghi flash mỗi máy. Giới hạn mặc
+> định 400 máy (`SEEN_MAX` trong `config/settings.sh`), máy cũ nhất bị loại
+> trước.
+
+### 3.5 Đường ra Internet
+
+- **Đổi đường ra**: chọn interface rồi bấm — interface đó nhận metric tốt nhất,
+  các đường khác lùi lại, network reload. WiFi và proxy không đổi.
+- **📌 Ghim**: chỉ ghi nhớ interface nào là đường ra **mong đợi**; không đổi gì
+  trên router, nhưng nếu router trôi sang đường khác thì phần kiểm tra sẽ báo
+  sai lệch.
+- **Tự động**: bỏ ghim, chấp nhận bất kỳ đường ra nào default route đang dùng.
+
+### 3.6 Backup, cập nhật, reset
+
+- **🗂 Backup / Rollback**: tạo backup (có hỏi nhãn, chỉ nhận chữ/số/`. _ -`),
+  **⭳ Về máy** (tải file backup về máy tính — làm việc này **trước khi flash
+  firmware**), **↩ Khôi phục**.
+- **⬆ Cập nhật**: đẩy package `.tar.gz`/`.zip` lên router. Không reload WiFi.
+- **⟲ Reset toàn bộ**: đá mọi thiết bị, xoá mọi SSID và pool, apply. Đọc cấu
+  hình thật từ router trước khi cảnh báo, và phải gõ `RESET` mới chạy.
+
+## 4. Map tính năng: desktop (.exe) ↔ web console
 
 Cả hai bản nói chuyện với **cùng một agent CGI** trên router, nên tính năng là
 tương đương trừ vài mục ghi chú dưới đây.
@@ -120,23 +205,33 @@ tương đương trừ vài mục ghi chú dưới đây.
 | Cài router từ đầu qua SSH (đẩy code, deps, agent) | ✅ | ❌ (việc của desktop/CLI) | — (SSH) |
 | Thêm / sửa / xoá / nhân bản SSID | ✅ | ✅ | — (local) + `save_conf` |
 | Nhập / xuất `wifi-socks.conf`, JSON | ✅ | ✅ | `get_conf` |
-| Đẩy & Áp (validate rồi apply) | ✅ | ✅ | `dryrun_conf`, `save_conf`, `apply` |
+| Đẩy & Áp: dry-run → ghi → apply | ✅ | ✅ | `dryrun_conf`, `save_conf`, `apply` |
 | Đổi SOCKS 1 SSID không reload WiFi (⚡) | ✅ | ✅ | `set_sock` |
+| Đổi MAC/BSSID ngẫu nhiên, chọn hãng (🎲) | ✅ | ✅ | `rotate_mac` |
 | Health + độ trễ từng SSID, sparkline | ✅ | ✅ | `status` |
 | Chẩn đoán đường dữ liệu 1 SSID (🩺) | ✅ | ✅ | `diagnose_ssid` |
-| Test 1 proxy từ router, kèm lý do fail (🧪) | ✅ (Pool, thêm proxy) | ✅ (nút trong form Thêm/Sửa WiFi) | `probe_proxy` |
+| Test 1 proxy từ router, kèm lý do fail (🧪) | ✅ | ✅ (form WiFi + Test cả pool) | `probe_proxy` |
+| **Pool proxy**: xem, thêm nhiều định dạng, xoá slot chọn lọc, xoá cả pool | ✅ | ✅ | `get_pool`, `save_pool` |
+| Pool: gán proxy cho 1 thiết bị / bỏ ghim | ✅ | ✅ (nút **Đổi proxy** ở màn Thiết bị) | `assign_proxy` |
+| Pool: chia đều thiết bị lên các slot | ✅ (chỉ trong code) | ✅ (**Rebalance client**) | `rebalance` |
 | Thiết bị: xem, kick, cấm, bỏ cấm | ✅ | ✅ | `clients`, `kick`, `ban`, `unban` |
-| Backup / tải backup về máy / rollback | ✅ | ✅ | `backups`, `backup`, `download_backup`, `rollback` |
-| Đường ra Internet: xem + đổi uplink | ✅ | ✅ | `gateway`, `switch_gateway` |
+| Thiết bị: lịch sử máy đã từng kết nối + trạng thái | ✅ | ✅ | `clients` |
+| Thiết bị: lọc, sắp xếp, tóm tắt, tự làm mới theo nhịp | ✅ | ✅ | — |
+| Thiết bị: chi tiết một máy | ✅ | ✅ (**ℹ**) | — |
+| Thiết bị: xuất CSV | ✅ | ✅ | — |
+| Thiết bị: chặn trước một MAC chưa kết nối | ✅ | ✅ (**⛔ Chặn MAC…**) | `ban` |
+| Backup (có nhãn) / tải về máy / rollback | ✅ | ✅ | `backups`, `backup`, `download_backup`, `rollback` |
+| Đường ra: xem, đổi uplink, ghim / bỏ ghim | ✅ | ✅ | `gateway`, `switch_gateway`, `set_gateway` |
 | Reset toàn bộ (kick hết, xoá hết, apply) | ✅ | ✅ (hành vi được test giống hệt desktop) | `kick`, `save_pool`, `save_conf`, `apply` |
 | Cập nhật agent bằng package .tar.gz/.zip | ✅ | ✅ | `update` |
-| Đổi MAC/BSSID (rotate) | ✅ | ❌ (API có sẵn, UI chưa có) | `rotate_mac` |
-| **Pool proxy** per-SSID: slots, gán MAC, rebalance | ✅ (màn hình Pool) | ❌ (chỉ xoá pool khi Reset; UI pool chưa có) | `get_pool`, `save_pool`, `assign_proxy`, `rebalance` |
-| Sửa lỗi SSH host key (dialog hướng dẫn) | ✅ | — (web không dùng SSH) | — |
 | Ngôn ngữ VI/EN, theme sáng/tối | ✅ | ✅ | — |
+| Sửa lỗi SSH host key, thư mục log, lưu token bằng DPAPI | ✅ | — (không áp dụng cho trình duyệt) | — |
 
-Hai chỗ web còn thiếu (rotate MAC, màn hình Pool) đều đã có API phía agent —
-chỉ là chưa có UI; dùng bản desktop cho các thao tác đó.
+Phần còn lại chỉ có ở desktop là những thứ **bản chất không chạy được trong
+trình duyệt**: cài router qua SSH, mã hoá token bằng Windows DPAPI, mở thư mục
+log cục bộ, và các chế độ dòng lệnh (`--provision`, `--probe`).
+`tests/run.sh` có một khối kiểm tra riêng khoá lại từng dòng "✅" ở cột web
+trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 
 ## 4. Khắc phục sự cố
 

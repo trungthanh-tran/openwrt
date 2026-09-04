@@ -41,3 +41,6 @@ sh tests/test_healthd.sh
 echo "===== Internet gateway suite ====="
 sh tests/test_gateway.sh
 sh tests/test_diagnose.sh
+
+echo "===== Client list and device history suite ====="
+sh tests/test_clients.sh

@@ -489,7 +489,11 @@ if command -v jq >/dev/null 2>&1; then
   printf 'wireless.w1.ssid=Alpha\nwireless.w2.ssid=Bravo\n' > "$STUB/uci_ssid"
   # settings.sh reassigns BANS_FILE, so override it via a custom SETTINGS that
   # sources the real one first (clients.sh re-sources settings in a subprocess).
-  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans2"\n' "$ROOT" "$STUB" > "$STUB/settings.sh"
+  # The seen store goes to the stub directory too: pointing it at the real
+  # /tmp would carry devices from one test — or one developer's router — into
+  # the next run's device count.
+  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans2"\nSEEN_FILE="%s/seen1"\nSEEN_STORE="%s/seen1.store"\n' \
+    "$ROOT" "$STUB" "$STUB" "$STUB" > "$STUB/settings.sh"
   out="$(UBUS_WIFI_JSON="$STUB/wifi.json" IW_DUMP_DIR="$STUB/iwd" LEASES="$STUB/leases" \
          SETTINGS="$STUB/settings.sh" UCI_STATE="$STUB/uci_ssid" sh "$ROOT/scripts/clients.sh" 2>/dev/null)"
   eq "ok true"        "$(printf '%s' "$out" | jq -r '.ok')" "true"
@@ -525,8 +529,8 @@ if command -v jq >/dev/null 2>&1; then
   # ee:01 pinned to a live slot, ee:02 pinned past the end of the pool,
   # ee:03 not pinned at all, ee:04 on an SSID with no pool.
   printf '1|aa:bb:cc:dd:ee:01|0|manual\n1|aa:bb:cc:dd:ee:02|7|manual\n1|aa:bb:cc:dd:ee:05|1|auto\n' > "$STUB/assign2"
-  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans3"\nASSIGN_FILE="%s/assign2"\n' \
-    "$ROOT" "$STUB" "$STUB" > "$STUB/settings2.sh"
+  printf '. "%s/config/settings.sh"\nBANS_FILE="%s/bans3"\nASSIGN_FILE="%s/assign2"\nSEEN_FILE="%s/seen2"\nSEEN_STORE="%s/seen2.store"\n' \
+    "$ROOT" "$STUB" "$STUB" "$STUB" "$STUB" > "$STUB/settings2.sh"
   out2="$(UBUS_WIFI_JSON="$STUB/wifi2.json" IW_DUMP_DIR="$STUB/iwd2" LEASES="$STUB/leases2" \
           SETTINGS="$STUB/settings2.sh" UCI_STATE="$STUB/uci_ssid2" POOLS="$STUB/pools2" \
           sh "$ROOT/scripts/clients.sh" 2>/dev/null)"
@@ -830,6 +834,38 @@ match "web console can log out"                     "$web_console" 'id="logoutBt
 match "web console keeps the raw-token fallback"    "$web_console" 'id="c_token"'
 match "web console can diagnose one SSID"           "$web_console" 'api\("diagnose_ssid&idx=" \+ idx\)'
 match "web console can probe a proxy from the form" "$web_console" 'api\("probe_proxy", "POST"'
+
+echo "== web console parity with the desktop app =="
+# Every desktop action a browser can perform must exist here too; the audit
+# that produced this list is in docs/web-console.md.
+match "web dry-runs before writing the config"      "$web_console" 'api\("dryrun_conf", "POST", conf, true\)'
+match "web can rotate one SSID's MAC"               "$web_console" 'api\("rotate_mac", "POST"'
+match "web can pin the expected uplink"             "$web_console" 'api\("set_gateway", "POST", \{ interface: name \}\)'
+match "web can unpin it again"                      "$web_console" 'api\("set_gateway", "POST", \{ interface: "" \}\)'
+match "web can switch the uplink"                   "$web_console" 'api\("switch_gateway", "POST"'
+match "web asks for a backup label"                 "$web_console" 'api\("backup", "POST", \{ label \}\)'
+match "web can delete named pool slots"             "$web_console" 'function deletePoolSlots\('
+match "web refuses to delete a slot in use"         "$web_console" 'c.online && slots.includes\(c.slot\)'
+match "web accepts the provider proxy formats"      "$web_console" 'function parseProxyLine\('
+match "web can block a MAC that never connected"    "$web_console" 'function manualBan\('
+match "web exports the device list as CSV"          "$web_console" 'function exportDevicesCsv\('
+match "web shows one device in detail"              "$web_console" 'function deviceDetails\('
+match "web filters devices by state"                "$web_console" 'id="devStateFilter"'
+match "web lets the device refresh interval change" "$web_console" 'function scheduleDeviceRefresh\('
+match "web renders the device status column"        "$web_console" 'function deviceStatusCell\('
+# The device table lost a column header once while the rows grew one; the two
+# have to be counted together or the whole table silently shifts.
+dev_head_cols="$(printf '%s' "$web_console" | awk '
+  /id="devBackdrop"/ { inside = 1 }
+  inside && /<tbody id="devRows">/ { exit }
+  inside { n += gsub(/<th[ >]/, "&") }   # "<th " or "<th>", never "<thead>"
+  END { print n + 0 }')"
+eq "the device table header has 9 columns" "$dev_head_cols" "9"
+match "and the empty-state spans them all"          "$web_console" 'colspan="\$\{DEV_COLS\}"'
+match "clients.sh reports a status per device"      "$(cat "$ROOT/scripts/clients.sh")" 'status:\$status'
+match "clients.sh remembers devices that have left" "$(cat "$ROOT/scripts/clients.sh")" 'emit_history\(\)'
+match "clients.sh only writes flash for a new device" "$(cat "$ROOT/scripts/clients.sh")" 'Only a device never recorded before earns a flash write'
+match "the seen store survives sysupgrade"          "$(cat "$ROOT/scripts/install-deps.sh")" '/etc/sbproxy.seen'
 [ -s "$ROOT/console/web/assets/bootstrap.min.css" ] \
   && ok "offline Bootstrap asset is present" || no "offline Bootstrap asset is present"
 match "agent has the login action"                  "$agent_cgi" '  login\)'

@@ -46,7 +46,10 @@ ensure_singbox_service
 
 # Register project files that standard OpenWrt sysupgrade backups must preserve.
 log "Registering files in /etc/sysupgrade.conf (to preserve sbproxy configuration during backup/upgrades)..."
-for p in /etc/sing-box/ /etc/sbproxy.nft /etc/sbproxy.env /etc/sbproxy.managed /etc/init.d/sbproxy $SB_ROOT/config/; do
+# The runtime state files belong here too: bans and pins are decisions the
+# operator made, and the seen store is the device history a console shows.
+for p in /etc/sing-box/ /etc/sbproxy.nft /etc/sbproxy.env /etc/sbproxy.managed /etc/init.d/sbproxy \
+         /etc/sbproxy.bans /etc/sbproxy.assign /etc/sbproxy.seen $SB_ROOT/config/; do
   grep -qxF "$p" /etc/sysupgrade.conf 2>/dev/null || echo "$p" >> /etc/sysupgrade.conf
 done
 

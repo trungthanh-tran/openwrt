@@ -110,9 +110,101 @@ sbproxy-webauth disable            # turn password login off (token only)
 | **Sidebar — Configuration** | ＋ Add Wi-Fi · ⤓ Import .conf · ⭳ Download wifi-socks.conf · ⭳ Download JSON · ✕ Clear all (browser-side only) |
 | **Sidebar — Router** (shown when connected) | ⇪ Push & Apply · 📱 Devices · ⭳ Pull from router · 🗂 Backup/Rollback · 🌐 Egress · ⬆ Update · ⟲ Reset everything |
 | **Top bar** | ☰ menu (mobile) · UI/agent version · 👤 account · Live · language · 🔌 Connect · ◐ Theme |
-| **Content** | Stat cards (Wi-Fi count, BSSIDs per band, distinct SOCKS, isolation/WebRTC) · Wi-Fi table (health, sparkline, ⚡ change SOCKS, 🩺 diagnose, edit/duplicate/delete) · preview tabs for `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
+| **Content** | Stat cards (Wi-Fi count, BSSIDs per band, distinct SOCKS, isolation/WebRTC) · Wi-Fi table (health, sparkline, ⚡ change SOCKS, 🩺 diagnose, 🎲 rotate MAC, pool, edit/duplicate/delete) · preview tabs for `wifi-socks.conf` / `sing-box config.json` / `sbproxy.nft` |
 
-## 3. Feature map: desktop (.exe) ↔ web console
+## 3. Day-to-day use
+
+### 3.1 Add a Wi-Fi and apply it
+
+1. **＋ Add Wi-Fi** → fill in the name, band, idx, Wi-Fi password (≥ 8
+   characters) and the proxy. The **Quick proxy input** field accepts
+   `host:port:user:password`; **Parse** splits it into the four fields.
+2. Click **🧪 Test proxy** (when connected) to try that proxy **from the
+   router** before saving — the answer says why it fails, not just that it did.
+3. **Save** → **⇪ Push & Apply**. Three steps, exactly like the desktop app:
+   dry-run → write the config → apply. A failed dry-run leaves the running
+   configuration **untouched**.
+
+### 3.2 Change a proxy without reloading Wi-Fi
+
+- **⚡** on a Wi-Fi row changes that SSID's SOCKS endpoint (`set_sock`). The
+  Wi-Fi is not reloaded; only open sessions may drop.
+- **🎲** gives that SSID a new random BSSID/MAC, with a vendor (OUI) choice
+  like the desktop app. This Wi-Fi reloads, so **every device on it
+  reconnects**.
+
+### 3.3 The proxy pool of one SSID
+
+Open it with the **pool** button on a Wi-Fi row.
+
+- **Paste proxies**: one per line. Pick the **provider format** (auto-detect,
+  `host:port:user:pass`, `user:pass@host:port`, `host:port`,
+  `host,port,user,pass`, `host;port;user;pass`,
+  `socks5://user:pass@host:port`) and the proxy type (SOCKS5/HTTP), then **Add
+  to the pool**. Lines that cannot be read are listed for you to decide on,
+  never silently dropped.
+- **Test proxy** tries the whole pool from the router; each slot shows OK/FAIL.
+- **Delete the listed slots**: type slot numbers (`0,2,5`). A slot still used
+  by an online device is **refused**, exactly as on the desktop, so nobody's
+  device is quietly repointed at a different proxy.
+- **Delete the pool** empties it entirely.
+- **Rebalance clients** spreads this SSID's online devices evenly over the
+  slots.
+
+### 3.4 The Devices screen
+
+The list holds **every machine that has ever joined**, not only the ones
+associated right now:
+
+| Status | Meaning |
+|---|---|
+| `active 5m 12s` | Associated now, with the current session's length |
+| `idle 2h 15m` | Has joined before, not associated now, with how long ago |
+| `blocked` | The MAC is on that SSID's blocklist |
+
+- **Filters**: by Wi-Fi, by status, and a search box (MAC/IP/hostname/SSID).
+  Filtering and sorting work on the payload already fetched — no extra router
+  calls.
+- **Sorting**: click a column header (click again to reverse).
+- **Auto refresh**: on/off plus a 5/10/30/60 second interval.
+- **Summary line**: shown / online / blocked / total known devices and total
+  traffic.
+- Per-row buttons: **Disconnect** (temporary, online devices only), **Block**
+  (persistent MAC block — reloads that band), **Unblock**, **Proxy** (choose a
+  pool slot, or `none` to unpin), **ℹ Details** (IP, hostname, first/last seen,
+  signal, traffic, pinned proxy, interface).
+- **⛔ Block a MAC…** blocks a MAC that has **never connected**.
+- **⭳ Export CSV** exports exactly the rows on screen (UTF-8 with a BOM, so
+  Excel does not mangle hostnames).
+
+> **Where does the history come from?** The router records each sighting in
+> `/tmp/sbproxy.seen` (RAM, rewritten on every poll, so it never wears the
+> flash) and only copies it to `/etc/sbproxy.seen` **when a device appears for
+> the first time** — history therefore survives a reboot and a sysupgrade at a
+> handful of flash writes per device. The default cap is 400 devices
+> (`SEEN_MAX` in `config/settings.sh`); the least recently seen go first.
+
+### 3.5 Internet egress
+
+- **Switch egress**: pick an interface — it gets the best metric, every other
+  uplink steps behind it, and the network reloads. Wi-Fi and proxies are
+  unchanged.
+- **📌 Pin** only records which interface is *expected*; nothing on the router
+  changes, but if it later drifts to another uplink the health check reports
+  the mismatch.
+- **Automatic** unpins it again: whatever the default route uses is accepted.
+
+### 3.6 Backup, update, reset
+
+- **🗂 Backup / Rollback**: create a backup (it asks for a label, letters,
+  digits and `. _ -` only), **⭳ Download** it to your computer (do this
+  **before flashing firmware**), **↩ Restore**.
+- **⬆ Update**: upload a `.tar.gz`/`.zip` package. Wi-Fi is not reloaded.
+- **⟲ Reset everything**: kick every device, delete every SSID and pool, then
+  apply. It reads the real configuration from the router before warning you,
+  and only runs after you type `RESET`.
+
+## 4. Feature map: desktop (.exe) ↔ web console
 
 Both fronts talk to the **same agent CGI** on the router, so features are
 equivalent except where noted.
@@ -123,23 +215,33 @@ equivalent except where noted.
 | Provision a fresh router over SSH (code, deps, agent) | ✅ | ❌ (a desktop/CLI job) | — (SSH) |
 | Add / edit / delete / duplicate SSIDs | ✅ | ✅ | — (local) + `save_conf` |
 | Import / export `wifi-socks.conf`, JSON | ✅ | ✅ | `get_conf` |
-| Push & Apply (validate, then apply) | ✅ | ✅ | `dryrun_conf`, `save_conf`, `apply` |
+| Push & Apply: dry-run → write → apply | ✅ | ✅ | `dryrun_conf`, `save_conf`, `apply` |
 | Change one SSID's SOCKS without a Wi-Fi reload (⚡) | ✅ | ✅ | `set_sock` |
+| Rotate MAC/BSSID with a vendor choice (🎲) | ✅ | ✅ | `rotate_mac` |
 | Per-SSID health + latency sparkline | ✅ | ✅ | `status` |
 | Diagnose one SSID's data path (🩺) | ✅ | ✅ | `diagnose_ssid` |
-| Probe one proxy from the router, with the failure reason (🧪) | ✅ (Pool, adding proxies) | ✅ (button in the Add/Edit Wi-Fi form) | `probe_proxy` |
+| Probe one proxy from the router, with the failure reason (🧪) | ✅ | ✅ (Wi-Fi form + whole-pool test) | `probe_proxy` |
+| **Proxy pool**: view, add in several provider formats, delete chosen slots, empty it | ✅ | ✅ | `get_pool`, `save_pool` |
+| Pool: pin/unpin one device's proxy | ✅ | ✅ (**Proxy** button on the Devices screen) | `assign_proxy` |
+| Pool: spread devices evenly over the slots | ✅ (code only) | ✅ (**Rebalance clients**) | `rebalance` |
 | Devices: list, kick, ban, unban | ✅ | ✅ | `clients`, `kick`, `ban`, `unban` |
-| Backup / download a backup / rollback | ✅ | ✅ | `backups`, `backup`, `download_backup`, `rollback` |
-| Internet egress: view + switch the uplink | ✅ | ✅ | `gateway`, `switch_gateway` |
+| Devices: history of every machine seen, with status | ✅ | ✅ | `clients` |
+| Devices: filter, sort, summary, auto-refresh interval | ✅ | ✅ | — |
+| Devices: details of one machine | ✅ | ✅ (**ℹ**) | — |
+| Devices: CSV export | ✅ | ✅ | — |
+| Devices: block a MAC that never connected | ✅ | ✅ (**⛔ Block a MAC…**) | `ban` |
+| Backup (with a label) / download / rollback | ✅ | ✅ | `backups`, `backup`, `download_backup`, `rollback` |
+| Egress: view, switch, pin / unpin | ✅ | ✅ | `gateway`, `switch_gateway`, `set_gateway` |
 | Reset everything (kick all, delete all, apply) | ✅ | ✅ (behaviour parity is tested) | `kick`, `save_pool`, `save_conf`, `apply` |
 | Update the agent with a .tar.gz/.zip package | ✅ | ✅ | `update` |
-| Rotate MAC/BSSID | ✅ | ❌ (API exists, no UI yet) | `rotate_mac` |
-| **Per-SSID proxy pool**: slots, MAC pinning, rebalance | ✅ (Pool screen) | ❌ (pools are only emptied by Reset; no pool UI yet) | `get_pool`, `save_pool`, `assign_proxy`, `rebalance` |
-| SSH host-key repair dialog | ✅ | — (the web console does not use SSH) | — |
 | VI/EN language, light/dark theme | ✅ | ✅ | — |
+| SSH host-key repair, log folder, DPAPI-encrypted token | ✅ | — (does not apply to a browser) | — |
 
-The two gaps on the web side (MAC rotate, the Pool screen) already have agent
-APIs — only the UI is missing; use the desktop app for those.
+What remains desktop-only is what **cannot work in a browser at all**:
+provisioning a router over SSH, encrypting the token with Windows DPAPI,
+opening a local log folder, and the command-line modes (`--provision`,
+`--probe`). `tests/run.sh` carries a block that pins every "✅" in the web
+column above, so removing one of these features turns the suite red.
 
 ## 4. Troubleshooting
 
