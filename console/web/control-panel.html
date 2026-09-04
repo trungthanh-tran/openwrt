@@ -1481,7 +1481,14 @@
   function savePoolRows(rows) {
     return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
       if (!d || d.ok === false) throw new Error((d && d.error) || "save_pool failed");
-      activePool = rows; loadPool(); toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
+      activePool = rows;
+      poolExpanded = false;
+      const shown = activePool.slice(0, 2);
+      $("poolRows").textContent = shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · chưa test`).join("\n");
+      $("poolMore").hidden = activePool.length <= 2;
+      $("poolMore").textContent = "Xem thêm";
+      toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
+      loadPool();
     });
   }
   function closePool() { $("poolBackdrop").classList.remove("show"); }
