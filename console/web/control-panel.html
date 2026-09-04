@@ -1432,7 +1432,7 @@
         if (!activePool.length) {
           const current = ssids.find(s => s.idx === activePoolIdx);
           if (current && current.host && current.port) activePool = [{
-            type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
+            slot: 0, type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
             user: current.user || "", pass: current.pass || "", label: "current"
           }];
         }
@@ -1452,7 +1452,7 @@
         if (!activePool.length) {
           const current = ssids.find(s => s.idx === activePoolIdx);
           if (current && current.host && current.port) activePool = [{
-            type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
+            slot: 0, type: current.proxy_type || "socks5", host: current.host, port: Number(current.port),
             user: current.user || "", pass: current.pass || "", label: "current"
           }];
         }
@@ -1464,6 +1464,19 @@
         $("poolMore").hidden = activePool.length <= 2;
         $("poolMore").textContent = poolExpanded ? "Thu gọn" : "Xem thêm";
       }).catch(e => { $("poolRows").textContent = e.message || e; });
+  }
+  function testAllPool() {
+    if (!activePool.length) return toast(pick("Pool is empty.", "Pool đang trống."));
+    activePool.forEach(p => { poolStatus[p.slot] = "đang test"; });
+    $("poolRows").textContent = activePool.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · đang test`).join("\n");
+    Promise.all(activePool.map(p =>
+      api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
+        .then(d => { poolStatus[p.slot] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
+        .catch(() => { poolStatus[p.slot] = "FAIL"; })
+    )).then(() => {
+      const shown = poolExpanded ? activePool : activePool.slice(0, 2);
+      $("poolRows").textContent = shown.map((p, i) => `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port} · ${poolStatus[p.slot] || "chưa test"}`).join("\n");
+    });
   }
   function savePoolRows(rows) {
     return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
@@ -1906,6 +1919,7 @@
   $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
   $("poolSave").onclick = addPoolLines;
   $("poolClear").onclick = clearPool;
+  $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;
   $("poolMore").onclick = () => { poolExpanded = !poolExpanded; loadPool(); };
   $("devRows").onclick = e => {
