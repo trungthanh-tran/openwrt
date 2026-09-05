@@ -14,6 +14,8 @@
 #                               and return {ok,token,user}; 403 once one exists
 # POST ?action=change_password body json {old_pass,new_pass,user?} -> rotate the web
 #                               account password (Bearer + current password required)
+# POST ?action=restart_singbox -> restart sing-box and wait for the process;
+#                               {ok,running,pid,enabled,config_ok,hint,log} (ok = it is up)
 # GET  ?action=status        -> {ssids:[...], health:{...}, meta:{...}} — meta carries
 #                               the effective settings.sh values a console needs
 # GET  ?action=get_conf      -> wifi-socks.conf as text/plain
@@ -636,6 +638,17 @@ case "$ACTION" in
       ((has("probes") | not) or ((.probes | type == "object") and all(.probes[]; type == "object")))
     ' >/dev/null 2>&1 || H='{}'
     json_ok "$(jq -n --argjson health "$H" '{ok:true, health:$health}')"
+    ;;
+
+  restart_singbox)
+    # The one repair a console can offer when status says the proxy engine is
+    # down. The script never fails the HTTP call for a router-state problem:
+    # ok:false plus a hint is exactly what the operator needs to read.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    OUT="$(cd "$SB_ROOT" && sh scripts/restart-singbox.sh 2>/dev/null)"
+    printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "restart-singbox trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
     ;;
 
   gateway)

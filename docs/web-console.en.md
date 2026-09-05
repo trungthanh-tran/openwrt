@@ -373,6 +373,55 @@ associated right now:
   apply. It reads the real configuration from the router before warning you,
   and only runs after you type `RESET`.
 
+### 5.7 sing-box not running — how to see it and restart it
+
+sing-box is the proxy engine: when it dies **every proxied Wi-Fi loses the
+Internet at once**, even though the WAN is fine and the SSIDs keep
+broadcasting. That state used to be visible only inside the Connect dialog;
+it now sits **on the main page**, refreshed every 10 seconds:
+
+- The **sing-box card** in the stats row: green *running* / red **NOT
+  RUNNING** with a **↻ Restart sing-box** button.
+- The **`sing-box ✓` chip** next to the Live badge in the top bar; it turns
+  blinking red when sing-box is down. Clicking it re-checks (when running) or
+  restarts (when down).
+
+**Restart** (card or chip → confirm) calls `restart_singbox`: the router
+re-enables the service flag if the firmware left `enabled=0`, runs
+`/etc/init.d/sing-box restart`, then **waits up to 6 seconds for the process
+to actually be alive** — the init script's exit code is not trusted. The
+result opens in the log box:
+
+| Line | Meaning |
+|---|---|
+| `Running: yes (pid …)` | It is up. Open sessions on proxied Wi-Fi reconnect. |
+| `Service enabled: no` | `/etc/config/sing-box` still has `enabled=0`; the script turned it on — restart once more. |
+| `config.json valid: no` | `sing-box check` rejects the config → press **⇪ Push & Apply** to regenerate it. |
+| `Hint: install the sing-box package…` | The `sing-box` package is missing → `sh scripts/install-deps.sh` on the router. |
+| The `logread -e sing-box` block | The last 15 log lines — the crash reason is usually here (bad proxy, busy port, missing kmod). |
+
+Still down: press **🩺** on a Wi-Fi row (walks every link: service, process,
+listening port, config, proxy), or over SSH:
+
+```sh
+/etc/init.d/sing-box restart; sleep 3; pgrep -f sing-box
+logread -e sing-box | tail -n 30
+sh /root/sbproxy/scripts/doctor.sh
+```
+
+> **The page never redraws itself wholesale.** Every 10 seconds only the
+> *Health* cells, the sing-box chip/card and the version line are updated in
+> place; the configuration is compared with the router every 60 seconds and
+> **re-rendered only when the text actually differs**.
+>
+> Both timer-driven tables (Wi-Fi and Devices) are **patched by key**: every row
+> carries its own key (Wi-Fi = the local row id, Devices = `idx|MAC`), and a row
+> the router reports identically **keeps its DOM node untouched**. Only rows
+> that really changed are re-rendered, new ones are inserted in place and gone
+> ones removed. So the table does not blink, and **the scroll position, a text
+> selection and a checkbox you just ticked all survive** a refresh. Re-sorting
+> **moves** the existing nodes rather than re-creating them.
+
 ## 6. Feature map: desktop (.exe) ↔ web console
 
 Both fronts talk to the **same agent CGI** on the router, so features are
@@ -416,6 +465,8 @@ column above, so removing one of these features turns the suite red.
 
 | Symptom | Cause / fix |
 |---|---|
+| **sing-box: NOT RUNNING** card (red), Wi-Fi broadcasts but has no Internet | Press **↻ Restart sing-box** and read the log box (§5.7). Still down → 🩺 diagnose one Wi-Fi, or `logread -e sing-box` over SSH. |
+| No sing-box card/chip at all | Not connected (Live badge off), or an old agent: update it (§3). |
 | `403 — no web account yet` (`setup_required`) | The router has no `/etc/sbproxy/webauth`: the page opens the **Create the first admin account** form by itself. If the form does not appear: SSH `sbproxy-webauth set admin`, or use a token under Advanced. |
 | `401 — wrong current password` (change password) | Re-enter the password in use; forgotten → SSH `sbproxy-webauth set <user>`. |
 | `401 — wrong username or password` | Double-check; the password was printed at agent install time. Forgot it → `sbproxy-webauth set admin`. |

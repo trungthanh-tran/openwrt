@@ -6,6 +6,27 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Trạng thái sing-box ngay trên trang chính của web console** (thẻ trong
+  dãy thống kê + chip cạnh badge Live), đỏ nhấp nháy khi sing-box không chạy —
+  trước đây chỉ thấy trong hộp Kết nối. Nút **↻ Khởi động lại sing-box** gọi
+  action mới `restart_singbox` (script `scripts/restart-singbox.sh`): bật lại
+  cờ service nếu `enabled=0`, restart, **chờ tiến trình thật sự lên** và trả
+  về `running/pid/enabled/config_ok/hint` cùng 15 dòng `logread` để biết vì
+  sao nó chết. Mục "sing-box không chạy" trong docs/web-console.md hướng dẫn kiểm tra và khởi động lại.
+
+### Fixed
+- **Web console không bao giờ vẽ lại cả trang nữa.** Mỗi 30 giây trang từng kéo
+  conf từ router rồi `render()` toàn bộ (bảng WiFi nhấp nháy, mất vị trí cuộn
+  và ô đang chọn). Giờ poll `status` mỗi 10 giây chỉ vá tại chỗ các ô Sức
+  khỏe, chip/thẻ sing-box và dòng version; conf được so với router mỗi 60 giây
+  và chỉ vẽ lại khi nội dung thật sự khác.
+- **Bảng WiFi và bảng Thiết bị được vá theo khoá thay vì dựng lại `innerHTML`.**
+  Bảng Thiết bị (làm mới mỗi 5–60 giây) từng dựng lại toàn bộ mỗi nhịp, phá cả
+  vị trí cuộn, đoạn text đang bôi đen và checkbox vừa tick. `patchTable()` giữ
+  nguyên node của hàng không đổi, chỉ vẽ lại hàng thật sự khác, chèn hàng mới
+  đúng chỗ, gỡ hàng biến mất và **di chuyển** node khi đổi thứ tự sắp xếp.
+  `tests/test_web_table_patch.py` chạy chính hàm đó dưới Node với DOM giả và
+  đếm số lần ghi `innerHTML` để chứng minh (payload y hệt → 0 lần ghi).
 - Release Windows có thêm `sbproxy-console-<version>-windows-x64.exe`: ứng dụng
   Desktop standalone đầy đủ để quản lý SSID, pool proxy, thiết bị, gateway,
   backup và log. Asset này tách biệt với Web Deployer tối giản.

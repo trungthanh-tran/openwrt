@@ -285,6 +285,14 @@
   .live-badge { display: none; align-items: center; gap: 6px; font-size: 12px; font-family: var(--mono); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
   .live-badge.on { display: inline-flex; color: var(--good); background: var(--good-soft); border-color: transparent; }
   .live-badge.on .dot { animation: pulse 1.6s infinite; }
+  /* sing-box state: green when the proxy engine runs, loud red when it does not
+     — a silent sing-box means every proxied SSID has no Internet. */
+  .sbchip { cursor: pointer; font-family: var(--mono); }
+  .sbchip.ok { color: var(--good); background: var(--good-soft); border-color: transparent; }
+  .sbchip.down { color: #fff; background: var(--crit); border-color: transparent; font-weight: 700; animation: pulse 1.2s infinite; }
+  .stat.sb { cursor: pointer; }
+  .stat.sb .val { font-size: 18px; }
+  .stat.sb .btn { margin-top: 8px; padding: 6px 10px; font-size: 12.5px; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
   #liveTools { display: flex; gap: 8px; }
   /* health pill */
@@ -494,6 +502,7 @@
     <div class="hdr-actions">
       <span class="chip" id="whoami" hidden></span>
       <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
+      <button class="chip sbchip" id="sbChip" hidden></button>
       <select class="language-select" id="languageSelect" aria-label="Language">
         <option value="en">English</option>
         <option value="vi">Tiếng Việt</option>
@@ -1141,6 +1150,42 @@
   const gw = i => `192.168.${octet(i)}.1`;
   const tport = i => TPROXY_BASE + i;
   const isIP = h => /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(h);
+  // Patch a <tbody> from a keyed list instead of rebuilding it.
+  //
+  // Replacing innerHTML on a timer re-creates every row: the table blinks, the
+  // scroll position jumps, a text selection disappears and a checkbox the
+  // operator just clicked is thrown away mid-poll. Here a row whose rendered
+  // HTML is unchanged keeps its DOM node untouched; only genuinely changed
+  // rows are rewritten, new keys inserted and gone keys removed.
+  function patchTable(tbody, items, keyOf, cellsOf, classOf) {
+    const existing = new Map();
+    Array.from(tbody.children).forEach(tr => {
+      const key = tr.getAttribute("data-key");
+      if (key === null) tr.remove();      // placeholder ("Loading…", empty state)
+      else existing.set(key, tr);
+    });
+    let prev = null;
+    items.forEach(item => {
+      const key = String(keyOf(item));
+      const cells = cellsOf(item);
+      const cls = classOf ? (classOf(item) || "") : "";
+      let tr = existing.get(key);
+      if (tr) existing.delete(key);
+      else {
+        tr = document.createElement("tr");
+        tr.setAttribute("data-key", key);
+      }
+      // The cached string is what makes this cheap: no DOM work at all for a
+      // row the router reported identically.
+      if (tr._cells !== cells) { tr.innerHTML = cells; tr._cells = cells; }
+      if (tr.className !== cls) tr.className = cls;
+      const want = prev ? prev.nextElementSibling : tbody.firstElementChild;
+      if (want !== tr) tbody.insertBefore(tr, want);
+      prev = tr;
+    });
+    existing.forEach(tr => tr.remove());
+  }
+
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
   function nextIdx() {
@@ -1217,41 +1262,122 @@
              "Version agent khác version UI — cân nhắc dùng ⬆ Cập nhật") : "";
   }
 
+  // The conf text the router last handed us. A refresh that finds the same
+  // text touches nothing on the page: re-rendering the table, the stats and
+  // the preview every tick was what made the console blink and lose scroll.
+  let lastRouterConf = null;
   function refreshConfFromRouter() {
     // Do not overwrite a form while the operator is editing it.
     if (configDirty || document.getElementById("backdrop").classList.contains("show")) return;
     api("get_conf", "GET", null, "resp").then(txt => {
-      if (txt != null) { parseConfInto(txt); render(); }
+      if (txt == null || txt === lastRouterConf) return;
+      lastRouterConf = txt;
+      parseConfInto(txt); render();
     }).catch(() => {});
   }
+  // Status (health, sing-box, version) every 10 s — cheap, and a dead sing-box
+  // should show within seconds. The conf is compared every 60 s.
   function startPoll() {
     stopPoll();
     poll();
     refreshConfFromRouter();
+    let tick = 0;
     agent.timer = setInterval(() => {
       poll();
-      refreshConfFromRouter();
-    }, 30000);
+      if (++tick % 6 === 0) refreshConfFromRouter();
+    }, 10000);
   }
   function stopPoll() { if (agent.timer) clearInterval(agent.timer); agent.timer = null; }
   function poll() {
     api("status").then(d => {
       if (!d || !d.ok) throw new Error((d && d.error) || pick("bad response", "phản hồi lỗi"));
+      const wasConnected = agent.connected;
       agent.connected = true;
       agent.health = (d.health && d.health.probes) || {};
       agent.version = (d.meta && d.meta.version) || "";
       applyRouterSettings(d.meta);
       recordHistory();
-      updateLiveUI(); renderRows();
-      const run = d.meta && d.meta.singbox_running;
+      const run = !!(d.meta && d.meta.singbox_running);
+      agent.singbox = { running: run, checked: Date.now() };
+      updateLiveUI();
+      // Only what a poll can change is touched: the health cells and the
+      // sing-box indicator. The rows come from the local SSID list, so they
+      // are rebuilt once, on the transition to connected (row buttons appear).
+      if (wasConnected) updateHealthCells(); else renderRows();
+      updateSingboxUI();
       setConnStatus(pick("Connected · sing-box " + (run ? "running" : "NOT running"),
                          "Đã kết nối · sing-box " + (run ? "đang chạy" : "KHÔNG chạy")), run ? "ok" : "bad");
     }).catch(err => {
-      if (agent.connected) { agent.connected = false; updateLiveUI(); renderRows(); }
+      if (agent.connected) { agent.connected = false; agent.singbox = null; updateLiveUI(); renderRows(); updateSingboxUI(); }
       stopPoll();
       setConnStatus(pick("Connection lost: " + err.message + " (mixed content? wrong token? agent not installed?)",
                          "Mất kết nối: " + err.message + " (mixed-content? token sai? agent chưa cài?)"), "bad");
     });
+  }
+
+  // ---- sing-box: the one process whose silence kills every proxied SSID ----
+  // Its state lives on the main page (a stats card and a top-bar chip), not
+  // only inside the Connect dialog, and every poll refreshes it in place.
+  function singboxCard() {
+    const sb = agent.singbox;
+    if (!agent.connected || !sb) {
+      return `<div class="stat sb" id="sbCard"><div class="label">sing-box</div><div class="val"><small>—</small></div></div>`;
+    }
+    if (sb.running) {
+      return `<div class="stat sb" id="sbCard" title="${pick("Click to restart sing-box", "Bấm để khởi động lại sing-box")}">
+        <div class="label">sing-box</div>
+        <div class="val" style="color:var(--good)">${pick("running", "đang chạy")}</div>
+        <div class="sub">${pick("proxy engine", "engine proxy")}</div></div>`;
+    }
+    return `<div class="stat sb warnstate" id="sbCard">
+      <div class="label">sing-box</div>
+      <div class="val" style="color:var(--crit)">${pick("NOT RUNNING", "KHÔNG CHẠY")}</div>
+      <div class="sub">${pick("every proxied Wi-Fi has no Internet", "mọi WiFi proxy đang mất mạng")}</div>
+      <button class="btn primary" id="sbRestartBtn">↻ ${pick("Restart sing-box", "Khởi động lại sing-box")}</button></div>`;
+  }
+  function updateSingboxUI() {
+    const card = document.getElementById("sbCard");
+    if (card) card.outerHTML = singboxCard();
+    const chip = document.getElementById("sbChip");
+    const sb = agent.singbox;
+    chip.hidden = !(agent.connected && sb);
+    if (chip.hidden) return;
+    chip.className = "chip sbchip " + (sb.running ? "ok" : "down");
+    chip.textContent = sb.running ? "sing-box ✓" : pick("sing-box DOWN", "sing-box KHÔNG CHẠY");
+    chip.title = sb.running
+      ? pick("The proxy engine is running — click to re-check", "Engine proxy đang chạy — bấm để kiểm tra lại")
+      : pick("sing-box is not running — click to restart it", "sing-box không chạy — bấm để khởi động lại");
+  }
+  // Patch only the health cells: the rows themselves come from the local SSID
+  // list, which a status poll never changes.
+  function updateHealthCells() {
+    document.querySelectorAll("td[data-health]").forEach(td => {
+      const html = healthCell(parseInt(td.getAttribute("data-health"), 10));
+      if (td._cells !== html) { td.innerHTML = html; td._cells = html; }
+    });
+  }
+  function formatSingbox(d) {
+    const yn = v => v === true ? pick("yes", "có") : v === false ? pick("no", "không") : "?";
+    return [
+      `${pick("Running", "Đang chạy")}: ${yn(d.running)}${d.pid ? " (pid " + d.pid + ")" : ""}`,
+      `${pick("Service enabled", "Service được bật")}: ${yn(d.enabled)}`,
+      `${pick("config.json valid", "config.json hợp lệ")}: ${yn(d.config_ok)}`,
+      d.hint ? `${pick("Hint", "Gợi ý")}: ${d.hint}` : "",
+      d.log ? "\n" + d.log : ""
+    ].filter(Boolean).join("\n");
+  }
+  function restartSingbox() {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    if (!confirm(pick("Restart sing-box now? Open sessions on every proxied Wi-Fi drop for a few seconds.",
+                      "Khởi động lại sing-box ngay? Phiên đang mở trên mọi WiFi proxy sẽ gián đoạn vài giây."))) return;
+    toast(pick("Restarting sing-box…", "Đang khởi động lại sing-box…"));
+    api("restart_singbox", "POST", {}).then(d => {
+      if (!d) throw new Error(pick("empty answer", "không có phản hồi"));
+      agent.singbox = { running: !!d.running, checked: Date.now() };
+      updateSingboxUI();
+      showLog("sing-box restart", { ok: !!d.ok, log: formatSingbox(d) || d.error || "" });
+      poll();
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
 
   // Bootstrap actions the CGI accepts without a Bearer header.
@@ -1354,7 +1480,8 @@
     }).catch(err => setConnStatus(pick("Cannot connect: ", "Không kết nối được: ") + err.message, "bad"));
   }
   function disconnect() {
-    agent.connected = false; stopPoll(); updateLiveUI(); renderRows();
+    agent.connected = false; agent.singbox = null; lastRouterConf = null;
+    stopPoll(); updateLiveUI(); renderRows(); updateSingboxUI();
     if (typeof closeDevices === "function") closeDevices();
     setConnStatus(pick("Disconnected.", "Đã ngắt kết nối."));
   }
@@ -1401,7 +1528,7 @@
       if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
       toast(pick("Step 3/3 · Applying…", "Bước 3/3 · Apply…"));
       return api("apply", "POST", {});
-    }).then(d => { configDirty = false; showLog("apply.sh", d); poll(); })
+    }).then(d => { configDirty = false; lastRouterConf = conf; showLog("apply.sh", d); poll(); })
       .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   // ---- Reset: back to zero SSIDs on the router -------------------------------
@@ -1464,7 +1591,7 @@
   function pullFromRouter() {
     api("get_conf", "GET", null, "resp").then(txt => {
       if (!txt) return toast(pick("The router has no config yet.", "Router chưa có conf."));
-      parseConfInto(txt); render(); toast(pick("Config downloaded from the router", "Đã tải config từ router"));
+      lastRouterConf = txt; parseConfInto(txt); render(); toast(pick("Config downloaded from the router", "Đã tải config từ router"));
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   function zapSock(s) {
@@ -2075,7 +2202,7 @@
       updateDeviceSelection();
       return;
     }
-    box.innerHTML = list.map(c => {
+    patchTable(box, list, c => deviceKey(c.idx, c.mac), c => {
       const ipHost = [c.ip || "", c.host || ""].filter(Boolean).join(" · ") || "—";
       const sig = (c.signal_dbm != null) ? c.signal_dbm + " dBm" : "—";
       const proxy = c.pool_size > 0
@@ -2092,8 +2219,7 @@
           `<button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Persistently block this MAC", "Chặn MAC lâu dài")}">⛔ ${pick("Block", "Cấm")}</button>`)
         + `<button class="iconbtn" data-detail="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Details", "Chi tiết")}">ℹ</button>`;
       const key = deviceKey(c.idx, c.mac);
-      const classes = [c.online ? "" : "dim", deviceSelected.has(key) ? "selected" : ""].filter(Boolean).join(" ");
-      return `<tr data-device-key="${esc(key)}"${classes ? ` class="${classes}"` : ""}>
+      return `
         <td class="select-cell"><input type="checkbox" data-device-select="${esc(key)}" ${deviceSelected.has(key) ? "checked" : ""} aria-label="${pick("Select device", "Chọn thiết bị")} ${esc(c.mac)}"></td>
         <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}</td>
         <td class="mono">${esc(c.mac)}</td>
@@ -2103,9 +2229,9 @@
         <td class="mono">${fmtBytes(c.tx_bytes)}</td>
         <td class="mono sub">${esc(sig)}</td>
         <td class="mono sub">${proxy} ${proxyBtn}</td>
-        <td><div class="rowbtns">${act}</div></td>
-      </tr>`;
-    }).join("");
+        <td><div class="rowbtns">${act}</div></td>`;
+    }, c => [c.online ? "" : "dim",
+             deviceSelected.has(deviceKey(c.idx, c.mac)) ? "selected" : ""].filter(Boolean).join(" "));
     updateDeviceSelection();
   }
   function loadDevices() {
@@ -2396,16 +2522,13 @@
       `<div class="stat"><div class="label">${pick("Total Wi-Fi", "Tổng WiFi")}</div><div class="val">${ssids.length}</div></div>` +
       meter(c2, "2.4 GHz") + meter(c5, "5 GHz") +
       `<div class="stat"><div class="label">${pick("Distinct SOCKS", "SOCKS riêng biệt")}</div><div class="val">${proxies}</div></div>` +
-      `<div class="stat"><div class="label">${pick("Isolation / WebRTC", "Cách ly / WebRTC")}</div><div class="val">${iso}<small> / ${web}</small></div></div>`;
+      `<div class="stat"><div class="label">${pick("Isolation / WebRTC", "Cách ly / WebRTC")}</div><div class="val">${iso}<small> / ${web}</small></div></div>` +
+      singboxCard();
   }
 
-  function renderRows() {
-    const tb = document.getElementById("rows");
-    document.getElementById("empty").style.display = ssids.length ? "none" : "block";
-    const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
-    tb.innerHTML = sorted.map(s => {
+  function wifiRowCells(s) {
       const auth = s.user ? `<span class="chip"><span class="dot"></span>${esc(s.user)}</span>` : `<span class="sub">—</span>`;
-      return `<tr>
+      return `
         <td><span class="idxpill">${s.idx}</span></td>
         <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)} · MAC ${esc(s.mac_oui ? s.mac_oui + " " + vendorName(s.mac_oui) : pick("02: anonymous", "02: ẩn danh"))}</div></td>
         <td><span class="band ${s.band === "2g" ? "b2" : "b5"}">${s.band === "2g" ? "2.4G" : "5G"}</span></td>
@@ -2413,7 +2536,7 @@
         <td>${auth}</td>
         <td>${s.isolate ? '<span class="chip on"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
         <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
-        <td>${healthCell(s.idx)}</td>
+        <td data-health="${s.idx}">${healthCell(s.idx)}</td>
         <td><button class="iconbtn" data-pool="${s.idx}">${pick("Pool", "Pool")}</button></td>
         <td><div class="rowbtns">
           ${agent.connected ? `<button class="iconbtn zap" data-zap="${s.id}" title="${pick("Change SOCKS without reloading Wi-Fi; open sessions may drop", "Đổi SOCKS không reload WiFi; phiên đang mở có thể gián đoạn")}">⚡</button>` : ""}
@@ -2422,9 +2545,15 @@
           <button class="iconbtn" data-edit="${s.id}">${pick("Edit", "Sửa")}</button>
           <button class="iconbtn" data-dup="${s.id}">⧉</button>
           <button class="iconbtn del" data-del="${s.id}">✕</button>
-        </div></td>
-      </tr>`;
-    }).join("");
+        </div></td>`;
+  }
+  function renderRows() {
+    const tb = document.getElementById("rows");
+    document.getElementById("empty").style.display = ssids.length ? "none" : "block";
+    const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
+    // Keyed on the local row id, which survives editing the idx: renaming a
+    // Wi-Fi rewrites one row, it does not rebuild the table.
+    patchTable(tb, sorted, s => s.id, wifiRowCells);
   }
 
   // ---- Generators matching scripts/lib.sh ----
@@ -2603,7 +2732,7 @@
     } else deviceAction(action, device.idx, device.mac);
   }
   function showDeviceContext(target, x, y) {
-    const device = selectContextDevice(target.dataset.deviceKey);
+    const device = selectContextDevice(target.dataset.key);
     if (!device) return;
     const contextDevices = selectedDevices();
     const oneSsid = contextDevices.length > 0 && new Set(contextDevices.map(c => c.idx)).size === 1;
@@ -2806,6 +2935,8 @@
     $("connBackdrop").classList.add("show");
   };
   $("connectBtn").onclick = connect;
+  $("sbChip").onclick = () => { if (agent.singbox && !agent.singbox.running) restartSingbox(); else poll(); };
+  $("stats").onclick = e => { if (e.target.closest("#sbCard") && agent.connected) restartSingbox(); };
   $("disconnectBtn").onclick = disconnect;
   $("logoutBtn").onclick = logout;
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
@@ -2906,7 +3037,7 @@
     if (u) return deviceAction("unban", idx, u);
   };
   $("devRows").oncontextmenu = e => {
-    const row = e.target.closest("tr[data-device-key]");
+    const row = e.target.closest("tr[data-key]");
     if (!row) return;
     e.preventDefault(); showDeviceContext(row, e.clientX, e.clientY);
   };
@@ -2915,7 +3046,7 @@
     if (!row) return;
     e.preventDefault(); showPoolContext(row, e.clientX, e.clientY);
   };
-  bindLongPress($("devRows"), "tr[data-device-key]", showDeviceContext);
+  bindLongPress($("devRows"), "tr[data-key]", showDeviceContext);
   bindLongPress($("poolRows"), "[data-pool-row]", showPoolContext);
   $("pullBtn").onclick = pullFromRouter;
   $("upBtn").onclick = openUpdate;

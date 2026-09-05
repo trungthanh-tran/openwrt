@@ -389,6 +389,52 @@ Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang k
 - Gói debug gồm phiên bản, uptime, dung lượng, route, trạng thái dịch vụ, log
   sbproxy theo ngày và syslog gần nhất của sbproxy/sing-box.
 
+### 5.8 sing-box không chạy — kiểm tra và khởi động lại
+
+sing-box là engine proxy: nó chết thì **mọi WiFi proxy mất mạng ngay** dù WAN
+vẫn thông và Wi-Fi vẫn phát. Trước đây trạng thái này chỉ hiện trong hộp
+Kết nối; giờ nó nằm **ngay trên trang chính**, cập nhật mỗi 10 giây:
+
+- **Thẻ sing-box** trong dãy thống kê: xanh *đang chạy* / đỏ **KHÔNG CHẠY**
+  kèm nút **↻ Khởi động lại sing-box**.
+- **Chip `sing-box ✓`** cạnh badge Live ở thanh trên; chuyển đỏ nhấp nháy khi
+  sing-box không chạy. Bấm chip: đang chạy → kiểm tra lại ngay; không chạy →
+  khởi động lại.
+
+**Khởi động lại** (thẻ hoặc chip → xác nhận) gọi `restart_singbox`: router bật
+lại cờ service nếu firmware để `enabled=0`, chạy `/etc/init.d/sing-box
+restart`, rồi **chờ tới 6 giây cho tiến trình thật sự lên** — init script trả
+về 0 không được tin. Kết quả mở trong hộp log:
+
+| Dòng | Ý nghĩa |
+|---|---|
+| `Đang chạy: có (pid …)` | Đã lên. Phiên đang mở trên các WiFi proxy sẽ nối lại. |
+| `Service được bật: không` | `/etc/config/sing-box` còn `enabled=0`; script đã tự bật, khởi động lại thêm lần nữa. |
+| `config.json hợp lệ: không` | `sing-box check` từ chối file cấu hình → bấm **⇪ Đẩy & Áp** để sinh lại. |
+| `Gợi ý: install the sing-box package…` | Gói `sing-box` chưa cài → `sh scripts/install-deps.sh` trên router. |
+| Đoạn `logread -e sing-box` | 15 dòng log gần nhất — lý do crash thường nằm ở đây (proxy sai, cổng bận, thiếu kmod). |
+
+Vẫn không lên: bấm **🩺** trên một hàng WiFi (chẩn đoán từng mắt xích:
+service, tiến trình, cổng lắng nghe, config, proxy), hoặc SSH:
+
+```sh
+/etc/init.d/sing-box restart; sleep 3; pgrep -f sing-box
+logread -e sing-box | tail -n 30
+sh /root/sbproxy/scripts/doctor.sh
+```
+
+> **Trang không bao giờ tự vẽ lại toàn bộ.** Mỗi 10 giây chỉ các ô *Sức khỏe*,
+> chip/thẻ sing-box và dòng version được cập nhật tại chỗ; cấu hình chỉ được
+> so với router mỗi 60 giây và **chỉ vẽ lại khi nội dung thật sự khác**.
+>
+> Hai bảng chạy theo nhịp (WiFi và Thiết bị) được **vá theo khoá**: mỗi hàng có
+> khoá riêng (WiFi = id nội bộ, Thiết bị = `idx|MAC`), và hàng nào router báo y
+> hệt lần trước thì **giữ nguyên node DOM, không đụng tới**. Chỉ hàng thật sự
+> đổi mới được vẽ lại, hàng mới được chèn đúng vị trí, hàng biến mất bị gỡ.
+> Nhờ vậy bảng không nhấp nháy, **không mất vị trí cuộn, không mất đoạn text
+> đang bôi đen, và không mất checkbox vừa tick** giữa hai lần làm mới. Đổi thứ
+> tự sắp xếp cũng chỉ **di chuyển** node sẵn có.
+
 ## 6. Map tính năng: desktop (.exe) ↔ web console
 
 Cả hai bản nói chuyện với **cùng một agent CGI** trên router, nên tính năng là
@@ -433,6 +479,8 @@ trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 
 | Hiện tượng | Nguyên nhân / cách xử lý |
 |---|---|
+| Thẻ **sing-box: KHÔNG CHẠY** (đỏ), WiFi vẫn phát nhưng không có mạng | Bấm **↻ Khởi động lại sing-box** rồi đọc hộp log (§5.8). Không lên → 🩺 chẩn đoán một WiFi, hoặc `logread -e sing-box` qua SSH. |
+| Không thấy thẻ/chip sing-box | Chưa kết nối (badge Live tắt), hoặc agent cũ: cập nhật agent (§3). |
 | `403 — chưa có tài khoản web` (`setup_required`) | Router chưa có `/etc/sbproxy/webauth`: trang sẽ tự mở form **Tạo tài khoản quản trị đầu tiên**. Nếu không thấy form: SSH `sbproxy-webauth set admin`, hoặc dùng token ở mục Nâng cao. |
 | `401 — mật khẩu hiện tại không đúng` (đổi mật khẩu) | Nhập lại mật khẩu đang dùng; quên → SSH `sbproxy-webauth set <user>`. |
 | `401 — sai tên đăng nhập hoặc mật khẩu` | Kiểm tra lại; mật khẩu in ra lúc cài agent. Quên → `sbproxy-webauth set admin`. |

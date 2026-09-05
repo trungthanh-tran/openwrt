@@ -702,6 +702,37 @@ eq "a running sing-box passes"              "$verify_rc" "0"
 verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=0 DRYRUN=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
 eq "dry-run does not wait for a process"    "$verify_rc" "0"
 
+echo "== restart-singbox.sh: restart, then prove the process is up =="
+# Reuses the sing-box service stubs above; the init script is a stub too, so
+# the test checks what the script DOES (enable, restart, wait) and what it
+# REPORTS, without a real sing-box.
+cat > "$SBS/bin/sing-box-init" <<'SH'
+#!/bin/sh
+echo "init $1" >> "$SBS_LOG"
+exit 0
+SH
+chmod +x "$SBS/bin/sing-box-init"
+rs() { ( cd "$ROOT" && PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
+        SINGBOX_INIT="$SBS/bin/sing-box-init" SINGBOX_CONF="$STUB/no-such-config.json" SINGBOX_START_WAIT=1 \
+        env "$@" sh scripts/restart-singbox.sh 2>/dev/null ); }
+: > "$SBS_LOG"
+out="$(rs SBS_RUNNING=1 SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json)"
+eq "a sing-box that comes back is ok"          "$(printf '%s' "$out" | jq -r .ok)" "true"
+eq "running is reported"                       "$(printf '%s' "$out" | jq -r .running)" "true"
+eq "the init script was restarted once"        "$(grep -c '^init restart$' "$SBS_LOG")" "1"
+eq "an enabled service is not touched"         "$(grep -c 'uci set' "$SBS_LOG")" "0"
+: > "$SBS_LOG"
+out="$(rs SBS_RUNNING=0 SBS_ENABLED=0)"
+eq "a sing-box that stays down is ok:false"    "$(printf '%s' "$out" | jq -r .ok)" "false"
+eq "but the answer is still valid JSON"        "$(printf '%s' "$out" | jq -r 'type')" "object"
+eq "the disabled service was switched on first" "$(grep -c 'uci set sing-box.main.enabled=1' "$SBS_LOG")" "1"
+match "the hint names the disabled flag"       "$(printf '%s' "$out" | jq -r .hint)" 'enabled=0'
+match "the sing-box log rides along"           "$(printf '%s' "$out" | jq -r .log)" 'FATAL\[0000\]'
+out="$(rs SBS_RUNNING=0 SBS_ENABLED=1 SINGBOX_INIT=/nonexistent/sing-box)"
+eq "a missing init script is exit 127"         "$(printf '%s' "$out" | jq -r .restart_exit)" "127"
+match "and the hint says to install the package" "$(printf '%s' "$out" | jq -r .hint)" 'install the sing-box package'
+match "agent exposes restart_singbox"          "$(cat "$ROOT/agent/cgi/sbproxy")" 'sh scripts/restart-singbox\.sh'
+
 echo "== shellcheck (same file list as CI) =="
 if command -v shellcheck >/dev/null 2>&1; then
   if (cd "$ROOT" && shellcheck -S warning scripts/*.sh tests/*.sh tests/vm/*.sh pc/*.sh console/desktop/*.sh         config/settings.sh agent/install-agent.sh agent/cgi/sbproxy agent/sbproxy-healthd         agent/sbproxy-assignd agent/sbproxy-dhcp-assign agent/sbproxy-webauth >"$STUB/shellcheck.out" 2>&1); then
@@ -929,6 +960,25 @@ match "clients.sh reports a status per device"      "$(cat "$ROOT/scripts/client
 match "clients.sh remembers devices that have left" "$(cat "$ROOT/scripts/clients.sh")" 'emit_history\(\)'
 match "clients.sh only writes flash for a new device" "$(cat "$ROOT/scripts/clients.sh")" 'Only a device never recorded before earns a flash write'
 match "the seen store survives sysupgrade"          "$(cat "$ROOT/scripts/install-deps.sh")" '/etc/sbproxy.seen'
+
+echo "== web console refreshes in place and shows sing-box on the main page =="
+# A 30-second full re-render used to blink the table and lose scroll and
+# selection; sing-box being down was only visible inside the Connect dialog.
+match "web poll patches health cells, not the table" "$web_console" 'function updateHealthCells\('
+match "health cells are addressable"                  "$web_console" 'td data-health="\$\{s\.idx\}"'
+match "the Wi-Fi table is patched, never rebuilt"      "$web_console" 'patchTable\(tb, sorted, s => s\.id, wifiRowCells\)'
+match "the device table is patched, never rebuilt"    "$web_console" 'patchTable\(box, list, c => deviceKey'
+match "a row keeps its node when nothing changed"     "$web_console" 'if \(tr\._cells !== cells\)'
+match "health cells are left alone when identical"    "$web_console" 'if \(td\._cells !== html\)'
+nomatch "no table body is replaced wholesale"         "$web_console" 'tb\.innerHTML = sorted'
+nomatch "the page never reloads itself"               "$web_console" 'location\.reload'
+match "web poll rebuilds rows only on the connect transition" "$(printf '%s' "$web_console" | awk '/^  function poll\(\)/,/^  \}/')" 'if \(wasConnected\) updateHealthCells\(\); else renderRows\(\);'
+match "conf refresh is a no-op when the router conf is unchanged" "$web_console" 'txt === lastRouterConf'
+match "the main page has a sing-box card"             "$web_console" 'id="sbCard"'
+match "the top bar has a sing-box chip"               "$web_console" 'id="sbChip"'
+match "web can restart sing-box"                      "$web_console" 'api\("restart_singbox", "POST", \{\}\)'
+match "the restart asks first"                        "$(printf '%s' "$web_console" | awk '/^  function restartSingbox\(\)/,/^  \}/')" 'confirm\('
+
 [ -s "$ROOT/console/web/assets/bootstrap.min.css" ] \
   && ok "offline Bootstrap asset is present" || no "offline Bootstrap asset is present"
 match "agent has the login action"                  "$agent_cgi" '  login\)'

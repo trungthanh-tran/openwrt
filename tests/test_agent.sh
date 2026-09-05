@@ -97,6 +97,13 @@ printf '{"ok":true,"state":"fail","curl_exit":7,"latency_ms":0,"code":0,"error":
 exit 0
 SH
 
+cat > "$SB_ROOT/scripts/restart-singbox.sh" <<'SH'
+#!/bin/sh
+printf 'restart-singbox\n' >> "$CALLS"
+printf '{"ok":%s,"running":%s,"pid":4242,"enabled":true,"config_ok":true,"restart_exit":0,"hint":"h","log":"l"}\n' "${SB_RESTART_OK:-true}" "${SB_RESTART_OK:-true}"
+exit 0
+SH
+
 cat > "$SB_ROOT/scripts/switch-gateway.sh" <<'SH'
 #!/bin/sh
 printf 'switch-gateway:%s:%s
@@ -302,6 +309,22 @@ contains "debug report includes system context" "$out" '== system =='
 contains "debug report includes the selected daily log" "$out" "== daily log: $today =="
 out="$(auth_run GET 'action=logs&date=../../etc/passwd')"
 contains "logs reject an unsafe date" "$out" 'Status: 400 Bad Request'
+
+echo "== restart_singbox =="
+out="$(auth_run GET 'action=restart_singbox')"
+contains "restart_singbox requires POST" "$out" 'Status: 405 Method Not Allowed'
+reset_calls
+out="$(auth_run POST 'action=restart_singbox' '{}')"
+contains "restart_singbox answers 200" "$out" 'Status: 200 OK'
+eq "and relays the script's verdict" "$(json_value "$out" '.running')" 'true'
+eq "the script ran exactly once" "$(grep -c '^restart-singbox$' "$CALLS")" "1"
+export SB_RESTART_OK=false
+out="$(auth_run POST 'action=restart_singbox' '{}')"
+unset SB_RESTART_OK
+eq "a sing-box that stays down is ok:false, not an HTTP error" "$(json_value "$out" '.ok')" 'false'
+contains "and still a 200 so the hint reaches the console" "$out" 'Status: 200 OK'
+out="$(run_agent POST 'action=restart_singbox' '' '{}')"
+contains "restart_singbox needs the bearer" "$out" 'Status: 401 Unauthorized'
 
 echo "== agent status and read-only endpoints =="
 cat > "$CONF" <<'EOF'
