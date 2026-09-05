@@ -13,7 +13,17 @@ if ($source -notmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)-SNAPSHOT$') { throw "VERSIO
 $major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
 $Version = "$major.$minor.$patch"
 $next = "$major.$minor.$($patch + 1)-SNAPSHOT"
-if (@(git status --short).Count -gt 0) { throw 'Working tree is not clean' }
+$null = git diff --quiet
+$trackedDiff = $LASTEXITCODE
+$null = git diff --cached --quiet
+$stagedDiff = $LASTEXITCODE
+if ($trackedDiff -ne 0 -or $stagedDiff -ne 0) {
+  throw 'Tracked working-tree changes are not committed'
+}
+$untracked = @(git status --short | Where-Object { $_ -match '^\?\? ' })
+if ($untracked.Count -gt 0) {
+  Write-Warning "Ignoring untracked files; they are not included in the release: $($untracked -join ', ')"
+}
 if (@(git tag --list $Version).Count -gt 0) { throw "Tag $Version already exists" }
 
 if ($SkipTests) {

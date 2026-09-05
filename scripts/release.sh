@@ -20,7 +20,12 @@ IFS=. read -r MAJOR MINOR PATCH <<EOF
 $RELEASE
 EOF
 NEXT="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT"
-[ -z "$(git status --short)" ] || { echo 'working tree is not clean' >&2; exit 1; }
+git diff --quiet && git diff --cached --quiet || {
+  echo 'tracked working-tree changes are not committed' >&2
+  exit 1
+}
+UNTRACKED=$(git status --porcelain | sed -n '/^?? /p')
+[ -z "$UNTRACKED" ] || echo "warning: ignoring untracked files: $UNTRACKED" >&2
 [ -z "$(git tag --list "$RELEASE")" ] || { echo "tag already exists: $RELEASE" >&2; exit 1; }
 if [ "$RUN_TESTS" = 1 ]; then
   echo "Running the full test suite before releasing $RELEASE..."
