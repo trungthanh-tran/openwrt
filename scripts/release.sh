@@ -3,6 +3,8 @@ set -eu
 PUSH=0
 RUN_TESTS=1
 WAIT=0
+# The default is selected by the argument parser below.
+# shellcheck disable=SC2034
 RELEASE_TYPE=patch
 while [ "$#" -gt 0 ]; do
   arg=$1
