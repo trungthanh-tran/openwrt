@@ -26,14 +26,16 @@ jobs:
           if ($tagVersion -ne $sourceVersion) {
             throw "Tag version $tagVersion does not match VERSION $sourceVersion"
           }
-      - name: Build Windows ZIP
+      - name: Build Windows standalone EXE and ZIP
         shell: pwsh
         run: .\console\deployer\package-windows.ps1
-      - name: Upload Windows package
+      - name: Upload Windows packages
         uses: actions/upload-artifact@v4
         with:
           name: sbproxy-web-deploy-windows-${{ github.ref_name || github.sha }}
-          path: dist/release/*-windows-x64.zip
+          path: |
+            dist/release/sbproxy-web-deployer-*-windows-x64.exe
+            dist/release/*-windows-x64.zip
           if-no-files-found: error
 
   linux:

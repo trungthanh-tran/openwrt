@@ -30,12 +30,14 @@ else
 fi
 cp "$HERE/dist/sbproxy-web-deployer" "$BUNDLE_DIR/"
 cp "$HERE/PACKAGE-README.md" "$BUNDLE_DIR/README.md"
+cp "$REPO_DIR/docs/WEB-DEPLOYER.md" "$BUNDLE_DIR/"
 cp "$REPO_DIR/docs/WEB-DEPLOY.md" "$BUNDLE_DIR/"
+cp -R "$REPO_DIR/docs/images" "$BUNDLE_DIR/images"
 cp "$REPO_DIR/LICENSE" "$BUNDLE_DIR/"
 sh "$REPO_DIR/pc/make-package.sh" "$BUNDLE_DIR"
 (
   cd "$BUNDLE_DIR"
-  sha256sum ./* > SHA256SUMS
+  find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 )
 
 ARCHIVE="$OUT_DIR/$BUNDLE_NAME.tar.gz"

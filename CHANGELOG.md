@@ -5,6 +5,18 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- Release Windows có thêm file standalone
+  `sbproxy-web-deployer-<version>-windows-x64.exe`, chạy trực tiếp không cần giải
+  nén; gói ZIP đầy đủ vẫn được phát hành song song.
+- Thêm hướng dẫn riêng cho Web Deployer và ảnh chụp thật của ứng dụng Windows,
+  dashboard, màn hình thiết bị, proxy pool và giao diện mobile.
+
+### Changed
+- Gói deploy Windows/Linux kèm cả tài liệu có ảnh; `SHA256SUMS` kiểm tra luôn các
+  file nằm trong thư mục con. Hướng dẫn Web Console được rút gọn và bổ sung luồng
+  sử dụng theo từng màn hình.
+
 ## [0.5.21] - 2026-09-05
 
 ### Fixed

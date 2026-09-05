@@ -10,6 +10,8 @@ Web console sau khi cài:
 http://192.168.8.1/sbproxy/
 ```
 
+![Tổng quan Web Console](images/web-dashboard.png)
+
 > Chỉ mở web trong LAN/VLAN quản trị. Không NAT hoặc công khai uhttpd, CGI hay
 > cổng quản trị của router ra Internet.
 
@@ -37,8 +39,9 @@ scp root@192.168.8.1:/tmp/openwrt-before-sbproxy.tar.gz .
 
 ## 2. Cách nhanh: dùng gói deploy theo hệ điều hành
 
-Tải và giải nén một trong hai file:
+Tải một trong các file:
 
+- Windows x64 chạy ngay: `sbproxy-web-deployer-<version>-windows-x64.exe`.
 - Windows x64: `sbproxy-web-deploy-<version>-windows-x64.zip`.
 - Linux: `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz`.
 
@@ -70,6 +73,7 @@ sh console/deployer/package-linux.sh
 
 Kết quả nằm tại `dist/release/`. Máy sử dụng gói không cần Git, Python hay source
 code; chỉ cần SSH client và kết nối LAN tới router. Xem thêm
+[hướng dẫn Web Deployer bằng hình ảnh](WEB-DEPLOYER.md),
 [cấu trúc gói release](RELEASE-ARTIFACTS.md) và
 [README của Web Deployer](../console/deployer/README.md).
 

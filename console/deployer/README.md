@@ -27,13 +27,15 @@ Khi router chưa cài, ứng dụng chạy đủ các bước khởi tạo. Khi 
 không apply lại Wi-Fi. Sau khi Agent API trả lời đúng, ứng dụng mở
 `http://<router>/sbproxy/`.
 
+Hướng dẫn người dùng kèm ảnh: [docs/WEB-DEPLOYER.md](../../docs/WEB-DEPLOYER.md).
+
 ## Gói phát hành mang sang máy khác
 
 Mỗi hệ điều hành có đúng một gói chính, đã kèm app, router update package,
 checksum và tài liệu:
 
 ```powershell
-# Windows x64 -> dist\release\...windows-x64.zip
+# Windows x64 -> một standalone .exe và một gói .zip đầy đủ
 .\package-windows.ps1
 ```
 
@@ -42,4 +44,5 @@ checksum và tài liệu:
 sh package-linux.sh
 ```
 
-Người dùng phải giải nén gói trước khi chạy. Xem [tổ chức gói deploy](../../docs/RELEASE-ARTIFACTS.md).
+File standalone Windows chạy trực tiếp. Với gói ZIP/TAR.GZ, người dùng phải giải
+nén trước khi chạy. Xem [tổ chức gói deploy](../../docs/RELEASE-ARTIFACTS.md).

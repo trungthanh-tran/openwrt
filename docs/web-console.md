@@ -12,6 +12,17 @@ trên máy tính và không cần Internet:
 http://<ip-router>/sbproxy/          (ví dụ: http://192.168.8.1/sbproxy/)
 ```
 
+![Dashboard Web Console](images/web-dashboard.png)
+
+Luồng sử dụng ngắn: **Thêm WiFi → mở Pool để thêm/test proxy → Đẩy & Áp lên
+router → mở Thiết bị để tìm, chọn và đổi proxy**. Trạng thái **Live** ở thanh
+trên xác nhận trình duyệt đang kết nối với agent.
+
+Trên điện thoại, menu thu vào nút góc trái; bảng Wi‑Fi cuộn ngang để giữ đủ
+thông tin và nút tác vụ.
+
+![Web Console trên điện thoại](images/web-mobile.png)
+
 - Giao diện kiểu **AdminLTE nhẹ**: sidebar trái (điều hướng + hành động), thanh
   trên (tài khoản, trạng thái Live, ngôn ngữ VI/EN, theme sáng/tối), nội dung
   ở giữa (thẻ thống kê, bảng WiFi, xem trước cấu hình).
@@ -301,6 +312,8 @@ sh scripts/self-update.sh /tmp/sbproxy-update-<version>.tar.gz
 
 ### 5.3 Pool proxy cho một SSID
 
+![Danh sách và thao tác proxy pool](images/web-proxy-pool.png)
+
 Mở bằng nút **pool** trên hàng WiFi.
 
 - **Dán proxy**: mỗi dòng một proxy. Chọn **định dạng nhà cung cấp** (tự động
@@ -316,6 +329,8 @@ Mở bằng nút **pool** trên hàng WiFi.
 - **Rebalance client**: chia đều thiết bị đang online của SSID lên các slot.
 
 ### 5.4 Màn hình Thiết bị
+
+![Tìm kiếm và quản lý thiết bị](images/web-devices.png)
 
 Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang kết nối:
 

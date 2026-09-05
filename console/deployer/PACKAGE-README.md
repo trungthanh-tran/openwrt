@@ -5,7 +5,12 @@ Nó không có chức năng quản lý Wi-Fi, proxy hoặc thiết bị.
 
 ## Chạy
 
-Windows:
+Windows standalone:
+
+1. Tải file `sbproxy-web-deployer-<version>-windows-x64.exe`.
+2. Chạy trực tiếp, không cần giải nén.
+
+Windows ZIP:
 
 1. Giải nén toàn bộ file ZIP.
 2. Chạy `sbproxy-web-deployer.exe`.
@@ -28,8 +33,13 @@ settings hiện có được giữ nguyên; Wi-Fi không bị apply lại.
 
 - `sbproxy-web-deployer[.exe]`: ứng dụng cài/cập nhật.
 - `sbproxy-update-<version>.tar.gz`: gói update riêng để upload trên Web Console.
+- `WEB-DEPLOYER.md`: hướng dẫn sử dụng ứng dụng bằng hình ảnh.
 - `WEB-DEPLOY.md`: hướng dẫn cài và sử dụng đầy đủ.
+- `images/`: ảnh minh hoạ Web Deployer và Web Console.
 - `SHA256SUMS`: checksum kiểm tra file sau khi copy/download.
 
 Windows kiểm tra checksum bằng `Get-FileHash <file> -Algorithm SHA256`. Linux
 dùng `sha256sum -c SHA256SUMS`.
+
+Bắt đầu với `WEB-DEPLOYER.md`; sau khi cài xong, xem phần sử dụng Web Console
+trong `WEB-DEPLOY.md`.

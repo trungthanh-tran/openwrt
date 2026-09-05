@@ -741,15 +741,29 @@ windows_bundle="$(cat "$ROOT/console/deployer/package-windows.ps1")"
 linux_bundle="$(cat "$ROOT/console/deployer/package-linux.sh")"
 release_workflow="$(cat "$ROOT/.github/workflows/deploy-release.yml")"
 match "Windows deploy release is versioned for x64" "$windows_bundle" 'bundleName = "sbproxy-web-deploy-\$version-windows-x64"'
+match "Windows release also emits a standalone executable" "$windows_bundle" 'sbproxy-web-deployer-\$version-windows-x64\.exe'
 match "Windows deploy release is a ZIP" "$windows_bundle" 'Compress-Archive'
 match "Windows deploy release carries checksums" "$windows_bundle" 'SHA256SUMS'
+nomatch "Windows package supports PowerShell 5.1" "$windows_bundle" 'GetRelativePath'
+match "Windows deploy bundle carries illustrated docs" "$windows_bundle" 'docs\\images'
 match "Windows deploy release tests its GUI executable" "$windows_bundle" 'self-test-gui'
 match "Linux deploy release is architecture-specific" "$linux_bundle" 'BUNDLE_NAME="sbproxy-web-deploy-\$VERSION-linux-\$ARCH"'
 match "Linux deploy release is a tar.gz" "$linux_bundle" 'ARCHIVE="\$OUT_DIR/\$BUNDLE_NAME\.tar\.gz"'
 match "Linux deploy release carries checksums" "$linux_bundle" 'sha256sum.*SHA256SUMS'
+match "Linux deploy bundle carries illustrated docs" "$linux_bundle" 'docs/images'
 match "Linux deploy release tests its GUI executable" "$linux_bundle" 'xvfb-run.*self-test-gui'
 match "release workflow builds Windows and Linux" "$release_workflow" 'needs: \[windows, linux\]'
+match "release workflow uploads standalone Windows executable" "$release_workflow" 'sbproxy-web-deployer-\*-windows-x64\.exe'
 match "release workflow publishes only after platform builds" "$release_workflow" 'gh release create'
+if [ -s "$ROOT/docs/images/web-deployer-windows.png" ] &&
+   [ -s "$ROOT/docs/images/web-dashboard.png" ] &&
+   [ -s "$ROOT/docs/images/web-devices.png" ] &&
+   [ -s "$ROOT/docs/images/web-proxy-pool.png" ] &&
+   [ -s "$ROOT/docs/images/web-mobile.png" ]; then
+  ok "illustrated deploy and web guides carry all screenshots"
+else
+  no "illustrated deploy and web guides carry all screenshots"
+fi
 match "desktop isolates every write under one home" "$desktop_main" 'def resolve_app_home\('
 match "desktop supports a portable data folder" "$desktop_main" 'portable = frozen_dir\(\) / "data"'
 match "desktop writes a rotating debug log" "$desktop_main" 'RotatingFileHandler'
