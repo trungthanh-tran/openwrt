@@ -3,9 +3,9 @@ set -eu
 PUSH=0
 RUN_TESTS=1
 WAIT=0
-# The default is selected by the argument parser below.
-# shellcheck disable=SC2034
-RELEASE_TYPE=patch
+# The default is selected by the argument parser below. Exporting it also
+# makes the default explicit to shellcheck and child release helpers.
+export RELEASE_TYPE=patch
 while [ "$#" -gt 0 ]; do
   arg=$1
   case "$arg" in
