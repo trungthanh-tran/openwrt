@@ -3,13 +3,23 @@ set -eu
 PUSH=0
 RUN_TESTS=1
 WAIT=0
-for arg in "$@"; do
+RELEASE_TYPE=patch
+while [ "$#" -gt 0 ]; do
+  arg=$1
   case "$arg" in
     --push) PUSH=1 ;;
     --skip-tests) RUN_TESTS=0 ;;
     --wait) WAIT=1 ;;
-    *) echo "Usage: $0 [--push] [--skip-tests] [--wait]" >&2; exit 2 ;;
+    --release-type=patch|--release-type=minor|--release-type=major)
+      RELEASE_TYPE=${arg#*=} ;;
+    --release-type)
+      [ "$#" -ge 2 ] || { echo '--release-type requires patch, minor or major' >&2; exit 2; }
+      RELEASE_TYPE=$2
+      case "$RELEASE_TYPE" in patch|minor|major) ;; *) echo "invalid release type: $RELEASE_TYPE" >&2; exit 2;; esac
+      shift ;;
+    *) echo "Usage: $0 [--push] [--skip-tests] [--wait] [--release-type patch|minor|major]" >&2; exit 2 ;;
   esac
+  shift
 done
 ROOT="$(cd -- "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -19,7 +29,12 @@ printf '%s' "$RELEASE" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo 'invalid 
 IFS=. read -r MAJOR MINOR PATCH <<EOF
 $RELEASE
 EOF
-NEXT="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT"
+case "$RELEASE_TYPE" in
+  patch) NEXT="$MAJOR.$MINOR.$((PATCH + 1))-SNAPSHOT" ;;
+  minor) NEXT="$MAJOR.$((MINOR + 1)).0-SNAPSHOT" ;;
+  major) NEXT="$((MAJOR + 1)).0.0-SNAPSHOT" ;;
+  *) echo "invalid release type: $RELEASE_TYPE" >&2; exit 2 ;;
+esac
 git diff --quiet && git diff --cached --quiet || {
   echo 'tracked working-tree changes are not committed' >&2
   exit 1
@@ -61,6 +76,6 @@ if [ "$PUSH" = 1 ]; then
     echo "Release $RELEASE is published."
   fi
 else
-  echo "Prepared release $RELEASE and next version $NEXT locally. Re-run with --push to push."
-  echo "Use --push --wait to push and wait for the GitHub Release."
+  echo "Prepared $RELEASE_TYPE release $RELEASE and next version $NEXT locally. Re-run with --push to push."
+  echo "Use --release-type patch|minor|major with --push --wait to publish."
 fi

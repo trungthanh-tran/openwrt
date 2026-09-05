@@ -56,12 +56,19 @@ $p.ExitCode # must be 0
 Console documentation ZIP, the Web Deployer EXE and the Linux TAR.GZ. A tag
 must match `VERSION`; the workflow then publishes all four assets together.
 
-For the normal release flow, set `VERSION` to `x.y.z-SNAPSHOT`, commit the
-changes, then run:
+For the normal release flow, keep `VERSION` on `main` as `x.y.z-SNAPSHOT`,
+commit the changes, then choose the release level:
 
 ```powershell
-.\scripts\release.ps1 -Push -Wait
+.\scripts\release.ps1 -ReleaseType patch -Push -Wait
+# or: -ReleaseType minor / -ReleaseType major
 ```
 
-The script creates the stable tag, pushes it, waits for GitHub Actions and
-prints the published assets.
+Linux/macOS:
+
+```sh
+sh scripts/release.sh --release-type minor --push --wait
+```
+
+The script removes `-SNAPSHOT` for the release commit and tag, then creates
+the next `patch`, `minor`, or `major` version with `-SNAPSHOT` on `main`.

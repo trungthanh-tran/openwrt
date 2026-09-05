@@ -1,7 +1,9 @@
 param(
   [switch]$Push,
   [switch]$SkipTests,
-  [switch]$Wait
+  [switch]$Wait,
+  [ValidateSet('patch', 'minor', 'major')]
+  [string]$ReleaseType = 'patch'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,7 +14,11 @@ $source = (Get-Content VERSION -Raw).Trim()
 if ($source -notmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)-SNAPSHOT$') { throw "VERSION must end in -SNAPSHOT: $source" }
 $major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
 $Version = "$major.$minor.$patch"
-$next = "$major.$minor.$($patch + 1)-SNAPSHOT"
+switch ($ReleaseType) {
+  'patch' { $next = "$major.$minor.$($patch + 1)-SNAPSHOT" }
+  'minor' { $next = "$major.$($minor + 1).0-SNAPSHOT" }
+  'major' { $next = "$($major + 1).0.0-SNAPSHOT" }
+}
 $null = git diff --quiet
 $trackedDiff = $LASTEXITCODE
 $null = git diff --cached --quiet
@@ -79,6 +85,6 @@ if ($Push) {
     Write-Host "Release $Version is published."
   }
 } else {
-  Write-Host "Prepared release $Version and next version $next locally. Re-run with -Push to push."
-  Write-Host "Use -Push -Wait to push and wait for the GitHub Release."
+  Write-Host "Prepared $ReleaseType release $Version and next version $next locally. Re-run with -Push to push."
+  Write-Host "Use -ReleaseType patch|minor|major and -Push -Wait to publish."
 }
