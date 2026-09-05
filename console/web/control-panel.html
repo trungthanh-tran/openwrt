@@ -308,9 +308,23 @@
   /* Device filters: one wrapping row of controls above the table. */
   .device-page[hidden] { display: none !important; }
   #devicesPage.device-page {
-    max-width: none; max-height: none; width: 100%; animation: none; box-shadow: var(--shadow);
+    width: 100%; display: flex; flex-direction: column; animation: none;
   }
-  #devicesPage > .form { overflow: visible; }
+  #devicesPage > h2 {
+    order: 0; margin: 0 0 12px; padding: 0; border: 0; background: transparent;
+    font-size: 24px; line-height: 1.25; letter-spacing: -.4px;
+  }
+  #devicesPage > .foot {
+    order: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 0 0 12px;
+    border: 0; background: transparent; flex-wrap: nowrap; overflow: hidden;
+  }
+  #devicesPage > .foot .btn { flex: 0 0 auto; white-space: nowrap; }
+  #devicesPage > .foot .folded-action { display: none !important; }
+  #devicesPage > .foot .action-overflow { min-width: 38px; justify-content: center; padding-inline: 10px; font-size: 18px; line-height: 1; }
+  #devicesPage > .form { order: 2; overflow: visible; padding: 0; }
+  #devicesPage .tablescroll {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  }
   .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .filterbar input[type=search] { flex: 1 1 200px; min-width: 160px; }
   .filterbar select { width: auto; min-width: 120px; }
@@ -357,6 +371,7 @@
     border-color: transparent; background: transparent; box-shadow: none; padding: 8px 10px;
   }
   .side-nav .btn:hover { background: var(--panel-2); border-color: transparent; box-shadow: none; }
+  .side-nav .btn.page-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
   .side-nav .btn.danger:hover { color: var(--crit); }
   .side-nav .btn.primary { background: var(--accent); color: #fff; }
   .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
@@ -524,7 +539,7 @@
     <div class="hint" id="applyHint"></div>
   </div>
   </div><!-- /#dashboardPage -->
-  <section class="modal device-page" id="devicesPage" hidden></section>
+  <section class="device-page" id="devicesPage" hidden></section>
   </div><!-- /.wrap -->
   </div><!-- /.main -->
 </div><!-- /.layout -->
@@ -1994,6 +2009,7 @@
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("dashboardPage").hidden = true;
     $("devicesPage").hidden = false;
+    $("devicesBtn").classList.add("page-active");
     scrollTo({ top: 0, behavior: "smooth" });
     scheduleDialogActions();
     loadDevices();
@@ -2002,6 +2018,7 @@
   function closeDevices() {
     $("devicesPage").hidden = true;
     $("dashboardPage").hidden = false;
+    $("devicesBtn").classList.remove("page-active");
     clearInterval(devTimer); devTimer = null;
   }
   function scheduleDeviceRefresh() {
@@ -2519,7 +2536,7 @@
   }
   function setupDialogActionFolding() {
     const resizeObserver = new ResizeObserver(entries => entries.forEach(entry => layoutDialogActions(entry.target)));
-    document.querySelectorAll(".modal > .foot").forEach(foot => {
+    document.querySelectorAll(".modal > .foot, .device-page > .foot").forEach(foot => {
       const more = document.createElement("button");
       more.type = "button"; more.className = "btn ghost action-overflow"; more.textContent = "⋯";
       more.setAttribute("aria-label", pick("More actions", "Thêm tác vụ")); more.hidden = true;
