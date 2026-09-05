@@ -10,10 +10,10 @@
 <link rel="stylesheet" href="assets/bootstrap.min.css">
 <style>
   :root {
-    --bg: #f2f4f8;
-    --bg-grad: radial-gradient(1200px 500px at 50% -10%, rgba(13,143,128,.08), transparent 60%);
+    --bg: #f7f9fc;
+    --bg-grad: radial-gradient(1200px 500px at 50% -10%, rgba(13,143,128,.06), transparent 60%);
     --panel: #ffffff;
-    --panel-2: #f5f7fa;
+    --panel-2: #f9fbfd;
     --glass: rgba(255,255,255,.78);
     --border: #dfe5ec;
     --border-strong: #c3cdd8;
@@ -40,7 +40,7 @@
   }
   :root:not([data-theme="light"]) {}
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root[data-theme="dark"] {
       --bg: #0a0f14;
       --bg-grad: radial-gradient(1200px 500px at 50% -10%, rgba(45,212,191,.07), transparent 60%);
       --panel: #131b23;
@@ -2239,7 +2239,7 @@
   }
   function toggleTheme() {
     const cur = document.documentElement.getAttribute("data-theme");
-    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const dark = cur === "dark";
     const next = dark ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("sbproxy.theme", next);
