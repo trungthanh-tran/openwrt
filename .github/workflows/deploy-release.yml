@@ -38,6 +38,7 @@ jobs:
           name: sbproxy-web-deploy-windows-${{ github.ref_name || github.sha }}
           path: |
             dist/release/sbproxy-web-deployer-*-windows-x64.exe
+            dist/release/sbproxy-web-deploy-*-windows-x64.zip
             dist/release/sbproxy-console-*-windows-x64.exe
             dist/release/sbproxy-console-*-windows-x64.zip
           if-no-files-found: error
