@@ -681,6 +681,7 @@
       <div class="filterbar">
         <select id="devBulkAction" aria-label="Thao tác với thiết bị đã chọn">
           <option value="">Thao tác đã chọn…</option>
+          <option value="replace_proxy" id="devProxyAction" hidden>Thêm proxy &amp; phân phối</option>
           <option value="kick">Ngắt kết nối</option>
           <option value="ban">Cấm</option>
           <option value="unban">Bỏ cấm</option>
@@ -706,6 +707,38 @@
       <button class="btn ghost" id="devCsv">⭳ Xuất CSV</button>
       <button class="btn ghost" id="devRefresh">↻ Làm mới</button>
       <button class="btn primary" id="devClose">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add proxies and spread selected devices within one SSID -->
+<div class="backdrop" id="devProxyBackdrop">
+  <div class="modal" style="max-width: 680px;">
+    <h2>Thêm proxy · <span id="devProxyTitle"></span></h2>
+    <div class="form">
+      <div class="conn-status" id="devProxyHint">Proxy mới được thêm vào SSID. Chỉ thiết bị đã chọn được phân phối lại.</div>
+      <div class="sub" id="devProxyCurrent">Đang tải pool…</div>
+      <div class="filterbar">
+        <select id="devProxyFormat" title="Định dạng của nhà cung cấp proxy">
+          <option value="auto">Tự động nhận dạng</option>
+          <option value="hpup">host:port:user:pass</option>
+          <option value="uphp">user:pass@host:port</option>
+          <option value="hp">host:port</option>
+          <option value="csv">host,port,user,pass</option>
+          <option value="semi">host;port;user;pass</option>
+          <option value="url">socks5://user:pass@host:port</option>
+        </select>
+        <select id="devProxyType" title="Loại proxy cho các dòng vừa dán">
+          <option value="socks5">SOCKS5</option>
+          <option value="http">HTTP</option>
+        </select>
+      </div>
+      <textarea id="devProxyInput" rows="7" placeholder="176.116.132.71:43137:user:pass"></textarea>
+      <div class="err" id="devProxyError"></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="devProxyCancel">Đóng</button>
+      <button class="btn primary" id="devProxySave">Thêm &amp; phân phối</button>
     </div>
   </div>
 </div>
@@ -907,6 +940,9 @@
     "Trạng thái": "Status", "Trạng thái: tất cả": "Status: all", "WiFi: tất cả": "Wi-Fi: all",
     "Thao tác đã chọn…": "Selected actions…", "Ngắt kết nối": "Disconnect", "Thực hiện": "Run",
     "0 đã chọn": "0 selected", "Chọn tất cả": "Select all", "Xóa proxy": "Delete proxy",
+    "Thêm proxy & phân phối": "Add proxies & distribute", "Thêm proxy": "Add proxies", "Thêm proxy ·": "Add proxies ·",
+    "Proxy mới được thêm vào SSID. Chỉ thiết bị đã chọn được phân phối lại.": "New proxies are added to the SSID. Only selected devices are redistributed.",
+    "Đang tải pool…": "Loading pool…", "Thêm & phân phối": "Add & distribute",
     "Tự làm mới": "Auto refresh", "Đang kết nối": "Connected", "Đã ngắt": "Disconnected",
     "Tự động": "Automatic", "Tự động nhận dạng": "Detect automatically",
     "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Pool changes do not reload Wi-Fi.",
@@ -1800,13 +1836,13 @@
   // Providers hand out proxy lists in a handful of shapes; the desktop console
   // accepts all of them, so this one does too. Returns null for a line that
   // does not fit the chosen format, so the caller can report it by number.
-  function parseProxyLine(line, format) {
+  function parseProxyLine(line, format, defaultType) {
     const cleaned = line.replace(/^\s*(socks5h?|https?):\/\//i, (m) => m).trim();
     const url = cleaned.match(/^(socks5h?|https?):\/\/(?:([^:@\/]*):([^@\/]*)@)?([^:\/@]+):(\d+)\/?$/i);
     const build = (host, port, user, pass, type) => {
       const p = Number(port);
       if (!host || !Number.isInteger(p) || p < 1 || p > 65535) return null;
-      return { type: type || $("poolType").value || "socks5", host: host.trim(), port: p,
+      return { type: type || defaultType || $("poolType").value || "socks5", host: host.trim(), port: p,
                user: (user || "").trim(), pass: pass || "" };
     };
     const bySep = (sep) => {
@@ -1834,11 +1870,11 @@
       case "semi": return bySep(";");
       case "hpup": return bySep(":");
       default: {  // auto: try each shape, most specific first
-        if (url) return parseProxyLine(line, "url");
-        if (/^[^:@]*:[^@]*@[^:]+:\d+$/.test(cleaned)) return parseProxyLine(line, "uphp");
-        if (cleaned.includes(",")) return parseProxyLine(line, "csv");
-        if (cleaned.includes(";")) return parseProxyLine(line, "semi");
-        return parseProxyLine(line, "hpup");
+        if (url) return parseProxyLine(line, "url", defaultType);
+        if (/^[^:@]*:[^@]*@[^:]+:\d+$/.test(cleaned)) return parseProxyLine(line, "uphp", defaultType);
+        if (cleaned.includes(",")) return parseProxyLine(line, "csv", defaultType);
+        if (cleaned.includes(";")) return parseProxyLine(line, "semi", defaultType);
+        return parseProxyLine(line, "hpup", defaultType);
       }
     }
   }
@@ -1913,6 +1949,11 @@
   function updateDeviceSelection() {
     const visible = visibleDevices().map(c => deviceKey(c.idx, c.mac));
     const selectedVisible = visible.filter(k => deviceSelected.has(k)).length;
+    const chosen = selectedDevices();
+    const oneSsid = chosen.length > 0 && new Set(chosen.map(c => c.idx)).size === 1;
+    $("devProxyAction").hidden = !oneSsid;
+    $("devProxyAction").disabled = !oneSsid;
+    if (!oneSsid && $("devBulkAction").value === "replace_proxy") $("devBulkAction").value = "";
     $("devSelectAll").checked = visible.length > 0 && selectedVisible === visible.length;
     $("devSelectAll").indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
     $("devBulkRun").disabled = deviceSelected.size === 0 || !$("devBulkAction").value;
@@ -2151,10 +2192,111 @@
   function selectedDevices() {
     return devicesData.filter(c => deviceSelected.has(deviceKey(c.idx, c.mac)));
   }
+  let devProxyBatch = null;
+  const cleanProxy = p => ({ type: p.type || "socks5", host: p.host, port: Number(p.port),
+    user: p.user || "", pass: p.pass || "", label: p.label || "" });
+  const proxyIdentity = p => [String(p.type || "socks5").toLowerCase(), String(p.host).toLowerCase(),
+    Number(p.port), p.user || "", p.pass || ""].join("|");
+  function fetchPoolForIdx(idx) {
+    return fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), {
+      headers: { "Authorization": `Bearer ${agent.token}` }
+    }).then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
+      return d.proxies || [];
+    });
+  }
+  function closeDeviceProxyBatch() {
+    $("devProxyBackdrop").classList.remove("show");
+    devProxyBatch = null;
+  }
+  function openDeviceProxyBatch() {
+    const rows = selectedDevices();
+    const idxs = new Set(rows.map(c => c.idx));
+    if (!rows.length || idxs.size !== 1) {
+      return toast(pick("Select devices from one SSID only.", "Chỉ chọn thiết bị trong cùng một SSID."));
+    }
+    const idx = rows[0].idx;
+    devProxyBatch = { idx, devices: rows.map(c => ({ idx: c.idx, mac: c.mac })), pool: null };
+    $("devProxyTitle").textContent = ssidNameByIdx(idx);
+    $("devProxyHint").textContent = pick(
+      `${rows.length} selected device(s). New proxies stay in this SSID; other devices keep their assignment.`,
+      `${rows.length} thiết bị đã chọn. Proxy mới được giữ trong SSID; thiết bị khác giữ nguyên.`);
+    $("devProxyCurrent").textContent = pick("Loading pool…", "Đang tải pool…");
+    $("devProxyInput").value = "";
+    $("devProxyError").textContent = "";
+    $("devProxySave").disabled = true;
+    $("devProxyBackdrop").classList.add("show");
+    fetchPoolForIdx(idx).then(pool => {
+      if (!devProxyBatch || devProxyBatch.idx !== idx) return;
+      devProxyBatch.pool = pool.map(cleanProxy);
+      $("devProxyCurrent").textContent = pick(
+        `${pool.length} current proxy(s) · pasted proxies will be appended`,
+        `${pool.length} proxy hiện tại · proxy dán vào sẽ được thêm cuối pool`);
+      $("devProxySave").disabled = false;
+      $("devProxyInput").focus();
+    }).catch(e => {
+      $("devProxyError").textContent = pick("Cannot load this SSID pool: ", "Không tải được pool của SSID: ") + e.message;
+    });
+  }
+  function submitDeviceProxyBatch() {
+    if (!devProxyBatch || !Array.isArray(devProxyBatch.pool)) return;
+    const lines = $("devProxyInput").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (!lines.length) { $("devProxyError").textContent = pick("Paste at least one proxy.", "Hãy dán ít nhất một proxy."); return; }
+    const format = $("devProxyFormat").value, type = $("devProxyType").value;
+    const parsed = [], bad = [];
+    lines.forEach((line, i) => {
+      const proxy = parseProxyLine(line, format, type);
+      if (proxy) parsed.push(cleanProxy(proxy)); else bad.push(i + 1);
+    });
+    if (bad.length) {
+      $("devProxyError").textContent = pick(`Unreadable line(s): ${bad.join(", ")}`, `Không đọc được dòng: ${bad.join(", ")}`);
+      return;
+    }
+    const targetById = new Map();
+    parsed.forEach(p => targetById.set(proxyIdentity(p), p));
+    const existingIds = new Set(devProxyBatch.pool.map(proxyIdentity));
+    const added = [...targetById.values()].filter(p => !existingIds.has(proxyIdentity(p)));
+    const merged = devProxyBatch.pool.concat(added);
+    const idx = devProxyBatch.idx, devices = devProxyBatch.devices.slice();
+    $("devProxyError").textContent = "";
+    $("devProxySave").disabled = true;
+    $("devProxySave").textContent = pick("Working…", "Đang xử lý…");
+    const save = added.length ? api("save_pool", "POST", { idx, proxies: merged }) : Promise.resolve({ ok: true });
+    save.then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.log) || "save_pool failed");
+      return fetchPoolForIdx(idx);
+    }).then(savedPool => {
+      const targetIds = new Set(targetById.keys());
+      const slots = savedPool.map((p, slot) => ({ p, slot })).filter(x => targetIds.has(proxyIdentity(x.p))).map(x => x.slot);
+      if (!slots.length) throw new Error(pick("The pasted proxies were not found after saving.", "Không tìm thấy proxy vừa dán sau khi lưu."));
+      // Shuffle before round-robin so repeated runs do not always give the
+      // first device the first proxy, while counts still differ by at most one.
+      for (let i = devices.length - 1; i > 0; i--) {
+        const random = new Uint32Array(1); crypto.getRandomValues(random);
+        const j = random[0] % (i + 1); [devices[i], devices[j]] = [devices[j], devices[i]];
+      }
+      const assignments = devices.map((device, i) => ({ mac: device.mac, slot: slots[i % slots.length] }));
+      return api("assign_proxy", "POST", { idx, assignments });
+    }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || pick("Some devices could not be assigned.", "Không gán được một số thiết bị."));
+      closeDeviceProxyBatch();
+      deviceSelected.clear(); $("devBulkAction").value = "";
+      toast(pick(`${devices.length} device(s) distributed across ${targetById.size} proxy(s) ✓`,
+                 `Đã phân phối ${devices.length} thiết bị qua ${targetById.size} proxy ✓`));
+      loadDevices(); poll();
+    }).catch(e => {
+      $("devProxyError").textContent = pick("Error: ", "Lỗi: ") + (e.message || e);
+      $("devProxySave").disabled = false;
+    }).finally(() => { $("devProxySave").textContent = pick("Add & distribute", "Thêm & phân phối"); });
+  }
   function runDeviceBulk() {
     const action = $("devBulkAction").value;
     const rows = selectedDevices();
     if (!action || !rows.length) return toast(pick("Select at least one device.", "Chọn ít nhất một thiết bị."));
+    if (action === "replace_proxy") return openDeviceProxyBatch();
     const verb = action === "kick" ? pick("disconnect", "ngắt")
       : action === "ban" ? pick("block", "cấm") : pick("unblock", "bỏ cấm");
     if (!confirm(pick(`${verb} ${rows.length} selected device(s)?`, `${verb} ${rows.length} thiết bị đã chọn?`))) return;
@@ -2358,9 +2500,11 @@
   function showDeviceContext(target, x, y) {
     const device = selectContextDevice(target.dataset.deviceKey);
     if (!device) return;
+    const contextDevices = selectedDevices();
+    const oneSsid = contextDevices.length > 0 && new Set(contextDevices.map(c => c.idx)).size === 1;
     openContextMenu(x, y, [
       { label: pick("Details", "Chi tiết"), run: () => deviceDetails(device.idx, device.mac) },
-      { label: pick("Change proxy", "Đổi proxy"), hidden: !(device.pool_size > 0), run: () => changeClientProxy(device.idx, device.mac) },
+      { label: pick("Add proxies & distribute", "Thêm proxy & phân phối"), hidden: !oneSsid, run: openDeviceProxyBatch },
       { label: pick("Disconnect selected", "Ngắt mục đã chọn"), hidden: !device.online, run: () => runDeviceContext("kick", device) },
       { label: pick("Unblock selected", "Bỏ cấm mục đã chọn"), hidden: !device.banned, run: () => runDeviceContext("unban", device) },
       { label: pick("Block selected", "Cấm mục đã chọn"), hidden: device.banned, danger: true, run: () => runDeviceContext("ban", device) }
@@ -2588,6 +2732,9 @@
   $("devBan").onclick = manualBan;
   $("devBulkAction").onchange = updateDeviceSelection;
   $("devBulkRun").onclick = runDeviceBulk;
+  $("devProxySave").onclick = submitDeviceProxyBatch;
+  $("devProxyCancel").onclick = closeDeviceProxyBatch;
+  $("devProxyBackdrop").onclick = e => { if (e.target.id === "devProxyBackdrop") closeDeviceProxyBatch(); };
   $("devSelectAll").onchange = e => {
     visibleDevices().forEach(c => {
       const key = deviceKey(c.idx, c.mac);
@@ -2726,7 +2873,10 @@
   addEventListener("resize", closeContextMenu);
   document.addEventListener("scroll", closeContextMenu, true);
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") { closeContextMenu(); closeModal(); }
+    if (e.key === "Escape") {
+      closeContextMenu(); closeModal();
+      if ($("devProxyBackdrop").classList.contains("show")) closeDeviceProxyBatch();
+    }
     if (e.key === "Enter" && $("backdrop").classList.contains("show") && e.target.tagName === "INPUT") saveForm();
   });
 

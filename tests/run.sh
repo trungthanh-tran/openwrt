@@ -864,6 +864,10 @@ match "web supports selecting device rows"          "$web_console" 'data-device-
 match "web supports selecting proxy rows"           "$web_console" 'data-pool-select='
 match "web provides a shared context menu"           "$web_console" 'id="contextMenu"'
 match "web supports mobile long press"               "$web_console" 'function bindLongPress\('
+match "web adds proxies for selected devices"        "$web_console" 'function submitDeviceProxyBatch\('
+match "device proxy change is limited to one SSID"   "$web_console" 'new Set\(rows.map\(c => c.idx\)\)'
+match "web appends proxies before assigning devices" "$web_console" 'const merged = devProxyBatch.pool.concat\(added\)'
+match "web assigns selected devices in one batch"    "$web_console" 'api\("assign_proxy", "POST", \{ idx, assignments \}\)'
 # The device table lost a column header once while the rows grew one; the two
 # have to be counted together or the whole table silently shifts.
 dev_head_cols="$(printf '%s' "$web_console" | awk '
