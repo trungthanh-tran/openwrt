@@ -189,6 +189,9 @@
   .settings-card p { margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; }
   .settings-value { min-height: 38px; padding: 9px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .section-toggle { display: flex; justify-content: flex-end; margin-top: 14px; }
+  #liveTools, #liveTools.on { display: none; }
+  #liveTools.tools-open, #liveTools.on.tools-open { display: flex; flex-direction: column; gap: 2px; }
   @media (max-width: 720px) { .settings-grid { grid-template-columns: 1fr; } .settings-head { align-items: start; flex-direction: column; } }
   .idxpill { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 2px 8px; }
   .band { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 7px; border: 1px solid var(--border); }
@@ -390,7 +393,7 @@
     border-color: transparent; background: transparent; box-shadow: none; padding: 8px 10px;
   }
   .side-nav .btn:hover { background: var(--panel-2); border-color: transparent; box-shadow: none; }
-  .side-nav .btn.page-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .side-nav .btn.page-active, .side-nav .btn.action-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
   .side-nav .btn.danger:hover { color: var(--crit); }
   .side-nav .btn.primary { background: var(--accent); color: #fff; }
   .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
@@ -486,6 +489,8 @@
       <button class="btn ghost" id="exportConf">⭳ Tải wifi-socks.conf</button>
       <button class="btn ghost" id="exportJson">⭳ Tải JSON</button>
       <button class="btn ghost danger" id="clearBtn">✕ Xoá hết</button>
+      <button class="btn primary page-active" id="configBtn" title="Quản lý cấu hình WiFi và proxy">▦ Config</button>
+      <button class="btn ghost" id="routerToolsBtn" title="Mở các công cụ router">⌄ Router tools</button>
       <span id="liveTools">
         <div class="side-group">Router</div>
         <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
@@ -496,8 +501,8 @@
         <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
         <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
         <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
-        <button class="btn ghost" id="settingsBtn" title="Kiểm tra và vận hành router">⚙ Cài đặt</button>
       </span>
+      <button class="btn ghost" id="settingsBtn" title="Kiểm tra và vận hành router">⚙ Cài đặt</button>
     </nav>
     <div class="side-foot">sbproxy Console</div>
   </aside>
@@ -527,6 +532,7 @@
   <div class="wrap">
   <div id="dashboardPage">
   <section class="stats" id="stats"></section>
+  <div class="toolbar config-toolbar" id="configToolbar"></div>
 
   <div class="tablecard">
     <div class="tablescroll">
@@ -546,7 +552,8 @@
     </div>
   </div>
 
-  <div class="out">
+  <div class="section-toggle"><button class="btn ghost" id="outputToggle">⌄ Configuration preview</button></div>
+  <div class="out" id="configOutput" hidden>
     <div class="tabs" id="outTabs">
       <button class="tab active" data-t="conf">wifi-socks.conf</button>
       <button class="tab" data-t="singbox">sing-box config.json</button>
@@ -1287,6 +1294,8 @@
   function updateLiveUI() {
     document.getElementById("liveBadge").classList.toggle("on", agent.connected);
     document.getElementById("liveTools").classList.toggle("on", agent.connected);
+    document.getElementById("routerToolsBtn").hidden = !agent.connected;
+    if (!agent.connected) document.getElementById("liveTools").classList.remove("tools-open");
     const who = document.getElementById("whoami");
     who.hidden = !(agent.connected && agent.user);
     who.textContent = agent.user ? "👤 " + agent.user : "";
@@ -2203,6 +2212,8 @@
     $("settingsPage").hidden = true;
     $("devicesPage").hidden = false;
     $("settingsBtn").classList.remove("page-active");
+    $("configBtn").classList.remove("page-active");
+    closeRouterTools();
     $("devicesBtn").classList.add("page-active");
     scrollTo({ top: 0, behavior: "smooth" });
     scheduleDialogActions();
@@ -2215,7 +2226,29 @@
     $("dashboardPage").hidden = false;
     $("devicesBtn").classList.remove("page-active");
     $("settingsBtn").classList.remove("page-active");
+    $("configBtn").classList.remove("page-active");
     clearInterval(devTimer); devTimer = null;
+  }
+  function setupConfigToolbar() {
+    const toolbar = $("configToolbar");
+    if (toolbar.dataset.ready) return;
+    ["addBtn", "importBtn", "exportConf", "exportJson", "pushApplyBtn", "pullBtn", "clearBtn"]
+      .forEach(id => { const el = $(id); if (el) toolbar.appendChild(el); });
+    toolbar.dataset.ready = "1";
+  }
+  function closeRouterTools() {
+    $("liveTools").classList.remove("tools-open");
+    $("routerToolsBtn").classList.remove("page-active");
+    $("routerToolsBtn").textContent = "⌄ Router tools";
+  }
+  function showDashboard() {
+    closeDevices();
+    setupConfigToolbar();
+    $("dashboardPage").hidden = false;
+    $("configBtn").classList.add("page-active");
+    $("settingsBtn").classList.remove("page-active");
+    closeRouterTools();
+    scrollTo({ top: 0, behavior: "smooth" });
   }
   function settingsStatusText() {
     if (!agent.connected) return pick("Not connected", "Chưa kết nối");
@@ -2248,6 +2281,8 @@
     $("dashboardPage").hidden = true;
     $("settingsPage").hidden = false;
     $("settingsBtn").classList.add("page-active");
+    $("configBtn").classList.remove("page-active");
+    closeRouterTools();
     renderSettings();
     loadSettingsGateway();
     scrollTo({ top: 0, behavior: "smooth" });
@@ -3034,9 +3069,11 @@
     localStorage.setItem("sbproxy.theme", next);
   }
 
+  setupConfigToolbar();
   setupDevicesPage();
 
   // ---- events ----
+  $("configBtn").onclick = showDashboard;
   $("addBtn").onclick = () => openModal(null);
   $("saveBtn").onclick = saveForm;
   $("cancelBtn").onclick = closeModal;
@@ -3047,6 +3084,17 @@
   $("f_proxy_compact").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fillCompactProxy(); } };
   $("languageSelect").onchange = e => setLanguage(e.target.value);
   $("themeBtn").onclick = toggleTheme;
+  $("routerToolsBtn").onclick = () => {
+    const tools = $("liveTools");
+    const open = tools.classList.toggle("tools-open");
+    $("routerToolsBtn").classList.toggle("page-active", open);
+    $("routerToolsBtn").textContent = `${open ? "⌃" : "⌄"} Router tools`;
+  };
+  $("outputToggle").onclick = () => {
+    const output = $("configOutput");
+    output.hidden = !output.hidden;
+    $("outputToggle").textContent = `${output.hidden ? "⌄" : "⌃"} Configuration preview`;
+  };
   $("importBtn").onclick = importConf;
   $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
   $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
@@ -3068,7 +3116,12 @@
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
   $("sidebar").onclick = e => {
     const button = e.target.closest("button");
-    if (button && button.id !== "devicesBtn" && button.id !== "settingsBtn") closeDevices();
+    if (button && !["devicesBtn", "settingsBtn", "configBtn", "routerToolsBtn"].includes(button.id)) closeDevices();
+    if (button && button.id !== "routerToolsBtn") closeRouterTools();
+    if (button && button.id !== "routerToolsBtn") {
+      $("sidebar").querySelectorAll(".action-active").forEach(el => el.classList.remove("action-active"));
+      button.classList.add("action-active");
+    }
     if (button && matchMedia("(max-width: 920px)").matches) {
       $("layout").classList.remove("side-open");
     }
