@@ -16,7 +16,7 @@ với Web Deployer tối giản.
 |---|---|---|
 | Windows x64 | `sbproxy-console-<version>-windows-x64.exe` | Quản lý đầy đủ SSID, proxy, thiết bị, gateway, backup và log |
 | Windows x64 | `sbproxy-web-deployer-<version>-windows-x64.exe` | Chạy ngay, không cần giải nén |
-| Windows x64 | `sbproxy-web-deploy-<version>-windows-x64.zip` | Gói đầy đủ, có tài liệu, ảnh, checksum và file update thủ công |
+| Windows x64 | `sbproxy-console-<version>-windows-x64.zip` | Gói Console đầy đủ, có tài liệu, ảnh và checksum |
 | Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | Gói đầy đủ cho đúng kiến trúc Linux |
 
 Windows có thể hiện cảnh báo SmartScreen vì file chưa ký số. Chọn **More info →

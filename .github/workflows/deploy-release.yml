@@ -39,7 +39,7 @@ jobs:
           path: |
             dist/release/sbproxy-web-deployer-*-windows-x64.exe
             dist/release/sbproxy-console-*-windows-x64.exe
-            dist/release/*-windows-x64.zip
+            dist/release/sbproxy-console-*-windows-x64.zip
           if-no-files-found: error
 
   linux:

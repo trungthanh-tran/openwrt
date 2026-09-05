@@ -42,7 +42,7 @@ scp root@192.168.8.1:/tmp/openwrt-before-sbproxy.tar.gz .
 Tải một trong các file:
 
 - Windows x64 chạy ngay: `sbproxy-web-deployer-<version>-windows-x64.exe`.
-- Windows x64: `sbproxy-web-deploy-<version>-windows-x64.zip`.
+- Windows x64 quản lý đầy đủ + tài liệu: `sbproxy-console-<version>-windows-x64.zip`.
 - Linux: `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz`.
 
 Chạy `sbproxy-web-deployer.exe` trên Windows hoặc `./sbproxy-web-deployer` trên

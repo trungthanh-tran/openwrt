@@ -1,104 +1,67 @@
-# Gói deploy và release
+# Release packages
 
-Người dùng chỉ cần tải **một gói đúng hệ điều hành**, giải nén rồi chạy. Không
-cần clone repository, cài Python hay tự tìm từng file rời.
+Download the package for the operating system you use. The Windows Console ZIP
+contains the full desktop manager and the documentation needed to use it.
 
-| Hệ điều hành | Gói tải về | Chương trình chạy |
+| Platform | Package | Purpose |
 |---|---|---|
-| Windows x64, quản lý đầy đủ | `sbproxy-console-<version>-windows-x64.exe` | Quản lý SSID, proxy, thiết bị và router |
-| Windows x64, chạy ngay | `sbproxy-web-deployer-<version>-windows-x64.exe` | Chính file vừa tải |
-| Windows x64 | `sbproxy-web-deploy-<version>-windows-x64.zip` | `sbproxy-web-deployer.exe` |
-| Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | `sbproxy-web-deployer` |
+| Windows x64 | `sbproxy-console-<version>-windows-x64.exe` | Full SSID, proxy, device and router manager |
+| Windows x64 | `sbproxy-console-<version>-windows-x64.zip` | Console EXE plus guides, screenshots, license and checksums |
+| Windows x64 | `sbproxy-web-deployer-<version>-windows-x64.exe` | Check, install/update router and open Web Console |
+| Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | Linux Web Deployer bundle |
 
-`<arch>` hiện là `x86_64`, `arm64`, hoặc kiến trúc thực tế của máy build. Binary
-PyInstaller không chạy chéo hệ điều hành hoặc kiến trúc.
-
-## Nội dung thống nhất trong mỗi gói
+## Windows Console ZIP
 
 ```text
-sbproxy-web-deploy-<version>-<platform>/
-├── sbproxy-web-deployer[.exe]       # kiểm tra, cài/update, mở Web Console
-├── sbproxy-update-<version>.tar.gz  # upload thủ công qua mục Cập nhật trên web
-├── README.md                        # bắt đầu nhanh
-├── WEB-DEPLOYER.md                  # dùng ứng dụng deploy, có ảnh
-├── WEB-DEPLOY.md                    # tài liệu cài và sử dụng đầy đủ
-├── images/                          # ảnh minh hoạ tài liệu
+sbproxy-console-<version>-windows-x64/
+├── sbproxy-console-<version>-windows-x64.exe
+├── README.md
+├── desktop-user-guide.md
+├── WEB-DEPLOYER.md
+├── WEB-DEPLOY.md
+├── RELEASE-ARTIFACTS.md
+├── images/
 ├── LICENSE
-└── SHA256SUMS                       # checksum các file bên trong
+└── SHA256SUMS
 ```
 
-Executable đã nhúng cùng router payload, vì vậy file update rời không bắt buộc
-khi cài bằng app. File `sbproxy-update-*.tar.gz` được kèm để cập nhật thủ công
-trên Web Console hoặc kiểm tra/lưu trữ độc lập.
+Run the EXE directly for the full Windows manager. The ZIP is useful when the
+operator also needs the usage guides and screenshots offline.
 
-## Build tại máy phát triển
-
-Windows x64:
+## Build on Windows
 
 ```powershell
 .\console\desktop\package-windows.ps1
 .\console\deployer\package-windows.ps1
 ```
 
-Linux:
+The output is written to `dist/release/`. The desktop script creates both the
+standalone EXE and the documentation ZIP. The deployer script creates only the
+standalone Web Deployer EXE.
 
-```sh
-sh console/deployer/package-linux.sh
-```
-
-Kết quả đều vào `dist/release/`. Script dừng nếu `VERSION` sai định dạng, build
-executable thất bại hoặc không tạo được router update package. Cả version ổn định
-(`1.2.3`) và bản phát triển (`1.2.3-SNAPSHOT`) đều build được.
-
-## Kiểm tra trước khi phát hành
-
-Windows:
+## Verify the Console ZIP
 
 ```powershell
-Expand-Archive .\dist\release\sbproxy-web-deploy-*-windows-x64.zip .\check
-Get-Content .\check\sbproxy-web-deploy-*\SHA256SUMS
-Get-FileHash .\check\sbproxy-web-deploy-*\sbproxy-web-deployer.exe -Algorithm SHA256
-$p = Start-Process .\dist\release\sbproxy-console-*-windows-x64.exe `
-  -ArgumentList --self-test-gui -Wait -PassThru
-$p.ExitCode   # phải là 0
+Expand-Archive .\dist\release\sbproxy-console-*-windows-x64.zip .\check
+Get-Content .\check\sbproxy-console-*\SHA256SUMS
+$exe = Get-ChildItem .\check\sbproxy-console-*\sbproxy-console-*-windows-x64.exe
+Get-FileHash $exe.FullName -Algorithm SHA256
+$p = Start-Process $exe.FullName -ArgumentList --self-test-gui -Wait -PassThru
+$p.ExitCode # must be 0
 ```
-
-Linux:
-
-```sh
-tar xzf dist/release/sbproxy-web-deploy-*-linux-*.tar.gz -C /tmp
-cd /tmp/sbproxy-web-deploy-*-linux-*
-sha256sum -c SHA256SUMS
-./sbproxy-web-deployer --self-test
-```
-
-Windows EXE cũng hỗ trợ `--self-test`. Vì là ứng dụng windowed, có thể kiểm tra
-exit code bằng PowerShell `Start-Process -Wait -PassThru`.
 
 ## GitHub Release
 
-### Phát hành bằng script
+`.github/workflows/deploy-release.yml` builds the Desktop Console EXE, the
+Console documentation ZIP, the Web Deployer EXE and the Linux TAR.GZ. A tag
+must match `VERSION`; the workflow then publishes all four assets together.
 
-Đặt `VERSION` ở dạng `x.y.z-SNAPSHOT`, commit mọi thay đổi rồi chạy trên máy có
-quyền push repository:
+For the normal release flow, set `VERSION` to `x.y.z-SNAPSHOT`, commit the
+changes, then run:
 
 ```powershell
 .\scripts\release.ps1 -Push -Wait
 ```
 
-Hoặc Linux/macOS:
-
-```sh
-sh scripts/release.sh --push --wait
-```
-
-Script chạy test, tạo annotated tag ổn định, push `main` và tag. GitHub Actions
-sẽ build bốn asset rồi tạo Release; `-Wait`/`--wait` chờ workflow hoàn tất và
-in danh sách asset. Dùng `-SkipTests`/`--skip-tests` chỉ khi đã có lý do rõ ràng.
-
-Workflow `.github/workflows/deploy-release.yml` build Desktop Console EXE, Web
-Deployer EXE, Windows ZIP và Linux TAR.GZ riêng trên runner đúng hệ điều hành.
-`workflow_dispatch` tạo artifact để
-kiểm tra nhưng không publish. Khi push tag `v<version>` hoặc `<version>`, tag
-phải khớp chính xác với file `VERSION`; sau khi cả hai build thành công, workflow
-đính kèm cả bốn file vào cùng một GitHub Release.
+The script creates the stable tag, pushes it, waits for GitHub Actions and
+prints the published assets.

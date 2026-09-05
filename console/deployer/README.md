@@ -35,7 +35,7 @@ Mỗi hệ điều hành có đúng một gói chính, đã kèm app, router upd
 checksum và tài liệu:
 
 ```powershell
-# Windows x64 -> một standalone .exe và một gói .zip đầy đủ
+# Windows x64 -> một standalone .exe
 .\package-windows.ps1
 ```
 
