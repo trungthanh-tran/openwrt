@@ -5,7 +5,16 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.20] - 2026-09-05
+
 ### Added
+- **Gói deploy theo hệ điều hành**: Windows x64 phát hành dưới dạng `.zip`, Linux
+  dưới dạng `.tar.gz`; mỗi gói có Web Deployer tối giản, router update package,
+  checksum SHA-256 và tài liệu. GitHub Actions build/test riêng trên Windows và
+  Linux rồi mới tạo release.
+- **Web Deployer tối giản** chỉ dành cho kiểm tra SSH, cài/cập nhật sbproxy và mở
+  Web Console. Cho phép sửa router IP/host, SSH port, username và password nhưng
+  không chứa chức năng quản lý Wi-Fi/proxy; update giữ nguyên cấu hình đang chạy.
 - **Danh sách thiết bị giờ có lịch sử, không chỉ máy đang kết nối.**
   `clients.sh` ghi nhớ mọi máy từng vào WiFi và trả thêm `status`
   (`online` / `blocked` / `offline`), `first_seen`, `last_seen`, `inactive_s`.
