@@ -1,6 +1,9 @@
 # Web console trên router — khởi tạo, kết nối, cập nhật và sử dụng
 
 > Bản tiếng Anh: [web-console.en.md](web-console.en.md)
+>
+> Muốn một quy trình độc lập có thể copy từng lệnh từ router mới đến vận hành
+> hằng ngày, xem [Deploy và sử dụng sbproxy Web từ đầu](WEB-DEPLOY.md).
 
 Web console là trang quản trị **được phục vụ ngay từ router**, không cần cài gì
 trên máy tính và không cần Internet:

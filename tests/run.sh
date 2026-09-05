@@ -730,6 +730,13 @@ match "desktop Linux build script uses PyInstaller" "$(cat "$ROOT/console/deskto
 match "desktop Linux build sets onefile windowed flags" "$(cat "$ROOT/console/desktop/build.sh")" 'set -- --noconfirm --clean --onefile --windowed --name sbproxy-console'
 match "desktop Linux build rejects relative runtime tmpdir" "$(cat "$ROOT/console/desktop/build.sh")" 'must be an absolute path'
 match "desktop Windows build isolates the bundled runtime" "$(cat "$ROOT/console/desktop/build.ps1")" 'runtime-tmpdir "%LOCALAPPDATA%\\sbproxy-console-native\\runtime"'
+deployer_main="$(cat "$ROOT/console/deployer/web_deployer.py")"
+match "web deployer has router check action" "$deployer_main" 'text="Kiểm tra router"'
+match "web deployer has install or update action" "$deployer_main" 'text="Cài / Cập nhật"'
+match "web deployer opens the Web Console" "$deployer_main" 'text="Mở Web Console"'
+match "web deployer preserves operator configuration" "$deployer_main" 'wifi-socks\.conf proxy-pools\.conf settings\.sh'
+match "web deployer has a packaged self-test" "$deployer_main" '--self-test'
+match "web deployer Windows build embeds the payload" "$(cat "$ROOT/console/deployer/build.ps1")" '--add-data "\$payload;payload"'
 match "desktop isolates every write under one home" "$desktop_main" 'def resolve_app_home\('
 match "desktop supports a portable data folder" "$desktop_main" 'portable = frozen_dir\(\) / "data"'
 match "desktop writes a rotating debug log" "$desktop_main" 'RotatingFileHandler'

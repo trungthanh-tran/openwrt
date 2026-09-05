@@ -1,0 +1,5 @@
+# PyInstaller output; build.ps1 can recreate all of it.
+build/
+dist/
+__pycache__/
+*.spec

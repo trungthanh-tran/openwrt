@@ -55,6 +55,7 @@ scripts/
 etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
 console/                    # Hai frontend độc lập dùng chung Agent API
   web/control-panel.html    #   UI Web self-host trên router
+  deployer/                 #   EXE chỉ kiểm tra, cài/cập nhật và mở Web Console
   desktop/                  #   App Windows Tkinter native, không dùng HTML/WebView
     main.py / build.ps1 / build.sh  # code native + build 1 lệnh -> dist/sbproxy-console(.exe)
 agent/                      # KIẾN TRÚC B: CGI trên uhttpd + health-check latency realtime
@@ -77,6 +78,7 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 
 ### Console: bản Web và bản Desktop native
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
+- **Web Deployer (.exe)** — công cụ Windows nhỏ chỉ có **Kiểm tra router**, **Cài / Cập nhật** và **Mở Web Console**. Có thể sửa IP/hostname, SSH port, username và password; không có màn hình quản lý Wi-Fi/proxy. File EXE nhúng sẵn gói router, giữ nguyên SSID/pool/settings khi cập nhật và không lưu mật khẩu SSH. Build tại `console/deployer` bằng `.\build.ps1`.
 - **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI (Linux/macOS dùng `chmod 600`), dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`.
 - **Cài router vừa flash ngay trong bản Desktop** — chức năng **Cài đặt sau khi flash** chạy qua SSH: kiểm tra router đang có sẵn gì, đẩy mã nguồn và cấu hình, cài phụ thuộc và agent, chạy script khởi tạo rồi đọc token về và mở màn hình điều khiển; phần nào đã cài thì dùng lại và từng bước hiện ngay trên giao diện. File build đã nhúng sẵn gói router nên máy chạy không cần mã nguồn. Bản build tách theo nền tảng vì PyInstaller không cross-compile: Windows dùng `console/desktop/dist/sbproxy-console.exe` (build bằng `.\build.ps1`), Linux/macOS dùng `console/desktop/dist/sbproxy-console` (build bằng `sh console/desktop/build.sh`); mỗi file tự chứa đủ mọi thứ, chạy bằng `.\sbproxy-console.exe` hoặc `./sbproxy-console`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
 
@@ -138,11 +140,13 @@ CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước 
 ## Tài liệu
 
 **Cài đặt**
+- **[console/deployer/README.md](console/deployer/README.md) — EXE tối giản để kiểm tra, cài/cập nhật và mở bản Web.**
 - **[docs/QUICKSTART.md](docs/QUICKSTART.md) — Cài nhanh bằng file exe: backup → flash → mật khẩu root → chạy app. Bắt đầu ở đây.**
 - [docs/INSTALL.md](docs/INSTALL.md) — cài tay từng lệnh, giải thích từng bước
 - [docs/GUIDE.md](docs/GUIDE.md) — hướng dẫn toàn tập một mạch: firmware → cấu hình → test → xử lý lỗi
 
 **Vận hành**
+- **[docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md) — Deploy web từ router mới và hướng dẫn sử dụng đầy đủ.**
 - **[docs/desktop-user-guide.md](docs/desktop-user-guide.md) — Hướng dẫn NGƯỜI DÙNG bản desktop (.exe): dùng app hằng ngày, không cần dòng lệnh.**
 - [docs/user-guide.md](docs/user-guide.md) — hướng dẫn người dùng bản console web trong trình duyệt
 - [docs/web-console.md](docs/web-console.md) — web console chạy ngay trên router: **khởi tạo router từ đầu không cần file exe**, kết nối/đăng nhập, cập nhật, dùng hằng ngày, bảng map tính năng desktop ↔ web
