@@ -703,6 +703,9 @@ verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-soc
 eq "dry-run does not wait for a process"    "$verify_rc" "0"
 
 echo "== restart-singbox.sh: restart, then prove the process is up =="
+if ! command -v jq >/dev/null 2>&1; then
+  sk "restart-singbox behavior tests" "jq is not installed"
+else
 # Reuses the sing-box service stubs above; the init script is a stub too, so
 # the test checks what the script DOES (enable, restart, wait) and what it
 # REPORTS, without a real sing-box.
@@ -732,6 +735,7 @@ out="$(rs SBS_RUNNING=0 SBS_ENABLED=1 SINGBOX_INIT=/nonexistent/sing-box)"
 eq "a missing init script is exit 127"         "$(printf '%s' "$out" | jq -r .restart_exit)" "127"
 match "and the hint says to install the package" "$(printf '%s' "$out" | jq -r .hint)" 'install the sing-box package'
 match "agent exposes restart_singbox"          "$(cat "$ROOT/agent/cgi/sbproxy")" 'sh scripts/restart-singbox\.sh'
+fi
 
 echo "== shellcheck (same file list as CI) =="
 if command -v shellcheck >/dev/null 2>&1; then
