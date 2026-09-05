@@ -605,7 +605,7 @@
   <div class="modal">
     <h2>Đường ra Internet</h2>
     <div class="form">
-      <div class="conn-status" id="gwHint" data-i18n-html="gwHint">Chọn interface rồi bấm <b>Đổi đường ra</b>: interface đó nhận ưu tiên route cao nhất, các đường ra khác lùi lại phía sau và network trên router reload. Wi-Fi và proxy không đổi.</div>
+      <div class="conn-status" id="gwHint" data-i18n-html="gwHint">Chọn interface rồi bấm <b>Đổi đường ra</b>. Wi-Fi và proxy không đổi.</div>
       <div class="conn-status" id="gwState">…</div>
       <div class="rblist" id="gwList"><div class="sub">Đang tải…</div></div>
     </div>
@@ -624,7 +624,7 @@
   <div class="modal">
     <h2>Backup &amp; Rollback</h2>
     <div class="form">
-      <div class="conn-status" id="rbHint" data-i18n-html="rbHint">Mỗi lần “Áp”/“đổi sock” router đã tự backup. ⚠️ Trước khi <b>cập nhật firmware</b>, hãy bấm <b>⭳ Về máy</b> để lưu backup ra máy tính — backup nằm trên router sẽ mất nếu reflash/brick.</div>
+      <div class="conn-status" id="rbHint" data-i18n-html="rbHint">Router tự backup khi Áp / đổi SOCKS. Trước khi cập nhật firmware, hãy bấm <b>⭳ Về máy</b>.</div>
       <div class="rblist" id="rbList"><div class="sub">Đang tải danh sách…</div></div>
     </div>
     <div class="foot">
@@ -639,7 +639,7 @@
   <div class="modal" style="max-width: 860px;">
     <h2>Thiết bị</h2>
     <div class="form">
-      <div class="conn-status" id="devHint" data-i18n-html="devHint">Mọi máy đã từng vào WiFi, kèm trạng thái. <b>Kick</b> = ngắt tạm (có thể nối lại). <b>Cấm</b> = chặn MAC lâu dài (reload băng tần đó).</div>
+      <div class="conn-status" id="devHint" data-i18n-html="devHint">Thiết bị theo từng Wi-Fi. <b>Ngắt</b> là tạm thời; <b>Cấm</b> là vĩnh viễn.</div>
       <div class="filterbar">
         <input id="devSearch" type="search" placeholder="Tìm MAC, IP, tên máy hoặc SSID…">
         <select id="devSsidFilter"><option value="">WiFi: tất cả</option></select>
@@ -721,7 +721,7 @@
   <div class="modal">
     <h2>Cập nhật agent trên router</h2>
     <div class="form">
-      <div class="conn-status" id="upStatus" data-i18n-html="upStatus">Chọn package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (tạo bằng <code>make package</code> hoặc <code>pc/make-package.sh</code>). Router tự backup trước khi cập nhật và giữ nguyên cấu hình WiFi/SOCKS đang chạy.</div>
+      <div class="conn-status" id="upStatus" data-i18n-html="upStatus">Chọn package cập nhật sbproxy. Router sẽ backup trước và giữ cấu hình Wi-Fi/SOCKS hiện tại.</div>
       <div class="field">
         <label>Bản đang chạy trên router</label>
         <div class="mono" id="upCurVer">—</div>
@@ -834,7 +834,7 @@
     "Huỷ": "Cancel", "Lưu": "Save", "Kết nối agent trên router": "Connect to the router agent",
     "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.": "Not connected. Log in with the sbproxy account.",
     "Tên đăng nhập": "Username", "Mật khẩu": "Password", "Đăng xuất": "Log out",
-    "Tài khoản riêng của sbproxy, tạo ở lần mở web đầu tiên; đổi trong UI hoặc bằng lệnh sbproxy-webauth trên router.": "The dedicated sbproxy account, created on the first visit; change it in the UI or with sbproxy-webauth on the router.",
+    "Tài khoản riêng của sbproxy, tạo ở lần mở web đầu tiên; đổi trong UI hoặc bằng lệnh sbproxy-webauth trên router.": "Dedicated sbproxy login. Change it here or with sbproxy-webauth.",
     "Nâng cao: URL khác hoặc token trực tiếp": "Advanced: a different URL or a raw token",
     "Tạo tài khoản quản trị đầu tiên": "Create the first admin account",
     "Router chưa có tài khoản web. Tạo tài khoản đầu tiên để đăng nhập.": "The router has no web account yet. Create the first one to log in.",
@@ -845,10 +845,10 @@
     "Trạng thái": "Status", "Trạng thái: tất cả": "Status: all", "WiFi: tất cả": "Wi-Fi: all",
     "Tự làm mới": "Auto refresh", "Đang kết nối": "Connected", "Đã ngắt": "Disconnected",
     "Tự động": "Automatic", "Tự động nhận dạng": "Detect automatically",
-    "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Changing the pool does not reload Wi‑Fi.",
+    "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Pool changes do not reload Wi-Fi.",
     "Xoá slot đã nhập": "Delete the listed slots", "Thêm vào pool": "Add to the pool",
     "Xóa pool": "Delete the pool", "Xem thêm": "Show more",
-    "Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.": "Change the sbproxy web account password. The current password is required.",
+    "Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.": "Change the sbproxy password.",
     "Mật khẩu hiện tại": "Current password", "Mật khẩu mới": "New password",
     "Nhập lại mật khẩu mới": "Repeat the new password",
     "Cấu hình": "Configuration",
@@ -866,14 +866,14 @@
     "Không có thiết bị nào đang kết nối.": "No connected devices.", "ẩn danh": "anonymous",
     "Ngẫu nhiên / ẩn danh (02:xx)": "Random / anonymous (02:xx)",
     "Cập nhật agent trên router": "Update the router agent",
-    "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Updating does NOT reload Wi-Fi — configuration changes only after you click “Push & Apply”."
+    "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Update does not reload Wi-Fi. Click “Push & Apply” to activate changes."
   };
   // Blocks that contain inline markup are swapped whole rather than per text node.
   const EN_HTML = {
-    rbHint: 'The router already backs up on every Apply / SOCKS change. ⚠️ Before <b>updating the firmware</b>, click <b>⭳ Download</b> to save a backup to your computer — backups kept only on the router are lost after a reflash or brick.',
-    devHint: 'Clients grouped by Wi-Fi. <b>Disconnect</b> = temporary (the device may reconnect). <b>Block</b> = persistent MAC block (reloads that band).',
-    gwHint: 'Pick an interface and click <b>Switch egress</b>: it gets the best route priority, every other uplink steps behind it, and the router network reloads. Wi-Fi and proxies are unchanged.',
-    upStatus: 'Choose the package <b>sbproxy-update-&lt;version&gt;.tar.gz</b> (built with <code>make package</code> or <code>pc/make-package.sh</code>). The router backs up before updating and keeps the running Wi-Fi/SOCKS configuration.'
+    rbHint: 'Backups are created on Apply / SOCKS changes. Before firmware updates, click <b>Download</b>.',
+    devHint: 'Devices are grouped by Wi-Fi. <b>Disconnect</b> is temporary; <b>Block</b> is permanent.',
+    gwHint: 'Select an interface, then click <b>Switch egress</b>. Wi-Fi and proxies stay unchanged.',
+    upStatus: 'Choose a <b>sbproxy update package</b>. The router backs up first and keeps the current Wi-Fi/SOCKS config.'
   };
   const EN_ATTR = {
     "Kết nối agent trên router": "Connect to the router agent", "Đổi giao diện sáng/tối": "Toggle light/dark theme",
