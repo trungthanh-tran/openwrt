@@ -861,6 +861,8 @@ match "web filters devices by state"                "$web_console" 'id="devState
 match "web lets the device refresh interval change" "$web_console" 'function scheduleDeviceRefresh\('
 match "web renders the device status column"        "$web_console" 'function deviceStatusCell\('
 match "web supports selecting device rows"          "$web_console" 'data-device-select='
+match "devices use a full-width content page"       "$web_console" 'id="devicesPage"'
+match "opening devices replaces the dashboard"      "$web_console" '\$\("dashboardPage"\)\.hidden = true'
 match "web supports selecting proxy rows"           "$web_console" 'data-pool-select='
 match "web provides a shared context menu"           "$web_console" 'id="contextMenu"'
 match "web supports mobile long press"               "$web_console" 'function bindLongPress\('

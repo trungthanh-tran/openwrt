@@ -306,6 +306,11 @@
   .rbitem .nm { font-family: var(--mono); font-size: 12.5px; }
   .rbitem .nm small { color: var(--text-faint); display: block; font-size: 11px; }
   /* Device filters: one wrapping row of controls above the table. */
+  .device-page[hidden] { display: none !important; }
+  #devicesPage.device-page {
+    max-width: none; max-height: none; width: 100%; animation: none; box-shadow: var(--shadow);
+  }
+  #devicesPage > .form { overflow: visible; }
   .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .filterbar input[type=search] { flex: 1 1 200px; min-width: 160px; }
   .filterbar select { width: auto; min-width: 120px; }
@@ -420,8 +425,8 @@
     #liveTools { width: 100%; }
     .side-nav .btn { min-height: 38px; }
     .logbox { max-height: 180px; overflow-wrap: anywhere; }
-    #devBackdrop .modal { max-width: 100%; }
-    #devBackdrop .modal .tablescroll { margin: 0 -2px; }
+    #devicesPage { max-width: 100%; }
+    #devicesPage .tablescroll { margin: 0 -2px; }
     #devSearch { min-height: 40px; }
     .context-menu { min-width: 200px; }
   }
@@ -484,6 +489,7 @@
   </header>
 
   <div class="wrap">
+  <div id="dashboardPage">
   <section class="stats" id="stats"></section>
 
   <div class="tablecard">
@@ -517,6 +523,8 @@
     <pre class="code" id="outCode"></pre>
     <div class="hint" id="applyHint"></div>
   </div>
+  </div><!-- /#dashboardPage -->
+  <section class="modal device-page" id="devicesPage" hidden></section>
   </div><!-- /.wrap -->
   </div><!-- /.main -->
 </div><!-- /.layout -->
@@ -669,7 +677,7 @@
 
 <!-- Devices modal -->
 <div class="backdrop" id="devBackdrop">
-  <div class="modal" style="max-width: 860px;">
+  <div class="modal device-modal">
     <h2>Thiết bị</h2>
     <div class="form">
       <div class="conn-status" id="devHint" data-i18n-html="devHint">Thiết bị theo từng Wi-Fi. <b>Ngắt</b> là tạm thời; <b>Cấm</b> là vĩnh viễn.</div>
@@ -703,7 +711,7 @@
         <span class="sub" id="devSelectedCount">0 đã chọn</span>
       </div>
       <div class="tablescroll">
-        <table style="min-width: 900px;">
+        <table style="min-width: 1040px;">
           <thead><tr>
             <th class="select-cell"><input id="devSelectAll" type="checkbox" aria-label="Chọn tất cả thiết bị hiển thị"></th>
             <th data-sort="idx">WiFi</th><th data-sort="mac">MAC</th><th data-sort="ip">IP / Tên máy</th>
@@ -1960,6 +1968,14 @@
   const DEV_COLS = 10;
   const deviceKey = (idx, mac) => `${idx}|${String(mac).toLowerCase()}`;
 
+  function setupDevicesPage() {
+    const source = $("devBackdrop").querySelector(":scope > .device-modal");
+    const page = $("devicesPage");
+    if (!source || page.children.length) return;
+    while (source.firstChild) page.appendChild(source.firstChild);
+    source.remove();
+  }
+
   function updateDeviceSelection() {
     const visible = visibleDevices().map(c => deviceKey(c.idx, c.mac));
     const selectedVisible = visible.filter(k => deviceSelected.has(k)).length;
@@ -1976,12 +1992,16 @@
 
   function openDevices() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
-    $("devBackdrop").classList.add("show");
+    $("dashboardPage").hidden = true;
+    $("devicesPage").hidden = false;
+    scrollTo({ top: 0, behavior: "smooth" });
+    scheduleDialogActions();
     loadDevices();
     scheduleDeviceRefresh();
   }
   function closeDevices() {
-    $("devBackdrop").classList.remove("show");
+    $("devicesPage").hidden = true;
+    $("dashboardPage").hidden = false;
     clearInterval(devTimer); devTimer = null;
   }
   function scheduleDeviceRefresh() {
@@ -2494,7 +2514,7 @@
   function scheduleDialogActions() {
     cancelAnimationFrame(dialogActionFrame);
     dialogActionFrame = requestAnimationFrame(() => {
-      document.querySelectorAll(".backdrop.show .modal > .foot").forEach(layoutDialogActions);
+      document.querySelectorAll(".backdrop.show .modal > .foot, .device-page:not([hidden]) > .foot").forEach(layoutDialogActions);
     });
   }
   function setupDialogActionFolding() {
@@ -2513,8 +2533,8 @@
         })));
       };
       foot.prepend(more); resizeObserver.observe(foot);
-      const backdrop = foot.closest(".backdrop");
-      new MutationObserver(scheduleDialogActions).observe(backdrop, { attributes: true, attributeFilter: ["class"] });
+      const surface = foot.closest(".backdrop") || foot.closest(".device-page");
+      if (surface) new MutationObserver(scheduleDialogActions).observe(surface, { attributes: true, attributeFilter: ["class", "hidden"] });
     });
   }
   function closeContextMenu() { $("contextMenu").hidden = true; }
@@ -2742,6 +2762,8 @@
     localStorage.setItem("sbproxy.theme", next);
   }
 
+  setupDevicesPage();
+
   // ---- events ----
   $("addBtn").onclick = () => openModal(null);
   $("saveBtn").onclick = saveForm;
@@ -2771,7 +2793,9 @@
   $("logoutBtn").onclick = logout;
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
   $("sidebar").onclick = e => {
-    if (e.target.closest("button") && matchMedia("(max-width: 920px)").matches) {
+    const button = e.target.closest("button");
+    if (button && button.id !== "devicesBtn") closeDevices();
+    if (button && matchMedia("(max-width: 920px)").matches) {
       $("layout").classList.remove("side-open");
     }
   };
@@ -2810,7 +2834,7 @@
     });
     renderDevices();
   };
-  $("devBackdrop").querySelector("thead").onclick = e => {
+  $("devicesPage").querySelector("thead").onclick = e => {
     const key = e.target.getAttribute("data-sort");
     if (!key) return;
     devSort = { key, desc: devSort.key === key ? !devSort.desc : false };
