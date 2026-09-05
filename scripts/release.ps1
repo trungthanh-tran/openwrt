@@ -1,6 +1,7 @@
 param(
   [switch]$Push,
-  [switch]$SkipTests
+  [switch]$SkipTests,
+  [switch]$Wait
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,7 +51,24 @@ git commit -m "chore: start $next development"
 if ($Push) {
   git push origin main
   git push origin $Version
-  Write-Host "Released $Version; main is now $next"
+  Write-Host "Pushed $Version; GitHub Actions is building the release."
+  if ($Wait) {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+      throw 'The -Wait option requires GitHub CLI (gh) to be installed and authenticated.'
+    }
+    $run = $null
+    for ($i = 0; $i -lt 30 -and -not $run; $i++) {
+      Start-Sleep -Seconds 2
+      $runs = gh run list --workflow deploy-release.yml --limit 20 --json databaseId,headSha,status |
+        ConvertFrom-Json
+      $run = $runs | Where-Object { $_.headSha -eq (git rev-list -n 1 $Version) } | Select-Object -First 1
+    }
+    if (-not $run) { throw "Could not find the GitHub Actions run for $Version" }
+    gh run watch $run.databaseId --exit-status
+    gh release view $Version --json tagName,isDraft,isPrerelease,assets
+    Write-Host "Release $Version is published."
+  }
 } else {
   Write-Host "Prepared release $Version and next version $next locally. Re-run with -Push to push."
+  Write-Host "Use -Push -Wait to push and wait for the GitHub Release."
 }

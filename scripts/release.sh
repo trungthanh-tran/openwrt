@@ -2,11 +2,13 @@
 set -eu
 PUSH=0
 RUN_TESTS=1
+WAIT=0
 for arg in "$@"; do
   case "$arg" in
     --push) PUSH=1 ;;
     --skip-tests) RUN_TESTS=0 ;;
-    *) echo "Usage: $0 [--push] [--skip-tests]" >&2; exit 2 ;;
+    --wait) WAIT=1 ;;
+    *) echo "Usage: $0 [--push] [--skip-tests] [--wait]" >&2; exit 2 ;;
   esac
 done
 ROOT="$(cd -- "$(dirname "$0")/.." && pwd)"
@@ -37,6 +39,23 @@ git commit -m "chore: start $NEXT development"
 if [ "$PUSH" = 1 ]; then
   git push origin main
   git push origin "$RELEASE"
+  echo "Pushed $RELEASE; GitHub Actions is building the release."
+  if [ "$WAIT" = 1 ]; then
+    command -v gh >/dev/null 2>&1 || { echo 'gh is required for --wait' >&2; exit 1; }
+    RUN_ID=""
+    TAG_SHA=$(git rev-list -n 1 "$RELEASE")
+    for _ in $(seq 1 30); do
+      RUN_ID=$(gh run list --workflow deploy-release.yml --limit 20 \
+        --json databaseId,headSha --jq ".[] | select(.headSha == \"$TAG_SHA\") | .databaseId" | head -n 1)
+      [ -n "$RUN_ID" ] && break
+      sleep 2
+    done
+    [ -n "$RUN_ID" ] || { echo "could not find the GitHub Actions run for $RELEASE" >&2; exit 1; }
+    gh run watch "$RUN_ID" --exit-status
+    gh release view "$RELEASE" --json tagName,isDraft,isPrerelease,assets
+    echo "Release $RELEASE is published."
+  fi
 else
   echo "Prepared release $RELEASE and next version $NEXT locally. Re-run with --push to push."
+  echo "Use --push --wait to push and wait for the GitHub Release."
 fi

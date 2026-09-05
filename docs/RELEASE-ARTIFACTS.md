@@ -77,6 +77,25 @@ exit code bằng PowerShell `Start-Process -Wait -PassThru`.
 
 ## GitHub Release
 
+### Phát hành bằng script
+
+Đặt `VERSION` ở dạng `x.y.z-SNAPSHOT`, commit mọi thay đổi rồi chạy trên máy có
+quyền push repository:
+
+```powershell
+.\scripts\release.ps1 -Push -Wait
+```
+
+Hoặc Linux/macOS:
+
+```sh
+sh scripts/release.sh --push --wait
+```
+
+Script chạy test, tạo annotated tag ổn định, push `main` và tag. GitHub Actions
+sẽ build bốn asset rồi tạo Release; `-Wait`/`--wait` chờ workflow hoàn tất và
+in danh sách asset. Dùng `-SkipTests`/`--skip-tests` chỉ khi đã có lý do rõ ràng.
+
 Workflow `.github/workflows/deploy-release.yml` build Desktop Console EXE, Web
 Deployer EXE, Windows ZIP và Linux TAR.GZ riêng trên runner đúng hệ điều hành.
 `workflow_dispatch` tạo artifact để
