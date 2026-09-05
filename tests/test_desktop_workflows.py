@@ -869,8 +869,10 @@ class WifiMutationTests(unittest.TestCase):
         self.assertEqual(instance.records, [target])
         instance.confirm_important.return_value = True
         instance.delete_wifi()
-        self.assertEqual(instance.records, [])
-        instance.render_wifi.assert_called_once()
+        # Mutations require a live Agent because they now apply immediately;
+        # without one the local edit is rolled back.
+        self.assertEqual(instance.records, [target])
+        self.assertEqual(instance.render_wifi.call_count, 2)
 
     def test_add_wifi_at_limit_reports_error_without_dialog(self):
         instance = bare_app()

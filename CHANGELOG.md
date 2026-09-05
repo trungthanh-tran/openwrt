@@ -37,6 +37,9 @@ Ngày theo định dạng YYYY-MM-DD.
   Desktop Console, dashboard, màn hình thiết bị, proxy pool và giao diện mobile.
 
 ### Changed
+- Web và Desktop tự dry-run, ghi và apply ngay sau mỗi lần thêm/sửa/xóa Wi‑Fi.
+  Pool proxy và thao tác thiết bị vốn đã gọi Agent trực tiếp nên cũng cập nhật
+  router ngay; các thao tác làm rớt kết nối vẫn có cảnh báo.
 - Gói deploy Windows/Linux kèm cả tài liệu có ảnh; `SHA256SUMS` kiểm tra luôn các
   file nằm trong thư mục con. Hướng dẫn Web Console được rút gọn và bổ sung luồng
   sử dụng theo từng màn hình.

@@ -762,6 +762,7 @@ match "desktop Linux build sets onefile windowed flags" "$(cat "$ROOT/console/de
 match "desktop Linux build rejects relative runtime tmpdir" "$(cat "$ROOT/console/desktop/build.sh")" 'must be an absolute path'
 match "desktop Windows build isolates the bundled runtime" "$(cat "$ROOT/console/desktop/build.ps1")" 'runtime-tmpdir "%LOCALAPPDATA%\\sbproxy-console-native\\runtime"'
 match "desktop supports a packaged GUI self-test" "$desktop_main" '"--self-test-gui" in sys\.argv'
+match "desktop applies Wi-Fi mutations immediately" "$desktop_main" 'def apply_wifi_change\('
 desktop_windows_package="$(cat "$ROOT/console/desktop/package-windows.ps1")"
 match "desktop release emits a versioned Windows executable" "$desktop_windows_package" 'sbproxy-console-\$version-windows-x64\.exe'
 match "desktop release smoke-tests its GUI" "$desktop_windows_package" 'self-test-gui'
@@ -790,6 +791,7 @@ match "Linux deploy release tests its GUI executable" "$linux_bundle" 'xvfb-run.
 match "release workflow builds Windows and Linux" "$release_workflow" 'needs: \[windows, linux\]'
 match "release workflow uploads standalone Windows executable" "$release_workflow" 'sbproxy-web-deployer-\*-windows-x64\.exe'
 match "release workflow uploads full Windows console" "$release_workflow" 'sbproxy-console-\*-windows-x64\.exe'
+match "web applies Wi-Fi mutations immediately" "$(cat "$ROOT/console/web/control-panel.html")" 'function autoApplyConfig\('
 match "release workflow publishes only after platform builds" "$release_workflow" 'gh release create'
 if [ -s "$ROOT/docs/images/web-deployer-windows.png" ] &&
    [ -s "$ROOT/docs/images/web-dashboard.png" ] &&

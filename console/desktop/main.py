@@ -5525,6 +5525,57 @@ class NativeApp:
                 return idx
         raise AgentError("Đã đạt giới hạn 200 SSID")
 
+    def apply_wifi_change(self, previous, label):
+        """Persist one Wi-Fi edit immediately, with a dry-run and rollback."""
+        try:
+            client = self.require_client()
+            current_content = render_conf(self.records)
+            previous_content = render_conf(previous)
+        except Exception as exc:
+            self.records = list(previous)
+            self.render_wifi()
+            if hasattr(self, "loading_window"):
+                self._task_error(exc)
+            else:
+                self.status_var.set(f"Error: {exc}")
+            return
+
+        def work():
+            try:
+                dryrun = client.dryrun_conf(current_content)
+                if not dryrun.get("ok", False):
+                    raise AgentError(dryrun.get("log") or "Dry-run thất bại")
+                saved = client.save_conf(current_content)
+                if not saved.get("ok", False):
+                    raise AgentError(saved.get("log") or "Ghi cấu hình thất bại")
+                result = client.apply()
+                if not result.get("ok", False):
+                    raise AgentError(result.get("log") or "Apply thất bại")
+                return {"ok": True, "result": result}
+            except Exception as exc:
+                # save_conf may have completed before apply failed. Restore the
+                # known-good configuration so the local editor and router agree.
+                try:
+                    old_check = client.dryrun_conf(previous_content)
+                    if old_check.get("ok", False):
+                        client.save_conf(previous_content)
+                        client.apply()
+                except Exception as restore:
+                    return {"ok": False, "error": f"{exc}; restore failed: {restore}"}
+                return {"ok": False, "error": str(exc)}
+
+        def done(payload):
+            if not payload.get("ok"):
+                self.records = list(previous)
+                self.render_wifi()
+                self._task_error(AgentError(payload.get("error") or "Apply thất bại"))
+                return
+            self.append_log(payload["result"].get("log") or self.t(label))
+            self.status_var.set(self.t(label))
+            self.root.after(1500, self.refresh_all)
+
+        self.run_task(self.t(label), work, done, show_loading=True, timeout_hint=225)
+
     def add_wifi(self):
         if self.block_if_incompatible():
             return
@@ -5536,12 +5587,14 @@ class NativeApp:
         dialog = WifiDialog(self.root, None, next_idx, self.language, self.palette)
         self.root.wait_window(dialog)
         if dialog.result:
+            previous = list(self.records)
             if any(item.idx == dialog.result.idx for item in self.records):
                 messagebox.showerror(self.t("IDX bị trùng"), self.t("IDX này đã được sử dụng"), parent=self.root)
                 return
             self.records.append(dialog.result)
             self.records.sort(key=lambda item: item.idx)
             self.render_wifi()
+            self.apply_wifi_change(previous, "Đã thêm Wi-Fi và apply")
 
     def edit_wifi(self):
         if self.block_if_incompatible():
@@ -5554,12 +5607,14 @@ class NativeApp:
                             pool_command=self.open_pool_editor, show_proxy_fields=False)
         self.root.wait_window(dialog)
         if dialog.result:
+            previous = list(self.records)
             if any(item.idx == dialog.result.idx and item is not record for item in self.records):
                 messagebox.showerror(self.t("IDX bị trùng"), self.t("IDX này đã được sử dụng"), parent=self.root)
                 return
             self.records[self.records.index(record)] = dialog.result
             self.records.sort(key=lambda item: item.idx)
             self.render_wifi()
+            self.apply_wifi_change(previous, "Đã cập nhật Wi-Fi và apply")
 
     def delete_wifi(self):
         if self.block_if_incompatible():
@@ -5574,15 +5629,17 @@ class NativeApp:
         impact = (
             "The router is not changed yet. On Apply, this SSID, its routing rules, and its connections will be removed."
             if self.language == "en" else
-            "Chưa tác động router ngay. Khi Apply, SSID, rule định tuyến và các kết nối của SSID này sẽ bị xoá."
+            "Thao tác apply ngay sẽ xoá SSID, rule định tuyến và các kết nối của SSID này."
         )
         if record and self.confirm_important(
             "Xoá SSID",
             action,
             impact,
         ):
+            previous = list(self.records)
             self.records.remove(record)
             self.render_wifi()
+            self.apply_wifi_change(previous, "Đã xoá Wi-Fi và apply")
 
     def quick_sock(self):
         if self.block_if_incompatible():

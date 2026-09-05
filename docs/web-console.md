@@ -14,9 +14,11 @@ http://<ip-router>/sbproxy/          (ví dụ: http://192.168.8.1/sbproxy/)
 
 ![Dashboard Web Console](images/web-dashboard.png)
 
-Luồng sử dụng ngắn: **Thêm WiFi → mở Pool để thêm/test proxy → Đẩy & Áp lên
-router → mở Thiết bị để tìm, chọn và đổi proxy**. Trạng thái **Live** ở thanh
-trên xác nhận trình duyệt đang kết nối với agent.
+Luồng sử dụng ngắn: **Thêm WiFi → mở Pool để thêm/test proxy → mở Thiết bị để
+tìm, chọn và đổi proxy**. Mỗi thay đổi WiFi tự dry-run và apply ngay; pool proxy
+và thao tác thiết bị cũng ghi trực tiếp lên router. Nút **Đẩy & Áp lên router**
+vẫn có để áp lại toàn bộ cấu hình thủ công. Trạng thái **Live** ở thanh trên
+xác nhận trình duyệt đang kết nối với agent.
 
 Trên điện thoại, menu thu vào nút góc trái; bảng Wi‑Fi cuộn ngang để giữ đủ
 thông tin và nút tác vụ.

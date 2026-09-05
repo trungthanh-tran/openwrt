@@ -6,6 +6,10 @@ Hướng dẫn dùng **ứng dụng desktop** (`sbproxy-console.exe` trên Windo
 `sbproxy-console` trên Linux/macOS) trong công việc hằng ngày: mở app, kết nối
 router, thêm/sửa WiFi và SOCKS5, xem thiết bị, sao lưu. Không cần dòng lệnh.
 
+Khi đã kết nối Agent, thêm/sửa/xóa WiFi trong Desktop sẽ tự dry-run và apply ngay.
+Thêm/xóa proxy pool, đổi proxy cho device và các thao tác thiết bị cũng được gửi
+trực tiếp lên router; các thao tác có thể làm client mất kết nối vẫn hỏi xác nhận.
+
 ![sbproxy Desktop Console trên Windows](images/desktop-console-windows.png)
 
 - Cài router mới từ đầu: [QUICKSTART.md](QUICKSTART.md) (4 bước).
