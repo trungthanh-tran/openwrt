@@ -1644,6 +1644,14 @@
   let poolExpanded = false;
   let poolLoadSeq = 0;
   let poolLoadController = null;
+  function renderPoolList() {
+    const shown = poolExpanded ? activePool : activePool.slice(0, 2);
+    $("poolRows").textContent = shown.length
+      ? shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n")
+      : pick("Pool is empty.", "Pool đang trống.");
+    $("poolMore").hidden = activePool.length <= 2;
+    $("poolMore").textContent = poolExpanded ? poolWord.less() : poolWord.more();
+  }
   function openPool(idx) {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     activePoolIdx = idx;
@@ -1681,12 +1689,7 @@
           }];
         }
         Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
-        const shown = poolExpanded ? activePool : activePool.slice(0, 2);
-        $("poolRows").textContent = shown.length
-          ? shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n")
-          : pick("Pool is empty.", "Pool đang trống.");
-        $("poolMore").hidden = activePool.length <= 2;
-        $("poolMore").textContent = poolExpanded ? poolWord.less() : poolWord.more();
+        renderPoolList();
       }).catch(e => {
         if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
         if (attempt < 1 && $("poolBackdrop").classList.contains("show")) {
@@ -1711,8 +1714,7 @@
         .then(d => { poolStatus[p.slot] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
         .catch(() => { poolStatus[p.slot] = "FAIL"; })
     )).then(() => {
-      const shown = poolExpanded ? activePool : activePool.slice(0, 2);
-      $("poolRows").textContent = shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n");
+      renderPoolList();
     });
   }
   function savePoolRows(rows) {
@@ -1720,12 +1722,9 @@
       if (!d || d.ok === false) throw new Error((d && d.error) || "save_pool failed");
       activePool = rows;
       poolExpanded = false;
-      const shown = activePool.slice(0, 2);
-      $("poolRows").textContent = shown.map((p, i) => poolLine(p, i, poolWord.untested())).join("\n");
-      $("poolMore").hidden = activePool.length <= 2;
-      $("poolMore").textContent = poolWord.more();
+      Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
+      renderPoolList();
       toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
-      loadPool();
     });
   }
   function closePool() {
@@ -2416,7 +2415,7 @@
   $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;
   $("poolRefresh").onclick = () => loadPool();
-  $("poolMore").onclick = () => { poolExpanded = !poolExpanded; loadPool(); };
+  $("poolMore").onclick = () => { poolExpanded = !poolExpanded; renderPoolList(); };
   $("devRows").onclick = e => {
     const k = e.target.getAttribute("data-kick");
     const b = e.target.getAttribute("data-ban");
