@@ -834,6 +834,10 @@ match "web console can log out"                     "$web_console" 'id="logoutBt
 match "web console keeps the raw-token fallback"    "$web_console" 'id="c_token"'
 match "web console can diagnose one SSID"           "$web_console" 'api\("diagnose_ssid&idx=" \+ idx\)'
 match "web console can probe a proxy from the form" "$web_console" 'api\("probe_proxy", "POST"'
+match "web console has daily debug logs"            "$web_console" 'id="dailyLogBackdrop"'
+match "web console downloads a portable debug report" "$web_console" 'apiUrl\("download_logs"\)'
+match "agent exposes daily logs"                    "$agent_cgi" '  logs\)'
+match "agent purges logs after the retention window" "$agent_cgi" 'LOG_RETENTION_DAYS - 1'
 
 echo "== web console parity with the desktop app =="
 # Every desktop action a browser can perform must exist here too; the audit

@@ -11,6 +11,10 @@
 SB_ROOT="${SB_ROOT:-/root/sbproxy}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+LOG_DIR="${LOG_DIR:-/etc/sbproxy/logs}"
+HEALTH_LOG_STATE="${HEALTH_LOG_STATE:-/tmp/sbproxy-health-log-state}"
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
+case "$LOG_RETENTION_DAYS" in ''|*[!0-9]*|0) LOG_RETENTION_DAYS=7;; esac
 PROBE_URL="${PROBE_URL:-https://www.gstatic.com/generate_204}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-8}"
 INTERVAL="${INTERVAL:-15}"
@@ -20,6 +24,22 @@ command -v jq   >/dev/null 2>&1 || { echo "healthd: jq is missing";   exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "healthd: curl is missing"; exit 1; }
 
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+
+health_daily_log() {
+  mkdir -p "$LOG_DIR" 2>/dev/null || return 0
+  chmod 700 "$LOG_DIR" 2>/dev/null || true
+  _day="$(date +%Y-%m-%d)"
+  ( umask 077; printf '%s health %s\n' "$(date '+%Y-%m-%d %H:%M:%S%z')" "$*" >> "$LOG_DIR/$_day.log" ) 2>/dev/null || true
+}
+
+purge_daily_logs() {
+  mkdir -p "$LOG_DIR" 2>/dev/null || return 0
+  _today="$(date +%Y-%m-%d)"; _marker="$LOG_DIR/.last-purge"
+  [ "$(cat "$_marker" 2>/dev/null)" = "$_today" ] && return 0
+  _max_age=$((LOG_RETENTION_DAYS - 1))
+  find "$LOG_DIR" -type f -name '*.log' -mtime "+$_max_age" -exec rm -f {} \; 2>/dev/null || true
+  ( umask 077; printf '%s\n' "$_today" > "$_marker" ) 2>/dev/null || true
+}
 
 # Replace every literal occurrence of $2 in $1 with ***. Never mask with sed:
 # the password is data, but sed reads it as a regex and as part of the s|||
@@ -76,7 +96,10 @@ probe_one() {
 
 run_once() {
   [ -r "$CONF" ] || { echo "healthd: cannot read config $CONF" >&2; return 1; }
+  purge_daily_logs
   probes="{}"
+  state_tmp="$HEALTH_LOG_STATE.tmp.$$"
+  : > "$state_tmp" 2>/dev/null || state_tmp=""
   # Read the source configuration.
   while IFS='|' read -r name band idx wifi_key host port user pass isolate webrtc _oui proxy_type extra; do
     case "$name" in ''|\#*) continue;; esac
@@ -102,10 +125,17 @@ run_once() {
     # result and PROBE_ERROR stay bound to THIS proxy even when /tmp is full.
     probe_one "$host" "$port" "$user" "$pass" "$proxy_type"
     state="$PROBE_STATE"; ms="$PROBE_MS"; code="$PROBE_CODE"
+    previous="$(awk -v i="$idx" '$1 == i {print $2; exit}' "$HEALTH_LOG_STATE" 2>/dev/null)"
+    if [ "$state" != "$previous" ]; then
+      health_daily_log "idx=$idx endpoint=$host:$port state=$state latency_ms=$ms code=$code"
+    fi
+    [ -z "$state_tmp" ] || printf '%s %s\n' "$idx" "$state" >> "$state_tmp"
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \
               --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
               '.[$i] = {state:$s, latency_ms:$ms, code:$c} + (if $e == "" then {} else {error:$e} end)')"
   done < "$CONF"
+
+  [ -z "$state_tmp" ] || mv "$state_tmp" "$HEALTH_LOG_STATE" 2>/dev/null || true
 
   ts="$(date +%s)"
   tmp="$HEALTH_FILE.tmp.$$"

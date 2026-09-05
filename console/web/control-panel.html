@@ -423,6 +423,7 @@
         <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
         <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
         <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
+        <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
         <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
       </span>
     </nav>
@@ -800,6 +801,25 @@
   </div>
 </div>
 
+<!-- Daily diagnostic logs -->
+<div class="backdrop" id="dailyLogBackdrop">
+  <div class="modal" style="max-width:760px">
+    <h2>Nhật ký debug</h2>
+    <div class="form">
+      <div class="conn-status">Log theo ngày, tự xoá sau 7 ngày. File tải về không chứa mật khẩu hoặc token.</div>
+      <div class="filterbar">
+        <select id="dailyLogDate" aria-label="Ngày log"></select>
+        <button class="btn ghost" id="dailyLogRefresh">↻ Làm mới</button>
+        <button class="btn ghost" id="dailyLogCopy">⧉ Copy</button>
+        <button class="btn primary" id="dailyLogDownload">↓ Tải gói debug</button>
+      </div>
+      <div class="sub" id="dailyLogMeta">—</div>
+      <div class="logbox" id="dailyLogBox" style="max-height:52vh">Đang tải…</div>
+    </div>
+    <div class="foot"><button class="btn primary" id="dailyLogClose">Đóng</button></div>
+  </div>
+</div>
+
 <!-- Log modal -->
 <div class="backdrop" id="logBackdrop">
   <div class="modal">
@@ -865,7 +885,9 @@
     "Chưa có backup nào.": "No backups available.", "Đang tải…": "Loading…",
     "Không có thiết bị nào đang kết nối.": "No connected devices.", "ẩn danh": "anonymous",
     "Ngẫu nhiên / ẩn danh (02:xx)": "Random / anonymous (02:xx)",
-    "Cập nhật agent trên router": "Update the router agent",
+    "Cập nhật agent trên router": "Update the router agent", "Nhật ký": "Logs", "Nhật ký debug": "Debug logs",
+    "Log theo ngày, tự xoá sau 7 ngày. File tải về không chứa mật khẩu hoặc token.": "Daily logs are deleted after 7 days. Downloads contain no passwords or tokens.",
+    "Ngày log": "Log date", "Tải gói debug": "Download debug report",
     "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Update does not reload Wi-Fi. Click “Push & Apply” to activate changes."
   };
   // Blocks that contain inline markup are swapped whole rather than per text node.
@@ -884,6 +906,8 @@
     "Xem và đổi đường ra Internet của router": "View and switch the router's Internet egress",
     "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
     "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package",
+    "Xem và tải nhật ký debug 7 ngày": "View and download 7 days of debug logs",
+    "Ngày log": "Log date",
     "Mở / đóng menu": "Open / close the menu",
     "Test proxy đang nhập từ router (không cần lưu trước)": "Test the entered proxy from the router (no need to save first)",
     "Ghi nhớ interface đang chọn là đường ra mong đợi": "Remember the selected interface as the expected uplink",
@@ -1526,6 +1550,45 @@
         a.href = URL.createObjectURL(b); a.download = "sbproxy-" + name + ".tar.gz"; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 1500);
         toast(pick("Backup downloaded ✓", "Đã tải backup về máy ✓"));
+      }).catch(err => toast(pick("Download failed: ", "Lỗi tải: ") + err.message));
+  }
+
+  function openDailyLogs() {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    $("dailyLogBackdrop").classList.add("show");
+    loadDailyLogs();
+  }
+  function loadDailyLogs(requestedDate) {
+    const date = requestedDate || $("dailyLogDate").value || "";
+    $("dailyLogBox").textContent = pick("Loading…", "Đang tải…");
+    fetch(apiUrl("logs") + (date ? "&date=" + encodeURIComponent(date) : ""), {
+      headers: { "Authorization": `Bearer ${agent.token}` }
+    }).then(r => r.json()).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "logs failed");
+      const select = $("dailyLogDate");
+      const dates = d.dates || [];
+      if (!dates.includes(d.date)) dates.unshift(d.date);
+      select.innerHTML = dates.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+      select.value = d.date;
+      $("dailyLogMeta").textContent = pick(
+        `${dates.length} day(s) available · kept ${d.retention_days || 7} days`,
+        `Có ${dates.length} ngày · lưu ${d.retention_days || 7} ngày`
+      );
+      $("dailyLogBox").textContent = d.log || pick("No log entries for this day.", "Ngày này chưa có log.");
+    }).catch(err => {
+      $("dailyLogBox").textContent = pick("Cannot load logs: ", "Không tải được log: ") + err.message;
+    });
+  }
+  function downloadDailyLogs() {
+    const date = $("dailyLogDate").value || new Date().toISOString().slice(0, 10);
+    fetch(apiUrl("download_logs") + "&date=" + encodeURIComponent(date), {
+      headers: { "Authorization": `Bearer ${agent.token}` }
+    }).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+      .then(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = "sbproxy-debug-" + date + ".txt"; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        toast(pick("Debug report downloaded ✓", "Đã tải gói debug ✓"));
       }).catch(err => toast(pick("Download failed: ", "Lỗi tải: ") + err.message));
   }
   function restore(name) {
@@ -2329,6 +2392,13 @@
   $("upGo").onclick = doUpdate;
   $("upCancel").onclick = () => $("upBackdrop").classList.remove("show");
   $("upBackdrop").onclick = e => { if (e.target.id === "upBackdrop") $("upBackdrop").classList.remove("show"); };
+  $("dailyLogBtn").onclick = openDailyLogs;
+  $("dailyLogRefresh").onclick = () => loadDailyLogs($("dailyLogDate").value);
+  $("dailyLogDate").onchange = e => loadDailyLogs(e.target.value);
+  $("dailyLogCopy").onclick = () => copy($("dailyLogBox").textContent);
+  $("dailyLogDownload").onclick = downloadDailyLogs;
+  $("dailyLogClose").onclick = () => $("dailyLogBackdrop").classList.remove("show");
+  $("dailyLogBackdrop").onclick = e => { if (e.target.id === "dailyLogBackdrop") $("dailyLogBackdrop").classList.remove("show"); };
   $("gwBtn").onclick = openGateway;
   $("resetAllBtn").onclick = resetEverything;
   $("gwRefresh").onclick = loadGateway;

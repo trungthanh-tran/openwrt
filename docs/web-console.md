@@ -361,6 +361,16 @@ Danh sách gồm **mọi máy đã từng vào WiFi**, không chỉ máy đang k
 - **⟲ Reset toàn bộ**: đá mọi thiết bị, xoá mọi SSID và pool, apply. Đọc cấu
   hình thật từ router trước khi cảnh báo, và phải gõ `RESET` mới chạy.
 
+### 5.7 Nhật ký debug
+
+- Mở **▤ Nhật ký** trong nhóm Router, chọn ngày để xem hoặc **Copy**.
+- Bấm **Tải gói debug** để lấy file `sbproxy-debug-YYYY-MM-DD.txt`; có thể gửi
+  file này sang máy khác để phân tích mà không cần truy cập trực tiếp router.
+- Log được tách theo ngày trong `/etc/sbproxy/logs`, chỉ giữ 7 ngày và tự xoá
+  file cũ. Log không ghi mật khẩu Wi-Fi, mật khẩu proxy hoặc token API.
+- Gói debug gồm phiên bản, uptime, dung lượng, route, trạng thái dịch vụ, log
+  sbproxy theo ngày và syslog gần nhất của sbproxy/sing-box.
+
 ## 6. Map tính năng: desktop (.exe) ↔ web console
 
 Cả hai bản nói chuyện với **cùng một agent CGI** trên router, nên tính năng là
@@ -391,6 +401,7 @@ tương đương trừ vài mục ghi chú dưới đây.
 | Đường ra: xem, đổi uplink, ghim / bỏ ghim | ✅ | ✅ | `gateway`, `switch_gateway`, `set_gateway` |
 | Reset toàn bộ (kick hết, xoá hết, apply) | ✅ | ✅ (hành vi được test giống hệt desktop) | `kick`, `save_pool`, `save_conf`, `apply` |
 | Cập nhật agent bằng package .tar.gz/.zip | ✅ | ✅ | `update` |
+| Log theo ngày, xem/copy/tải gói debug, giữ 7 ngày | ✅ | ✅ | `logs`, `download_logs` |
 | Ngôn ngữ VI/EN, theme sáng/tối | ✅ | ✅ | — |
 | Sửa lỗi SSH host key, thư mục log, lưu token bằng DPAPI | ✅ | — (không áp dụng cho trình duyệt) | — |
 

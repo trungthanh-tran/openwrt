@@ -17,10 +17,11 @@ SB_ROOT="$TMP/router"
 CONF="$SB_ROOT/config/wifi-socks.conf"
 TOKEN_FILE="$TMP/token"
 HEALTH_FILE="$TMP/health.json"
+LOG_DIR="$TMP/daily-logs"
 BACKUP_DIR="$TMP/backups"
 BIN="$TMP/bin"
 CALLS="$TMP/calls.log"
-mkdir -p "$SB_ROOT/config" "$SB_ROOT/scripts" "$BACKUP_DIR" "$BIN"
+mkdir -p "$SB_ROOT/config" "$SB_ROOT/scripts" "$BACKUP_DIR" "$BIN" "$LOG_DIR"
 printf '%s\n' 'agent-test-token' > "$TOKEN_FILE"
 : > "$CALLS"
 cp "$ROOT/scripts/lib.sh" "$SB_ROOT/scripts/lib.sh"
@@ -145,7 +146,7 @@ cat > "$BIN/pgrep" <<'SH'
 SH
 chmod +x "$BIN/uci" "$BIN/pgrep"
 
-export SB_ROOT CONF TOKEN_FILE HEALTH_FILE BACKUP_DIR CALLS
+export SB_ROOT CONF TOKEN_FILE HEALTH_FILE BACKUP_DIR LOG_DIR CALLS
 export TMPDIR="$TMP"
 export PATH="$BIN:$PATH"
 export APPLY_DRYRUN_RC=0 APPLY_REAL_RC=0 BACKUP_RC=0 SET_SOCK_RC=0 ROTATE_RC=0
@@ -285,6 +286,22 @@ not_contains "no cleartext password reaches the account file" "$(cat "$WEBAUTH_F
 sh "$WEBAUTH" disable >/dev/null
 rm -f "$WEBAUTH_LOCK_FILE"
 unset LOGIN_FAIL_DELAY
+
+echo "== daily logs and portable debug report =="
+today="$(date +%Y-%m-%d)"
+out="$(auth_run GET 'action=logs')"
+contains "logs endpoint succeeds" "$out" 'Status: 200 OK'
+contains "logs list includes today" "$out" "\"$today\""
+eq "logs report seven-day retention" "$(json_value "$out" '.retention_days')" '7'
+contains "daily log records actions" "$(json_value "$out" '.log')" 'action=login'
+not_contains "daily log never stores the bearer token" "$(json_value "$out" '.log')" 'agent-test-token'
+not_contains "daily log never stores request passwords" "$(json_value "$out" '.log')" 'secret-pass-1'
+out="$(auth_run GET "action=download_logs&date=$today")"
+contains "debug report downloads as an attachment" "$out" "filename=\"sbproxy-debug-$today.txt\""
+contains "debug report includes system context" "$out" '== system =='
+contains "debug report includes the selected daily log" "$out" "== daily log: $today =="
+out="$(auth_run GET 'action=logs&date=../../etc/passwd')"
+contains "logs reject an unsafe date" "$out" 'Status: 400 Bad Request'
 
 echo "== agent status and read-only endpoints =="
 cat > "$CONF" <<'EOF'

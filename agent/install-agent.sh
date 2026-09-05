@@ -37,6 +37,8 @@ cat > /etc/sbproxy/env <<EOF
 SB_ROOT=$SB_ROOT
 CONF=$SB_ROOT/config/wifi-socks.conf
 HEALTH_FILE=/tmp/sbproxy-health.json
+LOG_DIR=/etc/sbproxy/logs
+LOG_RETENTION_DAYS=7
 BACKUP_DIR=/root/sbproxy-backups
 PROBE_URL=https://www.gstatic.com/generate_204
 INTERVAL=15
@@ -49,6 +51,12 @@ GATEWAY_EXPECTED_INTERFACE=$KEEP_UPLINK
 GATEWAY_PROBE_URL=https://www.gstatic.com/generate_204
 GATEWAY_PROBE_TIMEOUT=8
 EOF
+
+mkdir -p /etc/sbproxy/logs
+chmod 700 /etc/sbproxy/logs 2>/dev/null || true
+LOG_DAY="$(date +%Y-%m-%d)"
+( umask 077; printf '%s agent installed or updated\n' "$(date '+%Y-%m-%d %H:%M:%S%z')" >> "/etc/sbproxy/logs/$LOG_DAY.log" )
+find /etc/sbproxy/logs -type f -name '*.log' -mtime +6 -exec rm -f {} \; 2>/dev/null || true
 
 log "3) Authentication token -> /etc/sbproxy/token"
 if [ ! -s /etc/sbproxy/token ]; then

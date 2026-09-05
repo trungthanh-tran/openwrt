@@ -36,6 +36,8 @@
 # POST ?action=assign_proxy  body json {idx,assignments:[{mac,slot}]} -> pin devices, no reload
 # POST ?action=rebalance     body json {idx,macs:[...],proxies?,seed?} -> spread devices evenly
 # GET  ?action=clients       -> {clients:[...]} devices per SSID (mac/ip/time/in-out/banned)
+# GET  ?action=logs[&date=YYYY-MM-DD] -> daily agent log + available dates (7 days)
+# GET  ?action=download_logs[&date=YYYY-MM-DD] -> portable text debug report
 # POST ?action=kick   body json {idx,mac} -> deauth one client (not persistent)
 # POST ?action=ban    body json {idx,mac} -> persistently block a MAC from an SSID
 # POST ?action=unban  body json {idx,mac} -> remove a MAC ban
@@ -49,6 +51,9 @@ TOKEN_FILE="${TOKEN_FILE:-/etc/sbproxy/token}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
 MAX_BODY_BYTES="${MAX_BODY_BYTES:-262144}"
 ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
+LOG_DIR="${LOG_DIR:-/etc/sbproxy/logs}"
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
+case "$LOG_RETENTION_DAYS" in ''|*[!0-9]*|0) LOG_RETENTION_DAYS=7;; esac
 # Update packages are binary and larger than text/JSON bodies.
 MAX_UPDATE_BYTES="${MAX_UPDATE_BYTES:-8388608}"
 
@@ -61,9 +66,44 @@ hdr() {
   printf 'Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n'
   printf 'Cache-Control: no-store\r\n\r\n'
 }
+download_hdr() { # filename
+  printf 'Status: 200 OK\r\n'
+  printf 'Content-Type: text/plain; charset=utf-8\r\n'
+  printf 'Content-Disposition: attachment; filename="%s"\r\n' "$1"
+  printf 'Access-Control-Allow-Origin: *\r\n'
+  printf 'Cache-Control: no-store\r\n\r\n'
+}
 json_ok()  { hdr "200 OK" "application/json"; printf '%s\n' "$1"; exit 0; }
 json_err() { hdr "$1" "application/json"; jq -n --arg e "$2" '{ok:false,error:$e}'; exit 0; }
 have() { command -v "$1" >/dev/null 2>&1; }
+valid_log_date() { printf '%s' "$1" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; }
+prepare_log_dir() {
+  mkdir -p "$LOG_DIR" 2>/dev/null || return 1
+  chmod 700 "$LOG_DIR" 2>/dev/null || true
+  _today="$(date +%Y-%m-%d)"
+  _marker="$LOG_DIR/.last-purge"
+  if [ "$(cat "$_marker" 2>/dev/null)" != "$_today" ]; then
+    # BusyBox find supports -mtime and -exec across the OpenWrt versions used
+    # here. Seven days means today plus the previous six daily files.
+    _max_age=$((LOG_RETENTION_DAYS - 1))
+    find "$LOG_DIR" -type f -name '*.log' -mtime "+$_max_age" -exec rm -f {} \; 2>/dev/null || true
+    ( umask 077; printf '%s\n' "$_today" > "$_marker" ) 2>/dev/null || true
+  fi
+}
+daily_log() { # already-sanitised single-line message
+  prepare_log_dir || return 0
+  _day="$(date +%Y-%m-%d)"
+  _stamp="$(date '+%Y-%m-%d %H:%M:%S%z')"
+  _line="$(printf '%s' "$*" | tr '\r\n' '  ')"
+  ( umask 077; printf '%s %s\n' "$_stamp" "$_line" >> "$LOG_DIR/$_day.log" ) 2>/dev/null || true
+}
+available_log_dates() {
+  prepare_log_dir || return 0
+  for _file in "$LOG_DIR"/????-??-??.log; do
+    [ -f "$_file" ] || continue
+    basename "$_file" .log
+  done | sort -r
+}
 # Effective settings.sh numbers, read in a subshell so nothing here inherits the
 # file's other variables. A console derives subnets and TPROXY ports from these
 # instead of repeating the defaults and drifting when settings.sh is edited.
@@ -150,6 +190,14 @@ case "$ACTION" in
     esac
     [ "$REQUEST_TOKEN" = "$TOKEN" ] || json_err "401 Unauthorized" "token sai hoặc thiếu Authorization: Bearer"
     ;;
+esac
+
+# Keep routine polling quiet; record operator actions without request bodies,
+# credentials or bearer tokens. REMOTE_ADDR is useful when the report is
+# collected from another management machine.
+case "$ACTION" in
+  status|clients|health_now|gateway|get_pool|get_conf|backups|logs|download_logs|login_state) : ;;
+  *) daily_log "cgi ip=${REMOTE_ADDR:-local} method=${REQUEST_METHOD:-GET} action=${ACTION:-unknown}" ;;
 esac
 
 # Shared by login / setup_account / change_password.
@@ -810,6 +858,58 @@ case "$ACTION" in
     OUT="$(cd "$SB_ROOT" && sh scripts/rebalance.sh "$@" 2>&1)"; RC=$?
     [ -z "$TMP_POOL" ] || rm -f "$TMP_POOL"
     json_ok "$(jq -n --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0), rc:$rc, log:$log}')"
+    ;;
+
+  logs)
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    dates="$(available_log_dates)"
+    date_req="$(query_field date)"
+    if [ -z "$date_req" ]; then
+      date_req="$(printf '%s\n' "$dates" | sed -n '1p')"
+      [ -n "$date_req" ] || date_req="$(date +%Y-%m-%d)"
+    fi
+    valid_log_date "$date_req" || json_err "400 Bad Request" "ngày log không hợp lệ"
+    log_text="$(tail -n 4000 "$LOG_DIR/$date_req.log" 2>/dev/null || true)"
+    dates_json="$(printf '%s\n' "$dates" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    json_ok "$(jq -n --arg date "$date_req" --arg log "$log_text" \
+      --argjson dates "$dates_json" --argjson retention "$LOG_RETENTION_DAYS" \
+      '{ok:true,date:$date,dates:$dates,retention_days:$retention,log:$log}')"
+    ;;
+
+  download_logs)
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    date_req="$(query_field date)"
+    [ -n "$date_req" ] || date_req="$(date +%Y-%m-%d)"
+    valid_log_date "$date_req" || json_err "400 Bad Request" "ngày log không hợp lệ"
+    download_hdr "sbproxy-debug-$date_req.txt"
+    printf 'sbproxy debug report\n'
+    printf 'generated: %s\nselected day: %s\nretention: %s days\n\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S%z')" "$date_req" "$LOG_RETENTION_DAYS"
+    printf '%s\n' '== system =='
+    printf 'version: '; tr -d '\r\n' < "$SB_ROOT/VERSION" 2>/dev/null || printf 'unknown'; printf '\n'
+    uname -a 2>/dev/null || true
+    uptime 2>/dev/null || true
+    df -h / /tmp 2>/dev/null || true
+    printf '\n%s\n' '== routes =='
+    ip route show 2>/dev/null || true
+    printf '\n%s\n' '== services =='
+    for _svc in sbproxy-healthd sbproxy-assignd sing-box uhttpd; do
+      printf '%s: ' "$_svc"
+      if [ -x "/etc/init.d/$_svc" ]; then
+        "/etc/init.d/$_svc" status 2>&1 || true
+      else
+        printf 'not installed\n'
+      fi
+    done
+    printf '\n== daily log: %s ==\n' "$date_req"
+    tail -n 4000 "$LOG_DIR/$date_req.log" 2>/dev/null || printf '(empty)\n'
+    printf '\n%s\n' '== recent system log (sbproxy / sing-box) =='
+    if have logread; then
+      logread 2>/dev/null | grep -E 'sbproxy|sing-box' | tail -n 800 || true
+    else
+      printf 'logread is unavailable\n'
+    fi
+    exit 0
     ;;
 
   clients)
