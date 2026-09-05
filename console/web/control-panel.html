@@ -2336,6 +2336,11 @@
   $("disconnectBtn").onclick = disconnect;
   $("logoutBtn").onclick = logout;
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
+  $("sidebar").onclick = e => {
+    if (e.target.closest("button") && matchMedia("(max-width: 920px)").matches) {
+      $("layout").classList.remove("side-open");
+    }
+  };
   $("probeBtn").onclick = probeFromForm;
   $("setupGo").onclick = submitSetup;
   $("setupCancel").onclick = () => $("setupBackdrop").classList.remove("show");
