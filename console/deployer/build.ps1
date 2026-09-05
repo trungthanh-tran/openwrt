@@ -3,7 +3,8 @@ $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo = Split-Path -Parent (Split-Path -Parent $here)
 $desktop = Join-Path $repo "console\desktop"
-Set-Location $here
+Push-Location $here
+try {
 
 python -c "import tkinter; import PyInstaller; print('Build dependencies OK')"
 if ($LASTEXITCODE -ne 0) {
@@ -40,3 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed: $LASTEXITCODE" }
 $exe = Join-Path $here "dist\sbproxy-web-deployer.exe"
 if (-not (Test-Path -LiteralPath $exe)) { throw "Output not found: $exe" }
 Write-Host "BUILD COMPLETE: $exe"
+}
+finally {
+  Pop-Location
+}

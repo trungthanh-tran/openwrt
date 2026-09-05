@@ -1,0 +1,86 @@
+name: Build deploy packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag and source version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart('v')
+          $sourceVersion = (Get-Content VERSION -Raw).Trim()
+          if ($tagVersion -ne $sourceVersion) {
+            throw "Tag version $tagVersion does not match VERSION $sourceVersion"
+          }
+      - name: Build Windows ZIP
+        shell: pwsh
+        run: .\console\deployer\package-windows.ps1
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbproxy-web-deploy-windows-${{ github.ref_name || github.sha }}
+          path: dist/release/*-windows-x64.zip
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Linux build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+          python -m pip install -r console/deployer/requirements.txt
+      - name: Validate tag and source version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          source_version="$(tr -d ' \r\n' < VERSION)"
+          test "$tag_version" = "$source_version" || {
+            echo "Tag version $tag_version does not match VERSION $source_version" >&2
+            exit 1
+          }
+      - name: Build Linux TAR.GZ
+        run: sh console/deployer/package-linux.sh
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbproxy-web-deploy-linux-${{ github.ref_name || github.sha }}
+          path: dist/release/*-linux-*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" release/* \
+            --repo "${{ github.repository }}" \
+            --title "sbproxy ${{ github.ref_name }}" \
+            --generate-notes

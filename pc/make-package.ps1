@@ -14,7 +14,7 @@ $RepoDir = Split-Path -Parent $PSScriptRoot
 if (-not $OutDir) { $OutDir = Join-Path $RepoDir 'dist' }
 
 $Ver = (Get-Content (Join-Path $RepoDir 'VERSION') -Raw).Trim()
-if ($Ver -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "VERSION khong hop le: '$Ver'" }
+if ($Ver -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$') { throw "VERSION khong hop le: '$Ver'" }
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $Pkg = Join-Path $OutDir "sbproxy-update-$Ver.tar.gz"

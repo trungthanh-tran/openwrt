@@ -1,16 +1,76 @@
-# Release artifacts
+# Gói deploy và release
 
-The GitHub release workflow builds the Windows desktop executable and publishes
-four downloadable artifacts:
+Người dùng chỉ cần tải **một gói đúng hệ điều hành**, giải nén rồi chạy. Không
+cần clone repository, cài Python hay tự tìm từng file rời.
 
-| Artifact | Contents | Use |
+| Hệ điều hành | Gói tải về | Chương trình chạy |
 |---|---|---|
-| `sbproxy-console-<version>.exe` | Native Tkinter desktop console with the matching router payload embedded | Run the management console on Windows |
-| `sbproxy-update-<version>.tar.gz` | Complete router-side update package | Install or update `/root/sbproxy` |
-| `sbproxy-agent-<version>.tar.gz` | `agent/`, version metadata, and agent documentation | Deploy or inspect the CGI/health-agent portion |
-| `sbproxy-scripts-docs-<version>.tar.gz` | `scripts/`, `docs/`, project guides, and security/contribution files | Offline operations, review, and field documentation |
+| Windows x64 | `sbproxy-web-deploy-<version>-windows-x64.zip` | `sbproxy-web-deployer.exe` |
+| Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | `sbproxy-web-deployer` |
 
-The workflow runs on tags matching either `0.4.0` or `v0.4.0`. On a tag, the
-tag version must match `VERSION`; the release job then attaches all artifacts to
-the GitHub Release. `workflow_dispatch` can build the same artifacts from the
-current branch without publishing a release.
+`<arch>` hiện là `x86_64`, `arm64`, hoặc kiến trúc thực tế của máy build. Binary
+PyInstaller không chạy chéo hệ điều hành hoặc kiến trúc.
+
+## Nội dung thống nhất trong mỗi gói
+
+```text
+sbproxy-web-deploy-<version>-<platform>/
+├── sbproxy-web-deployer[.exe]       # kiểm tra, cài/update, mở Web Console
+├── sbproxy-update-<version>.tar.gz  # upload thủ công qua mục Cập nhật trên web
+├── README.md                        # bắt đầu nhanh
+├── WEB-DEPLOY.md                    # tài liệu cài và sử dụng đầy đủ
+├── LICENSE
+└── SHA256SUMS                       # checksum các file bên trong
+```
+
+Executable đã nhúng cùng router payload, vì vậy file update rời không bắt buộc
+khi cài bằng app. File `sbproxy-update-*.tar.gz` được kèm để cập nhật thủ công
+trên Web Console hoặc kiểm tra/lưu trữ độc lập.
+
+## Build tại máy phát triển
+
+Windows x64:
+
+```powershell
+.\console\deployer\package-windows.ps1
+```
+
+Linux:
+
+```sh
+sh console/deployer/package-linux.sh
+```
+
+Kết quả đều vào `dist/release/`. Script dừng nếu `VERSION` sai định dạng, build
+executable thất bại hoặc không tạo được router update package. Cả version ổn định
+(`1.2.3`) và bản phát triển (`1.2.3-SNAPSHOT`) đều build được.
+
+## Kiểm tra trước khi phát hành
+
+Windows:
+
+```powershell
+Expand-Archive .\dist\release\sbproxy-web-deploy-*-windows-x64.zip .\check
+Get-Content .\check\sbproxy-web-deploy-*\SHA256SUMS
+Get-FileHash .\check\sbproxy-web-deploy-*\sbproxy-web-deployer.exe -Algorithm SHA256
+```
+
+Linux:
+
+```sh
+tar xzf dist/release/sbproxy-web-deploy-*-linux-*.tar.gz -C /tmp
+cd /tmp/sbproxy-web-deploy-*-linux-*
+sha256sum -c SHA256SUMS
+./sbproxy-web-deployer --self-test
+```
+
+Windows EXE cũng hỗ trợ `--self-test`. Vì là ứng dụng windowed, có thể kiểm tra
+exit code bằng PowerShell `Start-Process -Wait -PassThru`.
+
+## GitHub Release
+
+Workflow `.github/workflows/deploy-release.yml` build Windows ZIP và Linux
+TAR.GZ riêng trên runner đúng hệ điều hành. `workflow_dispatch` tạo artifact để
+kiểm tra nhưng không publish. Khi push tag `v<version>` hoặc `<version>`, tag
+phải khớp chính xác với file `VERSION`; sau khi cả hai build thành công, workflow
+đính kèm hai gói vào cùng một GitHub Release.

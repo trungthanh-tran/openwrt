@@ -20,7 +20,7 @@ command -v "$PY" >/dev/null 2>&1 || { echo "python3 is required (or set PYTHON=.
 # is built outside the repo so it never ends up inside its own payload.
 REPO_DIR="$(cd ../.. && pwd)"
 VERSION="$(tr -d ' \r\n' < "$REPO_DIR/VERSION")"
-printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$' \
   || { echo "Invalid VERSION: '$VERSION'"; exit 1; }
 PAYLOAD_DIR="$(mktemp -d)"
 trap 'rm -rf "$PAYLOAD_DIR"' EXIT INT TERM

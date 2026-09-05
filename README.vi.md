@@ -79,6 +79,7 @@ Makefile · .editorconfig · .shellcheckrc · CI (.github, .gitlab-ci.yml)
 ### Console: bản Web và bản Desktop native
 - **Bản Web** — mở từ `http://<router>/sbproxy/` (cài qua `install-agent.sh`), same-origin. Nếu mở qua **https** thì bị chặn mixed-content khi gọi router http.
 - **Web Deployer (.exe)** — công cụ Windows nhỏ chỉ có **Kiểm tra router**, **Cài / Cập nhật** và **Mở Web Console**. Có thể sửa IP/hostname, SSH port, username và password; không có màn hình quản lý Wi-Fi/proxy. File EXE nhúng sẵn gói router, giữ nguyên SSID/pool/settings khi cập nhật và không lưu mật khẩu SSH. Build tại `console/deployer` bằng `.\build.ps1`.
+- **Gói mang đi** — tải một file theo máy quản trị: `.zip` cho Windows x64 hoặc `.tar.gz` cho Linux. Mỗi gói có deployer, router update package, checksum và tài liệu. Xem [docs/RELEASE-ARTIFACTS.md](docs/RELEASE-ARTIFACTS.md).
 - **Bản Desktop (.exe)** — ứng dụng Tkinter native gọi trực tiếp Agent API qua LAN, không dùng HTML/WebView/WebView2. App lưu token bằng Windows DPAPI (Linux/macOS dùng `chmod 600`), dry-run trước Apply, có cảnh báo tác vụ quan trọng và quản lý thiết bị nâng cao. Build 1 lệnh: Windows `cd console/desktop; .\build.ps1`, Linux/macOS `sh console/desktop/build.sh`.
 - **Cài router vừa flash ngay trong bản Desktop** — chức năng **Cài đặt sau khi flash** chạy qua SSH: kiểm tra router đang có sẵn gì, đẩy mã nguồn và cấu hình, cài phụ thuộc và agent, chạy script khởi tạo rồi đọc token về và mở màn hình điều khiển; phần nào đã cài thì dùng lại và từng bước hiện ngay trên giao diện. File build đã nhúng sẵn gói router nên máy chạy không cần mã nguồn. Bản build tách theo nền tảng vì PyInstaller không cross-compile: Windows dùng `console/desktop/dist/sbproxy-console.exe` (build bằng `.\build.ps1`), Linux/macOS dùng `console/desktop/dist/sbproxy-console` (build bằng `sh console/desktop/build.sh`); mỗi file tự chứa đủ mọi thứ, chạy bằng `.\sbproxy-console.exe` hoặc `./sbproxy-console`. Chi tiết: [console/desktop/README.vi.md](console/desktop/README.vi.md).
 
@@ -141,6 +142,7 @@ CI (GitHub Actions + GitLab CI) chạy test + lint trên mỗi push. Quy ước 
 
 **Cài đặt**
 - **[console/deployer/README.md](console/deployer/README.md) — EXE tối giản để kiểm tra, cài/cập nhật và mở bản Web.**
+- **[docs/RELEASE-ARTIFACTS.md](docs/RELEASE-ARTIFACTS.md) — cấu trúc và cách build gói Windows ZIP / Linux TAR.GZ.**
 - **[docs/QUICKSTART.md](docs/QUICKSTART.md) — Cài nhanh bằng file exe: backup → flash → mật khẩu root → chạy app. Bắt đầu ở đây.**
 - [docs/INSTALL.md](docs/INSTALL.md) — cài tay từng lệnh, giải thích từng bước
 - [docs/GUIDE.md](docs/GUIDE.md) — hướng dẫn toàn tập một mạch: firmware → cấu hình → test → xử lý lỗi

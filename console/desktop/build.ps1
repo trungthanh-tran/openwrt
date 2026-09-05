@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) {
 # is built outside the repo so it never ends up inside its own payload.
 $repo = Split-Path -Parent (Split-Path -Parent $here)
 $version = (Get-Content (Join-Path $repo "VERSION") -Raw).Trim()
-if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "Invalid VERSION: '$version'" }
+if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$') { throw "Invalid VERSION: '$version'" }
 $payloadDir = Join-Path $env:TEMP "sbproxy-console-payload-$PID"
 New-Item -ItemType Directory -Force $payloadDir | Out-Null
 $payload = Join-Path $payloadDir "sbproxy-update-$version.tar.gz"

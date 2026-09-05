@@ -35,9 +35,15 @@ ssh root@192.168.8.1 "sysupgrade -b /tmp/openwrt-before-sbproxy.tar.gz"
 scp root@192.168.8.1:/tmp/openwrt-before-sbproxy.tar.gz .
 ```
 
-## 2. Cách nhanh: cài hoặc cập nhật bằng EXE
+## 2. Cách nhanh: dùng gói deploy theo hệ điều hành
 
-Chạy `sbproxy-web-deployer.exe` trên Windows. Đây là tiện ích triển khai riêng,
+Tải và giải nén một trong hai file:
+
+- Windows x64: `sbproxy-web-deploy-<version>-windows-x64.zip`.
+- Linux: `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz`.
+
+Chạy `sbproxy-web-deployer.exe` trên Windows hoặc `./sbproxy-web-deployer` trên
+Linux. Đây là tiện ích triển khai riêng,
 không phải console điều khiển và không có chức năng sửa Wi-Fi, device hay proxy.
 
 1. Điền **Router IP / host**, **SSH port**, **Username** và **Password**.
@@ -52,16 +58,20 @@ Khi cập nhật router đã cài, công cụ giữ nguyên `wifi-socks.conf`,
 `proxy-pools.conf`, `settings.sh`, không apply lại Wi-Fi. Khi cài router mới,
 công cụ tạo cấu hình rỗng an toàn rồi cài đủ Web/Agent.
 
-Build EXE từ mã nguồn:
+Build trọn gói từ mã nguồn:
 
 ```powershell
-cd console\deployer
-.\build.ps1
+.\console\deployer\package-windows.ps1
 ```
 
-Kết quả nằm tại `console\deployer\dist\sbproxy-web-deployer.exe`. Máy chạy file
-này không cần Git, Python hay source code; chỉ cần Windows OpenSSH và kết nối LAN
-tới router. Xem thêm [README của Web Deployer](../console/deployer/README.md).
+```sh
+sh console/deployer/package-linux.sh
+```
+
+Kết quả nằm tại `dist/release/`. Máy sử dụng gói không cần Git, Python hay source
+code; chỉ cần SSH client và kết nối LAN tới router. Xem thêm
+[cấu trúc gói release](RELEASE-ARTIFACTS.md) và
+[README của Web Deployer](../console/deployer/README.md).
 
 ## 3. Cài mới thủ công từ Windows
 

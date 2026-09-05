@@ -12,7 +12,7 @@ set -eu
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$REPO_DIR/dist}"
 VER="$(tr -d ' \r\n' < "$REPO_DIR/VERSION")"
-printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$' \
   || { echo "Invalid VERSION: '$VER'" >&2; exit 1; }
 
 mkdir -p "$OUT_DIR"

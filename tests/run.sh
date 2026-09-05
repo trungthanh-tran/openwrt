@@ -735,8 +735,21 @@ match "web deployer has router check action" "$deployer_main" 'text="Kiểm tra 
 match "web deployer has install or update action" "$deployer_main" 'text="Cài / Cập nhật"'
 match "web deployer opens the Web Console" "$deployer_main" 'text="Mở Web Console"'
 match "web deployer preserves operator configuration" "$deployer_main" 'wifi-socks\.conf proxy-pools\.conf settings\.sh'
-match "web deployer has a packaged self-test" "$deployer_main" '--self-test'
-match "web deployer Windows build embeds the payload" "$(cat "$ROOT/console/deployer/build.ps1")" '--add-data "\$payload;payload"'
+match "web deployer has a packaged self-test" "$deployer_main" 'self-test'
+match "web deployer Windows build embeds the payload" "$(cat "$ROOT/console/deployer/build.ps1")" 'add-data "\$payload;payload"'
+windows_bundle="$(cat "$ROOT/console/deployer/package-windows.ps1")"
+linux_bundle="$(cat "$ROOT/console/deployer/package-linux.sh")"
+release_workflow="$(cat "$ROOT/.github/workflows/deploy-release.yml")"
+match "Windows deploy release is versioned for x64" "$windows_bundle" 'bundleName = "sbproxy-web-deploy-\$version-windows-x64"'
+match "Windows deploy release is a ZIP" "$windows_bundle" 'Compress-Archive'
+match "Windows deploy release carries checksums" "$windows_bundle" 'SHA256SUMS'
+match "Windows deploy release tests its executable" "$windows_bundle" 'selfTest.ExitCode'
+match "Linux deploy release is architecture-specific" "$linux_bundle" 'BUNDLE_NAME="sbproxy-web-deploy-\$VERSION-linux-\$ARCH"'
+match "Linux deploy release is a tar.gz" "$linux_bundle" 'ARCHIVE="\$OUT_DIR/\$BUNDLE_NAME\.tar\.gz"'
+match "Linux deploy release carries checksums" "$linux_bundle" 'sha256sum.*SHA256SUMS'
+match "Linux deploy release tests its executable" "$linux_bundle" 'sbproxy-web-deployer.*self-test'
+match "release workflow builds Windows and Linux" "$release_workflow" 'needs: \[windows, linux\]'
+match "release workflow publishes only after platform builds" "$release_workflow" 'gh release create'
 match "desktop isolates every write under one home" "$desktop_main" 'def resolve_app_home\('
 match "desktop supports a portable data folder" "$desktop_main" 'portable = frozen_dir\(\) / "data"'
 match "desktop writes a rotating debug log" "$desktop_main" 'RotatingFileHandler'
