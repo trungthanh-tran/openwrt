@@ -6939,6 +6939,19 @@ def main() -> int:
     if os.environ.get("SBPROXY_ASKPASS") == "1":
         # ssh called us as its askpass helper; answer on stdout and exit.
         return write_askpass_answer(os.environ.get("SBPROXY_SSH_PASSWORD", ""))
+    if "--self-test" in sys.argv or "--self-test-gui" in sys.argv:
+        payload = find_payload()
+        if not payload or not Path(payload).exists() or not payload_version(payload):
+            return 1
+        if "--self-test-gui" in sys.argv:
+            root = tk.Tk()
+            root.withdraw()
+            try:
+                NativeApp(root)
+                root.update_idletasks()
+            finally:
+                root.destroy()
+        return 0
     setup_logging(verbose="--verbose" in sys.argv)
     install_exception_logging()
     migrate_legacy_config()

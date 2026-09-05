@@ -6,6 +6,8 @@ Hướng dẫn dùng **ứng dụng desktop** (`sbproxy-console.exe` trên Windo
 `sbproxy-console` trên Linux/macOS) trong công việc hằng ngày: mở app, kết nối
 router, thêm/sửa WiFi và SOCKS5, xem thiết bị, sao lưu. Không cần dòng lệnh.
 
+![sbproxy Desktop Console trên Windows](images/desktop-console-windows.png)
+
 - Cài router mới từ đầu: [QUICKSTART.md](QUICKSTART.md) (4 bước).
 - Dùng bản console web trong trình duyệt: [user-guide.md](user-guide.md).
 - Việc quản trị sâu (firmware, script, bảo mật): [admin-guide.md](admin-guide.md).
@@ -16,7 +18,9 @@ router, thêm/sửa WiFi và SOCKS5, xem thiết bị, sao lưu. Không cần d�
 
 Chỉ có **một file** duy nhất, không cần cài đặt gì thêm:
 
-- Windows: bấm đúp `sbproxy-console.exe`.
+- Windows: tải `sbproxy-console-<version>-windows-x64.exe` từ Release rồi bấm
+  đúp. Đây là bản quản lý đầy đủ, không phải `sbproxy-web-deployer-*.exe` chỉ
+  dùng để cài/cập nhật Web Console.
 - Linux/macOS: `chmod +x ./sbproxy-console` rồi `./sbproxy-console`.
 
 App nhớ token nên **lần sau mở là vào thẳng màn hình điều khiển**. Lần đầu (chưa

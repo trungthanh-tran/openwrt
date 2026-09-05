@@ -6,11 +6,14 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- Release Windows có thêm `sbproxy-console-<version>-windows-x64.exe`: ứng dụng
+  Desktop standalone đầy đủ để quản lý SSID, pool proxy, thiết bị, gateway,
+  backup và log. Asset này tách biệt với Web Deployer tối giản.
 - Release Windows có thêm file standalone
   `sbproxy-web-deployer-<version>-windows-x64.exe`, chạy trực tiếp không cần giải
   nén; gói ZIP đầy đủ vẫn được phát hành song song.
 - Thêm hướng dẫn riêng cho Web Deployer và ảnh chụp thật của ứng dụng Windows,
-  dashboard, màn hình thiết bị, proxy pool và giao diện mobile.
+  Desktop Console, dashboard, màn hình thiết bị, proxy pool và giao diện mobile.
 
 ### Changed
 - Gói deploy Windows/Linux kèm cả tài liệu có ảnh; `SHA256SUMS` kiểm tra luôn các

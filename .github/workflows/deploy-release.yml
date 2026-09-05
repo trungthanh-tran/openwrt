@@ -29,12 +29,16 @@ jobs:
       - name: Build Windows standalone EXE and ZIP
         shell: pwsh
         run: .\console\deployer\package-windows.ps1
+      - name: Build full Windows management console
+        shell: pwsh
+        run: .\console\desktop\package-windows.ps1
       - name: Upload Windows packages
         uses: actions/upload-artifact@v4
         with:
           name: sbproxy-web-deploy-windows-${{ github.ref_name || github.sha }}
           path: |
             dist/release/sbproxy-web-deployer-*-windows-x64.exe
+            dist/release/sbproxy-console-*-windows-x64.exe
             dist/release/*-windows-x64.zip
           if-no-files-found: error
 

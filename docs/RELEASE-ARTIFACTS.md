@@ -5,6 +5,7 @@ cần clone repository, cài Python hay tự tìm từng file rời.
 
 | Hệ điều hành | Gói tải về | Chương trình chạy |
 |---|---|---|
+| Windows x64, quản lý đầy đủ | `sbproxy-console-<version>-windows-x64.exe` | Quản lý SSID, proxy, thiết bị và router |
 | Windows x64, chạy ngay | `sbproxy-web-deployer-<version>-windows-x64.exe` | Chính file vừa tải |
 | Windows x64 | `sbproxy-web-deploy-<version>-windows-x64.zip` | `sbproxy-web-deployer.exe` |
 | Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | `sbproxy-web-deployer` |
@@ -35,6 +36,7 @@ trên Web Console hoặc kiểm tra/lưu trữ độc lập.
 Windows x64:
 
 ```powershell
+.\console\desktop\package-windows.ps1
 .\console\deployer\package-windows.ps1
 ```
 
@@ -56,6 +58,9 @@ Windows:
 Expand-Archive .\dist\release\sbproxy-web-deploy-*-windows-x64.zip .\check
 Get-Content .\check\sbproxy-web-deploy-*\SHA256SUMS
 Get-FileHash .\check\sbproxy-web-deploy-*\sbproxy-web-deployer.exe -Algorithm SHA256
+$p = Start-Process .\dist\release\sbproxy-console-*-windows-x64.exe `
+  -ArgumentList --self-test-gui -Wait -PassThru
+$p.ExitCode   # phải là 0
 ```
 
 Linux:
@@ -72,8 +77,9 @@ exit code bằng PowerShell `Start-Process -Wait -PassThru`.
 
 ## GitHub Release
 
-Workflow `.github/workflows/deploy-release.yml` build Windows standalone EXE,
-Windows ZIP và Linux TAR.GZ riêng trên runner đúng hệ điều hành. `workflow_dispatch` tạo artifact để
+Workflow `.github/workflows/deploy-release.yml` build Desktop Console EXE, Web
+Deployer EXE, Windows ZIP và Linux TAR.GZ riêng trên runner đúng hệ điều hành.
+`workflow_dispatch` tạo artifact để
 kiểm tra nhưng không publish. Khi push tag `v<version>` hoặc `<version>`, tag
 phải khớp chính xác với file `VERSION`; sau khi cả hai build thành công, workflow
-đính kèm cả ba file vào cùng một GitHub Release.
+đính kèm cả bốn file vào cùng một GitHub Release.

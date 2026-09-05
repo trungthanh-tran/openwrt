@@ -296,6 +296,15 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
+Build the versioned standalone asset used by a Windows release:
+
+```powershell
+.\package-windows.ps1
+# -> ..\..\dist\release\sbproxy-console-<version>-windows-x64.exe
+```
+
+The release script runs `--self-test-gui` before staging the asset.
+
 ```sh
 cd console/desktop
 sh build.sh

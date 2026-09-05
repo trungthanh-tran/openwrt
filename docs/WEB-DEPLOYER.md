@@ -4,12 +4,17 @@ Web Deployer là công cụ nhỏ để đưa sbproxy Web lên router qua SSH. C
 thực hiện ba việc: **kiểm tra**, **cài/cập nhật** và **mở Web Console**. Việc quản
 lý Wi‑Fi, proxy và thiết bị được thực hiện trong trình duyệt sau khi cài xong.
 
+Nếu muốn quản lý trực tiếp bằng ứng dụng Windows, tải
+`sbproxy-console-<version>-windows-x64.exe`. Đây là Desktop Console đầy đủ, khác
+với Web Deployer tối giản.
+
 ![sbproxy Web Deployer trên Windows](images/web-deployer-windows.png)
 
 ## 1. Chọn file tải về
 
 | Nền tảng | File | Khi nào nên dùng |
 |---|---|---|
+| Windows x64 | `sbproxy-console-<version>-windows-x64.exe` | Quản lý đầy đủ SSID, proxy, thiết bị, gateway, backup và log |
 | Windows x64 | `sbproxy-web-deployer-<version>-windows-x64.exe` | Chạy ngay, không cần giải nén |
 | Windows x64 | `sbproxy-web-deploy-<version>-windows-x64.zip` | Gói đầy đủ, có tài liệu, ảnh, checksum và file update thủ công |
 | Linux | `sbproxy-web-deploy-<version>-linux-<arch>.tar.gz` | Gói đầy đủ cho đúng kiến trúc Linux |

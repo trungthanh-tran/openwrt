@@ -730,6 +730,10 @@ match "desktop Linux build script uses PyInstaller" "$(cat "$ROOT/console/deskto
 match "desktop Linux build sets onefile windowed flags" "$(cat "$ROOT/console/desktop/build.sh")" 'set -- --noconfirm --clean --onefile --windowed --name sbproxy-console'
 match "desktop Linux build rejects relative runtime tmpdir" "$(cat "$ROOT/console/desktop/build.sh")" 'must be an absolute path'
 match "desktop Windows build isolates the bundled runtime" "$(cat "$ROOT/console/desktop/build.ps1")" 'runtime-tmpdir "%LOCALAPPDATA%\\sbproxy-console-native\\runtime"'
+match "desktop supports a packaged GUI self-test" "$desktop_main" '"--self-test-gui" in sys\.argv'
+desktop_windows_package="$(cat "$ROOT/console/desktop/package-windows.ps1")"
+match "desktop release emits a versioned Windows executable" "$desktop_windows_package" 'sbproxy-console-\$version-windows-x64\.exe'
+match "desktop release smoke-tests its GUI" "$desktop_windows_package" 'self-test-gui'
 deployer_main="$(cat "$ROOT/console/deployer/web_deployer.py")"
 match "web deployer has router check action" "$deployer_main" 'text="Kiểm tra router"'
 match "web deployer has install or update action" "$deployer_main" 'text="Cài / Cập nhật"'
@@ -754,6 +758,7 @@ match "Linux deploy bundle carries illustrated docs" "$linux_bundle" 'docs/image
 match "Linux deploy release tests its GUI executable" "$linux_bundle" 'xvfb-run.*self-test-gui'
 match "release workflow builds Windows and Linux" "$release_workflow" 'needs: \[windows, linux\]'
 match "release workflow uploads standalone Windows executable" "$release_workflow" 'sbproxy-web-deployer-\*-windows-x64\.exe'
+match "release workflow uploads full Windows console" "$release_workflow" 'sbproxy-console-\*-windows-x64\.exe'
 match "release workflow publishes only after platform builds" "$release_workflow" 'gh release create'
 if [ -s "$ROOT/docs/images/web-deployer-windows.png" ] &&
    [ -s "$ROOT/docs/images/web-dashboard.png" ] &&
@@ -763,6 +768,11 @@ if [ -s "$ROOT/docs/images/web-deployer-windows.png" ] &&
   ok "illustrated deploy and web guides carry all screenshots"
 else
   no "illustrated deploy and web guides carry all screenshots"
+fi
+if [ -s "$ROOT/docs/images/desktop-console-windows.png" ]; then
+  ok "desktop guide carries its Windows screenshot"
+else
+  no "desktop guide carries its Windows screenshot"
 fi
 match "desktop isolates every write under one home" "$desktop_main" 'def resolve_app_home\('
 match "desktop supports a portable data folder" "$desktop_main" 'portable = frozen_dir\(\) / "data"'

@@ -285,6 +285,15 @@ cd console\desktop
 # -> dist\sbproxy-console.exe
 ```
 
+Tạo đúng asset Windows standalone để đính kèm Release:
+
+```powershell
+.\package-windows.ps1
+# -> ..\..\dist\release\sbproxy-console-<version>-windows-x64.exe
+```
+
+Script release chạy `--self-test-gui` trước khi chép asset ra `dist/release`.
+
 ```sh
 cd console/desktop
 sh build.sh
