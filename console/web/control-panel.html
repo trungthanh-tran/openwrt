@@ -261,8 +261,11 @@
   .tg input { width: 16px; height: 16px; accent-color: var(--accent); }
   .modal .foot {
     order: 1; flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 9px 12px;
-    border-bottom: 1px solid var(--border); background: var(--panel);
+    border-bottom: 1px solid var(--border); background: var(--panel); flex-wrap: nowrap; overflow: hidden;
   }
+  .modal .foot .btn { flex: 0 0 auto; white-space: nowrap; }
+  .modal .foot .folded-action { display: none !important; }
+  .modal .foot .action-overflow { min-width: 38px; justify-content: center; padding-inline: 10px; font-size: 18px; line-height: 1; }
   .err { color: var(--crit); font-size: 12px; min-height: 0; }
   .derived { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); }
 
@@ -411,8 +414,8 @@
     .modal h2 { padding: 12px 14px; min-height: 46px; font-size: 15px; }
     .form { padding: 13px 14px; gap: 10px; }
     .field.two { grid-template-columns: 1fr; gap: 10px; }
-    .modal .foot { padding: 8px 10px; flex-wrap: wrap; }
-    .modal .foot .btn { flex: 1 1 auto; justify-content: center; min-height: 38px; }
+    .modal .foot { padding: 8px 10px; }
+    .modal .foot .btn { min-height: 38px; }
     .rowbtns { flex-wrap: wrap; }
     #liveTools { width: 100%; }
     .side-nav .btn { min-height: 38px; }
@@ -1044,6 +1047,7 @@
     });
     document.documentElement.lang = language;
     document.getElementById("languageSelect").value = language;
+    scheduleDialogActions();
   }
 
   function setLanguage(next) {
@@ -2464,6 +2468,55 @@
 
   // ---- modal ----
   const $ = id => document.getElementById(id);
+  let dialogActionFrame = 0;
+  function dialogActionsWidth(foot) {
+    const style = getComputedStyle(foot);
+    const visible = [...foot.children].filter(el => !el.hidden && !el.classList.contains("folded-action"));
+    const gap = parseFloat(style.columnGap || style.gap) || 0;
+    return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0) +
+      visible.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * Math.max(0, visible.length - 1);
+  }
+  function layoutDialogActions(foot) {
+    if (!foot || !foot.offsetParent) return;
+    const more = foot.querySelector(".action-overflow");
+    const buttons = [...foot.querySelectorAll(":scope > .btn:not(.action-overflow)")];
+    buttons.forEach(button => button.classList.remove("folded-action"));
+    more.hidden = true;
+    const visible = buttons.filter(button => !button.hidden);
+    if (dialogActionsWidth(foot) <= foot.clientWidth + 1) return;
+    more.hidden = false;
+    // Preserve the primary/right-most action. Fold secondary actions from the
+    // left until the title-bar toolbar fits on one line.
+    const keep = new Set([...visible.filter(button => button.classList.contains("primary")), visible[visible.length - 1]]);
+    const foldable = visible.filter(button => !keep.has(button)).concat(visible.filter(button => keep.has(button) && !button.classList.contains("primary") && button !== visible[visible.length - 1]));
+    while (dialogActionsWidth(foot) > foot.clientWidth + 1 && foldable.length) foldable.shift().classList.add("folded-action");
+  }
+  function scheduleDialogActions() {
+    cancelAnimationFrame(dialogActionFrame);
+    dialogActionFrame = requestAnimationFrame(() => {
+      document.querySelectorAll(".backdrop.show .modal > .foot").forEach(layoutDialogActions);
+    });
+  }
+  function setupDialogActionFolding() {
+    const resizeObserver = new ResizeObserver(entries => entries.forEach(entry => layoutDialogActions(entry.target)));
+    document.querySelectorAll(".modal > .foot").forEach(foot => {
+      const more = document.createElement("button");
+      more.type = "button"; more.className = "btn ghost action-overflow"; more.textContent = "⋯";
+      more.setAttribute("aria-label", pick("More actions", "Thêm tác vụ")); more.hidden = true;
+      more.onclick = e => {
+        e.stopPropagation(); layoutDialogActions(foot);
+        const folded = [...foot.querySelectorAll(":scope > .folded-action")].filter(button => !button.hidden && !button.disabled);
+        if (!folded.length) return;
+        const rect = more.getBoundingClientRect();
+        openContextMenu(rect.right, rect.bottom, folded.map(button => ({
+          label: button.textContent.trim(), danger: button.classList.contains("danger"), run: () => button.click()
+        })));
+      };
+      foot.prepend(more); resizeObserver.observe(foot);
+      const backdrop = foot.closest(".backdrop");
+      new MutationObserver(scheduleDialogActions).observe(backdrop, { attributes: true, attributeFilter: ["class"] });
+    });
+  }
   function closeContextMenu() { $("contextMenu").hidden = true; }
   function openContextMenu(x, y, items) {
     const menu = $("contextMenu");
@@ -2936,6 +2989,7 @@
   }
   renderVendorOptions();
 
+  setupDialogActionFolding();
   initTheme();
   localizeStatic();
   render();

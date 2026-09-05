@@ -864,6 +864,8 @@ match "web supports selecting device rows"          "$web_console" 'data-device-
 match "web supports selecting proxy rows"           "$web_console" 'data-pool-select='
 match "web provides a shared context menu"           "$web_console" 'id="contextMenu"'
 match "web supports mobile long press"               "$web_console" 'function bindLongPress\('
+match "dialog actions fold when space is limited"    "$web_console" 'function layoutDialogActions\('
+match "dialogs expose folded actions in a menu"      "$web_console" 'className = "btn ghost action-overflow"'
 match "web adds proxies for selected devices"        "$web_console" 'function submitDeviceProxyBatch\('
 match "device proxy change is limited to one SSID"   "$web_console" 'new Set\(rows.map\(c => c.idx\)\)'
 match "web appends proxies before assigning devices" "$web_console" 'const merged = devProxyBatch.pool.concat\(added\)'
