@@ -160,8 +160,8 @@ for f in VERSION scripts/apply.sh scripts/lib.sh agent/cgi/sbproxy console/web/c
 done
 
 # ---- compare versions (block downgrades) ----
-ver_ok() { printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; }
-ver_num() { printf '%s' "$1" | awk -F. '{ printf "%d", $1 * 100000000 + $2 * 10000 + $3 }'; }
+ver_ok() { printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$'; }
+ver_num() { printf '%s' "$1" | sed 's/-SNAPSHOT$//' | awk -F. '{ printf "%d", $1 * 100000000 + $2 * 10000 + $3 }'; }
 NEW_VER="$(tr -d ' \r\n' < "$NEW_ROOT/VERSION")"
 CUR_VER="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || echo 0.0.0)"
 ver_ok "$NEW_VER" || die "invalid VERSION in package: '$NEW_VER'"
