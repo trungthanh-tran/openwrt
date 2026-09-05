@@ -5,6 +5,8 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.22] - 2026-09-05
+
 ### Added
 - **Trạng thái sing-box ngay trên trang chính của web console** (thẻ trong
   dãy thống kê + chip cạnh badge Live), đỏ nhấp nháy khi sing-box không chạy —
