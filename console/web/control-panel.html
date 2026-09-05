@@ -349,6 +349,55 @@
   #backdrop .field:has(#f_proxy_type), #backdrop .field:has(#f_host),
   #backdrop .field:has(#f_user), #backdrop #probeBtn { display: none; }
   button[data-zap] { display: none; }
+
+  /* Compact phone layout. Tables remain horizontally scrollable so proxy,
+     device and health fields stay readable instead of being squeezed. */
+  @media (max-width: 600px) {
+    body { font-size: 13px; overflow-x: hidden; }
+    header.top { padding: 8px 10px; gap: 8px; align-items: flex-start; }
+    .brand { min-width: 0; gap: 8px; }
+    .logo { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; }
+    .brand h1 { font-size: 16px; white-space: nowrap; }
+    .brand p { display: none; }
+    .hdr-actions { flex: 0 0 auto; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+    .hdr-actions .chip, .live-badge { display: none !important; }
+    .language-select, .theme-btn { min-width: 0; width: auto; padding: 6px 8px; font-size: 11px; }
+    #connBtn { max-width: 42px; overflow: hidden; white-space: nowrap; font-size: 0; }
+    #connBtn::first-letter { font-size: 15px; }
+    .wrap { padding: 12px 8px 48px; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 10px; }
+    .stat { padding: 10px; border-radius: 10px; }
+    .stat .label { font-size: 9px; }
+    .stat .val { font-size: 18px; }
+    .tablecard, .out { border-radius: 10px; }
+    .tablescroll { -webkit-overflow-scrolling: touch; }
+    table { min-width: 720px; }
+    thead th { padding: 9px 8px; font-size: 10px; }
+    tbody td { padding: 9px 8px; }
+    .out .tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .tab { flex: 0 0 auto; padding: 7px 10px; }
+    .out .head { padding: 8px 10px; gap: 8px; }
+    pre.code { max-height: 260px; padding: 0 10px 10px; font-size: 11px; }
+    .backdrop { padding: 8px; align-items: flex-end; }
+    .modal { max-height: 94vh; border-radius: 14px 14px 8px 8px; }
+    .modal h2 { padding: 13px 14px; font-size: 15px; }
+    .form { padding: 13px 14px; gap: 10px; }
+    .field.two { grid-template-columns: 1fr; gap: 10px; }
+    .modal .foot { padding: 10px 12px; flex-wrap: wrap; }
+    .modal .foot .btn { flex: 1 1 auto; justify-content: center; min-height: 38px; }
+    .rowbtns { flex-wrap: wrap; }
+    #liveTools { width: 100%; }
+    .side-nav .btn { min-height: 38px; }
+    .logbox { max-height: 180px; overflow-wrap: anywhere; }
+    #devBackdrop .modal { max-width: 100%; }
+    #devBackdrop .modal .tablescroll { margin: 0 -2px; }
+    #devSearch { min-height: 40px; }
+  }
+
+  @media (min-width: 601px) and (max-width: 920px) {
+    .wrap { padding-left: 14px; padding-right: 14px; }
+    header.top { padding-left: 14px; padding-right: 14px; }
+  }
 </style>
 </head>
 <body>
