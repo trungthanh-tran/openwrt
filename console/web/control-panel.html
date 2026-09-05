@@ -687,7 +687,10 @@
     <div class="form">
       <div class="conn-status">Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.</div>
       <div class="logbox" id="poolRows">Đang tải…</div>
-      <button class="btn ghost" id="poolMore" hidden>Xem thêm</button>
+      <div class="filterbar">
+        <button class="btn ghost" id="poolRefresh">↻ Thử lại</button>
+        <button class="btn ghost" id="poolMore" hidden>Xem thêm</button>
+      </div>
       <div class="filterbar">
         <select id="poolFormat" title="Định dạng của nhà cung cấp proxy">
           <option value="auto">Tự động nhận dạng</option>
@@ -867,7 +870,7 @@
     "Tự động": "Automatic", "Tự động nhận dạng": "Detect automatically",
     "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Pool changes do not reload Wi-Fi.",
     "Xoá slot đã nhập": "Delete the listed slots", "Thêm vào pool": "Add to the pool",
-    "Xóa pool": "Delete the pool", "Xem thêm": "Show more",
+    "Xóa pool": "Delete the pool", "Xem thêm": "Show more", "Thử lại": "Retry",
     "Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.": "Change the sbproxy password.",
     "Mật khẩu hiện tại": "Current password", "Mật khẩu mới": "New password",
     "Nhập lại mật khẩu mới": "Repeat the new password",
@@ -1639,6 +1642,8 @@
     `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}` +
     `${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${status}`;
   let poolExpanded = false;
+  let poolLoadSeq = 0;
+  let poolLoadController = null;
   function openPool(idx) {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     activePoolIdx = idx;
@@ -1649,9 +1654,23 @@
     loadPool();
   }
   // Render only two pool entries until the operator asks for the full list.
-  function loadPool() {
-    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(activePoolIdx), { headers: { "Authorization": `Bearer ${agent.token}` } })
-      .then(r => r.json()).then(d => {
+  function loadPool(attempt = 0) {
+    const idx = activePoolIdx;
+    const seq = ++poolLoadSeq;
+    if (poolLoadController) poolLoadController.abort();
+    const controller = new AbortController();
+    poolLoadController = controller;
+    const timer = setTimeout(() => controller.abort(), 8000);
+    $("poolRows").textContent = attempt
+      ? pick("Connection was slow. Retrying…", "Kết nối chậm. Đang thử lại…")
+      : pick("Loading…", "Đang tải…");
+    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), {
+      headers: { "Authorization": `Bearer ${agent.token}` }, signal: controller.signal
+    }).then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(d => {
+        if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
         if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
         activePool = d.proxies || [];
         if (!activePool.length) {
@@ -1668,7 +1687,20 @@
           : pick("Pool is empty.", "Pool đang trống.");
         $("poolMore").hidden = activePool.length <= 2;
         $("poolMore").textContent = poolExpanded ? poolWord.less() : poolWord.more();
-      }).catch(e => { $("poolRows").textContent = e.message || e; });
+      }).catch(e => {
+        if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
+        if (attempt < 1 && $("poolBackdrop").classList.contains("show")) {
+          $("poolRows").textContent = pick("Connection was slow. Retrying…", "Kết nối chậm. Đang thử lại…");
+          setTimeout(() => {
+            if (idx === activePoolIdx && $("poolBackdrop").classList.contains("show")) loadPool(1);
+          }, 300);
+          return;
+        }
+        $("poolRows").textContent = pick("Cannot load the pool. Tap Retry.", "Không tải được pool. Bấm Thử lại.");
+      }).finally(() => {
+        clearTimeout(timer);
+        if (poolLoadController === controller) poolLoadController = null;
+      });
   }
   function testAllPool() {
     if (!activePool.length) return toast(pick("Pool is empty.", "Pool đang trống."));
@@ -1696,7 +1728,12 @@
       loadPool();
     });
   }
-  function closePool() { $("poolBackdrop").classList.remove("show"); }
+  function closePool() {
+    poolLoadSeq++;
+    if (poolLoadController) poolLoadController.abort();
+    poolLoadController = null;
+    $("poolBackdrop").classList.remove("show");
+  }
   // Providers hand out proxy lists in a handful of shapes; the desktop console
   // accepts all of them, so this one does too. Returns null for a line that
   // does not fit the chosen format, so the caller can report it by number.
@@ -2378,6 +2415,7 @@
   $("poolClear").onclick = clearPool;
   $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;
+  $("poolRefresh").onclick = () => loadPool();
   $("poolMore").onclick = () => { poolExpanded = !poolExpanded; loadPool(); };
   $("devRows").onclick = e => {
     const k = e.target.getAttribute("data-kick");
