@@ -175,6 +175,7 @@
   tbody tr:last-child td { border-bottom: none; }
   tbody tr { transition: background .12s; }
   tbody tr:hover { background: var(--panel-2); }
+  tbody tr.selected, .pool-select-row.selected { background: var(--accent-soft); }
   .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .ssid-name { font-weight: 600; }
   .sub { color: var(--text-dim); font-size: 12px; }
@@ -297,6 +298,23 @@
   .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .filterbar input[type=search] { flex: 1 1 200px; min-width: 160px; }
   .filterbar select { width: auto; min-width: 120px; }
+  .select-cell { width: 38px; text-align: center; }
+  .select-cell input, .pool-select-row input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+  .pool-list { padding: 0; white-space: normal; }
+  .pool-select-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  .pool-select-row:last-child { border-bottom: 0; }
+  .pool-select-row .mono { min-width: 0; overflow-wrap: anywhere; }
+  .context-menu {
+    position: fixed; z-index: 100; min-width: 180px; padding: 5px;
+    background: var(--panel); border: 1px solid var(--border-strong); border-radius: 11px;
+    box-shadow: var(--shadow-pop);
+  }
+  .context-menu button {
+    display: block; width: 100%; border: 0; border-radius: 7px; padding: 9px 11px;
+    background: transparent; color: var(--text); text-align: left; font: 13px var(--sans); cursor: pointer;
+  }
+  .context-menu button:hover, .context-menu button:focus { background: var(--panel-2); outline: none; }
+  .context-menu button.danger { color: var(--crit); }
   /* A device that is not associated right now stays readable but recedes. */
   tbody tr.dim td { opacity: .62; }
   tbody tr.dim:hover td { opacity: 1; }
@@ -392,6 +410,7 @@
     #devBackdrop .modal { max-width: 100%; }
     #devBackdrop .modal .tablescroll { margin: 0 -2px; }
     #devSearch { min-height: 40px; }
+    .context-menu { min-width: 200px; }
   }
 
   @media (min-width: 601px) and (max-width: 920px) {
@@ -659,15 +678,26 @@
         </select>
       </div>
       <div class="sub" id="devSummary">—</div>
+      <div class="filterbar">
+        <select id="devBulkAction" aria-label="Thao tác với thiết bị đã chọn">
+          <option value="">Thao tác đã chọn…</option>
+          <option value="kick">Ngắt kết nối</option>
+          <option value="ban">Cấm</option>
+          <option value="unban">Bỏ cấm</option>
+        </select>
+        <button class="btn ghost" id="devBulkRun" disabled>Thực hiện</button>
+        <span class="sub" id="devSelectedCount">0 đã chọn</span>
+      </div>
       <div class="tablescroll">
         <table style="min-width: 900px;">
           <thead><tr>
+            <th class="select-cell"><input id="devSelectAll" type="checkbox" aria-label="Chọn tất cả thiết bị hiển thị"></th>
             <th data-sort="idx">WiFi</th><th data-sort="mac">MAC</th><th data-sort="ip">IP / Tên máy</th>
             <th data-sort="status">Trạng thái</th><th data-sort="rx_bytes">Vào (in)</th>
             <th data-sort="tx_bytes">Ra (out)</th><th data-sort="signal_dbm">Sóng</th>
             <th data-sort="slot">Proxy</th><th></th>
           </tr></thead>
-          <tbody id="devRows"><tr><td colspan="9" class="sub">Đang tải…</td></tr></tbody>
+          <tbody id="devRows"><tr><td colspan="10" class="sub">Đang tải…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -686,10 +716,18 @@
     <h2>Proxy pool · <span id="poolTitle"></span></h2>
     <div class="form">
       <div class="conn-status">Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.</div>
-      <div class="logbox" id="poolRows">Đang tải…</div>
+      <div class="logbox pool-list" id="poolRows">Đang tải…</div>
       <div class="filterbar">
         <button class="btn ghost" id="poolRefresh">↻ Thử lại</button>
         <button class="btn ghost" id="poolMore" hidden>Xem thêm</button>
+        <label class="tg"><input id="poolSelectAll" type="checkbox"> Chọn tất cả</label>
+        <select id="poolBulkAction" aria-label="Thao tác với proxy đã chọn">
+          <option value="">Thao tác đã chọn…</option>
+          <option value="test">Test proxy</option>
+          <option value="delete">Xóa proxy</option>
+        </select>
+        <button class="btn ghost" id="poolBulkRun" disabled>Thực hiện</button>
+        <span class="sub" id="poolSelectedCount">0 đã chọn</span>
       </div>
       <div class="filterbar">
         <select id="poolFormat" title="Định dạng của nhà cung cấp proxy">
@@ -833,6 +871,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="context-menu" id="contextMenu" role="menu" hidden></div>
 
 <script>
 (function () {
@@ -866,6 +905,8 @@
     "Đổi mật khẩu": "Change password",
     "Bị cấm": "Blocked", "Chặn MAC…": "Block a MAC…", "Xuất CSV": "Export CSV",
     "Trạng thái": "Status", "Trạng thái: tất cả": "Status: all", "WiFi: tất cả": "Wi-Fi: all",
+    "Thao tác đã chọn…": "Selected actions…", "Ngắt kết nối": "Disconnect", "Thực hiện": "Run",
+    "0 đã chọn": "0 selected", "Chọn tất cả": "Select all", "Xóa proxy": "Delete proxy",
     "Tự làm mới": "Auto refresh", "Đang kết nối": "Connected", "Đã ngắt": "Disconnected",
     "Tự động": "Automatic", "Tự động nhận dạng": "Detect automatically",
     "Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.": "One proxy per line. Pool changes do not reload Wi-Fi.",
@@ -917,6 +958,9 @@
     "Bỏ ghim: chấp nhận đường ra mà default route đang dùng": "Unpin: accept whichever uplink the default route uses",
     "Định dạng của nhà cung cấp proxy": "The proxy provider's line format",
     "Loại proxy cho các dòng vừa dán": "Proxy type for the pasted lines",
+    "Thao tác với thiết bị đã chọn": "Actions for selected devices",
+    "Chọn tất cả thiết bị hiển thị": "Select all visible devices",
+    "Thao tác với proxy đã chọn": "Actions for selected proxies",
     "Đổi BSSID/MAC ngẫu nhiên cho WiFi này (client phải nối lại)": "New random BSSID/MAC for this Wi-Fi (clients must reconnect)"
   };
 
@@ -1628,6 +1672,7 @@
   }
   let activePoolIdx = 0;
   let activePool = [];
+  const poolSelected = new Set();
   const poolStatus = {};
   // The pool list is plain text, so its words go through pick() like every
   // other runtime string, and one formatter keeps the four places that draw a
@@ -1641,21 +1686,35 @@
   const poolLine = (p, i, status) =>
     `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}` +
     `${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${status}`;
+  const poolStatusKey = (p, i) => p.slot == null ? i : p.slot;
   let poolExpanded = false;
   let poolLoadSeq = 0;
   let poolLoadController = null;
+  function updatePoolSelection() {
+    const visible = (poolExpanded ? activePool : activePool.slice(0, 2)).map((_p, i) => i);
+    const selectedVisible = visible.filter(i => poolSelected.has(i)).length;
+    $("poolSelectAll").checked = visible.length > 0 && selectedVisible === visible.length;
+    $("poolSelectAll").indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
+    $("poolBulkRun").disabled = poolSelected.size === 0 || !$("poolBulkAction").value;
+    $("poolSelectedCount").textContent = pick(`${poolSelected.size} selected`, `${poolSelected.size} đã chọn`);
+  }
   function renderPoolList() {
     const shown = poolExpanded ? activePool : activePool.slice(0, 2);
-    $("poolRows").textContent = shown.length
-      ? shown.map((p, i) => poolLine(p, i, poolStatus[p.slot] || poolWord.untested())).join("\n")
-      : pick("Pool is empty.", "Pool đang trống.");
+    $("poolRows").innerHTML = shown.length
+      ? shown.map((p, i) => `<div class="pool-select-row${poolSelected.has(i) ? " selected" : ""}" data-pool-row="${i}">
+          <input type="checkbox" data-pool-select="${i}" ${poolSelected.has(i) ? "checked" : ""} aria-label="${pick("Select proxy slot", "Chọn proxy slot")} ${i}">
+          <span class="mono">${esc(poolLine(p, i, poolStatus[poolStatusKey(p, i)] || poolWord.untested()))}</span>
+        </div>`).join("")
+      : `<div class="sub" style="padding:10px">${pick("Pool is empty.", "Pool đang trống.")}</div>`;
     $("poolMore").hidden = activePool.length <= 2;
     $("poolMore").textContent = poolExpanded ? poolWord.less() : poolWord.more();
+    updatePoolSelection();
   }
   function openPool(idx) {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     activePoolIdx = idx;
     poolExpanded = false;
+    poolSelected.clear();
     $("poolTitle").textContent = ssidNameByIdx(idx) + " · idx " + idx;
     $("poolInput").value = "";
     $("poolBackdrop").classList.add("show");
@@ -1689,6 +1748,7 @@
           }];
         }
         Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
+        poolSelected.clear();
         renderPoolList();
       }).catch(e => {
         if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
@@ -1705,23 +1765,27 @@
         if (poolLoadController === controller) poolLoadController = null;
       });
   }
-  function testAllPool() {
-    if (!activePool.length) return toast(pick("Pool is empty.", "Pool đang trống."));
-    activePool.forEach(p => { poolStatus[p.slot] = poolWord.testing(); });
-    $("poolRows").textContent = activePool.map((p, i) => poolLine(p, i, poolWord.testing())).join("\n");
-    Promise.all(activePool.map(p =>
+  function testPoolSlots(slots) {
+    const rows = slots == null ? activePool.map((p, i) => ({ p, i }))
+      : [...slots].sort((a, b) => a - b).map(i => ({ p: activePool[i], i })).filter(x => x.p);
+    if (!rows.length) return toast(pick("Select at least one proxy.", "Chọn ít nhất một proxy."));
+    rows.forEach(({ p, i }) => { poolStatus[poolStatusKey(p, i)] = poolWord.testing(); });
+    renderPoolList();
+    Promise.all(rows.map(({ p, i }) =>
       api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
-        .then(d => { poolStatus[p.slot] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
-        .catch(() => { poolStatus[p.slot] = "FAIL"; })
+        .then(d => { poolStatus[poolStatusKey(p, i)] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
+        .catch(() => { poolStatus[poolStatusKey(p, i)] = "FAIL"; })
     )).then(() => {
       renderPoolList();
     });
   }
+  function testAllPool() { testPoolSlots(null); }
   function savePoolRows(rows) {
     return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
       if (!d || d.ok === false) throw new Error((d && d.error) || "save_pool failed");
       activePool = rows;
       poolExpanded = false;
+      poolSelected.clear();
       Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
       renderPoolList();
       toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
@@ -1818,6 +1882,15 @@
     }).then(r => { if (r !== null) $("poolSlots").value = ""; })
       .catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
   }
+  function runPoolBulk() {
+    const action = $("poolBulkAction").value;
+    if (!poolSelected.size) return toast(pick("Select at least one proxy.", "Chọn ít nhất một proxy."));
+    if (action === "test") return testPoolSlots(poolSelected);
+    if (action === "delete") {
+      $("poolSlots").value = [...poolSelected].sort((a, b) => a - b).join(",");
+      deletePoolSlots();
+    }
+  }
   function clearPool() {
     if (confirm(pick("Delete this proxy pool?", "Xóa pool proxy này?"))) savePoolRows([]).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
   }
@@ -1833,7 +1906,18 @@
   // export never have to re-ask the router.
   let devicesData = [];
   let devSort = { key: "", desc: false };
-  const DEV_COLS = 9;
+  const deviceSelected = new Set();
+  const DEV_COLS = 10;
+  const deviceKey = (idx, mac) => `${idx}|${String(mac).toLowerCase()}`;
+
+  function updateDeviceSelection() {
+    const visible = visibleDevices().map(c => deviceKey(c.idx, c.mac));
+    const selectedVisible = visible.filter(k => deviceSelected.has(k)).length;
+    $("devSelectAll").checked = visible.length > 0 && selectedVisible === visible.length;
+    $("devSelectAll").indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
+    $("devBulkRun").disabled = deviceSelected.size === 0 || !$("devBulkAction").value;
+    $("devSelectedCount").textContent = pick(`${deviceSelected.size} selected`, `${deviceSelected.size} đã chọn`);
+  }
 
   function openDevices() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
@@ -1896,6 +1980,7 @@
       `Hiện ${list.length} · ${online} đang kết nối · ${blocked} bị cấm · ${devicesData.length} đã từng vào · ${fmtBytes(traffic)} lưu lượng`);
     if (!list.length) {
       box.innerHTML = `<tr><td colspan="${DEV_COLS}" class="sub">${pick("No device matches the filter.", "Không có thiết bị nào khớp bộ lọc.")}</td></tr>`;
+      updateDeviceSelection();
       return;
     }
     box.innerHTML = list.map(c => {
@@ -1914,7 +1999,10 @@
             : "") +
           `<button class="iconbtn del" data-ban="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Persistently block this MAC", "Chặn MAC lâu dài")}">⛔ ${pick("Block", "Cấm")}</button>`)
         + `<button class="iconbtn" data-detail="${esc(c.mac)}" data-idx="${c.idx}" title="${pick("Details", "Chi tiết")}">ℹ</button>`;
-      return `<tr${c.online ? "" : ' class="dim"'}>
+      const key = deviceKey(c.idx, c.mac);
+      const classes = [c.online ? "" : "dim", deviceSelected.has(key) ? "selected" : ""].filter(Boolean).join(" ");
+      return `<tr data-device-key="${esc(key)}"${classes ? ` class="${classes}"` : ""}>
+        <td class="select-cell"><input type="checkbox" data-device-select="${esc(key)}" ${deviceSelected.has(key) ? "checked" : ""} aria-label="${pick("Select device", "Chọn thiết bị")} ${esc(c.mac)}"></td>
         <td><span class="idxpill">${c.idx}</span> ${esc(ssidNameByIdx(c.idx))}</td>
         <td class="mono">${esc(c.mac)}</td>
         <td class="mono sub">${esc(ipHost)}</td>
@@ -1926,6 +2014,7 @@
         <td><div class="rowbtns">${act}</div></td>
       </tr>`;
     }).join("");
+    updateDeviceSelection();
   }
   function loadDevices() {
     api("clients").then(d => {
@@ -1933,6 +2022,8 @@
       // "no devices" when the agent actually failed hides the real problem.
       if (!d || !d.ok) throw new Error((d && d.error) || pick("error", "lỗi"));
       devicesData = (d.clients || []).filter(c => c && c.mac);
+      const currentKeys = new Set(devicesData.map(c => deviceKey(c.idx, c.mac)));
+      [...deviceSelected].forEach(k => { if (!currentKeys.has(k)) deviceSelected.delete(k); });
       const chosen = $("devSsidFilter").value;
       const seen = [...new Set(devicesData.map(c => c.idx))].sort((a, b) => a - b);
       $("devSsidFilter").innerHTML = `<option value="">${pick("Wi-Fi: all", "WiFi: tất cả")}</option>` +
@@ -2055,6 +2146,33 @@
       if (!d || !d.ok) return showLog(verb, d);
       toast(verb + " ✓"); loadDevices(); poll();
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+
+  function selectedDevices() {
+    return devicesData.filter(c => deviceSelected.has(deviceKey(c.idx, c.mac)));
+  }
+  function runDeviceBulk() {
+    const action = $("devBulkAction").value;
+    const rows = selectedDevices();
+    if (!action || !rows.length) return toast(pick("Select at least one device.", "Chọn ít nhất một thiết bị."));
+    const verb = action === "kick" ? pick("disconnect", "ngắt")
+      : action === "ban" ? pick("block", "cấm") : pick("unblock", "bỏ cấm");
+    if (!confirm(pick(`${verb} ${rows.length} selected device(s)?`, `${verb} ${rows.length} thiết bị đã chọn?`))) return;
+    toast(pick(`Working on ${rows.length} device(s)…`, `Đang xử lý ${rows.length} thiết bị…`));
+    rows.reduce((chain, c) => chain.then(async results => {
+      try {
+        const d = await api(action, "POST", { idx: c.idx, mac: c.mac });
+        results.push({ ok: !!(d && d.ok), c });
+      } catch (_e) { results.push({ ok: false, c }); }
+      return results;
+    }), Promise.resolve([])).then(results => {
+        const failed = results.filter(r => !r.ok).length;
+        if (!failed) deviceSelected.clear();
+        toast(failed
+          ? pick(`${failed}/${rows.length} failed.`, `Lỗi ${failed}/${rows.length} thiết bị.`)
+          : pick(`${rows.length} device(s) updated ✓`, `Đã cập nhật ${rows.length} thiết bị ✓`));
+        loadDevices(); poll();
+      });
   }
 
   // ---- render ----
@@ -2194,6 +2312,74 @@
 
   // ---- modal ----
   const $ = id => document.getElementById(id);
+  function closeContextMenu() { $("contextMenu").hidden = true; }
+  function openContextMenu(x, y, items) {
+    const menu = $("contextMenu");
+    menu.replaceChildren();
+    items.filter(item => !item.hidden).forEach(item => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = item.label;
+      if (item.danger) button.className = "danger";
+      button.onclick = e => { e.stopPropagation(); closeContextMenu(); item.run(); };
+      menu.appendChild(button);
+    });
+    menu.hidden = false;
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - rect.width - 8)) + "px";
+    menu.style.top = Math.max(8, Math.min(y, innerHeight - rect.height - 8)) + "px";
+    menu.querySelector("button")?.focus({ preventScroll: true });
+  }
+  function bindLongPress(root, selector, callback) {
+    let timer = null, startX = 0, startY = 0;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    root.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" || e.target.closest("button,input,select,a")) return;
+      const target = e.target.closest(selector);
+      if (!target) return;
+      startX = e.clientX; startY = e.clientY;
+      timer = setTimeout(() => { timer = null; callback(target, startX, startY); }, 550);
+    });
+    root.addEventListener("pointermove", e => {
+      if (timer && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) cancel();
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(name => root.addEventListener(name, cancel));
+  }
+  function deviceByKey(key) { return devicesData.find(c => deviceKey(c.idx, c.mac) === key); }
+  function selectContextDevice(key) {
+    if (!deviceSelected.has(key)) { deviceSelected.clear(); deviceSelected.add(key); renderDevices(); }
+    return deviceByKey(key);
+  }
+  function runDeviceContext(action, device) {
+    if (deviceSelected.size > 1) {
+      $("devBulkAction").value = action; updateDeviceSelection(); runDeviceBulk();
+    } else deviceAction(action, device.idx, device.mac);
+  }
+  function showDeviceContext(target, x, y) {
+    const device = selectContextDevice(target.dataset.deviceKey);
+    if (!device) return;
+    openContextMenu(x, y, [
+      { label: pick("Details", "Chi tiết"), run: () => deviceDetails(device.idx, device.mac) },
+      { label: pick("Change proxy", "Đổi proxy"), hidden: !(device.pool_size > 0), run: () => changeClientProxy(device.idx, device.mac) },
+      { label: pick("Disconnect selected", "Ngắt mục đã chọn"), hidden: !device.online, run: () => runDeviceContext("kick", device) },
+      { label: pick("Unblock selected", "Bỏ cấm mục đã chọn"), hidden: !device.banned, run: () => runDeviceContext("unban", device) },
+      { label: pick("Block selected", "Cấm mục đã chọn"), hidden: device.banned, danger: true, run: () => runDeviceContext("ban", device) }
+    ]);
+  }
+  function selectContextPool(slot) {
+    if (!poolSelected.has(slot)) { poolSelected.clear(); poolSelected.add(slot); renderPoolList(); }
+  }
+  function showPoolContext(target, x, y) {
+    const slot = Number(target.dataset.poolRow);
+    if (!Number.isInteger(slot)) return;
+    selectContextPool(slot);
+    openContextMenu(x, y, [
+      { label: pick("Test selected", "Test mục đã chọn"), run: () => testPoolSlots(poolSelected) },
+      { label: pick("Delete selected", "Xóa mục đã chọn"), danger: true, run: () => {
+        $("poolSlots").value = [...poolSelected].sort((a, b) => a - b).join(","); deletePoolSlots();
+      } }
+    ]);
+  }
   function openModal(id) {
     editId = id;
     const s = id ? ssids.find(x => x.id === id) : null;
@@ -2400,6 +2586,15 @@
   $("devInterval").onchange = scheduleDeviceRefresh;
   $("devCsv").onclick = exportDevicesCsv;
   $("devBan").onclick = manualBan;
+  $("devBulkAction").onchange = updateDeviceSelection;
+  $("devBulkRun").onclick = runDeviceBulk;
+  $("devSelectAll").onchange = e => {
+    visibleDevices().forEach(c => {
+      const key = deviceKey(c.idx, c.mac);
+      if (e.target.checked) deviceSelected.add(key); else deviceSelected.delete(key);
+    });
+    renderDevices();
+  };
   $("devBackdrop").querySelector("thead").onclick = e => {
     const key = e.target.getAttribute("data-sort");
     if (!key) return;
@@ -2416,19 +2611,56 @@
   $("poolRebalance").onclick = rebalancePoolClients;
   $("poolRefresh").onclick = () => loadPool();
   $("poolMore").onclick = () => { poolExpanded = !poolExpanded; renderPoolList(); };
+  $("poolBulkAction").onchange = updatePoolSelection;
+  $("poolBulkRun").onclick = runPoolBulk;
+  $("poolSelectAll").onchange = e => {
+    const count = poolExpanded ? activePool.length : Math.min(2, activePool.length);
+    for (let i = 0; i < count; i++) {
+      if (e.target.checked) poolSelected.add(i); else poolSelected.delete(i);
+    }
+    renderPoolList();
+  };
+  $("poolRows").onclick = e => {
+    const checkbox = e.target.closest("[data-pool-select]");
+    if (!checkbox) return;
+    const slot = Number(checkbox.dataset.poolSelect);
+    if (checkbox.checked) poolSelected.add(slot); else poolSelected.delete(slot);
+    renderPoolList();
+  };
   $("devRows").onclick = e => {
-    const k = e.target.getAttribute("data-kick");
-    const b = e.target.getAttribute("data-ban");
-    const u = e.target.getAttribute("data-unban");
-    const p = e.target.getAttribute("data-proxy");
-    const info = e.target.getAttribute("data-detail");
-    const idx = parseInt(e.target.getAttribute("data-idx"), 10);
+    const checkbox = e.target.closest("[data-device-select]");
+    if (checkbox) {
+      const key = checkbox.dataset.deviceSelect;
+      if (checkbox.checked) deviceSelected.add(key); else deviceSelected.delete(key);
+      renderDevices();
+      return;
+    }
+    const button = e.target.closest("button");
+    if (!button) return;
+    const k = button.getAttribute("data-kick");
+    const b = button.getAttribute("data-ban");
+    const u = button.getAttribute("data-unban");
+    const p = button.getAttribute("data-proxy");
+    const info = button.getAttribute("data-detail");
+    const idx = parseInt(button.getAttribute("data-idx"), 10);
     if (info) return deviceDetails(idx, info);
     if (p) return changeClientProxy(idx, p);
     if (k) return deviceAction("kick", idx, k);
     if (b) return deviceAction("ban", idx, b);
     if (u) return deviceAction("unban", idx, u);
   };
+  $("devRows").oncontextmenu = e => {
+    const row = e.target.closest("tr[data-device-key]");
+    if (!row) return;
+    e.preventDefault(); showDeviceContext(row, e.clientX, e.clientY);
+  };
+  $("poolRows").oncontextmenu = e => {
+    const row = e.target.closest("[data-pool-row]");
+    if (!row) return;
+    e.preventDefault(); showPoolContext(row, e.clientX, e.clientY);
+  };
+  bindLongPress($("devRows"), "tr[data-device-key]", showDeviceContext);
+  bindLongPress($("poolRows"), "[data-pool-row]", showPoolContext);
   $("pullBtn").onclick = pullFromRouter;
   $("upBtn").onclick = openUpdate;
   $("upGo").onclick = doUpdate;
@@ -2490,8 +2722,11 @@
     renderOutput();
   };
 
+  document.addEventListener("pointerdown", e => { if (!e.target.closest("#contextMenu")) closeContextMenu(); });
+  addEventListener("resize", closeContextMenu);
+  document.addEventListener("scroll", closeContextMenu, true);
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") closeModal();
+    if (e.key === "Escape") { closeContextMenu(); closeModal(); }
     if (e.key === "Enter" && $("backdrop").classList.contains("show") && e.target.tagName === "INPUT") saveForm();
   });
 

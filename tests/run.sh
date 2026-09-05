@@ -860,6 +860,10 @@ match "web shows one device in detail"              "$web_console" 'function dev
 match "web filters devices by state"                "$web_console" 'id="devStateFilter"'
 match "web lets the device refresh interval change" "$web_console" 'function scheduleDeviceRefresh\('
 match "web renders the device status column"        "$web_console" 'function deviceStatusCell\('
+match "web supports selecting device rows"          "$web_console" 'data-device-select='
+match "web supports selecting proxy rows"           "$web_console" 'data-pool-select='
+match "web provides a shared context menu"           "$web_console" 'id="contextMenu"'
+match "web supports mobile long press"               "$web_console" 'function bindLongPress\('
 # The device table lost a column header once while the rows grew one; the two
 # have to be counted together or the whole table silently shifts.
 dev_head_cols="$(printf '%s' "$web_console" | awk '
@@ -867,7 +871,7 @@ dev_head_cols="$(printf '%s' "$web_console" | awk '
   inside && /<tbody id="devRows">/ { exit }
   inside { n += gsub(/<th[ >]/, "&") }   # "<th " or "<th>", never "<thead>"
   END { print n + 0 }')"
-eq "the device table header has 9 columns" "$dev_head_cols" "9"
+eq "the device table header has 10 columns" "$dev_head_cols" "10"
 match "and the empty-state spans them all"          "$web_console" 'colspan="\$\{DEV_COLS\}"'
 match "clients.sh reports a status per device"      "$(cat "$ROOT/scripts/clients.sh")" 'status:\$status'
 match "clients.sh remembers devices that have left" "$(cat "$ROOT/scripts/clients.sh")" 'emit_history\(\)'
