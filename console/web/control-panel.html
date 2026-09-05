@@ -189,9 +189,22 @@
   .settings-card p { margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; }
   .settings-value { min-height: 38px; padding: 9px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #featurePage { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; }
+  #featurePage[hidden] { display: none !important; }
+  #featurePage > .modal.inline-feature {
+    position: static !important; inset: auto !important; z-index: auto !important;
+    width: 100% !important; max-width: none; height: auto; max-height: none;
+    overflow: visible; border-radius: var(--radius); box-shadow: var(--shadow);
+    transform: none !important; animation: none !important;
+  }
+  #featurePage > .modal.inline-feature.show { display: flex !important; }
+  #featurePage > .modal.inline-feature .form { max-height: none; overflow: visible; }
   .section-toggle { display: flex; justify-content: flex-end; margin-top: 14px; }
-  #liveTools, #liveTools.on { display: none; }
-  #liveTools.tools-open, #liveTools.on.tools-open { display: flex; flex-direction: column; gap: 2px; }
+  #liveTools { display: none; }
+  #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
+  #topRouterTools { display: none; align-items: center; gap: 5px; }
+  #topRouterTools.on { display: inline-flex; }
+  #topRouterTools .theme-btn { padding: 6px 9px; font-size: 12px; }
   @media (max-width: 720px) { .settings-grid { grid-template-columns: 1fr; } .settings-head { align-items: start; flex-direction: column; } }
   .idxpill { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 2px 8px; }
   .band { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 7px; border: 1px solid var(--border); }
@@ -396,9 +409,21 @@
   .side-nav .btn.page-active, .side-nav .btn.action-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
   .side-nav .btn.danger:hover { color: var(--crit); }
   .side-nav .btn.primary { background: var(--accent); color: #fff; }
+  .nav-block { padding: 0 0 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .nav-block:last-child { border-bottom: 0; }
+  .content-block { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; }
+  .content-block > .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+  .block-head h2 { margin: 0; font-size: 16px; letter-spacing: -.2px; }
+  .block-head p { margin: 2px 0 0; color: var(--text-dim); font-size: 12px; }
+  .block-body { padding: 14px; }
+  .content-block .stats { margin: 0; }
+  .content-block .tablecard { border: 0; border-radius: 0; box-shadow: none; }
+  .content-block .toolbar { margin: 0 0 12px; }
+  .content-block .section-toggle { margin: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+  .content-block .out { margin: 12px 0 0; box-shadow: none; }
   .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
   .main { flex: 1 1 auto; min-width: 0; }
-  #liveTools { display: flex; flex-direction: column; gap: 2px; }
+  #liveTools { display: none; flex-direction: column; gap: 2px; }
   #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
   #menuBtn { display: none; font-size: 15px; }
   @media (max-width: 920px) {
@@ -433,6 +458,8 @@
     .brand h1 { font-size: 16px; white-space: nowrap; }
     .brand p { display: none; }
     .hdr-actions { flex: 0 0 auto; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+    #topRouterTools { flex-wrap: wrap; justify-content: flex-end; }
+    #topRouterTools .theme-btn { padding: 5px 7px; font-size: 11px; }
     .hdr-actions .chip, .live-badge { display: none !important; }
     .language-select, .theme-btn { min-width: 0; width: auto; padding: 6px 8px; font-size: 11px; }
     #connBtn { max-width: 42px; overflow: hidden; white-space: nowrap; font-size: 0; }
@@ -483,6 +510,7 @@
       <div><b>sbproxy</b><small>Multi-WiFi → SOCKS5</small></div>
     </div>
     <nav class="side-nav">
+      <div class="nav-block">
       <div class="side-group">Cấu hình</div>
       <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
       <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
@@ -490,7 +518,8 @@
       <button class="btn ghost" id="exportJson">⭳ Tải JSON</button>
       <button class="btn ghost danger" id="clearBtn">✕ Xoá hết</button>
       <button class="btn primary page-active" id="configBtn" title="Quản lý cấu hình WiFi và proxy">▦ Config</button>
-      <button class="btn ghost" id="routerToolsBtn" title="Mở các công cụ router">⌄ Router tools</button>
+      </div>
+      <div class="nav-block">
       <span id="liveTools">
         <div class="side-group">Router</div>
         <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
@@ -502,7 +531,10 @@
         <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
         <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
       </span>
+      </div>
+      <div class="nav-block">
       <button class="btn ghost" id="settingsBtn" title="Kiểm tra và vận hành router">⚙ Cài đặt</button>
+      </div>
     </nav>
     <div class="side-foot">sbproxy Console</div>
   </aside>
@@ -525,14 +557,29 @@
         <option value="vi">Tiếng Việt</option>
       </select>
       <button class="theme-btn" id="connBtn" title="Kết nối agent trên router">🔌 Kết nối router</button>
+      <span id="topRouterTools">
+        <button class="theme-btn" id="topRbBtn" title="Backup và rollback trên router">🗂 Backup</button>
+        <button class="theme-btn" id="topGwBtn" title="Xem đường ra Internet của router">🌐 Egress</button>
+        <button class="theme-btn" id="topUpBtn" title="Cập nhật sbproxy trên router">⬆ Update</button>
+      </span>
       <button class="theme-btn" id="themeBtn" title="Đổi giao diện sáng/tối">◐ Theme</button>
     </div>
   </header>
 
   <div class="wrap">
   <div id="dashboardPage">
+  <section class="content-block" aria-labelledby="configBlockTitle">
+    <div class="block-head"><div><h2 id="configBlockTitle">WiFi &amp; proxy</h2><p>Quản lý SSID, pool proxy và trạng thái từng đường mạng.</p></div></div>
   <section class="stats" id="stats"></section>
+  </section>
+  <section class="content-block" aria-labelledby="actionsBlockTitle">
+    <div class="block-head"><div><h2 id="actionsBlockTitle">Configuration actions</h2><p>Thêm, nhập, xuất và áp dụng cấu hình lên router.</p></div></div>
+    <div class="block-body">
   <div class="toolbar config-toolbar" id="configToolbar"></div>
+    </div>
+  </section>
+  <section class="content-block" aria-labelledby="ssidBlockTitle">
+    <div class="block-head"><div><h2 id="ssidBlockTitle">WiFi networks</h2><p>Danh sách SSID và thao tác riêng cho từng WiFi.</p></div></div>
 
   <div class="tablecard">
     <div class="tablescroll">
@@ -552,7 +599,9 @@
     </div>
   </div>
 
-  <div class="section-toggle"><button class="btn ghost" id="outputToggle">⌄ Configuration preview</button></div>
+  </section>
+  <section class="content-block" aria-labelledby="previewBlockTitle">
+    <div class="block-head"><div><h2 id="previewBlockTitle">Configuration preview</h2><p>Xem nội dung cấu hình trước khi sao chép hoặc debug.</p></div><button class="btn ghost" id="outputToggle">⌄ Show</button></div>
   <div class="out" id="configOutput" hidden>
     <div class="tabs" id="outTabs">
       <button class="tab active" data-t="conf">wifi-socks.conf</button>
@@ -566,6 +615,7 @@
     <pre class="code" id="outCode"></pre>
     <div class="hint" id="applyHint"></div>
   </div>
+  </section>
   </div><!-- /#dashboardPage -->
   <section class="settings-page" id="settingsPage" hidden>
     <div class="settings-head">
@@ -598,6 +648,7 @@
       </section>
     </div>
   </section>
+  <section id="featurePage" hidden></section>
   <section class="device-page" id="devicesPage" hidden></section>
   </div><!-- /.wrap -->
   </div><!-- /.main -->
@@ -1066,6 +1117,17 @@
     "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Update does not reload Wi-Fi. Click “Push & Apply” to activate changes."
   };
   // Blocks that contain inline markup are swapped whole rather than per text node.
+  Object.assign(EN_TEXT, {
+    "Cài đặt": "Settings", "Router settings": "Router settings", "Quản lý SSID, pool proxy và trạng thái từng đường mạng.": "Manage SSIDs, proxy pools and each network path.", "Thêm, nhập, xuất và áp dụng cấu hình lên router.": "Add, import, export and apply router configuration.", "Danh sách SSID và thao tác riêng cho từng WiFi.": "SSID list and per-Wi-Fi actions.", "Xem nội dung cấu hình trước khi sao chép hoặc debug.": "Review configuration before copying or debugging.", "Chưa kết nối": "Not connected",
+    "Kết nối agent, phiên bản và dịch vụ proxy.": "Agent connection, version and proxy service.",
+    "Kiểm tra health": "Health check", "Restart sing-box": "Restart sing-box",
+    "Egress": "Egress", "Đường ra Internet thực tế của router.": "The router's actual Internet egress.",
+    "Chưa kiểm tra": "Not checked", "Chi tiết egress": "Egress details",
+    "Chẩn đoán SSID": "SSID diagnostics", "Kiểm tra Wi-Fi, bridge, DHCP, nftables, route, sing-box và proxy.": "Check Wi-Fi, bridge, DHCP, nftables, routing, sing-box and proxy.",
+    "Chọn SSID cần chẩn đoán": "SSID to diagnose", "Chạy chẩn đoán": "Run diagnostics", "Nhật ký 7 ngày": "7-day logs",
+    "Bảo trì router": "Router maintenance", "Chỉ các mục kiểm tra và vận hành cần thiết trên router.": "Only the checks and operations needed on the router.", "Các thao tác có thể làm thay đổi hoặc khôi phục hệ thống.": "Actions that can change or restore the system.",
+    "Cập nhật agent": "Update agent"
+  });
   const EN_HTML = {
     rbHint: 'Backups are created on Apply / SOCKS changes. Before firmware updates, click <b>Download</b>.',
     devHint: 'Devices are grouped by Wi-Fi. <b>Disconnect</b> is temporary; <b>Block</b> is permanent.',
@@ -1073,6 +1135,12 @@
     upStatus: 'Choose a <b>sbproxy update package</b>. The router backs up first and keeps the current Wi-Fi/SOCKS config.'
   };
   const EN_ATTR = {
+    "Backup và rollback trên router": "Back up and roll back the router",
+    "Xem đường ra Internet của router": "View the router's Internet egress",
+    "Cập nhật sbproxy trên router": "Update sbproxy on the router",
+    "Kiểm tra và vận hành router": "Check and operate the router",
+    "Quản lý cấu hình WiFi và proxy": "Manage Wi-Fi and proxy configuration",
+    "Mở các công cụ router": "Open router tools",
     "Kết nối agent trên router": "Connect to the router agent", "Đổi giao diện sáng/tối": "Toggle light/dark theme",
     "Ghi config lên router rồi chạy apply.sh": "Write the configuration to the router and run apply.sh",
     "Thiết bị đang kết nối từng WiFi (kick / cấm)": "Devices connected to each Wi-Fi (disconnect / block)",
@@ -1294,8 +1362,7 @@
   function updateLiveUI() {
     document.getElementById("liveBadge").classList.toggle("on", agent.connected);
     document.getElementById("liveTools").classList.toggle("on", agent.connected);
-    document.getElementById("routerToolsBtn").hidden = !agent.connected;
-    if (!agent.connected) document.getElementById("liveTools").classList.remove("tools-open");
+    document.getElementById("topRouterTools").classList.toggle("on", agent.connected);
     const who = document.getElementById("whoami");
     who.hidden = !(agent.connected && agent.user);
     who.textContent = agent.user ? "👤 " + agent.user : "";
@@ -1320,7 +1387,7 @@
   let lastRouterConf = null;
   function refreshConfFromRouter() {
     // Do not overwrite a form while the operator is editing it.
-    if (configDirty || document.getElementById("backdrop").classList.contains("show")) return;
+    if (configDirty || featureOpen("backdrop")) return;
     api("get_conf", "GET", null, "resp").then(txt => {
       if (txt == null || txt === lastRouterConf) return;
       lastRouterConf = txt;
@@ -1445,7 +1512,7 @@
     $("su_err").textContent = "";
     $("su_pass").value = ""; $("su_pass2").value = "";
     if (!$("su_user").value.trim()) $("su_user").value = "admin";
-    $("setupBackdrop").classList.add("show");
+    showInline("setupBackdrop");
     $("su_user").focus();
   }
   function submitSetup() {
@@ -1461,7 +1528,7 @@
       localStorage.setItem("sbproxy.agent.token", agent.token);
       localStorage.setItem("sbproxy.agent.user", agent.user);
       $("su_pass").value = ""; $("su_pass2").value = "";
-      $("setupBackdrop").classList.remove("show");
+      hideInline("setupBackdrop");
       toast(pick("Account created ✓", "Đã tạo tài khoản ✓"));
       finishConnect();
     }).catch(e => err(String(e.message || e)));
@@ -1471,7 +1538,7 @@
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("cp_err").textContent = "";
     $("cp_old").value = ""; $("cp_new").value = ""; $("cp_new2").value = "";
-    $("cpBackdrop").classList.add("show");
+    showInline("cpBackdrop");
     $("cp_old").focus();
   }
   function submitChangePassword() {
@@ -1483,7 +1550,7 @@
     api("change_password", "POST", { old_pass: oldPass, new_pass: newPass }).then(d => {
       if (!d || !d.ok) throw new Error((d && d.error) || pick("could not change the password", "không đổi được mật khẩu"));
       $("cp_old").value = ""; $("cp_new").value = ""; $("cp_new2").value = "";
-      $("cpBackdrop").classList.remove("show");
+      hideInline("cpBackdrop");
       toast(pick("Password changed ✓", "Đã đổi mật khẩu ✓"));
     }).catch(e => err(String(e.message || e)));
   }
@@ -1500,7 +1567,7 @@
       postUnauthed("login", { user, pass }).then(d => {
         if (d && d.setup_required) {
           // No account exists yet: first-run setup instead of a dead end.
-          document.getElementById("connBackdrop").classList.remove("show");
+          hideInline("connBackdrop");
           openSetup();
           return;
         }
@@ -1529,7 +1596,7 @@
       updateLiveUI(); renderRows(); startPoll();
       setConnStatus(pick("Connected ✓", "Đã kết nối ✓"), "ok");
       toast(pick("Connected to the router", "Đã kết nối router"));
-      setTimeout(() => document.getElementById("connBackdrop").classList.remove("show"), 700);
+      setTimeout(() => hideInline("connBackdrop"), 700);
     }).catch(err => setConnStatus(pick("Cannot connect: ", "Không kết nối được: ") + err.message, "bad"));
   }
   function disconnect() {
@@ -1561,7 +1628,7 @@
   function showLog(title, d) {
     document.getElementById("logTitle").textContent = title + (d && d.ok ? " ✓" : " ✗");
     document.getElementById("logBox").textContent = (d && (d.log || d.error)) || JSON.stringify(d, null, 2);
-    document.getElementById("logBackdrop").classList.add("show");
+    showInline("logBackdrop");
   }
 
   let configApplying = false;
@@ -1723,7 +1790,7 @@
       agent.version ? "v" + agent.version : pick("unknown (older agent)", "không rõ (agent cũ)");
     document.getElementById("upFile").value = "";
     document.getElementById("upForce").checked = false;
-    document.getElementById("upBackdrop").classList.add("show");
+    showInline("upBackdrop");
   }
   function doUpdate() {
     const f = document.getElementById("upFile").files[0];
@@ -1738,7 +1805,7 @@
       headers: { "Authorization": `Bearer ${agent.token}`, "Content-Type": "application/octet-stream" },
       body: f
     }).then(r => r.json()).then(d => {
-      document.getElementById("upBackdrop").classList.remove("show");
+      hideInline("upBackdrop");
       showLog("self-update.sh" + (d && d.ok ? ` (${d.from} → ${d.to})` : ""), d);
       // uhttpd may reload; re-poll shortly after to pick up the new version.
       setTimeout(poll, 1500);
@@ -1759,7 +1826,7 @@
   let gwChoice = "";
   function openGateway() {
     if (!agent.connected) return;
-    $("gwBackdrop").classList.add("show");
+    showInline("gwBackdrop");
     loadGateway();
   }
   function loadGateway() {
@@ -1829,7 +1896,7 @@
   }
 
   function openRollback() {
-    document.getElementById("rbBackdrop").classList.add("show");
+    showInline("rbBackdrop");
     loadBackups();
   }
   function loadBackups() {
@@ -1876,7 +1943,7 @@
 
   function openDailyLogs() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
-    $("dailyLogBackdrop").classList.add("show");
+    showInline("dailyLogBackdrop");
     loadDailyLogs();
   }
   function loadDailyLogs(requestedDate) {
@@ -1918,7 +1985,7 @@
     toast(pick("Rolling back…", "Đang rollback…"));
     api("rollback", "POST", { name }).then(d => {
       showLog("rollback.sh " + name, d);
-      document.getElementById("rbBackdrop").classList.remove("show");
+      hideInline("rbBackdrop");
       poll();
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
@@ -1991,7 +2058,7 @@
     poolSelected.clear();
     $("poolTitle").textContent = ssidNameByIdx(idx) + " · idx " + idx;
     $("poolInput").value = "";
-    $("poolBackdrop").classList.add("show");
+    showInline("poolBackdrop");
     loadPool();
   }
   // Render only two pool entries until the operator asks for the full list.
@@ -2026,10 +2093,10 @@
         renderPoolList();
       }).catch(e => {
         if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
-        if (attempt < 1 && $("poolBackdrop").classList.contains("show")) {
+        if (attempt < 1 && featureOpen("poolBackdrop")) {
           $("poolRows").textContent = pick("Connection was slow. Retrying…", "Kết nối chậm. Đang thử lại…");
           setTimeout(() => {
-            if (idx === activePoolIdx && $("poolBackdrop").classList.contains("show")) loadPool(1);
+            if (idx === activePoolIdx && featureOpen("poolBackdrop")) loadPool(1);
           }, 300);
           return;
         }
@@ -2069,7 +2136,7 @@
     poolLoadSeq++;
     if (poolLoadController) poolLoadController.abort();
     poolLoadController = null;
-    $("poolBackdrop").classList.remove("show");
+    hideInline("poolBackdrop");
   }
   // Providers hand out proxy lists in a handful of shapes; the desktop console
   // accepts all of them, so this one does too. Returns null for a line that
@@ -2237,9 +2304,7 @@
     toolbar.dataset.ready = "1";
   }
   function closeRouterTools() {
-    $("liveTools").classList.remove("tools-open");
-    $("routerToolsBtn").classList.remove("page-active");
-    $("routerToolsBtn").textContent = "⌄ Router tools";
+    // Router tools are now always visible in the left menu when connected.
   }
   function showDashboard() {
     closeDevices();
@@ -2541,7 +2606,7 @@
     });
   }
   function closeDeviceProxyBatch() {
-    $("devProxyBackdrop").classList.remove("show");
+    hideInline("devProxyBackdrop");
     devProxyBatch = null;
   }
   function openDeviceProxyBatch() {
@@ -2560,7 +2625,7 @@
     $("devProxyInput").value = "";
     $("devProxyError").textContent = "";
     $("devProxySave").disabled = true;
-    $("devProxyBackdrop").classList.add("show");
+    showInline("devProxyBackdrop");
     fetchPoolForIdx(idx).then(pool => {
       if (!devProxyBatch || devProxyBatch.idx !== idx) return;
       devProxyBatch.pool = pool.map(cleanProxy);
@@ -2789,6 +2854,42 @@
 
   // ---- modal ----
   const $ = id => document.getElementById(id);
+  let inlineFeature = null;
+  function showInline(backdropId) {
+    const backdrop = $(backdropId), modal = backdrop && backdrop.querySelector(":scope > .modal");
+    if (!modal) return;
+    if (inlineFeature) hideInline(inlineFeature.id);
+    backdrop.classList.remove("show");
+    modal.classList.remove("show");
+    inlineFeature = {
+      id: backdropId, modal, parent: backdrop,
+      next: modal.nextSibling,
+      returnPage: !$('settingsPage').hidden ? 'settings' : (!$('devicesPage').hidden ? 'devices' : 'dashboard')
+    };
+    $("dashboardPage").hidden = true;
+    $("settingsPage").hidden = true;
+    $("devicesPage").hidden = true;
+    $("featurePage").hidden = false;
+    modal.classList.add("inline-feature");
+    $("featurePage").appendChild(modal);
+    scrollTo({ top: 0, behavior: "smooth" });
+    scheduleDialogActions();
+  }
+  function hideInline(backdropId) {
+    if (!inlineFeature || inlineFeature.id !== backdropId) {
+      $(backdropId)?.classList.remove("show");
+      return;
+    }
+    const item = inlineFeature;
+    item.modal.classList.remove("inline-feature");
+    item.parent.insertBefore(item.modal, item.next && item.next.parentNode === item.parent ? item.next : null);
+    $("featurePage").hidden = true;
+    inlineFeature = null;
+    if (item.returnPage === "settings") openSettings();
+    else if (item.returnPage === "devices") openDevices();
+    else showDashboard();
+  }
+  function featureOpen(backdropId) { return inlineFeature?.id === backdropId || $(backdropId)?.classList.contains("show"); }
   let dialogActionFrame = 0;
   function dialogActionsWidth(foot) {
     const style = getComputedStyle(foot);
@@ -2815,7 +2916,7 @@
   function scheduleDialogActions() {
     cancelAnimationFrame(dialogActionFrame);
     dialogActionFrame = requestAnimationFrame(() => {
-      document.querySelectorAll(".backdrop.show .modal > .foot, .device-page:not([hidden]) > .foot").forEach(layoutDialogActions);
+      document.querySelectorAll(".backdrop.show .modal > .foot, #featurePage > .modal > .foot, .device-page:not([hidden]) > .foot").forEach(layoutDialogActions);
     });
   }
   function setupDialogActionFolding() {
@@ -2834,7 +2935,7 @@
         })));
       };
       foot.prepend(more); resizeObserver.observe(foot);
-      const surface = foot.closest(".backdrop") || foot.closest(".device-page");
+      const surface = foot.closest(".backdrop") || foot.closest("#featurePage") || foot.closest(".device-page");
       if (surface) new MutationObserver(scheduleDialogActions).observe(surface, { attributes: true, attributeFilter: ["class", "hidden"] });
     });
   }
@@ -2933,10 +3034,10 @@
     $("f_err").textContent = "";
     $("probeBtn").hidden = !agent.connected;
     updateDerived();
-    $("backdrop").classList.add("show");
+    showInline("backdrop");
     $("f_name").focus();
   }
-  function closeModal() { $("backdrop").classList.remove("show"); editId = null; }
+  function closeModal() { hideInline("backdrop"); editId = null; }
 
   function updateDerived() {
     const i = parseInt($("f_idx").value, 10);
@@ -3084,12 +3185,6 @@
   $("f_proxy_compact").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fillCompactProxy(); } };
   $("languageSelect").onchange = e => setLanguage(e.target.value);
   $("themeBtn").onclick = toggleTheme;
-  $("routerToolsBtn").onclick = () => {
-    const tools = $("liveTools");
-    const open = tools.classList.toggle("tools-open");
-    $("routerToolsBtn").classList.toggle("page-active", open);
-    $("routerToolsBtn").textContent = `${open ? "⌃" : "⌄"} Router tools`;
-  };
   $("outputToggle").onclick = () => {
     const output = $("configOutput");
     output.hidden = !output.hidden;
@@ -3106,7 +3201,7 @@
     $("c_base").value = agent.base; $("c_token").value = agent.token; $("c_user").value = agent.user;
     $("cpBtn").hidden = !agent.connected;
     if (!agent.connected) setConnStatus(pick("Not connected. Log in with the sbproxy account.", "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy."));
-    $("connBackdrop").classList.add("show");
+    showInline("connBackdrop");
   };
   $("connectBtn").onclick = connect;
   $("sbChip").onclick = () => { if (agent.singbox && !agent.singbox.running) restartSingbox(); else poll(); };
@@ -3116,9 +3211,8 @@
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
   $("sidebar").onclick = e => {
     const button = e.target.closest("button");
-    if (button && !["devicesBtn", "settingsBtn", "configBtn", "routerToolsBtn"].includes(button.id)) closeDevices();
-    if (button && button.id !== "routerToolsBtn") closeRouterTools();
-    if (button && button.id !== "routerToolsBtn") {
+    if (button && !["devicesBtn", "settingsBtn", "configBtn"].includes(button.id)) closeDevices();
+    if (button) {
       $("sidebar").querySelectorAll(".action-active").forEach(el => el.classList.remove("action-active"));
       button.classList.add("action-active");
     }
@@ -3128,14 +3222,14 @@
   };
   $("probeBtn").onclick = probeFromForm;
   $("setupGo").onclick = submitSetup;
-  $("setupCancel").onclick = () => $("setupBackdrop").classList.remove("show");
-  $("setupBackdrop").onclick = e => { if (e.target.id === "setupBackdrop") $("setupBackdrop").classList.remove("show"); };
+  $("setupCancel").onclick = () => hideInline("setupBackdrop");
+  $("setupBackdrop").onclick = e => { if (e.target.id === "setupBackdrop") hideInline("setupBackdrop"); };
   $("cpBtn").onclick = openChangePassword;
   $("cpGo").onclick = submitChangePassword;
-  $("cpCancel").onclick = () => $("cpBackdrop").classList.remove("show");
-  $("cpBackdrop").onclick = e => { if (e.target.id === "cpBackdrop") $("cpBackdrop").classList.remove("show"); };
-  $("connCancel").onclick = () => $("connBackdrop").classList.remove("show");
-  $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") $("connBackdrop").classList.remove("show"); };
+  $("cpCancel").onclick = () => hideInline("cpBackdrop");
+  $("cpBackdrop").onclick = e => { if (e.target.id === "cpBackdrop") hideInline("cpBackdrop"); };
+  $("connCancel").onclick = () => hideInline("connBackdrop");
+  $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") hideInline("connBackdrop"); };
   $("pushApplyBtn").onclick = pushApply;
   $("devicesBtn").onclick = openDevices;
   $("devClose").onclick = closeDevices;
@@ -3229,17 +3323,19 @@
   bindLongPress($("poolRows"), "[data-pool-row]", showPoolContext);
   $("pullBtn").onclick = pullFromRouter;
   $("upBtn").onclick = openUpdate;
+  $("topUpBtn").onclick = openUpdate;
   $("upGo").onclick = doUpdate;
-  $("upCancel").onclick = () => $("upBackdrop").classList.remove("show");
-  $("upBackdrop").onclick = e => { if (e.target.id === "upBackdrop") $("upBackdrop").classList.remove("show"); };
+  $("upCancel").onclick = () => hideInline("upBackdrop");
+  $("upBackdrop").onclick = e => { if (e.target.id === "upBackdrop") hideInline("upBackdrop"); };
   $("dailyLogBtn").onclick = openDailyLogs;
   $("dailyLogRefresh").onclick = () => loadDailyLogs($("dailyLogDate").value);
   $("dailyLogDate").onchange = e => loadDailyLogs(e.target.value);
   $("dailyLogCopy").onclick = () => copy($("dailyLogBox").textContent);
   $("dailyLogDownload").onclick = downloadDailyLogs;
-  $("dailyLogClose").onclick = () => $("dailyLogBackdrop").classList.remove("show");
-  $("dailyLogBackdrop").onclick = e => { if (e.target.id === "dailyLogBackdrop") $("dailyLogBackdrop").classList.remove("show"); };
+  $("dailyLogClose").onclick = () => hideInline("dailyLogBackdrop");
+  $("dailyLogBackdrop").onclick = e => { if (e.target.id === "dailyLogBackdrop") hideInline("dailyLogBackdrop"); };
   $("gwBtn").onclick = openGateway;
+  $("topGwBtn").onclick = openGateway;
   $("resetAllBtn").onclick = resetEverything;
   $("settingsBtn").onclick = openSettings;
   $("settingsRefresh").onclick = refreshSettings;
@@ -3255,20 +3351,21 @@
   $("gwPin").onclick = pinGateway;
   $("gwAuto").onclick = unpinGateway;
   $("gwSwitch").onclick = switchGateway;
-  $("gwClose").onclick = () => $("gwBackdrop").classList.remove("show");
-  $("gwBackdrop").onclick = e => { if (e.target.id === "gwBackdrop") $("gwBackdrop").classList.remove("show"); };
+  $("gwClose").onclick = () => hideInline("gwBackdrop");
+  $("gwBackdrop").onclick = e => { if (e.target.id === "gwBackdrop") hideInline("gwBackdrop"); };
   $("rbBtn").onclick = openRollback;
-  $("rbClose").onclick = () => $("rbBackdrop").classList.remove("show");
+  $("topRbBtn").onclick = openRollback;
+  $("rbClose").onclick = () => hideInline("rbBackdrop");
   $("rbBackupNow").onclick = backupNow;
-  $("rbBackdrop").onclick = e => { if (e.target.id === "rbBackdrop") $("rbBackdrop").classList.remove("show"); };
+  $("rbBackdrop").onclick = e => { if (e.target.id === "rbBackdrop") hideInline("rbBackdrop"); };
   $("rbList").onclick = e => {
     const r = e.target.getAttribute("data-restore");
     const d = e.target.getAttribute("data-dl");
     if (r) return restore(r);
     if (d) return downloadBackup(d);
   };
-  $("logClose").onclick = () => $("logBackdrop").classList.remove("show");
-  $("logBackdrop").onclick = e => { if (e.target.id === "logBackdrop") $("logBackdrop").classList.remove("show"); };
+  $("logClose").onclick = () => hideInline("logBackdrop");
+  $("logBackdrop").onclick = e => { if (e.target.id === "logBackdrop") hideInline("logBackdrop"); };
 
   document.getElementById("rows").onclick = e => {
     const ed = e.target.getAttribute("data-edit");
@@ -3314,9 +3411,9 @@
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
       closeContextMenu(); closeModal();
-      if ($("devProxyBackdrop").classList.contains("show")) closeDeviceProxyBatch();
+      if (featureOpen("devProxyBackdrop")) closeDeviceProxyBatch();
     }
-    if (e.key === "Enter" && $("backdrop").classList.contains("show") && e.target.tagName === "INPUT") saveForm();
+    if (e.key === "Enter" && featureOpen("backdrop") && e.target.tagName === "INPUT") saveForm();
   });
 
   // ---- seed demo on first run ----
