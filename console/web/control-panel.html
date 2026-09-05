@@ -179,6 +179,17 @@
   .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .ssid-name { font-weight: 600; }
   .sub { color: var(--text-dim); font-size: 12px; }
+  .settings-page[hidden] { display: none !important; }
+  .settings-page { display: grid; gap: 14px; }
+  .settings-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+  .settings-head h2 { margin: 0; font-size: 24px; letter-spacing: -.4px; }
+  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+  .settings-card h3 { margin: 0 0 4px; font-size: 15px; }
+  .settings-card p { margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; }
+  .settings-value { min-height: 38px; padding: 9px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  @media (max-width: 720px) { .settings-grid { grid-template-columns: 1fr; } .settings-head { align-items: start; flex-direction: column; } }
   .idxpill { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 2px 8px; }
   .band { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 7px; border: 1px solid var(--border); }
   .band.b2 { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
@@ -485,6 +496,7 @@
         <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
         <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
         <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
+        <button class="btn ghost" id="settingsBtn" title="Kiểm tra và vận hành router">⚙ Cài đặt</button>
       </span>
     </nav>
     <div class="side-foot">sbproxy Console</div>
@@ -548,6 +560,37 @@
     <div class="hint" id="applyHint"></div>
   </div>
   </div><!-- /#dashboardPage -->
+  <section class="settings-page" id="settingsPage" hidden>
+    <div class="settings-head">
+      <div><h2>Router settings</h2><div class="sub">Chỉ các mục kiểm tra và vận hành cần thiết trên router.</div></div>
+      <button class="btn ghost" id="settingsRefresh">↻ Làm mới</button>
+    </div>
+    <div class="settings-grid">
+      <section class="settings-card">
+        <h3>Trạng thái</h3>
+        <p>Kết nối agent, phiên bản và dịch vụ proxy.</p>
+        <div class="settings-value" id="settingsStatus">Chưa kết nối</div>
+        <div class="settings-actions"><button class="btn ghost" id="settingsHealth">Kiểm tra health</button><button class="btn ghost" id="settingsRestart">Restart sing-box</button></div>
+      </section>
+      <section class="settings-card">
+        <h3>Egress</h3>
+        <p>Đường ra Internet thực tế của router.</p>
+        <div class="settings-value" id="settingsGateway">Chưa kiểm tra</div>
+        <div class="settings-actions"><button class="btn ghost" id="settingsGatewayOpen">Chi tiết egress</button></div>
+      </section>
+      <section class="settings-card">
+        <h3>Chẩn đoán SSID</h3>
+        <p>Kiểm tra Wi-Fi, bridge, DHCP, nftables, route, sing-box và proxy.</p>
+        <select id="settingsDiagSsid" aria-label="SSID cần chẩn đoán"></select>
+        <div class="settings-actions"><button class="btn ghost" id="settingsDiagRun">Chạy chẩn đoán</button><button class="btn ghost" id="settingsLogs">Nhật ký 7 ngày</button></div>
+      </section>
+      <section class="settings-card">
+        <h3>Bảo trì router</h3>
+        <p>Các thao tác có thể làm thay đổi hoặc khôi phục hệ thống.</p>
+        <div class="settings-actions"><button class="btn ghost" id="settingsBackup">Backup / Rollback</button><button class="btn ghost" id="settingsUpdate">Cập nhật agent</button><button class="btn ghost" id="settingsConnect">Kết nối</button></div>
+      </section>
+    </div>
+  </section>
   <section class="device-page" id="devicesPage" hidden></section>
   </div><!-- /.wrap -->
   </div><!-- /.main -->
@@ -1305,6 +1348,7 @@
       // are rebuilt once, on the transition to connected (row buttons appear).
       if (wasConnected) updateHealthCells(); else renderRows();
       updateSingboxUI();
+      if (!$('settingsPage').hidden) renderSettings();
       setConnStatus(pick("Connected · sing-box " + (run ? "running" : "NOT running"),
                          "Đã kết nối · sing-box " + (run ? "đang chạy" : "KHÔNG chạy")), run ? "ok" : "bad");
     }).catch(err => {
@@ -2156,7 +2200,9 @@
   function openDevices() {
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     $("dashboardPage").hidden = true;
+    $("settingsPage").hidden = true;
     $("devicesPage").hidden = false;
+    $("settingsBtn").classList.remove("page-active");
     $("devicesBtn").classList.add("page-active");
     scrollTo({ top: 0, behavior: "smooth" });
     scheduleDialogActions();
@@ -2165,9 +2211,62 @@
   }
   function closeDevices() {
     $("devicesPage").hidden = true;
+    $("settingsPage").hidden = true;
     $("dashboardPage").hidden = false;
     $("devicesBtn").classList.remove("page-active");
+    $("settingsBtn").classList.remove("page-active");
     clearInterval(devTimer); devTimer = null;
+  }
+  function settingsStatusText() {
+    if (!agent.connected) return pick("Not connected", "Chưa kết nối");
+    const sb = agent.singbox && agent.singbox.running ? "sing-box running" : "sing-box DOWN";
+    const probes = Object.keys(agent.health || {}).length;
+    return `agent v${agent.version || "?"} · ${sb} · ${probes} health probe(s)`;
+  }
+  function renderSettings() {
+    $("settingsStatus").textContent = settingsStatusText();
+    const select = $("settingsDiagSsid");
+    const keep = select.value;
+    select.innerHTML = ssids.length
+      ? ssids.map(s => `<option value="${s.idx}">${esc(s.name)} · idx ${s.idx}</option>`).join("")
+      : `<option value="">${pick("No Wi-Fi", "Chưa có WiFi")}</option>`;
+    if ([...select.options].some(o => o.value === keep)) select.value = keep;
+  }
+  function loadSettingsGateway() {
+    const box = $("settingsGateway");
+    if (!agent.connected) { box.textContent = pick("Not connected", "Chưa kết nối"); return; }
+    box.textContent = pick("Checking…", "Đang kiểm tra…");
+    api("gateway").then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "gateway failed");
+      const state = d.state || "?";
+      box.textContent = `${state} · ${d.interface || "?"} (${d.device || "?"})${d.ipv4 ? " · " + d.ipv4 : ""}`
+        + (d.expected_interface ? ` · pinned ${d.expected_interface}` : "");
+    }).catch(e => { box.textContent = `${pick("Error: ", "Lỗi: ")}${e.message || e}`; });
+  }
+  function openSettings() {
+    closeDevices();
+    $("dashboardPage").hidden = true;
+    $("settingsPage").hidden = false;
+    $("settingsBtn").classList.add("page-active");
+    renderSettings();
+    loadSettingsGateway();
+    scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function refreshSettings() {
+    if (!agent.connected) return toast(pick("Connect to the router first.", "Hãy kết nối router trước."));
+    poll();
+    renderSettings();
+    loadSettingsGateway();
+  }
+  function runSettingsHealth() {
+    if (!agent.connected) return toast(pick("Connect to the router first.", "Hãy kết nối router trước."));
+    api("health_now").then(d => { if (!d || d.ok === false) throw new Error((d && d.error) || "health check failed"); poll(); toast(pick("Health checked", "Đã kiểm tra health")); })
+      .catch(e => toast(`${pick("Error: ", "Lỗi: ")}${e.message || e}`));
+  }
+  function runSettingsDiagnosis() {
+    const idx = parseInt($("settingsDiagSsid").value, 10);
+    if (!agent.connected || !isFinite(idx)) return toast(pick("Connect and choose a Wi-Fi.", "Hãy kết nối và chọn WiFi."));
+    diagnoseSsid(idx);
   }
   function scheduleDeviceRefresh() {
     clearInterval(devTimer); devTimer = null;
@@ -2969,7 +3068,7 @@
   $("menuBtn").onclick = () => $("layout").classList.toggle("side-open");
   $("sidebar").onclick = e => {
     const button = e.target.closest("button");
-    if (button && button.id !== "devicesBtn") closeDevices();
+    if (button && button.id !== "devicesBtn" && button.id !== "settingsBtn") closeDevices();
     if (button && matchMedia("(max-width: 920px)").matches) {
       $("layout").classList.remove("side-open");
     }
@@ -3089,6 +3188,16 @@
   $("dailyLogBackdrop").onclick = e => { if (e.target.id === "dailyLogBackdrop") $("dailyLogBackdrop").classList.remove("show"); };
   $("gwBtn").onclick = openGateway;
   $("resetAllBtn").onclick = resetEverything;
+  $("settingsBtn").onclick = openSettings;
+  $("settingsRefresh").onclick = refreshSettings;
+  $("settingsHealth").onclick = runSettingsHealth;
+  $("settingsRestart").onclick = restartSingbox;
+  $("settingsGatewayOpen").onclick = openGateway;
+  $("settingsDiagRun").onclick = runSettingsDiagnosis;
+  $("settingsLogs").onclick = openDailyLogs;
+  $("settingsBackup").onclick = openRollback;
+  $("settingsUpdate").onclick = openUpdate;
+  $("settingsConnect").onclick = () => $("connBtn").click();
   $("gwRefresh").onclick = loadGateway;
   $("gwPin").onclick = pinGateway;
   $("gwAuto").onclick = unpinGateway;
