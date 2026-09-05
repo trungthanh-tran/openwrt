@@ -39,6 +39,28 @@ class ConnectionValidationTests(unittest.TestCase):
                 deployer.validate_connection_fields(*values)
 
 
+class DeployerGuiSmokeTests(unittest.TestCase):
+    def test_main_window_constructs_with_boolean_variables(self):
+        try:
+            root = deployer.tk.Tk()
+        except deployer.tk.TclError as exc:
+            self.skipTest(f"Tk display unavailable: {exc}")
+        root.withdraw()
+        try:
+            with mock.patch.object(
+                deployer.core,
+                "load_provision_settings",
+                return_value=deployer.core.ProvisionSettings(),
+            ):
+                app = deployer.DeployApp(root)
+            root.update_idletasks()
+            self.assertFalse(app.show_password.get())
+            self.assertTrue(app.open_after.get())
+            self.assertGreater(len(app.steps.get_children()), 0)
+        finally:
+            root.destroy()
+
+
 class UpdateSafetyTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

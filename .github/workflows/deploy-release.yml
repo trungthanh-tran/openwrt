@@ -46,7 +46,7 @@ jobs:
       - name: Install Linux build prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk
+          sudo apt-get install -y python3-tk xvfb
           python -m pip install -r console/deployer/requirements.txt
       - name: Validate tag and source version
         if: startsWith(github.ref, 'refs/tags/')

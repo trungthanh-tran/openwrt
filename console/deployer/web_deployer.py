@@ -112,8 +112,8 @@ class DeployApp:
         self.port = tk.StringVar(value=str(saved.port or 22))
         self.user = tk.StringVar(value=saved.user or "root")
         self.password = tk.StringVar()
-        self.show_password = tk.BooleanVar(False)
-        self.open_after = tk.BooleanVar(True)
+        self.show_password = tk.BooleanVar(value=False)
+        self.open_after = tk.BooleanVar(value=True)
         self.status = tk.StringVar(value="Sẵn sàng kiểm tra hoặc cài đặt")
 
         shell = ttk.Frame(root, padding=20)
@@ -314,11 +314,19 @@ class DeployApp:
 def main() -> int:
     if os.environ.get("SBPROXY_ASKPASS") == "1":
         return 0 if core.write_stdout(os.environ.get("SBPROXY_SSH_PASSWORD", "") + "\n") else 1
-    if "--self-test" in sys.argv:
+    if "--self-test" in sys.argv or "--self-test-gui" in sys.argv:
         payload = core.find_payload()
         if not payload or not Path(payload).exists() or not core.payload_version(payload):
             return 1
         validate_connection_fields("192.168.8.1", "root", "22")
+        if "--self-test-gui" in sys.argv:
+            root = tk.Tk()
+            root.withdraw()
+            try:
+                DeployApp(root)
+                root.update_idletasks()
+            finally:
+                root.destroy()
         return 0
     core.setup_logging(verbose=False)
     root = tk.Tk()

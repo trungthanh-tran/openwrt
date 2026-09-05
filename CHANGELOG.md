@@ -5,6 +5,13 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.21] - 2026-09-05
+
+### Fixed
+- Windows Web Deployer không còn crash lúc mở do `BooleanVar` nhận nhầm giá trị
+  boolean làm Tk master. Thêm smoke test dựng cửa sổ thật và self-test GUI cho
+  executable trước khi đóng gói release.
+
 ## [0.5.20] - 2026-09-05
 
 ### Added
