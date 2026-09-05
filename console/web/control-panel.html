@@ -1511,6 +1511,34 @@
     document.getElementById("logBackdrop").classList.add("show");
   }
 
+  let configApplying = false;
+  function applyConfigText(conf, showResult) {
+    if (!agent.connected) return Promise.reject(new Error(pick("Not connected to the router.", "Chưa kết nối router.")));
+    if (configApplying) return Promise.reject(new Error(pick("Another configuration change is being applied.", "Một thay đổi cấu hình khác đang được apply.")));
+    configApplying = true;
+    toast(pick("Step 1/3 · Dry-run…", "Bước 1/3 · Dry-run…"));
+    return api("dryrun_conf", "POST", conf, true).then(dr => {
+      if (!dr || !dr.ok) throw new Error((dr && (dr.log || dr.error)) || pick("dry-run failed", "dry-run lỗi"));
+      toast(pick("Step 2/3 · Writing the config…", "Bước 2/3 · Ghi cấu hình…"));
+      return api("save_conf", "POST", conf, true);
+    }).then(sv => {
+      if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
+      toast(pick("Step 3/3 · Applying…", "Bước 3/3 · Apply…"));
+      return api("apply", "POST", {});
+    }).then(d => {
+      if (!d || !d.ok) throw new Error((d && (d.log || d.error)) || pick("apply failed", "apply lỗi"));
+      configDirty = false;
+      if (showResult) showLog("apply.sh", d);
+      poll();
+      return d;
+    }).finally(() => { configApplying = false; });
+  }
+  function autoApplyConfig(previous, successMessage) {
+    return applyConfigText(genConf(), false).then(() => toast(successMessage + " ✓")).catch(async err => {
+      ssids = previous; configDirty = true; render();
+      toast(pick("Change was not applied: ", "Không apply được thay đổi: ") + err.message);
+    });
+  }
   function pushApply() {
     if (!agent.connected) return;
     if (!confirm(pick("Write the current wifi-socks.conf to the router and run apply.sh (reloads Wi-Fi)?",
@@ -1520,16 +1548,9 @@
     // router rejects is caught while the live one is still in place, instead
     // of being written first and blowing up during apply.
     toast(pick("Step 1/3 · Dry-run…", "Bước 1/3 · Dry-run…"));
-    api("dryrun_conf", "POST", conf, true).then(dr => {
-      if (!dr || !dr.ok) throw new Error((dr && (dr.log || dr.error)) || pick("dry-run failed", "dry-run lỗi"));
-      toast(pick("Step 2/3 · Writing the config…", "Bước 2/3 · Ghi cấu hình…"));
-      return api("save_conf", "POST", conf, true);
-    }).then(sv => {
-      if (!sv || !sv.ok) throw new Error((sv && sv.error) || pick("writing the config failed", "ghi conf lỗi"));
-      toast(pick("Step 3/3 · Applying…", "Bước 3/3 · Apply…"));
-      return api("apply", "POST", {});
-    }).then(d => { configDirty = false; lastRouterConf = conf; showLog("apply.sh", d); poll(); })
-      .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    applyConfigText(conf, true).then(() => {
+      configDirty = false;
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
   }
   // ---- Reset: back to zero SSIDs on the router -------------------------------
   // Kick every online device, empty every pool, write an empty wifi-socks.conf,
@@ -2793,6 +2814,9 @@
   }
 
   function saveForm() {
+    if (!agent.connected) return $("f_err").textContent = pick("Connect to the router before changing Wi-Fi.", "Hãy kết nối router trước khi đổi WiFi.");
+    if (configApplying) return $("f_err").textContent = pick("Wait for the current apply to finish.", "Hãy chờ lần apply hiện tại hoàn tất.");
+    const previous = ssids.map(s => ({ ...s }));
     const name = $("f_name").value.trim();
     const band = $("f_band").value;
     const idx = parseInt($("f_idx").value, 10);
@@ -2820,7 +2844,8 @@
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     configDirty = true;
     const wasEditing = !!editId;
-    closeModal(); render(); toast(wasEditing ? pick("Updated", "Đã cập nhật") : pick("Wi-Fi added", "Đã thêm WiFi"));
+    closeModal(); render();
+    autoApplyConfig(previous, wasEditing ? pick("Updated and applied", "Đã cập nhật và apply") : pick("Wi-Fi added and applied", "Đã thêm WiFi và apply"));
   }
 
   function fillCompactProxy() {
@@ -2871,12 +2896,14 @@
     return rows.length;
   }
   function importConf() {
+    if (!agent.connected) return toast(pick("Connect to the router before importing.", "Hãy kết nối router trước khi nhập cấu hình."));
+    const previous = ssids.map(s => ({ ...s }));
     const txt = prompt(pick("Paste the contents of wifi-socks.conf:", "Dán nội dung wifi-socks.conf:"));
     if (!txt) return;
     const n = parseConfInto(txt);
     configDirty = true;
     if (!n) return toast(pick("No valid Wi-Fi rows were found.", "Không đọc được dòng WiFi nào."));
-    render(); toast(pick(`Imported ${n} Wi-Fi row(s)`, `Đã nhập ${n} WiFi`));
+    render(); autoApplyConfig(previous, pick(`Imported and applied ${n} Wi-Fi row(s)`, `Đã nhập và apply ${n} WiFi`));
   }
 
   // ---- download / copy ----
@@ -2925,7 +2952,7 @@
   $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
   $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
   $("copyBtn").onclick = () => copy(TABS[curTab].gen());
-  $("clearBtn").onclick = () => { if (confirm(pick("Remove all Wi-Fi entries from the console? (This does not change the router.)", "Xoá toàn bộ WiFi khỏi console? (không đụng tới router)"))) { ssids = []; configDirty = true; render(); } };
+  $("clearBtn").onclick = resetEverything;
 
   // live mode events
   $("connBtn").onclick = () => {
@@ -3095,11 +3122,21 @@
     if (zp) return zapSock(ssids.find(x => x.id === zp));
     if (ed) return openModal(ed);
     if (du) {
+      if (!agent.connected) return toast(pick("Connect to the router before changing Wi-Fi.", "Hãy kết nối router trước khi đổi WiFi."));
+      const previous = ssids.map(x => ({ ...x }));
       const s = ssids.find(x => x.id === du);
       const clone = { ...s, id: "s" + Date.now(), idx: nextIdx(), name: s.name + "-copy" };
-      ssids.push(clone); configDirty = true; render(); toast(pick("Duplicated", "Đã nhân bản"));
+      ssids.push(clone); configDirty = true; render(); autoApplyConfig(previous, pick("Duplicated and applied", "Đã nhân bản và apply"));
     }
-    if (de) { const s = ssids.find(x => x.id === de); if (confirm(pick(`Delete Wi-Fi "${s.name}"?`, `Xoá WiFi "${s.name}"?`))) { ssids = ssids.filter(x => x.id !== de); configDirty = true; render(); } }
+    if (de) {
+      const s = ssids.find(x => x.id === de);
+      if (!agent.connected) return toast(pick("Connect to the router before deleting Wi-Fi.", "Hãy kết nối router trước khi xoá WiFi."));
+      if (confirm(pick(`Delete Wi-Fi "${s.name}" and apply immediately? Connected devices will disconnect.`, `Xoá WiFi "${s.name}" và apply ngay? Thiết bị đang dùng sẽ mất kết nối.`))) {
+        const previous = ssids.map(x => ({ ...x }));
+        ssids = ssids.filter(x => x.id !== de); configDirty = true; render();
+        autoApplyConfig(previous, pick("Wi-Fi deleted and applied", "Đã xoá WiFi và apply"));
+      }
+    }
   };
 
   document.getElementById("outTabs").onclick = e => {
