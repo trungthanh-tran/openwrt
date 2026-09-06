@@ -109,6 +109,72 @@ class AgentAnswerTests(unittest.TestCase):
         self.assertIn("kh\u00f4ng ph\u1ea3i JSON", self.out["html_vi"]["message"])
 
 
+def reason_source() -> str:
+    """routerReason, from its comment block to its closing brace."""
+    text = PANEL.read_text(encoding="utf-8")
+    start = text.index("  // What the router said, trimmed")
+    end = text.index("\n  }\n", text.index("function routerReason", start)) + len("\n  }\n")
+    return text[start:end]
+
+
+REASON_HARNESS = r"""
+let LANG = "en";
+const pick = (en, vi) => (LANG === "en" ? en : vi);
+
+%(reason)s
+
+const APPLY_FAILURE = "[sbproxy] Backing up before apply...\n[sbproxy] Wrote /tmp/x\n[sbproxy][ERR] WIFI_COUNTRY must be a two-letter uppercase country code";
+const out = {
+  from_log: routerReason({ ok: false, rc: 1, log: APPLY_FAILURE }, "fallback"),
+  from_error: routerReason({ ok: false, error: "cần POST" }, "fallback"),
+  empty: routerReason({ ok: false, log: "" }, "fallback"),
+  missing: routerReason(null, "fallback"),
+  chatty: routerReason({ log: "line one\nline two\nline three" }, "fallback"),
+  long: routerReason({ log: "x".repeat(400) + " failed" }, "fallback"),
+  denied: routerReason({ log: "step ok\nFATAL read config: permission denied\ndone" }, "fallback")
+};
+console.log(JSON.stringify(out));
+"""
+
+
+@unittest.skipUnless(NODE, "node is not installed; the reason check cannot run")
+class RouterReasonTests(unittest.TestCase):
+    """A failed action must repeat what the router said, not "X failed"."""
+
+    @classmethod
+    def setUpClass(cls):
+        script = REASON_HARNESS % {"reason": reason_source()}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "reason.js")
+            Path(path).write_text(script, encoding="utf-8")
+            done = subprocess.run([NODE, path], capture_output=True, text=True,
+                                  encoding="utf-8", timeout=30, check=True)
+        cls.out = json.loads(done.stdout.strip().splitlines()[-1])
+
+    def test_the_failing_line_is_picked_out_of_a_long_log(self):
+        """apply prints progress first and the reason last."""
+        self.assertIn("WIFI_COUNTRY", self.out["from_log"])
+        self.assertNotIn("Backing up", self.out["from_log"])
+
+    def test_a_cgi_refusal_comes_through(self):
+        self.assertEqual(self.out["from_error"], "cần POST")
+
+    def test_a_silent_answer_falls_back(self):
+        self.assertEqual(self.out["empty"], "fallback")
+        self.assertEqual(self.out["missing"], "fallback")
+
+    def test_a_log_with_no_obvious_failure_shows_its_last_line(self):
+        """Where a script stopped is more useful than where it started."""
+        self.assertEqual(self.out["chatty"], "line three")
+
+    def test_a_huge_line_is_trimmed_for_the_toast(self):
+        self.assertLessEqual(len(self.out["long"]), 241)
+        self.assertTrue(self.out["long"].endswith("\u2026"))
+
+    def test_the_permission_error_survives(self):
+        self.assertIn("permission denied", self.out["denied"])
+
+
 class PanelParsesEveryAnswerSafelyTests(unittest.TestCase):
     """No fetch may go straight to .json() again."""
 

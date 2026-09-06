@@ -5,6 +5,18 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **"Error: save_pool failed" và những thông báo trống rỗng khác.** Thêm proxy
+  vào pool báo đúng một câu đó, trong khi lý do đã nằm sẵn trong phản hồi:
+  `save_pool` trả `{ok, rc, log}` với `log` là output của script, còn console
+  chỉ đọc `.error` — trường mà action này không bao giờ đặt. Apply, dry-run và
+  bước ghi conf cũng rơi về "apply failed" mỗi khi router in nhiều dòng. Nay
+  `routerReason()` lấy đúng dòng báo lỗi (dò ngược từ cuối, vì script in tiến
+  trình trước và lý do sau) rồi cắt vừa một toast.
+- **Ô sức khoẻ đỏ chỉ ghi "fail".** healthd vốn đã ghi lại lý do (mã lỗi curl +
+  dòng lỗi đầu tiên, mật khẩu đã che). Nay hiện trong tooltip của ô, có dấu ⓘ
+  khi có lý do; ô xanh cũng cho biết HTTP code và độ trễ.
+
 ### Changed
 - **`WIFI_COUNTRY` không còn là điều kiện chặn.** Router có `settings.sh` mất
   key này thì **mọi đường ghi đều dừng** — apply, đổi pool proxy, xoá SSID, cả
