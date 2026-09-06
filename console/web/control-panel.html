@@ -1405,13 +1405,34 @@
   // Every write to the router goes through this: the chip says which step is
   // running and the page stops accepting a second write until it is done.
   function busy(step) {
-    document.body.classList.add("busy");
-    $("busyText").textContent = step;
     toast(step);
+    setBusyChip(step, true);
   }
-  function busyDone() {
-    document.body.classList.remove("busy");
-    $("busyText").textContent = "";
+  function busyDone() { setBusyChip("", false); }
+  // Decoration only: these functions are also cut out of this file and run
+  // under Node by the tests, and a chip that throws would take the reset or
+  // the apply down with it.
+  function setBusyChip(step, on) {
+    if (typeof document === "undefined" || !document.body) return;
+    document.body.classList.toggle("busy", on);
+    const chip = document.getElementById("busyText");
+    if (chip) chip.textContent = step;
+  }
+  // Every mutating action -- SSID, proxy or device -- is a write to the
+  // router, and they all owe the operator the same three things: the wait
+  // while it happens, the router's own words when it refuses, and a refresh
+  // of whatever it changed. Wrapping them one by one drifted; this is the path.
+  function routerWrite(label, run, after) {
+    busy(label + "…");
+    return Promise.resolve().then(run).then(d => {
+      if (d && d.ok === false) throw new Error(routerReason(d, label));
+      toast(label + " ✓");
+      if (after) after(d);
+      return d;
+    }).catch(err => {
+      toast(pick("Error: ", "Lỗi: ") + (err.message || err));
+      throw err;
+    }).finally(busyDone);
   }
   function routerReason(d, fallback) {
     const raw = String((d && (d.error || d.log)) || "").replace(/\s+/g, " ").trim();
@@ -1945,10 +1966,9 @@
     if (!agent.connected) return;
     if (!confirm(pick(`Change the SOCKS endpoint of "${s.name}" now? Wi-Fi is not reloaded, but open sessions may drop.\n→ ${s.host}:${s.port}`,
                       `Đổi SOCKS của "${s.name}" ngay? WiFi không reload nhưng phiên đang mở có thể gián đoạn.\n→ ${s.host}:${s.port}`))) return;
-    toast(pick("Changing the SOCKS endpoint…", "Đang đổi sock…"));
-    api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "", type: s.proxy_type || "socks5" })
-      .then(d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); })
-      .catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    routerWrite(pick("Changing the SOCKS endpoint", "Đổi sock"),
+      () => api("set_sock", "POST", { idx: s.idx, host: s.host, port: s.port, user: s.user || "", pass: s.pass || "", type: s.proxy_type || "socks5" }),
+      d => { showLog("set-sock.sh idx=" + s.idx, d); poll(); }).catch(() => {});
   }
 
   // ---- diagnostics: the same tools the desktop app has ----
@@ -2071,19 +2091,13 @@
     const label = name || pick("automatic", "tự động");
     if (!confirm(pick(`Expect ${label} as the uplink from now on? Nothing is switched; only the health check's expectation changes.`,
                       `Từ giờ coi ${label} là đường ra mong đợi? Không đổi gì trên router, chỉ đổi kỳ vọng của phần kiểm tra.`))) return;
-    api("set_gateway", "POST", { interface: name }).then(d => {
-      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "set_gateway failed");
-      toast(pick(`Uplink expectation: ${label}`, `Đường ra mong đợi: ${label}`));
-      loadGateway();
-    }).catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
+    routerWrite(pick(`Uplink expectation: ${label}`, `Đường ra mong đợi: ${label}`),
+      () => api("set_gateway", "POST", { interface: name }), loadGateway).catch(() => {});
   }
   function unpinGateway() {
     if (!confirm(pick("Stop expecting a specific uplink (automatic)?", "Bỏ ghim đường ra (để tự động)?"))) return;
-    api("set_gateway", "POST", { interface: "" }).then(d => {
-      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "set_gateway failed");
-      toast(pick("Uplink expectation: automatic", "Đường ra mong đợi: tự động"));
-      loadGateway();
-    }).catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
+    routerWrite(pick("Uplink expectation: automatic", "Đường ra mong đợi: tự động"),
+      () => api("set_gateway", "POST", { interface: "" }), loadGateway).catch(() => {});
   }
   function switchGateway() {
     const picked = document.querySelector('input[name="gwIface"]:checked');
@@ -2093,11 +2107,9 @@
                       `Đổi đường ra Internet của router sang ${name}? Network trên router sẽ reload; Wi-Fi và proxy không đổi.`))) return;
     gwChoice = name;
     $("gwSwitch").disabled = true;
-    api("switch_gateway", "POST", { interface: name }).then(d => {
-      if (!d || d.ok === false) throw new Error((d && (d.error || d.detail)) || "switch_gateway failed");
-      toast(pick(`Egress switched to ${name}`, `Đã đổi đường ra sang ${name}`));
-      loadGateway();
-    }).catch(e => { toast(String(e.message || e)); loadGateway(); })
+    routerWrite(pick(`Egress switched to ${name}`, `Đã đổi đường ra sang ${name}`),
+      () => api("switch_gateway", "POST", { interface: name }), loadGateway)
+      .catch(() => loadGateway())
       .finally(() => { $("gwSwitch").disabled = false; });
   }
 
@@ -2448,8 +2460,10 @@
     api("clients").then(d => {
       const macs = (d.clients || []).filter(c => c.idx === activePoolIdx && c.online && c.mac).map(c => c.mac);
       if (!macs.length) throw new Error(pick("No online clients on this SSID.", "SSID này không có client online."));
-      return api("rebalance", "POST", { idx: activePoolIdx, macs });
-    }).then(() => { toast(pick("Clients rebalanced ✓", "Đã rebalance client ✓")); loadDevices(); }).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
+      return routerWrite(pick("Clients rebalanced", "Rebalance client"),
+        () => api("rebalance", "POST", { idx: activePoolIdx, macs }),
+        () => { loadDevices(); poll(); });
+    }).catch(e => toast(pick("Error: ", "Lỗi: ") + e.message));
   }
 
   // The device table keeps the last payload so filtering, sorting and CSV
@@ -2744,9 +2758,10 @@
         const value = answer.trim().toLowerCase();
         const slot = value === "none" ? "none" : Number(value);
         if (slot !== "none" && (!Number.isInteger(slot) || slot < 0 || slot >= pool.length)) throw new Error(pick("Invalid proxy slot.", "Slot proxy không hợp lệ."));
-        return api("assign_proxy", "POST", { idx, assignments: [{ mac, slot }] });
-      }).then(d => { if (d) { toast(pick("Proxy changed ✓", "Đã đổi proxy ✓")); loadDevices(); } })
-      .catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
+        return routerWrite(pick("Proxy changed", "Đổi proxy"),
+          () => api("assign_proxy", "POST", { idx, assignments: [{ mac, slot }] }),
+          () => { loadDevices(); poll(); });
+      }).catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
   }
 
   // Random MAC: a new BSSID for one SSID, optionally from another vendor's OUI.
@@ -2769,12 +2784,14 @@
     }
     if (!confirm(pick(`Give "${rec ? rec.name : "w" + idx}" a new random MAC now? That Wi-Fi reloads and every device on it must reconnect.`,
                       `Đổi MAC ngẫu nhiên cho "${rec ? rec.name : "w" + idx}" ngay? WiFi đó sẽ reload, mọi thiết bị phải kết nối lại.`))) return;
-    toast(pick("Rotating the MAC…", "Đang đổi MAC…"));
-    api("rotate_mac", "POST", oui ? { idx, oui } : { idx }).then(d => {
-      showLog("rotate-mac.sh idx=" + idx, d);
-      if (rec) { rec.mac_oui = oui; save(); }
-      setTimeout(() => { poll(); render(); }, 4000);
-    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    routerWrite(pick("Rotating the MAC", "Đổi MAC"),
+      () => api("rotate_mac", "POST", oui ? { idx, oui } : { idx }),
+      d => {
+        showLog("rotate-mac.sh idx=" + idx, d);
+        if (rec) { rec.mac_oui = oui; save(); }
+        // The radio reloads; give it a moment before believing the next poll.
+        setTimeout(() => { poll(); render(); }, 4000);
+      }).catch(() => {});
   }
 
   function deviceAction(action, idx, mac) {
@@ -2788,11 +2805,8 @@
           ? pick("\n\n⚠️ The band of this Wi-Fi will reload (clients on the same band drop briefly).",
                  "\n\n⚠️ Băng tần của WiFi này sẽ reload (các client cùng băng bị ngắt trong giây lát).")
           : ""))) return;
-    toast(pick(verb + "…", "Đang " + verb.toLowerCase() + "…"));
-    api(action, "POST", { idx, mac }).then(d => {
-      if (!d || !d.ok) return showLog(verb, d);
-      toast(verb + " ✓"); loadDevices(); poll();
-    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    routerWrite(verb, () => api(action, "POST", { idx, mac }),
+      () => { loadDevices(); poll(); }).catch(() => {});
   }
 
   function selectedDevices() {
@@ -2884,7 +2898,7 @@
       const assignments = devices.map((device, i) => ({ mac: device.mac, slot: slots[i % slots.length] }));
       return api("assign_proxy", "POST", { idx, assignments });
     }).then(d => {
-      if (!d || d.ok === false) throw new Error((d && d.error) || pick("Some devices could not be assigned.", "Không gán được một số thiết bị."));
+      if (!d || d.ok === false) throw new Error(routerReason(d, pick("Some devices could not be assigned.", "Không gán được một số thiết bị.")));
       closeDeviceProxyBatch();
       deviceSelected.clear(); $("devBulkAction").value = "";
       toast(pick(`${devices.length} device(s) distributed across ${targetById.size} proxy(s) ✓`,
@@ -2903,7 +2917,7 @@
     const verb = action === "kick" ? pick("disconnect", "ngắt")
       : action === "ban" ? pick("block", "cấm") : pick("unblock", "bỏ cấm");
     if (!confirm(pick(`${verb} ${rows.length} selected device(s)?`, `${verb} ${rows.length} thiết bị đã chọn?`))) return;
-    toast(pick(`Working on ${rows.length} device(s)…`, `Đang xử lý ${rows.length} thiết bị…`));
+    busy(pick(`Working on ${rows.length} device(s)…`, `Đang xử lý ${rows.length} thiết bị…`));
     rows.reduce((chain, c) => chain.then(async results => {
       try {
         const d = await api(action, "POST", { idx: c.idx, mac: c.mac });
@@ -2917,7 +2931,7 @@
           ? pick(`${failed}/${rows.length} failed.`, `Lỗi ${failed}/${rows.length} thiết bị.`)
           : pick(`${rows.length} device(s) updated ✓`, `Đã cập nhật ${rows.length} thiết bị ✓`));
         loadDevices(); poll();
-      });
+      }).finally(busyDone);
   }
 
   // ---- render ----

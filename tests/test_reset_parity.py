@@ -80,6 +80,10 @@ let ssids = (fixture.localSsids !== undefined ? fixture.localSsids : fixture.ssi
 const agent = { connected: true };
 const pick = (en, vi) => vi;
 const toast = () => {};
+// The progress chip is decoration around the same calls; the sequence under
+// test is unchanged by it.
+const busy = () => {};
+const busyDone = () => {};
 const showLog = () => {};
 const poll = () => {};
 const save = () => {};

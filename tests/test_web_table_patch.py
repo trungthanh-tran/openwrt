@@ -212,14 +212,53 @@ class RouterBusyStateTests(unittest.TestCase):
         """Whatever raises it must clear it, on failure as much as on success."""
         self.assertGreaterEqual(self.text.count("busy(pick("), 8,
                                 "each step of each router write announces itself")
-        # applyConfigText, savePoolRows, reset, sing-box restart, an assistant
-        # fix and the package upload: six flows, one definition of busyDone.
-        self.assertEqual(self.text.count("busyDone") - 1, 6,
-                         "every flow that raises the chip clears it exactly once")
+        # Clearing must be unconditional: a refusal has to hand the page back
+        # exactly like a success does.
+        self.assertGreaterEqual(self.text.count(".finally(busyDone)"), 6,
+                                "each flow clears the chip in a finally")
 
     def test_the_clearing_always_runs(self):
         for tail in (".finally(busyDone)", "configApplying = false; busyDone();"):
             self.assertIn(tail, self.text)
+
+
+class EveryWriteReachesTheRouterTests(unittest.TestCase):
+    """Wi-Fi, proxy and device actions all take effect on the router at once.
+
+    Nothing in this console is a local edit waiting for a later "push": an
+    operator who deletes a Wi-Fi, repoints a proxy or blocks a device expects
+    the router to be in that state when the toast fades. Each of these actions
+    must therefore go out immediately, behind the progress chip, and report the
+    router's own words if it refuses.
+    """
+
+    # The action each write uses, and how far back its wrapper may sit.
+    WRITES = ("set_sock", "assign_proxy", "rebalance", "rotate_mac", "set_gateway",
+              "switch_gateway", "save_pool", "restart_singbox", "debug_fix")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = PANEL.read_text(encoding="utf-8")
+
+    def test_every_router_write_announces_itself(self):
+        for action in self.WRITES:
+            with self.subTest(action=action):
+                at = self.text.find(f'api("{action}"')
+                self.assertNotEqual(at, -1, f"{action} is no longer called")
+                window = self.text[max(0, at - 500):at]
+                self.assertTrue("routerWrite(" in window or "busy(" in window,
+                                f"{action} runs without raising the progress chip")
+
+    def test_device_actions_go_through_the_shared_path(self):
+        self.assertIn('routerWrite(verb, () => api(action, "POST", { idx, mac })', self.text)
+
+    def test_wifi_edits_apply_without_a_second_click(self):
+        """Add, edit, duplicate, import and delete each end in an apply."""
+        self.assertGreaterEqual(self.text.count("autoApplyConfig(previous"), 5)
+        self.assertIn("applyConfigText(genConf(), false)", self.text)
+
+    def test_a_refused_write_restores_the_previous_wifi_list(self):
+        self.assertIn("ssids = previous; configDirty = true; render();", self.text)
 
 
 if __name__ == "__main__":
