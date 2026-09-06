@@ -1574,7 +1574,8 @@
     if (!agent.connected) return '<span class="sub">—</span>';
     const h = agent.health[idx];
     if (!h) return '<span class="hp wait">…</span>';
-    const why = h.error ? String(h.error) : "";
+    const where = h.endpoint ? String(h.endpoint) + " · " : "";
+    const why = (where + (h.error ? String(h.error) : "")).trim();
     const pill = h.state === "fail"
       ? `<span class="hp bad" title="${esc(why || pick("The probe did not get through this proxy.", "Probe không đi qua được proxy này."))}"><span class="dot"></span>fail${h.code ? " " + h.code : ""}${why ? " ⓘ" : ""}</span>`
       : `<span class="hp ${h.state === "slow" ? "warnp" : "okp"}" title="${esc(pick(`HTTP ${h.code} in ${h.latency_ms}ms`, `HTTP ${h.code} trong ${h.latency_ms}ms`))}"><span class="dot"></span>${h.latency_ms}ms</span>`;
@@ -3342,10 +3343,15 @@
     $("f_band").value = s ? s.band : "2g";
     $("f_idx").value = s ? s.idx : nextIdx();
     $("f_key").value = s ? s.key : "";
-    $("f_host").value = s ? s.host : "127.0.0.1";
+    // Never pre-fill an address: 127.0.0.1 looked like a sensible default and
+     // became the live outbound of every SSID whose operator used a pool
+     // instead -- red health on all of them, and no Internet for any device
+     // that was not pinned to a slot.
+    $("f_host").value = s ? s.host : "";
     $("f_proxy_type").value = s ? (s.proxy_type || "socks5") : "socks5";
     $("f_proxy_compact").value = "";
     $("f_port").value = s ? s.port : "1080";
+    $("f_host").placeholder = pick("proxy host or IP", "host hoặc IP của proxy");
     $("f_user").value = s ? (s.user || "") : "";
     $("f_pass").value = s ? (s.pass || "") : "";
     $("f_isolate").checked = s ? !!s.isolate : true;

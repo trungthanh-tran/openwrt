@@ -130,9 +130,12 @@ run_once() {
       health_daily_log "idx=$idx endpoint=$host:$port state=$state latency_ms=$ms code=$code"
     fi
     [ -z "$state_tmp" ] || printf '%s %s\n' "$idx" "$state" >> "$state_tmp"
+    # The endpoint travels with the result: "fail" on its own hid the whole
+     # point of these lines, which is WHICH proxy did not answer.
     probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \
+              --arg ep "$host:$port" \
               --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
-              '.[$i] = {state:$s, latency_ms:$ms, code:$c} + (if $e == "" then {} else {error:$e} end)')"
+              '.[$i] = {state:$s, latency_ms:$ms, code:$c, endpoint:$ep} + (if $e == "" then {} else {error:$e} end)')"
   done < "$CONF"
 
   [ -z "$state_tmp" ] || mv "$state_tmp" "$HEALTH_LOG_STATE" 2>/dev/null || true

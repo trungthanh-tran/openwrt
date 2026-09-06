@@ -195,6 +195,17 @@ match "the probe error travels with it"  "$(printf '%s' "$out" | jq -r '.finding
 match "and the probe URL is named"       "$(printf '%s' "$out" | jq -r '.findings[] | select(.id == "proxy_fail") | .detail_en')" 'PROBE_URL'
 printf '{"ts":1,"probes":{}}\n' > "$HEALTH"
 
+# The console used to pre-fill 127.0.0.1:1080, which then became the live
+# outbound of every SSID whose operator used a pool instead.
+printf 'alpha|2g|1|password12|127.0.0.1|1080|u|pw|1|1||socks5\n' > "$SB/config/wifi-socks.conf"
+out="$(report)"
+match "a loopback proxy is found"        "$(ids "$out")" 'proxy_loopback'
+eq "and it is critical"                  "$(sev "$out" proxy_loopback)" "crit"
+match "the SSID is named"                "$(printf '%s' "$out" | jq -r '.findings[] | select(.id == "proxy_loopback") | .title')" '1'
+printf 'alpha|2g|1|password12|p.example|1080|u|pw|1|1||socks5\n' > "$SB/config/wifi-socks.conf"
+out="$(report)"
+nomatch "a real proxy is not accused"    "$(ids "$out")" 'proxy_loopback'
+
 echo "== debug-agent: CRLF configuration =="
 printf 'WIFI_COUNTRY="VN"\r\n' >> "$SB/config/settings.sh"
 out="$(report)"

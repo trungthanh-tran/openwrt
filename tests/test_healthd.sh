@@ -179,6 +179,9 @@ eq "only valid endpoint rows are published" "$(jq -r '.probes | keys | join(",")
 eq "NaN latency is normalized to failure" "$(jq -r '.probes["7"] | [.state,.latency_ms,.code] | join(":")' "$HEALTH_FILE")" 'fail:0:204'
 eq "garbled curl output is normalized to failure" "$(jq -r '.probes["8"] | [.state,.latency_ms,.code] | join(":")' "$HEALTH_FILE")" 'fail:0:0'
 eq "dirty rows never invoke curl" "$(wc -l < "$CURL_CALLS" | tr -d ' ')" '3'
+# "fail" without the endpoint hid the whole point of the line: WHICH proxy did
+# not answer. A console pill has no room for a second request to find out.
+eq "each probe carries the endpoint it hit" "$(jq -r '.probes["6"].endpoint' "$HEALTH_FILE")" 'fast.example:1080'
 
 echo ""
 printf 'HEALTHD TOTAL: pass=%d fail=%d\n' "$pass" "$fail"

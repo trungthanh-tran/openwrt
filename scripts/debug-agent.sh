@@ -245,6 +245,20 @@ if [ -s "$HEALTH_FILE" ]; then
     "$bad_why"
 fi
 
+# A proxy on the router's own loopback is almost never a proxy: it is the
+# default this console used to pre-fill. sing-box sends every unpinned device
+# there, and healthd reports the SSID red for as long as it stands.
+if [ -s "$CONF" ]; then
+  loopback="$(awk -F'|' '!/^[[:space:]]*(#|$)/ {
+                host = $5; gsub(/[[:space:]]/, "", host)
+                if (host ~ /^(127\.|localhost$|::1$)/) printf "%s ", $3 }' "$CONF" 2>/dev/null | sed 's/ *$//')"
+  [ -z "$loopback" ] || add "proxy_loopback" "crit" "" \
+    "SSID trỏ proxy về chính router: idx $loopback" \
+    "SSID pointing at the router itself: idx $loopback" \
+    "127.0.0.1 không phải proxy: thiết bị chưa được ghim vào slot pool sẽ không có mạng, và ô sức khoẻ luôn đỏ. Sửa proxy của SSID ở màn hình WiFi (hoặc ghim mọi thiết bị vào pool)." \
+    "127.0.0.1 is not a proxy: any device not pinned to a pool slot has no Internet, and the health pill stays red. Fix the SSID's proxy on the Wi-Fi screen (or pin every device to the pool)."
+fi
+
 # ---------------------------------------------------------------------------
 # 8. The host itself
 # ---------------------------------------------------------------------------

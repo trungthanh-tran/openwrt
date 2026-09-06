@@ -282,6 +282,11 @@ class PlainSkinTests(unittest.TestCase):
         """Otherwise the first click sets dark on a page that is already dark."""
         self.assertIn('document.documentElement.getAttribute("data-theme") || "dark"', self.text)
 
+    def test_the_add_form_suggests_no_proxy_address(self):
+        """127.0.0.1:1080 was a default, and became three routers' live outbound."""
+        self.assertNotIn('$("f_host").value = s ? s.host : "127.0.0.1";', self.text)
+        self.assertIn('$("f_host").value = s ? s.host : "";', self.text)
+
     def test_the_skin_changes_no_behaviour(self):
         """It is presentation only: no id or handler is renamed by it."""
         for probe in ('id="pushApplyBtn"', 'id="devicesBtn"', 'id="debugBtn"', 'id="busyChip"'):
