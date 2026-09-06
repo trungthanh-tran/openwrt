@@ -230,11 +230,19 @@ fi
 if [ -s "$HEALTH_FILE" ]; then
   bad_probes="$(jq -r '[(.probes // {}) | to_entries[] | select(.value.state == "fail") | .key] | join(", ")' \
                   "$HEALTH_FILE" 2>/dev/null || true)"
+  # healthd records why each probe failed (curl's exit and its first error
+  # line). Without it "fail" is indistinguishable from a proxy that works for
+  # browsing but cannot reach the probe URL -- a difference that decides
+  # whether the operator should change the proxy or the probe.
+  bad_why="$(jq -r '[(.probes // {}) | to_entries[] | select(.value.state == "fail")
+                      | "idx " + .key + ": " + (.value.error // ("HTTP " + ((.value.code // 0) | tostring)))]
+                    | join("\n")' "$HEALTH_FILE" 2>/dev/null || true)"
   [ -z "$bad_probes" ] || add "proxy_fail" "warn" "" \
     "Proxy hỏng ở SSID: $bad_probes" \
     "Failing proxy on SSID: $bad_probes" \
-    "Kiểm tra host/port/user/pass và whitelist IP của nhà cung cấp; hoặc đổi sang slot khác ở màn hình Pool." \
-    "Check host/port/user/pass and the provider's IP allow-list, or switch to another slot on the Pool screen."
+    "Kiểm tra host/port/user/pass và whitelist IP của nhà cung cấp; hoặc đổi sang slot khác ở màn hình Pool. Nếu proxy vẫn dùng được bình thường thì có thể chỉ URL probe (${PROBE_URL:-https://www.gstatic.com/generate_204}) bị chặn — đổi PROBE_URL trong /etc/sbproxy/env." \
+    "Check host/port/user/pass and the provider's IP allow-list, or switch to another slot on the Pool screen. If the proxy is in fact usable, only the probe URL (${PROBE_URL:-https://www.gstatic.com/generate_204}) may be blocked — set PROBE_URL in /etc/sbproxy/env." \
+    "$bad_why"
 fi
 
 # ---------------------------------------------------------------------------

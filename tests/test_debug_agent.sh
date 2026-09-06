@@ -185,10 +185,14 @@ out="$(report UI_ASSETS="$TMP/absent.css")"
 match "missing UI assets are found"      "$(ids "$out")" 'ui_assets_missing'
 out="$(report WEBAUTH_FILE="$TMP/absent-auth")"
 eq "a missing web account is only a note" "$(sev "$out" webauth_missing)" "info"
-printf '{"ts":1,"probes":{"1":{"state":"fail"},"2":{"state":"ok"}}}\n' > "$HEALTH"
+printf '{"ts":1,"probes":{"1":{"state":"fail","error":"curl exit 7: refused"},"2":{"state":"ok"}}}\n' > "$HEALTH"
 out="$(report)"
 match "a failing proxy is reported"      "$(ids "$out")" 'proxy_fail'
 match "and the SSID is named"            "$(printf '%s' "$out" | jq -r '.findings[] | select(.id == "proxy_fail") | .title')" '1'
+# "fail" alone cannot tell a dead proxy from a probe URL the proxy will not
+# fetch, and those two need opposite fixes.
+match "the probe error travels with it"  "$(printf '%s' "$out" | jq -r '.findings[] | select(.id == "proxy_fail") | .evidence')" 'curl exit 7'
+match "and the probe URL is named"       "$(printf '%s' "$out" | jq -r '.findings[] | select(.id == "proxy_fail") | .detail_en')" 'PROBE_URL'
 printf '{"ts":1,"probes":{}}\n' > "$HEALTH"
 
 echo "== debug-agent: CRLF configuration =="
