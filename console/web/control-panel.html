@@ -544,17 +544,36 @@
     --shadow: none; --shadow-pop: 0 18px 50px rgba(0,0,0,.5);
   }
   :root[data-theme="light"] {
-    --bg: #f5f5f7; --bg-grad: none;
-    --panel: #ffffff; --panel-2: #f2f3f5; --glass: rgba(255,255,255,.9);
-    --border: #d8dade; --border-strong: #bcc0c6;
-    --text: #1d1d1f; --text-dim: #6e6e73; --text-faint: #86868b;
-    --accent: #2c7be5; --accent-2: #0a84ff; --accent-soft: #e5f1ff; --accent-ink: #1a5fb4;
-    --good: #248a3d; --good-soft: #e4f6e8; --warn: #b86e00; --warn-soft: #fff1d6;
-    --crit: #d70015; --crit-soft: #ffe5e7;
+    /* The same page in daylight: a white sheet to read, a grey frame around
+       it, and the one blue that means "this is where you are". */
+    --bg: #eef1f5; --bg-grad: none;
+    --panel: #ffffff; --panel-2: #f4f6f9; --glass: #ffffff;
+    --border: #dde2e9; --border-strong: #c2c9d4;
+    --text: #1f2733; --text-dim: #5b6672; --text-faint: #7c8794;
+    --accent: #2c7be5; --accent-2: #1c66c9; --accent-soft: #e6f0fd; --accent-ink: #1a5fb4;
+    --good: #2f9e56; --good-soft: #e6f5ea; --warn: #b5771a; --warn-soft: #fdf1dd;
+    --crit: #cf3040; --crit-soft: #fce9eb;
     --ring: rgba(44,123,229,.28);
     --shadow: none;
   }
   body { background: var(--bg); }
+
+  /* Nothing here is decoration: no glass, no gradient bars, no lift on hover.
+     A settings page should look the same whether or not the pointer is over
+     it, so what moves means something. */
+  header.top, .backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .stat { padding: 13px 14px; transition: border-color .15s; }
+  .stat::before { display: none; }
+  .stat:hover { transform: none; border-color: var(--border-strong); }
+  .stat .val { font-size: 21px; letter-spacing: -.2px; }
+  .meter > i { background: var(--accent); }
+  .modal { animation: none; }
+  .modal h2 { background: var(--panel); font-size: 15px; }
+  /* One pill shape for every state chip: border, no fill, colour says the rest. */
+  .chip, .live-badge, .hp, .sev, .busychip { border-radius: var(--radius-sm); font-weight: 500; }
+  .sbchip.down { animation: none; }
+  .tab { border-radius: var(--radius-sm); }
+  .tab.active { box-shadow: none; }
 
   /* Sidebar: rows of text, one of them filled. */
   .sidebar { width: 224px; background: var(--panel); border-right: 1px solid var(--border); padding: 0 0 10px; }
@@ -3462,6 +3481,15 @@
   function initTheme() {
     const saved = localStorage.getItem("sbproxy.theme");
     if (saved) document.documentElement.setAttribute("data-theme", saved);
+    updateThemeButton();
+  }
+  // "Theme" told nobody what pressing it would do. The button names the
+  // theme it switches TO, which is also how the operator learns there is one.
+  function updateThemeButton() {
+    const button = document.getElementById("themeBtn");
+    if (!button) return;
+    const dark = (document.documentElement.getAttribute("data-theme") || "dark") === "dark";
+    button.textContent = dark ? pick("☀ Light", "☀ Sáng") : pick("🌙 Dark", "🌙 Tối");
   }
   function toggleTheme() {
     // Dark is the default skin now, so an unset attribute means dark and the
@@ -3470,6 +3498,7 @@
     const next = cur === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("sbproxy.theme", next);
+    updateThemeButton();
   }
 
   setupConfigToolbar();
