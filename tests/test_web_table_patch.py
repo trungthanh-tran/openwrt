@@ -261,5 +261,32 @@ class EveryWriteReachesTheRouterTests(unittest.TestCase):
         self.assertIn("ssids = previous; configDirty = true; render();", self.text)
 
 
+class PlainSkinTests(unittest.TestCase):
+    """The console is skinned as a settings page, and both themes still work."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = PANEL.read_text(encoding="utf-8")
+
+    def test_dark_is_the_default_and_an_explicit_dark_lands_on_it(self):
+        self.assertIn(':root, :root[data-theme="dark"] {', self.text)
+        # The older palette also matches [data-theme="dark"]; the skin has to
+        # come after it, or choosing dark from the toggle undoes the skin.
+        self.assertGreater(self.text.index(':root, :root[data-theme="dark"] {'),
+                           self.text.index(':root[data-theme="dark"] {'))
+
+    def test_light_is_still_reachable(self):
+        self.assertIn(':root[data-theme="light"] {', self.text)
+
+    def test_the_toggle_reads_an_unset_theme_as_dark(self):
+        """Otherwise the first click sets dark on a page that is already dark."""
+        self.assertIn('document.documentElement.getAttribute("data-theme") || "dark"', self.text)
+
+    def test_the_skin_changes_no_behaviour(self):
+        """It is presentation only: no id or handler is renamed by it."""
+        for probe in ('id="pushApplyBtn"', 'id="devicesBtn"', 'id="debugBtn"', 'id="busyChip"'):
+            self.assertIn(probe, self.text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

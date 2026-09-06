@@ -520,6 +520,87 @@
     .wrap { padding-left: 14px; padding-right: 14px; }
     header.top { padding-left: 14px; padding-right: 14px; }
   }
+  /* ---- Plain settings skin -------------------------------------------------
+     A router settings console, not a dashboard: one dark surface, a text-only
+     sidebar whose active row is filled, form rows that read label-left /
+     control-right, and a single green Save against a plain Cancel. Everything
+     here is presentation -- ids, structure and behaviour are untouched -- and
+     it sits last so it wins over the rules above without editing each of them.
+
+     Dark is the default now, which is why the light palette moves under an
+     explicit [data-theme="light"]: the toggle still works both ways. The
+     [data-theme="dark"] selector is repeated here so an explicit choice of
+     dark lands on this palette rather than on the older one above. */
+  :root, :root[data-theme="dark"] {
+    --bg: #10161f; --bg-grad: none;
+    --panel: #172130; --panel-2: #1d2937; --glass: rgba(16,22,31,.86);
+    --border: #26313f; --border-strong: #364354;
+    --text: #e8eef5; --text-dim: #9fb0c3; --text-faint: #7d8ea3;
+    --accent: #2c7be5; --accent-2: #4d95f0; --accent-soft: #17304f; --accent-ink: #8ec1ff;
+    --good: #46b26a; --good-soft: #16301f; --warn: #d99b32; --warn-soft: #33270f;
+    --crit: #e5636f; --crit-soft: #351a1e;
+    --ring: rgba(44,123,229,.45);
+    --radius: 6px; --radius-sm: 4px;
+    --shadow: none; --shadow-pop: 0 18px 50px rgba(0,0,0,.5);
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f5f7; --bg-grad: none;
+    --panel: #ffffff; --panel-2: #f2f3f5; --glass: rgba(255,255,255,.9);
+    --border: #d8dade; --border-strong: #bcc0c6;
+    --text: #1d1d1f; --text-dim: #6e6e73; --text-faint: #86868b;
+    --accent: #2c7be5; --accent-2: #0a84ff; --accent-soft: #e5f1ff; --accent-ink: #1a5fb4;
+    --good: #248a3d; --good-soft: #e4f6e8; --warn: #b86e00; --warn-soft: #fff1d6;
+    --crit: #d70015; --crit-soft: #ffe5e7;
+    --ring: rgba(44,123,229,.28);
+    --shadow: none;
+  }
+  body { background: var(--bg); }
+
+  /* Sidebar: rows of text, one of them filled. */
+  .sidebar { width: 224px; background: var(--panel); border-right: 1px solid var(--border); padding: 0 0 10px; }
+  .side-brand { padding: 16px 18px 14px; margin: 0; }
+  .side-group { padding: 16px 18px 6px; font-size: 10px; }
+  .side-nav { gap: 0; }
+  .side-nav .btn {
+    border-radius: 0; padding: 10px 18px; font-size: 13.5px; font-weight: 500;
+    color: var(--text-dim); border-left: 3px solid transparent;
+  }
+  .side-nav .btn:hover { background: var(--panel-2); color: var(--text); }
+  .side-nav .btn.page-active, .side-nav .btn.action-active {
+    background: var(--accent); color: #fff; border-left-color: var(--accent-2); font-weight: 600;
+  }
+  .side-foot { padding: 12px 18px; }
+
+  /* One flat header, no glass. */
+  header.top { background: var(--panel); border-bottom: 1px solid var(--border); backdrop-filter: none; }
+
+  /* Panels and tables: borders instead of cards. */
+  .tablecard, .stat, .content-block, .modal { box-shadow: none; }
+  .tablecard { border-radius: var(--radius); }
+  thead th { background: transparent; font-size: 10.5px; }
+
+  /* Buttons: one green Save, everything else quiet. */
+  .btn { border-radius: var(--radius-sm); font-weight: 500; }
+  .btn.primary { background: var(--good); color: #fff; box-shadow: none; }
+  .btn.primary:hover { background: #3d9c5c; box-shadow: none; }
+  .btn.ghost { border-color: transparent; color: var(--text-dim); }
+  .btn.ghost:hover { border-color: var(--border-strong); color: var(--text); }
+
+  /* Forms: the label sits beside its control, the way a settings page reads. */
+  input[type=text], input[type=password], input[type=number], select, input[type=search] {
+    border-radius: var(--radius-sm); background: var(--panel-2);
+  }
+  @media (min-width: 760px) {
+    .form .field:not(.two) {
+      grid-template-columns: 180px minmax(0, 1fr);
+      align-items: center; gap: 6px 18px;
+    }
+    .form .field:not(.two) > label { grid-column: 1; margin: 0; font-size: 13px; color: var(--text-dim); }
+    .form .field:not(.two) > :not(label) { grid-column: 2; }
+    /* A hint under a control lines up with the control, not with the label. */
+    .form .field:not(.two) > .sub, .form .field:not(.two) > .derived, .form .field:not(.two) > .err { grid-column: 2; }
+  }
+
 </style>
 </head>
 <body>
@@ -3383,9 +3464,10 @@
     if (saved) document.documentElement.setAttribute("data-theme", saved);
   }
   function toggleTheme() {
-    const cur = document.documentElement.getAttribute("data-theme");
-    const dark = cur === "dark";
-    const next = dark ? "light" : "dark";
+    // Dark is the default skin now, so an unset attribute means dark and the
+    // first click has to go to light -- otherwise it appears to do nothing.
+    const cur = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = cur === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("sbproxy.theme", next);
   }
