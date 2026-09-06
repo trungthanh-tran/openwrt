@@ -701,6 +701,34 @@ case "$ACTION" in
       '{ok:true, interface:$interface, automatic:($interface == "")}')"
     ;;
 
+  debug)
+    # The troubleshooting assistant: one read-only pass over every subsystem,
+    # answered as ranked findings rather than as five screens of raw state.
+    [ "$REQUEST_METHOD" = "GET" ] || json_err "405 Method Not Allowed" "cần GET"
+    OUT="$(cd "$SB_ROOT" && sh scripts/debug-agent.sh report 2>/dev/null)"
+    printf '%s' "$OUT" | jq -e 'type == "object" and (.findings | type == "array")' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "debug-agent trả dữ liệu không hợp lệ"
+    json_ok "$OUT"
+    ;;
+
+  debug_fix)
+    # Apply ONE repair the report offered. The id is checked here for shape and
+    # again by name inside debug-agent.sh, which knows no other repairs -- the
+    # browser never names a command, only a finding.
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    fix_id="$(trim_field "$(jq_r '.id // ""' "$BODY_FILE")")"
+    case "$fix_id" in
+      ""|*[!a-z_]*) json_err "400 Bad Request" "id sửa lỗi không hợp lệ" ;;
+    esac
+    [ "${#fix_id}" -le 32 ] || json_err "400 Bad Request" "id sửa lỗi dài quá 32 ký tự"
+    OUT="$(cd "$SB_ROOT" && sh scripts/debug-agent.sh fix "$fix_id" 2>&1)"
+    printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 \
+      || json_err "500 Internal Server Error" "debug-agent trả dữ liệu không hợp lệ"
+    logger -t sbproxy "debug fix requested: $fix_id" 2>/dev/null || true
+    json_ok "$(printf '%s' "$OUT" | jq -c --arg id "$fix_id" '. + {id: $id}')"
+    ;;
+
   diagnose_ssid)
     # Read-only walk of one SSID's data path; the answer says which link is
     # broken so "connected but no Internet" stops being a guessing game.

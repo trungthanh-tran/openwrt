@@ -453,6 +453,52 @@ ls -l /etc/sing-box/config.json; uci get sing-box.main.user
 > selection and a checkbox you just ticked all survive** a refresh. Re-sorting
 > **moves** the existing nodes rather than re-creating them.
 
+### 5.8 🤖 Troubleshooting assistant (diagnose from the page)
+
+Open **🤖 Troubleshooting assistant** in the Router group. It walks the whole
+router once and answers with a list of **findings**, worst first, each carrying
+its own fix.
+
+The assistant runs **entirely on the router** (`scripts/debug-agent.sh`): no
+Internet, no API key, and nothing leaves the box. Its conclusions are rules
+over local state, not a call to an external AI service.
+
+It follows the order in which faults cascade, so the first finding is usually
+the cause rather than a symptom:
+
+| Area | Example findings |
+|---|---|
+| Dependencies | `sing-box`, `nft`, `iw`, `jq` or `ubus` missing |
+| Configuration | `settings.sh` missing, Windows (CRLF) line endings, invalid `wifi-socks.conf` |
+| Engine | sing-box not running · only seconds old (crash loop) · service `enabled=0` · `permission denied` in the log · cannot read `config.json` |
+| Data path | nftables table `inet sbproxy` missing, fwmark policy route missing, `bridge-nf-call-iptables=1` |
+| Egress | the router has no default route |
+| Agent | the installed agent is older than the code, offline assets missing, no web account |
+| Proxies | which SSIDs healthd last saw failing |
+| Host | wrong clock (breaks TLS), `/overlay` nearly full |
+
+**Fixing.** A finding that can be repaired shows a button; pressing it opens a
+confirmation first — **nothing runs on its own**. Exactly five repairs exist,
+named inside `debug-agent.sh`; the browser can send a name, never a command:
+
+| Button | What it does |
+|---|---|
+| Restart sing-box | `scripts/restart-singbox.sh` — enables the service if it is off, repairs the `config.json` access, restarts, then proves the process really stayed up |
+| Strip the CR characters | removes CRLF from `settings.sh`, `wifi-socks.conf`, `proxy-pools.conf` |
+| Turn bridge-nf off | writes `0` to `/proc/sys/net/bridge/bridge-nf-call-iptables` |
+| Apply | `scripts/apply.sh` — **reloads Wi-Fi**, so connected devices drop for a few seconds (the confirmation says so) |
+| Reinstall the agent | `agent/install-agent.sh` when the installed agent is older than the code |
+
+After a fix the assistant scans again and the main page updates with it; no F5
+anywhere. The command's full output stays in the log box.
+
+By hand on the router (the same data, as JSON):
+
+```sh
+sh /root/sbproxy/scripts/debug-agent.sh report | jq .
+sh /root/sbproxy/scripts/debug-agent.sh fix singbox_restart
+```
+
 ## 6. Feature map: desktop (.exe) ↔ web console
 
 Both fronts talk to the **same agent CGI** on the router, so features are

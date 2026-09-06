@@ -5,6 +5,31 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **🤖 Trợ lý gỡ lỗi ngay trên web console.** Trước đây muốn biết router hỏng ở
+  đâu phải tự đọc thẻ sing-box, health probe, nhật ký và chẩn đoán SSID rồi tự
+  ghép lại. Nay có `scripts/debug-agent.sh`: quét một lượt theo đúng thứ tự lỗi
+  lan ra (gói phụ thuộc → file cấu hình → engine → đường dữ liệu → đường ra →
+  agent → proxy → máy chủ) và trả về danh sách phát hiện xếp nặng trước, nên
+  dòng đầu tiên thường là nguyên nhân gốc chứ không phải hậu quả. Agent thêm
+  hai action `debug` (chỉ đọc) và `debug_fix`.
+
+  Trợ lý chạy **hoàn toàn trên router**: không cần Internet, không cần API key,
+  không dữ liệu nào rời khỏi máy — mọi kết luận là luật trên trạng thái thật
+  của router, không gọi dịch vụ AI bên ngoài.
+
+  Mỗi phát hiện tự mang theo cách sửa. Chỉ có đúng 5 cách sửa được phép
+  (`singbox_restart`, `config_eol`, `bridge_nf`, `apply`, `install_agent`) và
+  tên chúng nằm cứng trong script: trình duyệt chỉ gửi được **tên** một cách
+  sửa, không bao giờ gửi được câu lệnh, và `debug_fix` từ chối mọi id không
+  phải `[a-z_]` trước khi script được gọi. Không có gì tự chạy — mọi nút đều
+  hỏi xác nhận, riêng `apply` nói rõ là sẽ reload WiFi.
+
+  Phát hiện và gợi ý đều song ngữ, viết ngay cạnh luật sinh ra chúng nên hai
+  bản không trôi khỏi nhau. Danh sách được patch theo `id` như các bảng khác:
+  quét lại không dựng lại cả bảng.
+
+
 ## [0.5.27] - 2026-09-06
 
 ### Fixed

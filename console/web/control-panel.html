@@ -328,6 +328,15 @@
   .hp.warnp { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
   .hp.bad { color: var(--crit); background: var(--crit-soft); border-color: transparent; }
   .hp.wait { color: var(--text-faint); }
+  /* assistant severity pills, same vocabulary as the health pills above */
+  .sev { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+         padding: 2px 8px; border-radius: 20px; border: 1px solid transparent; white-space: nowrap; }
+  .sev.crit { color: var(--crit); background: var(--crit-soft); }
+  .sev.warn { color: var(--warn); background: var(--warn-soft); }
+  .sev.info { color: var(--text-dim); background: var(--panel-2); border-color: var(--border); }
+  .findrow td { vertical-align: top; }
+  .findrow details { margin-top: 6px; }
+  .findrow summary { cursor: pointer; color: var(--text-dim); font-size: 12px; }
   .iconbtn.zap { color: var(--accent-ink); }
   .iconbtn.zap:hover { border-color: var(--accent); }
   .conn-status { font-size: 12.5px; padding: 8px 11px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); }
@@ -529,6 +538,7 @@
         <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
         <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
         <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
+        <button class="btn ghost" id="debugBtn" title="Quét lỗi trên router và đề xuất cách sửa">🤖 Trợ lý gỡ lỗi</button>
         <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
       </span>
       </div>
@@ -1040,6 +1050,29 @@
   </div>
 </div>
 
+<div class="backdrop" id="debugBackdrop">
+  <div class="modal" style="max-width:900px">
+    <h2>🤖 Trợ lý gỡ lỗi</h2>
+    <div class="form">
+      <div class="conn-status">Chạy hoàn toàn trên router: không cần Internet, không có dữ liệu nào rời khỏi máy. Mỗi kết luận kèm cách sửa, và chỉ chạy khi bạn bấm xác nhận.</div>
+      <div class="filterbar">
+        <button class="btn primary" id="debugRun">↻ Quét lại</button>
+        <span class="sub" id="debugMeta">—</span>
+      </div>
+      <div class="conn-status" id="debugVerdict">—</div>
+      <div class="tablecard">
+        <div class="tablescroll">
+          <table>
+            <thead><tr><th style="width:96px">Mức độ</th><th>Phát hiện</th><th style="width:210px">Cách sửa</th></tr></thead>
+            <tbody id="debugRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><button class="btn primary" id="debugClose">Đóng</button></div>
+  </div>
+</div>
+
 <!-- Log modal -->
 <div class="backdrop" id="logBackdrop">
   <div class="modal">
@@ -1112,6 +1145,10 @@
     "Không có thiết bị nào đang kết nối.": "No connected devices.", "ẩn danh": "anonymous",
     "Ngẫu nhiên / ẩn danh (02:xx)": "Random / anonymous (02:xx)",
     "Cập nhật agent trên router": "Update the router agent", "Nhật ký": "Logs", "Nhật ký debug": "Debug logs",
+    "Trợ lý gỡ lỗi": "Troubleshooting assistant", "Quét lại": "Scan again",
+    "Mức độ": "Severity", "Phát hiện": "Finding", "Cách sửa": "Fix",
+    "Chạy hoàn toàn trên router: không cần Internet, không có dữ liệu nào rời khỏi máy. Mỗi kết luận kèm cách sửa, và chỉ chạy khi bạn bấm xác nhận.":
+      "It runs entirely on the router: no Internet, and nothing leaves the box. Every finding carries its fix, and a fix runs only when you confirm it.",
     "Log theo ngày, tự xoá sau 7 ngày. File tải về không chứa mật khẩu hoặc token.": "Daily logs are deleted after 7 days. Downloads contain no passwords or tokens.",
     "Ngày log": "Log date", "Tải gói debug": "Download debug report",
     "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Update does not reload Wi-Fi. Click “Push & Apply” to activate changes."
@@ -1150,6 +1187,7 @@
     "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
     "Cập nhật code sbproxy trên router bằng package .tar.gz/.zip": "Update sbproxy on the router using a .tar.gz/.zip package",
     "Xem và tải nhật ký debug 7 ngày": "View and download 7 days of debug logs",
+    "Quét lỗi trên router và đề xuất cách sửa": "Scan the router for faults and offer a fix",
     "Ngày log": "Log date",
     "Mở / đóng menu": "Open / close the menu",
     "Test proxy đang nhập từ router (không cần lưu trước)": "Test the entered proxy from the router (no need to save first)",
@@ -1551,6 +1589,84 @@
       showLog("sing-box restart", { ok: !!d.ok, log: formatSingbox(d) || d.error || "" });
       poll();
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+  }
+
+  // ---- the router's own troubleshooting assistant -------------------------
+  // Everything here is answered by scripts/debug-agent.sh on the router; this
+  // side only renders findings and asks before running the fix each one names.
+  let debugReport = null;
+  const fixLabel = id => ({
+    singbox_restart: pick("Restart sing-box", "Khởi động lại sing-box"),
+    config_eol: pick("Strip the CR characters", "Bỏ ký tự CR"),
+    bridge_nf: pick("Turn bridge-nf off", "Tắt bridge-nf"),
+    apply: pick("Apply (reloads Wi-Fi)", "Áp dụng (reload WiFi)"),
+    install_agent: pick("Reinstall the agent", "Cài lại agent")
+  }[id] || id);
+  const fixWarning = id => ({
+    apply: pick("Wi-Fi is reloaded: connected devices drop for a few seconds.",
+                "WiFi sẽ được reload: thiết bị đang kết nối rớt vài giây."),
+    install_agent: pick("uhttpd is restarted; reload the page afterwards.",
+                        "uhttpd sẽ khởi động lại; sau đó hãy tải lại trang.")
+  }[id] || "");
+
+  function openDebug() {
+    if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
+    showInline("debugBackdrop");
+    if (!debugReport) loadDebug();
+  }
+  function loadDebug() {
+    $("debugMeta").textContent = pick("Scanning…", "Đang quét…");
+    api("debug").then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "debug failed");
+      debugReport = d;
+      renderDebug();
+    }).catch(err => {
+      $("debugMeta").textContent = "";
+      $("debugVerdict").className = "conn-status bad";
+      $("debugVerdict").textContent = pick("Scan failed: ", "Quét lỗi thất bại: ") + err.message;
+    });
+  }
+  function findingTitle(f) { return pick(f.title_en || f.title, f.title); }
+  function findingDetail(f) { return pick(f.detail_en || f.detail, f.detail); }
+  function debugRowCells(f) {
+    const sev = f.severity === "crit" ? pick("CRITICAL", "NGHIÊM TRỌNG")
+              : f.severity === "warn" ? pick("WARNING", "CẢNH BÁO")
+              : pick("NOTE", "GHI CHÚ");
+    const evidence = f.evidence
+      ? `<details><summary>${pick("Router log", "Log của router")}</summary><div class="logbox">${esc(f.evidence)}</div></details>`
+      : "";
+    const action = f.fix
+      ? `<button class="btn ghost" data-fix="${esc(f.fix)}">${esc(fixLabel(f.fix))}</button>`
+      : `<span class="sub">${pick("Manual fix", "Tự xử lý")}</span>`;
+    return `<td><span class="sev ${esc(f.severity)}">${sev}</span></td>
+      <td><b>${esc(findingTitle(f))}</b><div class="sub">${esc(findingDetail(f))}</div>${evidence}</td>
+      <td>${action}</td>`;
+  }
+  function renderDebug() {
+    const d = debugReport;
+    if (!d) return;
+    const when = d.ts ? new Date(d.ts * 1000).toLocaleTimeString() : "";
+    $("debugMeta").textContent = pick(
+      `${d.summary.crit} critical · ${d.summary.warn} warning · ${d.summary.info} note · scanned at ${when}`,
+      `${d.summary.crit} nghiêm trọng · ${d.summary.warn} cảnh báo · ${d.summary.info} ghi chú · quét lúc ${when}`);
+    const verdict = pick(d.verdict_en || d.verdict, d.verdict);
+    $("debugVerdict").className = "conn-status " + (d.summary.crit ? "bad" : d.summary.warn ? "" : "ok");
+    $("debugVerdict").textContent = verdict;
+    patchTable($("debugRows"), d.findings || [], f => f.id, debugRowCells, () => "findrow");
+  }
+  function runDebugFix(fix) {
+    let question = pick(`Run this fix now: ${fixLabel(fix)}?`, `Chạy cách sửa này: ${fixLabel(fix)}?`);
+    const warning = fixWarning(fix);
+    if (warning) question += "\n" + warning;
+    if (!confirm(question)) return;
+    toast(pick("Running the fix…", "Đang sửa…"));
+    api("debug_fix", "POST", { id: fix }).then(d => {
+      if (!d || d.ok === false) throw new Error((d && d.error) || "fix failed");
+      const hint = pick(d.hint_en || d.hint || "", d.hint || "");
+      showLog(pick("Fix: ", "Sửa: ") + fixLabel(fix), { ok: d.ok, log: [d.log, hint].filter(Boolean).join("\n\n") });
+      loadDebug();
+      poll();
+    }).catch(err => toast(pick("Fix failed: ", "Sửa thất bại: ") + err.message));
   }
 
   // Bootstrap actions the CGI accepts without a Bearer header.
@@ -3382,6 +3498,14 @@
   $("dailyLogDate").onchange = e => loadDailyLogs(e.target.value);
   $("dailyLogCopy").onclick = () => copy($("dailyLogBox").textContent);
   $("dailyLogDownload").onclick = downloadDailyLogs;
+  $("debugBtn").onclick = openDebug;
+  $("debugRun").onclick = loadDebug;
+  $("debugClose").onclick = () => hideInline("debugBackdrop");
+  $("debugBackdrop").onclick = e => { if (e.target.id === "debugBackdrop") hideInline("debugBackdrop"); };
+  $("debugRows").onclick = e => {
+    const button = e.target.closest("button[data-fix]");
+    if (button) runDebugFix(button.getAttribute("data-fix"));
+  };
   $("dailyLogClose").onclick = () => hideInline("dailyLogBackdrop");
   $("dailyLogBackdrop").onclick = e => { if (e.target.id === "dailyLogBackdrop") hideInline("dailyLogBackdrop"); };
   $("gwBtn").onclick = openGateway;

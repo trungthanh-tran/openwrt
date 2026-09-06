@@ -44,3 +44,6 @@ sh tests/test_diagnose.sh
 
 echo "===== Client list and device history suite ====="
 sh tests/test_clients.sh
+
+echo "===== Troubleshooting assistant suite ====="
+sh tests/test_debug_agent.sh

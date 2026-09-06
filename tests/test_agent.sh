@@ -104,6 +104,19 @@ printf '{"ok":%s,"running":%s,"pid":4242,"enabled":true,"config_ok":true,"restar
 exit 0
 SH
 
+cat > "$SB_ROOT/scripts/debug-agent.sh" <<'SH'
+#!/bin/sh
+printf 'debug-agent:%s:%s\n' "${1:-}" "${2:-}" >> "$CALLS"
+case "${1:-}" in
+  report)
+    [ "${DEBUG_BAD_JSON:-0}" = 1 ] && { echo 'not json'; exit 0; }
+    printf '{"ok":true,"ts":1,"summary":{"crit":1,"warn":0,"info":0},"healthy":false,"verdict":"v","verdict_en":"v","findings":[{"id":"singbox_down","severity":"crit","fix":"singbox_restart","title":"t","title_en":"t","detail":"d","detail_en":"d","evidence":""}]}\n'
+    ;;
+  fix) printf '{"ok":true,"changed":true,"log":"fixed %s","hint":"","hint_en":""}\n' "${2:-}" ;;
+esac
+exit 0
+SH
+
 cat > "$SB_ROOT/scripts/switch-gateway.sh" <<'SH'
 #!/bin/sh
 printf 'switch-gateway:%s:%s
@@ -334,6 +347,39 @@ eq "a sing-box that stays down is ok:false, not an HTTP error" "$(json_value "$o
 contains "and still a 200 so the hint reaches the console" "$out" 'Status: 200 OK'
 out="$(run_agent POST 'action=restart_singbox' '' '{}')"
 contains "restart_singbox needs the bearer" "$out" 'Status: 401 Unauthorized'
+
+echo "== debug assistant =="
+out="$(auth_run POST 'action=debug' '{}')"
+contains "debug requires GET" "$out" 'Status: 405 Method Not Allowed'
+reset_calls
+out="$(auth_run GET 'action=debug')"
+contains "debug answers 200" "$out" 'Status: 200 OK'
+eq "the findings are relayed" "$(json_value "$out" '.findings[0].id')" 'singbox_down'
+eq "the assistant ran once" "$(grep -c '^debug-agent:report:$' "$CALLS")" "1"
+out="$(run_agent GET 'action=debug' '')"
+contains "debug needs the bearer" "$out" 'Status: 401 Unauthorized'
+export DEBUG_BAD_JSON=1
+out="$(auth_run GET 'action=debug')"
+unset DEBUG_BAD_JSON
+contains "a broken assistant is an error, not garbage" "$out" 'Status: 500 Internal Server Error'
+
+out="$(auth_run GET 'action=debug_fix')"
+contains "debug_fix requires POST" "$out" 'Status: 405 Method Not Allowed'
+reset_calls
+out="$(auth_run POST 'action=debug_fix' '{"id":"singbox_restart"}')"
+contains "debug_fix answers 200" "$out" 'Status: 200 OK'
+eq "the repair id comes back" "$(json_value "$out" '.id')" 'singbox_restart'
+eq "and only that repair ran" "$(grep -c '^debug-agent:fix:singbox_restart$' "$CALLS")" "1"
+# The browser may name only a repair. Anything that could reach a shell -- a
+# path, a semicolon, an option -- is refused before the script is started.
+reset_calls
+for bad in '{"id":"../../bin/sh"}' '{"id":"restart; rm -rf /"}' '{"id":""}' '{"id":"UPPER"}' '{"id":"a b"}'; do
+  out="$(auth_run POST 'action=debug_fix' "$bad")"
+  contains "debug_fix refuses $bad" "$out" 'Status: 400 Bad Request'
+done
+eq "and never started the assistant" "$(grep -c '^debug-agent:fix' "$CALLS")" "0"
+out="$(run_agent POST 'action=debug_fix' '' '{"id":"singbox_restart"}')"
+contains "debug_fix needs the bearer" "$out" 'Status: 401 Unauthorized'
 
 echo "== agent status and read-only endpoints =="
 cat > "$CONF" <<'EOF'

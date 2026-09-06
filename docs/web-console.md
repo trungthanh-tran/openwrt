@@ -467,6 +467,51 @@ ls -l /etc/sing-box/config.json; uci get sing-box.main.user
 > đang bôi đen, và không mất checkbox vừa tick** giữa hai lần làm mới. Đổi thứ
 > tự sắp xếp cũng chỉ **di chuyển** node sẵn có.
 
+### 5.9 🤖 Trợ lý gỡ lỗi (chẩn đoán ngay trên web)
+
+Mở **🤖 Trợ lý gỡ lỗi** trong nhóm Router. Nó quét một lượt toàn bộ router và
+trả về danh sách **phát hiện**, nặng nhất xếp trước, mỗi dòng kèm cách sửa.
+
+Trợ lý chạy **hoàn toàn trên router** (`scripts/debug-agent.sh`): không cần
+Internet, không cần API key, không có dữ liệu nào rời khỏi máy. Nó suy luận
+theo luật trên trạng thái thật của router, chứ không gọi dịch vụ AI bên ngoài.
+
+Nó đi theo đúng thứ tự mà lỗi lan ra, nên phát hiện đầu tiên thường là nguyên
+nhân gốc chứ không phải hậu quả:
+
+| Nhóm | Ví dụ phát hiện |
+|---|---|
+| Gói phụ thuộc | thiếu `sing-box`, `nft`, `iw`, `jq`, `ubus` |
+| File cấu hình | `settings.sh` không tồn tại, cấu hình lưu kiểu Windows (CRLF), `wifi-socks.conf` sai cú pháp |
+| Engine | sing-box không chạy · vừa restart (crash-loop) · service bị `enabled=0` · log có `permission denied` · không đọc được `config.json` |
+| Đường dữ liệu | thiếu bảng nftables `inet sbproxy`, thiếu policy route fwmark, `bridge-nf-call-iptables=1` |
+| Đường ra | router không có default route |
+| Agent | agent đã cài cũ hơn code trên router, thiếu asset offline, chưa có tài khoản web |
+| Proxy | SSID nào đang fail theo lần đo gần nhất của healthd |
+| Máy chủ | đồng hồ sai (hỏng TLS), `/overlay` gần đầy |
+
+**Sửa lỗi.** Dòng nào sửa được sẽ có nút; bấm vào là hiện hộp xác nhận, **không
+có gì tự chạy**. Chỉ đúng 5 cách sửa được phép, tên chúng nằm cứng trong
+`debug-agent.sh` — trình duyệt chỉ gửi được tên, không gửi được câu lệnh:
+
+| Nút | Việc nó làm |
+|---|---|
+| Khởi động lại sing-box | `scripts/restart-singbox.sh` — bật service nếu đang tắt, sửa quyền `config.json`, restart rồi xác nhận tiến trình sống thật |
+| Bỏ ký tự CR | bỏ CRLF trong `settings.sh`, `wifi-socks.conf`, `proxy-pools.conf` |
+| Tắt bridge-nf | ghi `0` vào `/proc/sys/net/bridge/bridge-nf-call-iptables` |
+| Áp dụng | `scripts/apply.sh` — **reload WiFi**, thiết bị đang kết nối rớt vài giây (hộp xác nhận có nói rõ) |
+| Cài lại agent | `agent/install-agent.sh` khi bản đã cài cũ hơn code trên router |
+
+Sau khi sửa, trợ lý tự quét lại và trang chính cũng cập nhật theo, không cần
+F5. Kết quả đầy đủ của lệnh sửa hiện trong hộp log để đọc lại.
+
+Chạy tay trên router (cùng dữ liệu, dạng JSON):
+
+```sh
+sh /root/sbproxy/scripts/debug-agent.sh report | jq .
+sh /root/sbproxy/scripts/debug-agent.sh fix singbox_restart
+```
+
 ## 6. Map tính năng: desktop (.exe) ↔ web console
 
 Cả hai bản nói chuyện với **cùng một agent CGI** trên router, nên tính năng là
@@ -478,6 +523,7 @@ tương đương trừ vài mục ghi chú dưới đây.
 | Cài router từ đầu qua SSH (đẩy code, deps, agent) | ✅ | ❌ (việc của desktop/CLI) | — (SSH) |
 | Thêm / sửa / xoá / nhân bản SSID | ✅ | ✅ | — (local) + `save_conf` |
 | Nhập / xuất `wifi-socks.conf`, JSON | ✅ | ✅ | `get_conf` |
+| 🤖 Trợ lý gỡ lỗi (quét + sửa có xác nhận) | ❌ | ✅ | `debug`, `debug_fix` |
 | Đẩy & Áp: dry-run → ghi → apply | ✅ | ✅ | `dryrun_conf`, `save_conf`, `apply` |
 | Đổi SOCKS 1 SSID không reload WiFi (⚡) | ✅ | ✅ | `set_sock` |
 | Đổi MAC/BSSID ngẫu nhiên, chọn hãng (🎲) | ✅ | ✅ | `rotate_mac` |
