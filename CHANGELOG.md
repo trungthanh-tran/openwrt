@@ -5,7 +5,18 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.28] - 2026-09-06
+
 ### Added
+- **Mọi thao tác WiFi / proxy / thiết bị đều apply thẳng lên router.** Sửa WiFi
+  vốn đã tự apply, nhưng phần còn lại thì không giống vậy: đổi SOCKS, ghim
+  proxy cho một thiết bị, rebalance client của pool, đổi MAC, ngắt/cấm/bỏ cấm
+  thiết bị và đổi đường ra — mỗi cái một kiểu toast, một kiểu báo lỗi, không
+  dấu hiệu nào cho biết router đang làm; hai trong số đó đổ nguyên cục JSON ra
+  hộp log khi bị từ chối. Nay tất cả đi qua `routerWrite()`: bật chip chờ, lặp
+  lại đúng lời router nói khi `ok:false`, rồi làm mới đúng thứ vừa đổi (danh
+  sách thiết bị, pool, đường ra). Không còn thao tác nào là sửa cục bộ chờ
+  push sau.
 - **Chip "đang chạy" cho mọi thao tác ghi lên router.** Apply mất vài giây mà
   dấu hiệu duy nhất là một toast đã tắt, nên người dùng không biết router đang
   làm hay cú bấm bị rơi — và không có gì ngăn bấm Apply lần nữa vào giữa lần
@@ -16,32 +27,6 @@ Ngày theo định dạng YYYY-MM-DD.
   lỗi cũng trả trang về đúng như khi thành công. Lưu pool giờ poll lại sau khi
   lưu: `pool.sh` có dựng lại sing-box + nftables, nên màn hình pool từng để lại
   bức tranh sức khoẻ cũ.
-
-### Fixed
-- **"Error: save_pool failed" và những thông báo trống rỗng khác.** Thêm proxy
-  vào pool báo đúng một câu đó, trong khi lý do đã nằm sẵn trong phản hồi:
-  `save_pool` trả `{ok, rc, log}` với `log` là output của script, còn console
-  chỉ đọc `.error` — trường mà action này không bao giờ đặt. Apply, dry-run và
-  bước ghi conf cũng rơi về "apply failed" mỗi khi router in nhiều dòng. Nay
-  `routerReason()` lấy đúng dòng báo lỗi (dò ngược từ cuối, vì script in tiến
-  trình trước và lý do sau) rồi cắt vừa một toast.
-- **Ô sức khoẻ đỏ chỉ ghi "fail".** healthd vốn đã ghi lại lý do (mã lỗi curl +
-  dòng lỗi đầu tiên, mật khẩu đã che). Nay hiện trong tooltip của ô, có dấu ⓘ
-  khi có lý do; ô xanh cũng cho biết HTTP code và độ trễ.
-
-### Changed
-- **`WIFI_COUNTRY` không còn là điều kiện chặn.** Router có `settings.sh` mất
-  key này thì **mọi đường ghi đều dừng** — apply, đổi pool proxy, xoá SSID, cả
-  "reset toàn bộ" — vì đường nào cũng đi qua `validate_settings`, và nó từ chối
-  chạy với lỗi về một thiết lập người dùng chưa từng đụng tới, trong khi radio
-  vẫn phát bình thường với mã quốc gia của chính nó. Nay: giá trị được trim +
-  viết hoa (`"vn "` = `VN`), giá trị lạ chỉ cảnh báo rồi bị bỏ qua, và `apply`
-  chỉ ghi mã quốc gia cho radio **khi có mã để ghi** — không bao giờ xoá mã
-  đang có. Đặt sai mã vẫn là vấn đề pháp lý, nên tài liệu bảo mật vẫn khuyên
-  đặt đúng; nhưng đó là quyết định của người vận hành, không phải lý do để
-  công cụ từ chối xoá một SSID.
-
-### Added
 - **🤖 Trợ lý gỡ lỗi ngay trên web console.** Trước đây muốn biết router hỏng ở
   đâu phải tự đọc thẻ sing-box, health probe, nhật ký và chẩn đoán SSID rồi tự
   ghép lại. Nay có `scripts/debug-agent.sh`: quét một lượt theo đúng thứ tự lỗi
@@ -65,6 +50,47 @@ Ngày theo định dạng YYYY-MM-DD.
   bản không trôi khỏi nhau. Danh sách được patch theo `id` như các bảng khác:
   quét lại không dựng lại cả bảng.
 
+### Changed
+- **Giao diện phẳng kiểu trang settings.** Console trước đây trông như một
+  dashboard (card bo tròn, đổ bóng, nút pill trong sidebar) trong khi việc cần
+  làm là việc của một trang settings: tìm mục bên trái, sửa một ô, lưu. Nay:
+  một nền tối mặc định, sidebar chỉ chữ với dòng đang chọn được tô, panel viền
+  thay vì card, form đọc theo kiểu nhãn-trái / ô-phải, một nút Save xanh lá và
+  Cancel im lặng. Chế độ sáng được thiết kế lại cho đúng skin này thay vì dùng
+  lại bảng màu cũ, mọi component bỏ phần trang trí thừa (gradient trên stat
+  card, glass blur sau header, hiệu ứng nhấc khi hover, chip nhấp nháy), và nút
+  Theme ghi rõ nó chuyển sang **Sáng** hay **Tối**. Chỉ đổi trình bày: id,
+  handler và cấu trúc giữ nguyên.
+- **`WIFI_COUNTRY` không còn là điều kiện chặn.** Router có `settings.sh` mất
+  key này thì **mọi đường ghi đều dừng** — apply, đổi pool proxy, xoá SSID, cả
+  "reset toàn bộ" — vì đường nào cũng đi qua `validate_settings`, và nó từ chối
+  chạy với lỗi về một thiết lập người dùng chưa từng đụng tới, trong khi radio
+  vẫn phát bình thường với mã quốc gia của chính nó. Nay: giá trị được trim +
+  viết hoa (`"vn "` = `VN`), giá trị lạ chỉ cảnh báo rồi bị bỏ qua, và `apply`
+  chỉ ghi mã quốc gia cho radio **khi có mã để ghi** — không bao giờ xoá mã
+  đang có. Đặt sai mã vẫn là vấn đề pháp lý, nên tài liệu bảo mật vẫn khuyên
+  đặt đúng; nhưng đó là quyết định của người vận hành, không phải lý do để
+  công cụ từ chối xoá một SSID.
+
+### Fixed
+- **Ô sức khoẻ đỏ vì proxy thật sự là `127.0.0.1:1080`.** Log của router lặp
+  lại `health idx=1 endpoint=127.0.0.1:1080 state=fail` cho cả ba SSID. Form
+  "Thêm WiFi" điền sẵn `127.0.0.1` làm host proxy, nên người dùng nào khai
+  proxy trong pool rồi để nguyên dòng đó sẽ có outbound mặc định trỏ về chính
+  router: healthd probe nó và báo đỏ mãi mãi, còn thiết bị **chưa ghim vào
+  slot pool** thì không có mạng thật. Nay form không gợi ý địa chỉ nào nữa,
+  healthd ghi kèm endpoint đã probe (console hiện trong tooltip), và trợ lý gỡ
+  lỗi báo proxy loopback là lỗi nghiêm trọng kèm hậu quả của nó.
+- **"Error: save_pool failed" và những thông báo trống rỗng khác.** Thêm proxy
+  vào pool báo đúng một câu đó, trong khi lý do đã nằm sẵn trong phản hồi:
+  `save_pool` trả `{ok, rc, log}` với `log` là output của script, còn console
+  chỉ đọc `.error` — trường mà action này không bao giờ đặt. Apply, dry-run và
+  bước ghi conf cũng rơi về "apply failed" mỗi khi router in nhiều dòng. Nay
+  `routerReason()` lấy đúng dòng báo lỗi (dò ngược từ cuối, vì script in tiến
+  trình trước và lý do sau) rồi cắt vừa một toast.
+- **Ô sức khoẻ đỏ chỉ ghi "fail".** healthd vốn đã ghi lại lý do (mã lỗi curl +
+  dòng lỗi đầu tiên, mật khẩu đã che). Nay hiện trong tooltip của ô, có dấu ⓘ
+  khi có lý do; ô xanh cũng cho biết HTTP code và độ trễ.
 
 ## [0.5.27] - 2026-09-06
 
