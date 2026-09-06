@@ -94,8 +94,8 @@ sh scripts/preflight.sh
 - **valid interface combinations**: số AP tối đa mỗi radio. Số SSID định tạo
   phải ≤ số này.
 
-Đặt luôn mã quốc gia trong `config/settings.sh` (bắt buộc):
-`WIFI_COUNTRY="VN"`.
+Mã quốc gia trong `config/settings.sh` là **tuỳ chọn**: đặt `WIFI_COUNTRY="VN"`
+thì apply ghi mã đó cho cả hai radio, để trống thì radio giữ nguyên mã sẵn có.
 
 ### Bước 4 — Cài và khởi tạo (3 lệnh)
 
@@ -568,5 +568,5 @@ trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 | Agent cũ không có action `login` | Cập nhật agent (⬆ Cập nhật bằng token, hoặc `self-update.sh`), hoặc đăng nhập bằng token. |
 | `Không đăng nhập được: Unexpected token 'U' … is not valid JSON` (bản ≤ 0.5.26) | uhttpd trả về text thay vì JSON, gần như luôn là **router chưa cài agent**. Từ 0.5.27 web console báo thẳng: cài bằng `sh /root/sbproxy/agent/install-agent.sh`, hoặc dùng **sbproxy Web Deploy → Cài / Cập nhật**. |
 | `HTTP 5xx: phản hồi không phải JSON — …` | Đọc đoạn nội dung in kèm: đó là nguyên văn router trả về (uhttpd lỗi, proxy chặn, agent crash). Kiểm tra `logread -e uhttpd` và `ls -l /www/cgi-bin/sbproxy`. |
-| Preflight báo `WIFI_COUNTRY must be a two-letter uppercase country code` dù file ghi `WIFI_COUNTRY="VN"` | File `config/settings.sh` lưu kiểu Windows (CRLF): giá trị thật là `VN` + ký tự xuống dòng. Từ 0.5.27 lib tự bỏ CR và chỉ cảnh báo; sửa hẳn bằng `sed -i 's/\r$//' /root/sbproxy/config/settings.sh`. Thông báo lỗi mới in kèm giá trị đọc được. |
+| `WIFI_COUNTRY must be a two-letter uppercase country code` (bản ≤ 0.5.27) chặn apply / xoá SSID / đổi pool / reset | Từ 0.5.28 mã quốc gia không còn là điều kiện chặn: giá trị sai chỉ cảnh báo và radio giữ nguyên mã sẵn có. Nếu vẫn thấy lỗi này thì router đang chạy bản cũ — cập nhật rồi thử lại. |
 | `[WARN] … has Windows (CRLF) line endings` cho `wifi-socks.conf` / `proxy-pools.conf` | Chạy đúng lệnh `sed` in kèm cảnh báo. Hai file này được nhiều script đọc trực tiếp nên không tự sửa. |

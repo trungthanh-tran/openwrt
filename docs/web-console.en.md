@@ -79,8 +79,9 @@ Two lines matter:
 - **valid interface combinations**: the real maximum number of APs per radio.
   Plan for that many SSIDs or fewer.
 
-Set the country code in `config/settings.sh` too (required):
-`WIFI_COUNTRY="VN"`.
+The country code in `config/settings.sh` is **optional**: set `WIFI_COUNTRY="VN"`
+and apply writes it to both radios, leave it empty and the radios keep the code
+they already have.
 
 ### Step 4 — Install and initialise (3 commands)
 
@@ -553,5 +554,5 @@ column above, so removing one of these features turns the suite red.
 | An old agent has no `login` action | Update the agent (⬆ Update with a token, or `self-update.sh`), or log in with the token. |
 | `Cannot log in: Unexpected token 'U' … is not valid JSON` (≤ 0.5.26) | uhttpd answered with text instead of JSON, which almost always means **the agent is not installed**. From 0.5.27 the console says so: install it with `sh /root/sbproxy/agent/install-agent.sh`, or use **sbproxy Web Deploy → Install / Update**. |
 | `HTTP 5xx: the answer is not JSON — …` | Read the quoted body: it is what the router actually sent (a uhttpd error, a proxy, a crashed agent). Check `logread -e uhttpd` and `ls -l /www/cgi-bin/sbproxy`. |
-| Preflight says `WIFI_COUNTRY must be a two-letter uppercase country code` although the file reads `WIFI_COUNTRY="VN"` | `config/settings.sh` was saved with Windows (CRLF) endings, so the value is `VN` plus a carriage return. From 0.5.27 the library strips it and only warns; fix the file itself with `sed -i 's/\r$//' /root/sbproxy/config/settings.sh`. The new message also prints the value it read. |
+| `WIFI_COUNTRY must be a two-letter uppercase country code` (≤ 0.5.27) blocks apply / deleting an SSID / pool changes / reset | From 0.5.28 the country code is no longer a gate: a bad value only warns and the radios keep the code they already have. Still seeing it means the router runs the older code — update and try again. |
 | `[WARN] … has Windows (CRLF) line endings` for `wifi-socks.conf` / `proxy-pools.conf` | Run the `sed` command printed with the warning. A dozen scripts read those files directly, so they are never rewritten automatically. |

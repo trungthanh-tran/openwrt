@@ -33,8 +33,10 @@ fi
 TMP="/tmp/sbproxy-uci.$$"
 : > "$TMP"; trap 'rm -rf "$TMP" "${STAGE:-}"' EXIT INT TERM
 {
-  echo "set wireless.$RADIO_2G.country=$WIFI_COUNTRY"
-  echo "set wireless.$RADIO_5G.country=$WIFI_COUNTRY"
+  if radio_country_set; then
+    echo "set wireless.$RADIO_2G.country=$WIFI_COUNTRY"
+    echo "set wireless.$RADIO_5G.country=$WIFI_COUNTRY"
+  fi
 } >> "$TMP"
 emit_stale_uci >> "$TMP"
 emit_all() { emit_uci_one "$@" >> "$TMP"; }

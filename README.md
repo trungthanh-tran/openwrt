@@ -51,7 +51,7 @@ control screens. Nothing else has to be installed on your computer.
 cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
 vi config/wifi-socks.conf
-vi config/settings.sh          # set radio mapping and WIFI_COUNTRY
+vi config/settings.sh          # set the radio mapping (WIFI_COUNTRY is optional)
 sh scripts/preflight.sh
 sh scripts/install-deps.sh
 DRYRUN=1 sh scripts/apply.sh | less

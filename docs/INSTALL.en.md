@@ -21,7 +21,7 @@ vi config/wifi-socks.conf
 vi config/settings.sh
 ```
 
-Set `RADIO_2G`, `RADIO_5G`, and the required two-letter `WIFI_COUNTRY`. Verify the actual BSSID limit with `iw list`.
+Set `RADIO_2G` and `RADIO_5G`. `WIFI_COUNTRY` is optional: a valid two-letter code is written to both radios, and an empty one leaves the country OpenWrt already has in place. Verify the actual BSSID limit with `iw list`.
 
 ## 2. Preflight and dependencies
 

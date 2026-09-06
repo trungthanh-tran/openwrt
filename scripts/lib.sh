@@ -89,6 +89,11 @@ check_crlf() {
   warn "$2 has Windows (CRLF) line endings; values end with a carriage return. Fix it with: sed -i 's/\r\$//' $1"
 }
 
+# Whether apply should set a country on the radios at all. An empty
+# WIFI_COUNTRY leaves whatever OpenWrt has in place: the project never clears a
+# regulatory setting it cannot supply.
+radio_country_set() { case "${WIFI_COUNTRY:-}" in [A-Z][A-Z]) return 0 ;; *) return 1 ;; esac; }
+
 validate_settings() {
   # Without this file every setting reads as unset, and the first one checked
   # (WIFI_COUNTRY) took the blame for it.
@@ -96,14 +101,16 @@ validate_settings() {
   [ "${SETTINGS_CRLF:-0}" = "1" ] && warn "config/settings.sh has Windows (CRLF) line endings; it was read without them. Fix it once with: sed -i 's/\r\$//' $SETTINGS"
   check_crlf "$CONF" "config/wifi-socks.conf"
   check_crlf "$POOLS" "config/proxy-pools.conf"
-  case "${WIFI_COUNTRY:-}" in
-    [A-Z][A-Z]) : ;;
-    *)
-      # Showing the value turns "your file is wrong" into something the
-      # operator can act on -- an empty line, a lowercase code and a stray
-      # character all read the same in the old message.
-      if [ -n "${WIFI_COUNTRY:-}" ]; then _vs_shown="'$WIFI_COUNTRY'"; else _vs_shown="unset"; fi
-      die "WIFI_COUNTRY must be a two-letter uppercase country code in $SETTINGS (for example, VN); it is currently $_vs_shown." ;;
+  # The country code is no longer a gate. Refusing to run over it stopped
+  # apply, pool changes, deleting an SSID and reset alike on a router whose
+  # settings.sh had merely lost the key, while the radios themselves were
+  # perfectly happy. "vn " and "VN" mean the same thing, and an unusable value
+  # means "leave the radios' own country alone" -- see radio_country_set.
+  WIFI_COUNTRY="$(printf '%s' "${WIFI_COUNTRY:-}" | tr -d ' \r\t' | tr 'a-z' 'A-Z')"
+  case "$WIFI_COUNTRY" in
+    ''|[A-Z][A-Z]) : ;;
+    *) warn "WIFI_COUNTRY='$WIFI_COUNTRY' in $SETTINGS is not a two-letter code; the radios keep the country they already have."
+       WIFI_COUNTRY="" ;;
   esac
   [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 only supports IPV6_MODE=disable."
   # Empty means "use the built-in default", the same as everywhere else here.

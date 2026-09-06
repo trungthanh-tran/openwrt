@@ -36,7 +36,9 @@ Chỉnh tunables:
 vi config/settings.sh
 ```
 - `RADIO_2G` / `RADIO_5G`: **phải khớp** phần cứng — xác nhận ở bước 3.
-- `WIFI_COUNTRY`: **bắt buộc**, mã ISO 2 chữ nơi router hoạt động (ví dụ `VN`).
+- `WIFI_COUNTRY`: tuỳ chọn, mã ISO 2 chữ nơi router hoạt động (ví dụ `VN`).
+  Có giá trị hợp lệ thì apply ghi mã đó cho cả hai radio; để trống thì radio
+  giữ nguyên mã OpenWrt đang dùng — không bao giờ bị xoá.
 - `BSSID_LIMIT`: xem `iw list`.
 - `ZONE_INPUT`: để `ACCEPT` (mặc định, chạy chắc). Xem giải thích trong file.
 

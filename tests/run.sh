@@ -140,12 +140,39 @@ fi
 out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'validate_settings')"
 nomatch "a plain settings.sh is not accused of CRLF" "$out" 'CRLF'
 
-# The old rejection described the rule only, so an empty value, a lowercase
-# code and a stray character all produced the same sentence.
-out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'WIFI_COUNTRY=vn; validate_settings')"
-match "a rejected country code is quoted back" "$out" "currently 'vn'"
-out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'unset WIFI_COUNTRY; validate_settings')"
-match "a missing country code says so"         "$out" 'currently unset'
+# WIFI_COUNTRY is not a gate. Refusing to run over it stopped apply, pool
+# changes, deleting an SSID and reset alike on a router whose settings.sh had
+# merely lost the key, while its radios were perfectly happy.
+if run_settings "$CRLF_DIR/lf-settings.sh" 'unset WIFI_COUNTRY; validate_settings' >/dev/null 2>&1; then
+  ok "a missing country code no longer stops anything"
+else
+  no "a missing country code no longer stops anything"
+fi
+out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'WIFI_COUNTRY=" vn "; validate_settings; printf "[%s]" "$WIFI_COUNTRY"')"
+match "spacing and case are normalised" "$out" '\[VN\]'
+out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'WIFI_COUNTRY="Vietnam"; validate_settings; printf "[%s]" "$WIFI_COUNTRY"')"
+match "an unusable value only warns"    "$out" 'not a two-letter code'
+match "and is dropped, not guessed at"  "$out" '\[\]'
+if run_settings "$CRLF_DIR/lf-settings.sh" 'WIFI_COUNTRY="Vietnam"; validate_settings' >/dev/null 2>&1; then
+  ok "and it still does not stop the run"
+else
+  no "and it still does not stop the run"
+fi
+
+# What apply writes: a country only when there is one to write. Clearing a
+# regulatory setting the project cannot supply would be worse than leaving it.
+if run_lib 'WIFI_COUNTRY=VN; radio_country_set' >/dev/null 2>&1; then
+  ok "a valid code is pushed to the radios"
+else
+  no "a valid code is pushed to the radios"
+fi
+if run_lib 'WIFI_COUNTRY=""; radio_country_set' >/dev/null 2>&1; then
+  no "an empty code leaves the radios alone"
+else
+  ok "an empty code leaves the radios alone"
+fi
+match "apply only emits a country when it has one" \
+  "$(cat "$ROOT/scripts/apply.sh")" 'if radio_country_set; then'
 
 # A router whose config/ never arrived reported the country rule instead.
 out="$(run_settings "$CRLF_DIR/absent-settings.sh" 'validate_settings')"

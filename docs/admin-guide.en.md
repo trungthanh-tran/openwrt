@@ -94,7 +94,7 @@ See [../console/desktop/README.md](../console/desktop/README.md).
 
 ## Installation and acceptance
 
-Follow [INSTALL.en.md](INSTALL.en.md), then complete [TESTING.en.md](TESTING.en.md). Do not bypass preflight, staged validation, or the first dry-run. Set `WIFI_COUNTRY` to the router's real operating country and verify radio mapping with `iw`/UCI rather than assuming `radio0` is 2.4 GHz.
+Follow [INSTALL.en.md](INSTALL.en.md), then complete [TESTING.en.md](TESTING.en.md). Do not bypass preflight, staged validation, or the first dry-run. Set `WIFI_COUNTRY` to the router's real operating country -- it is optional for the tooling, but leaving the radios on a wrong country is a regulatory problem of its own -- and verify radio mapping with `iw`/UCI rather than assuming `radio0` is 2.4 GHz.
 
 ## Local agent
 

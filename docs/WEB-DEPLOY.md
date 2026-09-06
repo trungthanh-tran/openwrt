@@ -108,7 +108,8 @@ Kiểm tra hai mục trong kết quả:
   `RADIO_2G` và `RADIO_5G` trong `config/settings.sh`.
 - `valid interface combinations` cho biết số SSID tối đa trên mỗi radio.
 
-Đặt `WIFI_COUNTRY` thành mã quốc gia nơi router hoạt động, ví dụ:
+Nếu muốn sbproxy đặt mã quốc gia cho radio (tuỳ chọn — bỏ trống thì giữ
+nguyên mã router đang dùng):
 
 ```sh
 sed -i 's/^WIFI_COUNTRY=.*/WIFI_COUNTRY="VN"/' config/settings.sh
@@ -324,7 +325,7 @@ unset TOKEN
 | Thiết bị có Wi-Fi nhưng không có mạng | Chạy Chẩn đoán trên SSID; kiểm tra health của slot proxy và default route. |
 | Apply lỗi hoặc mất mạng | Cắm LAN dây, chạy `cd /root/sbproxy && sh scripts/rollback.sh`. |
 | Quên mật khẩu web | Chạy `sbproxy-webauth set admin` qua SSH. |
-| Dừng ở bước **Chạy preflight** với `WIFI_COUNTRY must be a two-letter uppercase country code` | `config/settings.sh` trên router lưu kiểu Windows (CRLF). Bản 0.5.27 trở đi tự chuẩn hoá khi đẩy code; nếu đang dùng bản cũ: `sed -i 's/\r$//' /root/sbproxy/config/settings.sh`. |
+| Dừng ở bước **Chạy preflight** với `WIFI_COUNTRY must be a two-letter uppercase country code` | Router đang chạy bản ≤ 0.5.27, ở đó mã quốc gia là điều kiện chặn. Bản 0.5.28 bỏ hẳn: giá trị sai chỉ cảnh báo. Tạm thời: `sed -i 's/^WIFI_COUNTRY=.*/WIFI_COUNTRY="VN"/' /root/sbproxy/config/settings.sh`. |
 | Bước **Chạy preflight** hiện `bỏ qua preflight lỗi: …` | Đúng như thiết kế từ 0.5.27 với router **đã cài**: cập nhật web/agent không đụng Wi-Fi nên không bị cấu hình cũ chặn. Vẫn nên sửa lỗi in kèm trước lần apply tiếp theo. |
 | Web console báo `Unexpected token 'U' … is not valid JSON` khi đăng nhập | Agent chưa được cài (deploy dừng trước bước **Cài / cập nhật agent**). Chạy lại **Cài / Cập nhật**, hoặc SSH `sh /root/sbproxy/agent/install-agent.sh`. |
 

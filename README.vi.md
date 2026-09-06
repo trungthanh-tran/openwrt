@@ -107,7 +107,7 @@ cd /root/sbproxy
 cp config/wifi-socks.conf.example config/wifi-socks.conf
 vi config/wifi-socks.conf        # điền WiFi + SOCKS của bạn
 vi config/settings.sh            # chỉnh RADIO_2G/RADIO_5G cho đúng
-# bắt buộc đặt WIFI_COUNTRY (ví dụ VN) trong settings.sh
+# WIFI_COUNTRY (ví dụ VN) là tuỳ chọn: bỏ trống thì radio giữ mã sẵn có
 
 # 1. Kiểm tra môi trường (không đổi gì)
 sh scripts/preflight.sh

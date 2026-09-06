@@ -5,6 +5,18 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Changed
+- **`WIFI_COUNTRY` không còn là điều kiện chặn.** Router có `settings.sh` mất
+  key này thì **mọi đường ghi đều dừng** — apply, đổi pool proxy, xoá SSID, cả
+  "reset toàn bộ" — vì đường nào cũng đi qua `validate_settings`, và nó từ chối
+  chạy với lỗi về một thiết lập người dùng chưa từng đụng tới, trong khi radio
+  vẫn phát bình thường với mã quốc gia của chính nó. Nay: giá trị được trim +
+  viết hoa (`"vn "` = `VN`), giá trị lạ chỉ cảnh báo rồi bị bỏ qua, và `apply`
+  chỉ ghi mã quốc gia cho radio **khi có mã để ghi** — không bao giờ xoá mã
+  đang có. Đặt sai mã vẫn là vấn đề pháp lý, nên tài liệu bảo mật vẫn khuyên
+  đặt đúng; nhưng đó là quyết định của người vận hành, không phải lý do để
+  công cụ từ chối xoá một SSID.
+
 ### Added
 - **🤖 Trợ lý gỡ lỗi ngay trên web console.** Trước đây muốn biết router hỏng ở
   đâu phải tự đọc thẻ sing-box, health probe, nhật ký và chẩn đoán SSID rồi tự
