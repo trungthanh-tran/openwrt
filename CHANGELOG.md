@@ -5,6 +5,18 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Chip "đang chạy" cho mọi thao tác ghi lên router.** Apply mất vài giây mà
+  dấu hiệu duy nhất là một toast đã tắt, nên người dùng không biết router đang
+  làm hay cú bấm bị rơi — và không có gì ngăn bấm Apply lần nữa vào giữa lần
+  đầu. Nay mọi thao tác ghi (kiểm tra cấu hình → ghi lên router → apply, đá
+  thiết bị, lưu pool, restart sing-box, chạy cách sửa của trợ lý, upload gói)
+  đều bật một chip có spinner ghi rõ bước đang chạy, đồng thời khoá sidebar và
+  các nút chính/nguy hiểm cho tới khi xong. Chip được tắt trong `finally` nên
+  lỗi cũng trả trang về đúng như khi thành công. Lưu pool giờ poll lại sau khi
+  lưu: `pool.sh` có dựng lại sing-box + nftables, nên màn hình pool từng để lại
+  bức tranh sức khoẻ cũ.
+
 ### Fixed
 - **"Error: save_pool failed" và những thông báo trống rỗng khác.** Thêm proxy
   vào pool báo đúng một câu đó, trong khi lý do đã nằm sẵn trong phản hồi:

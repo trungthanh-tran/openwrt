@@ -339,6 +339,18 @@
   .findrow summary { cursor: pointer; color: var(--text-dim); font-size: 12px; }
   .iconbtn.zap { color: var(--accent-ink); }
   .iconbtn.zap:hover { border-color: var(--accent); }
+  /* Applying takes seconds on the router; a toast that has already faded is
+     not an answer to "is it still working?" */
+  .busychip { display: none; align-items: center; gap: 7px; font-size: 12px; font-weight: 600;
+              padding: 4px 10px; border-radius: 20px; border: 1px solid var(--accent);
+              color: var(--accent-ink); background: var(--accent-soft, var(--panel-2)); }
+  body.busy .busychip { display: inline-flex; }
+  .busychip .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor;
+                    border-top-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* While the router is mid-apply, a second write would race the first. */
+  body.busy .side-nav .btn, body.busy .btn.primary, body.busy .btn.danger { pointer-events: none; opacity: .55; }
+  body.busy { cursor: progress; }
   .conn-status { font-size: 12.5px; padding: 8px 11px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); }
   .conn-status.ok { color: var(--good); }
   .conn-status.bad { color: var(--crit); }
@@ -560,6 +572,7 @@
     </div>
     <div class="hdr-actions">
       <span class="chip" id="whoami" hidden></span>
+      <span class="busychip" id="busyChip"><span class="spin"></span><span id="busyText"></span></span>
       <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
       <button class="chip sbchip" id="sbChip" hidden></button>
       <select class="language-select" id="languageSelect" aria-label="Language">
@@ -1389,6 +1402,17 @@
   // What the router said, trimmed to something a toast can hold. Router
   // scripts answer with `log` (their own stdout+stderr) or `error` (the CGI's
   // own refusal); a generic "X failed" hides both.
+  // Every write to the router goes through this: the chip says which step is
+  // running and the page stops accepting a second write until it is done.
+  function busy(step) {
+    document.body.classList.add("busy");
+    $("busyText").textContent = step;
+    toast(step);
+  }
+  function busyDone() {
+    document.body.classList.remove("busy");
+    $("busyText").textContent = "";
+  }
   function routerReason(d, fallback) {
     const raw = String((d && (d.error || d.log)) || "").replace(/\s+/g, " ").trim();
     if (!raw) return fallback;
@@ -1593,7 +1617,7 @@
     if (!agent.connected) return toast(pick("Not connected to the router.", "Chưa kết nối router."));
     if (!confirm(pick("Restart sing-box now? Open sessions on every proxied Wi-Fi drop for a few seconds.",
                       "Khởi động lại sing-box ngay? Phiên đang mở trên mọi WiFi proxy sẽ gián đoạn vài giây."))) return;
-    toast(pick("Restarting sing-box…", "Đang khởi động lại sing-box…"));
+    busy(pick("Restarting sing-box…", "Đang khởi động lại sing-box…"));
     api("restart_singbox", "POST", {}).then(d => {
       if (!d) throw new Error(pick("empty answer", "không có phản hồi"));
       // A fresh start is not flapping: the operator just asked for it.
@@ -1602,7 +1626,7 @@
       updateSingboxUI();
       showLog("sing-box restart", { ok: !!d.ok, log: formatSingbox(d) || d.error || "" });
       poll();
-    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message)).finally(busyDone);
   }
 
   // ---- the router's own troubleshooting assistant -------------------------
@@ -1673,14 +1697,14 @@
     const warning = fixWarning(fix);
     if (warning) question += "\n" + warning;
     if (!confirm(question)) return;
-    toast(pick("Running the fix…", "Đang sửa…"));
+    busy(pick("Running the fix on the router…", "Router đang chạy cách sửa…"));
     api("debug_fix", "POST", { id: fix }).then(d => {
       if (!d || d.ok === false) throw new Error((d && d.error) || "fix failed");
       const hint = pick(d.hint_en || d.hint || "", d.hint || "");
       showLog(pick("Fix: ", "Sửa: ") + fixLabel(fix), { ok: d.ok, log: [d.log, hint].filter(Boolean).join("\n\n") });
       loadDebug();
       poll();
-    }).catch(err => toast(pick("Fix failed: ", "Sửa thất bại: ") + err.message));
+    }).catch(err => toast(pick("Fix failed: ", "Sửa thất bại: ") + err.message)).finally(busyDone);
   }
 
   // Bootstrap actions the CGI accepts without a Bearer header.
@@ -1819,14 +1843,14 @@
     if (!agent.connected) return Promise.reject(new Error(pick("Not connected to the router.", "Chưa kết nối router.")));
     if (configApplying) return Promise.reject(new Error(pick("Another configuration change is being applied.", "Một thay đổi cấu hình khác đang được apply.")));
     configApplying = true;
-    toast(pick("Step 1/3 · Dry-run…", "Bước 1/3 · Dry-run…"));
+    busy(pick("Step 1/3 · Checking the configuration…", "Bước 1/3 · Kiểm tra cấu hình…"));
     return api("dryrun_conf", "POST", conf, true).then(dr => {
       if (!dr || !dr.ok) throw new Error(routerReason(dr, pick("dry-run failed", "dry-run lỗi")));
-      toast(pick("Step 2/3 · Writing the config…", "Bước 2/3 · Ghi cấu hình…"));
+      busy(pick("Step 2/3 · Writing to the router…", "Bước 2/3 · Ghi lên router…"));
       return api("save_conf", "POST", conf, true);
     }).then(sv => {
       if (!sv || !sv.ok) throw new Error(routerReason(sv, pick("writing the config failed", "ghi conf lỗi")));
-      toast(pick("Step 3/3 · Applying…", "Bước 3/3 · Apply…"));
+      busy(pick("Step 3/3 · Applying on the router…", "Bước 3/3 · Router đang apply…"));
       return api("apply", "POST", {});
     }).then(d => {
       if (!d || !d.ok) throw new Error(routerReason(d, pick("apply failed", "apply lỗi")));
@@ -1834,7 +1858,7 @@
       if (showResult) showLog("apply.sh", d);
       poll();
       return d;
-    }).finally(() => { configApplying = false; });
+    }).finally(() => { configApplying = false; busyDone(); });
   }
   function autoApplyConfig(previous, successMessage) {
     return applyConfigText(genConf(), false).then(() => toast(successMessage + " ✓")).catch(async err => {
@@ -1850,7 +1874,6 @@
     // Dry-run before writing, the way the desktop console does: a config the
     // router rejects is caught while the live one is still in place, instead
     // of being written first and blowing up during apply.
-    toast(pick("Step 1/3 · Dry-run…", "Bước 1/3 · Dry-run…"));
     applyConfigText(conf, true).then(() => {
       configDirty = false;
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
@@ -1880,19 +1903,19 @@
     if ((typed || "").trim().toUpperCase() !== RESET_WORD) { toast(pick("Reset cancelled.", "Đã huỷ reset.")); return; }
     const skipped = [];
     let kicked = 0;
-    toast(pick("Step 1/4 · Kicking devices…", "Bước 1/4 · Đá thiết bị…"));
+    busy(pick("Step 1/4 · Kicking devices…", "Bước 1/4 · Đá thiết bị…"));
     api("clients").then(d => {
       const online = ((d && d.clients) || []).filter(c => c && c.online && c.mac);
       return online.reduce((chain, c) => chain.then(() =>
         api("kick", "POST", { idx: c.idx, mac: c.mac }).then(() => { kicked++; }).catch(e => skipped.push(`${c.mac}: ${e.message || e}`))
       ), Promise.resolve());
     }).then(() => {
-      toast(pick("Step 2/4 · Emptying proxy pools…", "Bước 2/4 · Xoá pool proxy…"));
+      busy(pick("Step 2/4 · Emptying proxy pools…", "Bước 2/4 · Xoá pool proxy…"));
       return idxs.reduce((chain, idx) => chain.then(() =>
         api("save_pool", "POST", { idx, proxies: [] }).catch(e => skipped.push(`pool idx=${idx}: ${e.message || e}`))
       ), Promise.resolve());
     }).then(() => {
-      toast(pick("Step 3/4 · Writing the empty configuration…", "Bước 3/4 · Ghi cấu hình rỗng…"));
+      busy(pick("Step 3/4 · Writing the empty configuration…", "Bước 3/4 · Ghi cấu hình rỗng…"));
       const before = ssids; ssids = []; const emptyConf = genConf(); ssids = before;
       return api("dryrun_conf", "POST", emptyConf, true).then(dr => {
         if (!dr || !dr.ok) throw new Error(routerReason(dr, pick("dry-run failed", "dry-run lỗi")));
@@ -1900,7 +1923,7 @@
       });
     }).then(sv => {
       if (!sv || !sv.ok) throw new Error(routerReason(sv, pick("writing the config failed", "ghi conf lỗi")));
-      toast(pick("Step 4/4 · Applying…", "Bước 4/4 · Apply…"));
+      busy(pick("Step 4/4 · Applying on the router…", "Bước 4/4 · Router đang apply…"));
       return api("apply", "POST", {});
     }).then(d => {
       if (!d || !d.ok) throw new Error(routerReason(d, pick("apply failed", "apply lỗi")));
@@ -1910,7 +1933,7 @@
         + (skipped.length ? "\n" + pick(`${skipped.length} minor errors were skipped:`, `Bỏ qua ${skipped.length} lỗi nhỏ:`) + "\n" + skipped.slice(0, 10).join("\n") : "");
       showLog(pick("Reset everything", "Reset toàn bộ"), { ok: true, log: summary + "\n\n" + (d.log || "") });
       poll();
-    }).catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err)));
+    }).catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err))).finally(busyDone);
   }
   function pullFromRouter() {
     api("get_conf", "GET", null, "resp").then(txt => {
@@ -1982,7 +2005,7 @@
     const force = document.getElementById("upForce").checked;
     if (!confirm(pick(`Update sbproxy on the router with "${f.name}"${force ? " (FORCE — downgrade allowed)" : ""}?\nThe router backs up first; Wi-Fi is not reloaded.`,
                       `Cập nhật code sbproxy trên router bằng "${f.name}"${force ? " (FORCE — cho phép hạ version)" : ""}?\nRouter tự backup trước; WiFi không reload.`))) return;
-    toast(pick("Uploading and updating…", "Đang upload & cập nhật…"));
+    busy(pick("Uploading and updating…", "Đang upload & cập nhật…"));
     fetch(apiUrl("update") + (force ? "&force=1" : ""), {
       method: "POST",
       headers: { "Authorization": `Bearer ${agent.token}`, "Content-Type": "application/octet-stream" },
@@ -1992,7 +2015,7 @@
       showLog("self-update.sh" + (d && d.ok ? ` (${d.from} → ${d.to})` : ""), d);
       // uhttpd may reload; re-poll shortly after to pick up the new version.
       setTimeout(poll, 1500);
-    }).catch(err => toast(pick("Update failed: ", "Lỗi cập nhật: ") + err.message));
+    }).catch(err => toast(pick("Update failed: ", "Lỗi cập nhật: ") + err.message)).finally(busyDone);
   }
 
   function recordHistory() {
@@ -2302,6 +2325,9 @@
   }
   function testAllPool() { testPoolSlots(null); }
   function savePoolRows(rows) {
+    // pool.sh rebuilds sing-box and nftables and restarts them, so this is a
+    // router-side apply in every sense except that Wi-Fi is not reloaded.
+    busy(pick("Saving the pool on the router…", "Đang lưu pool lên router…"));
     return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
       // The script's own output is the only place that says WHY: reading just
       // .error left the operator with "save_pool failed" and nothing to act on.
@@ -2311,8 +2337,9 @@
       poolSelected.clear();
       Object.keys(poolStatus).forEach(k => delete poolStatus[k]);
       renderPoolList();
-      toast(pick("Pool saved ✓", "Đã lưu pool ✓"));
-    });
+      toast(pick("Pool saved and applied ✓", "Đã lưu và áp pool ✓"));
+      poll();
+    }).finally(busyDone);
   }
   function closePool() {
     poolLoadSeq++;

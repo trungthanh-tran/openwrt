@@ -188,5 +188,39 @@ class PanelUsesThePatcherTests(unittest.TestCase):
         self.assertNotIn("location.reload", self.text)
 
 
+class RouterBusyStateTests(unittest.TestCase):
+    """Applying takes seconds on the router; the page has to say so.
+
+    A toast fades after a moment, which left an operator watching an unchanged
+    page wondering whether the router was working or the click had been lost --
+    and free to press Apply again into the middle of the first one.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = PANEL.read_text(encoding="utf-8")
+
+    def test_the_page_has_a_busy_chip(self):
+        self.assertIn('id="busyChip"', self.text)
+        self.assertIn('id="busyText"', self.text)
+        self.assertIn("body.busy .busychip { display: inline-flex; }", self.text)
+
+    def test_a_busy_page_refuses_a_second_write(self):
+        self.assertIn("body.busy .side-nav .btn, body.busy .btn.primary, body.busy .btn.danger", self.text)
+
+    def test_every_router_write_raises_and_clears_the_chip(self):
+        """Whatever raises it must clear it, on failure as much as on success."""
+        self.assertGreaterEqual(self.text.count("busy(pick("), 8,
+                                "each step of each router write announces itself")
+        # applyConfigText, savePoolRows, reset, sing-box restart, an assistant
+        # fix and the package upload: six flows, one definition of busyDone.
+        self.assertEqual(self.text.count("busyDone") - 1, 6,
+                         "every flow that raises the chip clears it exactly once")
+
+    def test_the_clearing_always_runs(self):
+        for tail in (".finally(busyDone)", "configApplying = false; busyDone();"):
+            self.assertIn(tail, self.text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
