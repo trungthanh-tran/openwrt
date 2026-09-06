@@ -151,6 +151,15 @@ cat > "$BIN/pgrep" <<'SH'
 #!/bin/sh
 [ "${SINGBOX_RUNNING:-0}" = "1" ]
 SH
+# status now reads process names out of /proc instead of trusting `pgrep -f
+# sing-box`, which also matched the agent's own diagnostics. A fake /proc lets
+# the suite drive both answers.
+FAKE_PROC="$TMP/proc"; mkdir -p "$FAKE_PROC/4242"
+printf 'sing-box\n' > "$FAKE_PROC/4242/comm"
+printf '4242 (sing-box) S %s 900\n' "$(i=0; while [ $i -lt 18 ]; do printf '0 '; i=$((i+1)); done)" > "$FAKE_PROC/4242/stat"
+printf '1000.00 900.00\n' > "$FAKE_PROC/uptime"
+mkdir -p "$TMP/proc-empty"
+export PROC_DIR="$TMP/proc-empty"
 chmod +x "$BIN/uci" "$BIN/pgrep"
 
 export SB_ROOT CONF TOKEN_FILE HEALTH_FILE BACKUP_DIR LOG_DIR CALLS
@@ -342,14 +351,25 @@ not_contains "status hides Wi-Fi passwords" "$out" 'alpha-password'
 not_contains "status hides SOCKS passwords" "$out" 'bob-secret'
 eq "status includes health" "$(json_value "$out" '.health.probes["1"].state')" 'ok'
 eq "status defaults running false" "$(json_value "$out" '.meta.singbox_running')" 'false'
+eq "and reports no uptime for a stopped engine" "$(json_value "$out" '.meta.singbox_uptime_s')" 'null'
 SINGBOX_CONF="$TMP/sing-box.json"; export SINGBOX_CONF
 touch "$SINGBOX_CONF"
-export SINGBOX_RUNNING=1
+export PROC_DIR="$FAKE_PROC"
 out="$(auth_run GET 'action=status')"
 eq "status detects applied config" "$(json_value "$out" '.meta.applied')" 'true'
 eq "status detects running sing-box" "$(json_value "$out" '.meta.singbox_running')" 'true'
+# 1000 s of router uptime minus a process that started at tick 900 (100 Hz).
+eq "status reports how long it has been up" "$(json_value "$out" '.meta.singbox_uptime_s')" '991'
+# A command line that merely mentions sing-box is not the service: this is what
+# made a crash-looping router report a healthy engine.
+mkdir -p "$FAKE_PROC/5555"; printf 'logread
+' > "$FAKE_PROC/5555/comm"
+mkdir -p "$TMP/proc-parked"; mv "$FAKE_PROC/4242" "$TMP/proc-parked/4242"
+out="$(auth_run GET 'action=status')"
+eq "a process merely named after sing-box does not count" "$(json_value "$out" '.meta.singbox_running')" 'false'
+mv "$TMP/proc-parked/4242" "$FAKE_PROC/4242"
 rm -f "$SINGBOX_CONF"
-export SINGBOX_RUNNING=0
+export PROC_DIR="$TMP/proc-empty"
 
 mv "$CONF" "$CONF.saved"
 out="$(auth_run GET 'action=status')"

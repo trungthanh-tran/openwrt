@@ -5,6 +5,33 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.26] - 2026-09-06
+
+### Fixed
+- **sing-box crash-loop vì không đọc được `config.json` — và console báo nhầm
+  là "đang chạy".** Agent CGI đọc body request dưới `umask 077`, nên `apply`
+  chạy từ web console ghi `/etc/sing-box/config.json` ở chế độ 0600 của root;
+  gói sing-box của OpenWrt có thể chạy service dưới user không phải root, và
+  nó chết ngay với `permission denied` (apply qua SSH với `umask 022` thì
+  không sao). Nay: CGI trả `umask` về 022 trước khi chạy script, `apply.sh` và
+  `build_singbox` đặt quyền **tường minh** và trao file cho đúng user của
+  service (vẫn 0600, không bao giờ world-readable vì file chứa mật khẩu
+  proxy), và `scripts/restart-singbox.sh` sửa quyền trước khi restart — còn
+  nếu vẫn "permission denied" thì chuyển service sang chạy bằng root, thử lại
+  một lần và báo rõ trong trường `repaired`. Router **không khai báo** user cho
+  service thì quyền file được giữ nguyên: siết lại khi không biết ai đọc file
+  sẽ làm hỏng chính những router đang chạy tốt.
+- **Kiểm tra "sing-box có chạy không" không còn nhận nhầm.** `pgrep -f
+  sing-box` khớp cả `logread -e sing-box` và chính script chẩn đoán của dự án,
+  lại coi một service đang crash-loop (procd bật lại mỗi vài giây) là khoẻ
+  mạnh — đó là lý do màn hình restart báo `Running: yes (pid 17956)` giữa một
+  log đầy FATAL. Nay dùng `singbox_pid` đọc tên tiến trình từ `/proc`, và
+  `verify_singbox_running` đòi **cùng một PID** sau vài giây. `status` trả
+  thêm `singbox_uptime_s`; web console thấy uptime tụt giữa hai lần poll thì
+  hiện thẻ đỏ **KHỞI ĐỘNG LẠI LIÊN TỤC** thay vì màu xanh. `doctor.sh` cảnh
+  báo tiến trình mới dưới 15 giây và kiểm tra chủ sở hữu `config.json` so với
+  user của service.
+
 ## [0.5.22] - 2026-09-05
 
 ### Added

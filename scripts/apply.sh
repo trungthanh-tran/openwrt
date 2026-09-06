@@ -84,6 +84,9 @@ cp "$NFT_FILE" "$REAL_NFT_FILE.new"
 mv "$REAL_SINGBOX_CONF.new" "$REAL_SINGBOX_CONF"
 mv "$REAL_NFT_FILE.new" "$REAL_NFT_FILE"
 SINGBOX_CONF="$REAL_SINGBOX_CONF"; NFT_FILE="$REAL_NFT_FILE"
+# The staged copy carried the right mode; `cp` to the live path re-applies the
+# caller's umask, so the installed file gets the access fix too.
+ensure_singbox_conf_access "$REAL_SINGBOX_CONF"
 desired_idx | tr '\n' ' ' > /etc/sbproxy.managed
 cat > /etc/sbproxy.env.new <<EOF
 NFT_FILE=$NFT_FILE

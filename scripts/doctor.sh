@@ -52,7 +52,22 @@ else
 fi
 
 sec "sing-box"
-if pgrep -f 'sing-box' >/dev/null 2>&1; then ok "process is running"; else bad "NOT running"; fi
+if singbox_pid >/dev/null 2>&1; then
+  _d_up="$(singbox_uptime_s 2>/dev/null || true)"
+  if [ -n "$_d_up" ] && [ "$_d_up" -lt 15 ] 2>/dev/null; then
+    wn "process is running but only ${_d_up}s old — it may be crash-looping (logread -e sing-box)"
+  else
+    ok "process is running${_d_up:+ (up ${_d_up}s)}"
+  fi
+else bad "NOT running"; fi
+if [ -f "${SINGBOX_CONF:-/etc/sing-box/config.json}" ]; then
+  _d_user="$(uci -q get sing-box.main.user 2>/dev/null || true)"
+  _d_owner="$(ls -l "${SINGBOX_CONF:-/etc/sing-box/config.json}" 2>/dev/null | awk '{print $3}')"
+  case "$_d_user" in
+    ''|root) ok "sing-box runs as root; config ownership does not matter" ;;
+    *) [ "$_d_user" = "$_d_owner" ]          && ok "config.json is owned by the service user ($_d_user)"          || bad "config.json is owned by '$_d_owner' but the service runs as '$_d_user' — it cannot read it (scripts/restart-singbox.sh repairs this)" ;;
+  esac
+fi
 if uci -q get sing-box.main >/dev/null 2>&1; then
   if [ "$(uci -q get sing-box.main.enabled)" = "1" ]; then ok "service is enabled in /etc/config/sing-box"
   else bad "/etc/config/sing-box has enabled=0: the init script never starts sing-box (apply.sh fixes this)"; fi

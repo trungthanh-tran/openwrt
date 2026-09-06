@@ -668,13 +668,12 @@ case "$1:$2" in
   get:sing-box.main) exit 0 ;;
   get:sing-box.main.enabled) printf '%s\n' "${SBS_ENABLED:-0}" ;;
   get:sing-box.main.conffile) printf '%s\n' "${SBS_CONFFILE:-}" ;;
+  get:sing-box.main.user) [ -n "${SBS_USER:-}" ] && printf '%s\n' "$SBS_USER" || exit 1 ;;
 esac
 exit 0
 SH
-cat > "$SBS/bin/pgrep" <<'SH'
-#!/bin/sh
-[ "${SBS_RUNNING:-0}" = 1 ]
-SH
+mkdir -p "$SBS/proc-up/4242" "$SBS/proc-down"
+printf 'sing-box\n' > "$SBS/proc-up/4242/comm"
 cat > "$SBS/bin/logread" <<'SH'
 #!/bin/sh
 echo "daemon.err sing-box: FATAL[0000] start service: open /etc/sing-box/config.json: no such file"
@@ -692,15 +691,76 @@ eq "an enabled service is left alone"      "$(grep -c 'uci set' "$SBS_LOG")" "0"
 : > "$SBS_LOG"
 ( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" DRYRUN=1 SBS_ENABLED=0 sh -c '. "$0/scripts/lib.sh"; ensure_singbox_service' "$ROOT" ) >/dev/null 2>&1
 eq "dry-run changes nothing"               "$(grep -c 'uci set' "$SBS_LOG")" "0"
-verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=0 SINGBOX_START_WAIT=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" PROC_DIR="$SBS/proc-down" SINGBOX_START_WAIT=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
 eq "a sing-box that never comes up fails apply" "$verify_rc" "1"
 match "the failure names sing-box"          "$verify_out" 'sing-box did not start'
 match "the failure carries the sing-box log" "$verify_out" 'FATAL\[0000\]'
 match "the failure names the disabled flag"  "$verify_out" 'enabled=0'
-verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" PROC_DIR="$SBS/proc-up" SINGBOX_STABLE_WAIT=0 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
 eq "a running sing-box passes"              "$verify_rc" "0"
-verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" SBS_RUNNING=0 DRYRUN=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
+verify_out="$( PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" PROC_DIR="$SBS/proc-down" DRYRUN=1 sh -c '. "$0/scripts/lib.sh"; verify_singbox_running' "$ROOT" 2>&1 )"; verify_rc=$?
 eq "dry-run does not wait for a process"    "$verify_rc" "0"
+
+echo "== sing-box liveness: an exact process, and one that stays up =="
+# `pgrep -f sing-box` also matches `logread -e sing-box` and this project's own
+# helpers, so a router whose engine was dead could be reported healthy by its
+# own diagnostics. The check now reads process names out of /proc.
+FP="$STUB/proc"; mkdir -p "$FP/4242" "$FP/777"
+printf 'sing-box\n' > "$FP/4242/comm"
+printf 'logread\n'  > "$FP/777/comm"
+printf '4242 (sing-box) S %s 900\n' "$(i=0; while [ $i -lt 18 ]; do printf '0 '; i=$((i+1)); done)" > "$FP/4242/stat"
+printf '1000.00 900.00\n' > "$FP/uptime"
+sbl() { ( PROC_DIR="$FP" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
+          sh -c '. "$0/scripts/lib.sh"; '"$1" "$ROOT" 2>/dev/null ); }
+eq "the sing-box process is found"          "$(sbl 'singbox_pid')" "4242"
+eq "its uptime is derived from /proc"       "$(sbl 'singbox_uptime_s')" "991"
+mv "$FP/4242" "$STUB/parked-4242"
+eq "a look-alike command is not sing-box"   "$(sbl 'singbox_pid'; echo "rc=$?")" "rc=1"
+mv "$STUB/parked-4242" "$FP/4242"
+eq "a stable process passes the stability check" \
+   "$(SINGBOX_STABLE_WAIT=0 sbl 'singbox_running_stable && echo stable')" "stable"
+
+echo "== the config the service user has to be able to read =="
+# The agent CGI reads request bodies under umask 077; an apply run through it
+# wrote a 0600 root-owned config.json, and the unprivileged sing-box service
+# crash-looped on "permission denied" while the console showed a clean apply.
+match "the CGI restores a sane umask before running scripts" "$agent_cgi" '^  umask 022$'
+match "build_singbox fixes the config access"       "$(cat "$ROOT/scripts/lib.sh")" 'ensure_singbox_conf_access "\$SINGBOX_CONF"'
+match "apply fixes it again on the installed copy"  "$apply_script" 'ensure_singbox_conf_access "\$REAL_SINGBOX_CONF"'
+SBP="$STUB/sbperm"; mkdir -p "$SBP/bin"
+cat > "$SBP/bin/uci" <<'SH'
+#!/bin/sh
+[ "$1" = "-q" ] && shift
+printf 'uci %s\n' "$*" >> "$SBP_LOG"
+case "$1:$2" in
+  get:sing-box.main.user) [ -n "${SBP_USER:-}" ] && printf '%s\n' "$SBP_USER" || exit 1 ;;
+  get:sing-box.main) exit 0 ;;
+  get:sing-box.main.enabled) printf '1\n' ;;
+esac
+exit 0
+SH
+chmod +x "$SBP/bin/uci"
+SBP_LOG="$SBP/uci.log"; export SBP_LOG
+CONFJ="$SBP/config.json"; : > "$CONFJ"
+acc() { ( PATH="$SBP/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
+          DRYRUN=1 SINGBOX_CONF="$CONFJ" SINGBOX_CACHE="$SBP/cache.db" \
+          sh -c '. "$0/scripts/lib.sh"; ensure_singbox_conf_access "$1"' "$ROOT" "$CONFJ" 2>&1 ); }
+out="$(SBP_USER='' acc)"
+# Nobody declared a service user, so which account opens the file is unknown:
+# tightening it here would break the routers that work today.
+nomatch "an undeclared service user is left alone" "$out" 'DRYRUN> chmod'
+nomatch "and nothing is chowned either"            "$out" 'DRYRUN> chown'
+out="$(SBP_USER=root acc)"
+match "a root service gets a private config"       "$out" "chmod 600 '$CONFJ'"
+nomatch "and root needs no chown"                  "$out" 'DRYRUN> chown'
+out="$(SBP_USER=sing-box acc)"
+match "an unprivileged service is given the file"  "$out" "chown 'sing-box' '$CONFJ'"
+match "and the directory it writes its cache into" "$out" "chown 'sing-box' '$CONFJ' '$SBP'"
+match "and the file is then made private"          "$out" "chmod 600 '$CONFJ'"
+nomatch "the config never becomes world-readable"  "$out" 'chmod 6\?44'
+out="$(SBP_USER='evil; reboot' acc)"
+nomatch "an odd service user is refused, not run"  "$out" 'DRYRUN> chown'
+match "and the refusal says so"                    "$out" 'Refusing to chown'
 
 echo "== restart-singbox.sh: restart, then prove the process is up =="
 if ! command -v jq >/dev/null 2>&1; then
@@ -716,25 +776,52 @@ exit 0
 SH
 chmod +x "$SBS/bin/sing-box-init"
 rs() { ( cd "$ROOT" && PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
-        SINGBOX_INIT="$SBS/bin/sing-box-init" SINGBOX_CONF="$STUB/no-such-config.json" SINGBOX_START_WAIT=1 \
+        SINGBOX_INIT="$SBS/bin/sing-box-init" SINGBOX_CONF="$STUB/no-such-config.json" \
+        SINGBOX_START_WAIT=1 SINGBOX_STABLE_WAIT=0 \
         env "$@" sh scripts/restart-singbox.sh 2>/dev/null ); }
 : > "$SBS_LOG"
-out="$(rs SBS_RUNNING=1 SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json)"
+out="$(rs PROC_DIR="$SBS/proc-up" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json)"
 eq "a sing-box that comes back is ok"          "$(printf '%s' "$out" | jq -r .ok)" "true"
 eq "running is reported"                       "$(printf '%s' "$out" | jq -r .running)" "true"
 eq "the init script was restarted once"        "$(grep -c '^init restart$' "$SBS_LOG")" "1"
 eq "an enabled service is not touched"         "$(grep -c 'uci set' "$SBS_LOG")" "0"
 : > "$SBS_LOG"
-out="$(rs SBS_RUNNING=0 SBS_ENABLED=0)"
+out="$(rs PROC_DIR="$SBS/proc-down" SBS_ENABLED=0)"
 eq "a sing-box that stays down is ok:false"    "$(printf '%s' "$out" | jq -r .ok)" "false"
 eq "but the answer is still valid JSON"        "$(printf '%s' "$out" | jq -r 'type')" "object"
 eq "the disabled service was switched on first" "$(grep -c 'uci set sing-box.main.enabled=1' "$SBS_LOG")" "1"
 match "the hint names the disabled flag"       "$(printf '%s' "$out" | jq -r .hint)" 'enabled=0'
 match "the sing-box log rides along"           "$(printf '%s' "$out" | jq -r .log)" 'FATAL\[0000\]'
-out="$(rs SBS_RUNNING=0 SBS_ENABLED=1 SINGBOX_INIT=/nonexistent/sing-box)"
+out="$(rs PROC_DIR="$SBS/proc-down" SBS_ENABLED=1 SINGBOX_INIT=/nonexistent/sing-box)"
 eq "a missing init script is exit 127"         "$(printf '%s' "$out" | jq -r .restart_exit)" "127"
 match "and the hint says to install the package" "$(printf '%s' "$out" | jq -r .hint)" 'install the sing-box package'
 match "agent exposes restart_singbox"          "$(cat "$ROOT/agent/cgi/sbproxy")" 'sh scripts/restart-singbox\.sh'
+
+echo "== restart-singbox.sh repairs the permission crash loop =="
+# The router this came from: restart exits 0, a pid exists at every glance, and
+# the log fills with "permission denied" because the service user cannot read
+# config.json. The restart has to repair that, not report success.
+cat > "$SBS/bin/logread" <<'SH'
+#!/bin/sh
+if [ "${SBS_DENIED:-0}" = 1 ]; then
+  echo "daemon.err sing-box[8462]: FATAL[0000] read config at /etc/sing-box/config.json: open /etc/sing-box/config.json: permission denied"
+else
+  echo "daemon.err sing-box: FATAL[0000] start service: open /etc/sing-box/config.json: no such file"
+fi
+SH
+chmod +x "$SBS/bin/logread"
+: > "$SBS_LOG"
+out="$(rs PROC_DIR="$SBS/proc-down" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json SBS_DENIED=1 SBS_USER=sing-box)"
+eq "a config the service cannot read is still ok:false" "$(printf '%s' "$out" | jq -r .ok)" "false"
+match "the hint names the unreadable config"       "$(printf '%s' "$out" | jq -r .hint)" 'cannot read'
+eq "the service is handed to root to repair it"    "$(grep -c 'uci set sing-box.main.user=root' "$SBS_LOG")" "1"
+eq "and the repair is committed"                   "$(grep -c 'uci commit sing-box' "$SBS_LOG")" "1"
+eq "so the restart is attempted twice"             "$(grep -c '^init restart$' "$SBS_LOG")" "2"
+match "the repair is reported to the operator"     "$(printf '%s' "$out" | jq -r .repaired)" 'run as root'
+: > "$SBS_LOG"
+out="$(rs PROC_DIR="$SBS/proc-up" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json SBS_DENIED=1 SBS_USER=sing-box)"
+eq "a healthy engine is never handed to root"      "$(grep -c "uci set sing-box.main.user" "$SBS_LOG")" "0"
+eq "and it restarts exactly once"                  "$(grep -c '^init restart$' "$SBS_LOG")" "1"
 fi
 
 echo "== shellcheck (same file list as CI) =="

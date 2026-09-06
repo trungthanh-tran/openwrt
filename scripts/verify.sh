@@ -18,7 +18,7 @@ check() {
   fi
 }
 
-check 'sing-box process is running' pgrep -f sing-box
+check 'sing-box process is running' singbox_pid
 check 'sing-box configuration is valid' sh -c "env ${SINGBOX_COMPAT_ENV:-} sing-box check -c /etc/sing-box/config.json"
 check 'sing-box service has compat env' sh -c "grep -q 'procd_set_param env ENABLE_DEPRECATED' /etc/init.d/sing-box || [ -z '${SINGBOX_COMPAT_ENV:-}' ]"
 check 'sbproxy nftables table exists' nft list table inet sbproxy

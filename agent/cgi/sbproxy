@@ -251,10 +251,15 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     * ) [ "$CONTENT_LENGTH" -le "$BODY_LIMIT" ] 2>/dev/null \
           || json_err "413 Payload Too Large" "body vượt quá $BODY_LIMIT byte";;
   esac
+  # The request body is private, but this umask must not survive into the
+  # scripts below: apply.sh writes /etc/sing-box/config.json, and under 077 it
+  # came out 0600 root-only, which the unprivileged sing-box service cannot
+  # read — the router then crash-looped while the console showed a clean apply.
   umask 077
   BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/sbproxy-cgi-body.XXXXXX")" \
     || json_err "500 Internal Server Error" "không tạo được body tạm"
   cat > "$BODY_FILE" || json_err "400 Bad Request" "không đọc được body"
+  umask 022
   body_size="$(wc -c < "$BODY_FILE" | tr -d ' ')"
   [ "$body_size" -le "$BODY_LIMIT" ] 2>/dev/null \
     || json_err "413 Payload Too Large" "body vượt quá $BODY_LIMIT byte"
@@ -420,7 +425,14 @@ case "$ACTION" in
       ((has("probes") | not) or ((.probes | type == "object") and all(.probes[]; type == "object")))
     ' >/dev/null 2>&1 || H='{}'
     applied="false"; [ -f "$SINGBOX_CONF" ] || [ -f /etc/sing-box/config.json ] && applied="true"
-    running="false"; pgrep -f sing-box >/dev/null 2>&1 && running="true"
+    # Exact process name, not `pgrep -f sing-box`: that also matched this
+    # agent's own diagnostics and reported a dead engine as alive.
+    running="false"; sb_uptime=null
+    if sb_pid="$(cd "$SB_ROOT" && sh -c '. ./scripts/lib.sh; singbox_pid' 2>/dev/null)" && [ -n "$sb_pid" ]; then
+      running="true"
+      sb_up="$(cd "$SB_ROOT" && sh -c '. ./scripts/lib.sh; singbox_uptime_s' 2>/dev/null)"
+      case "$sb_up" in ''|*[!0-9]*) : ;; *) sb_uptime="$sb_up" ;; esac
+    fi
     ver="$(tr -d ' \r\n' < "$SB_ROOT/VERSION" 2>/dev/null || true)"; [ -n "$ver" ] || ver="unknown"
     # shellcheck disable=SC2046  # three plain integers, deliberately split
     set -- $(settings_numbers)
@@ -434,12 +446,14 @@ case "$ACTION" in
     esac
     STATUS_JSON="$(jq -n --argjson ssids "$S" --argjson health "$H" \
                      --argjson running "$running" --argjson applied "$applied" --arg ver "$ver" \
+                     --argjson singbox_uptime_s "$sb_uptime" \
                      --argjson net_base "$net_base" --argjson tproxy_port_base "$tproxy_base" \
                      --argjson bssid_limit "$bssid_limit" \
                      --argjson pool_port_base "$pool_base" \
                      --argjson pool_port_stride "$pool_stride" \
       '{ok:true, ssids:$ssids, health:$health,
-        meta:{singbox_running:$running, applied:$applied, version:$ver,
+        meta:{singbox_running:$running, singbox_uptime_s:$singbox_uptime_s,
+              applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
               bssid_limit:$bssid_limit,
               pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}' 2>/dev/null)" \

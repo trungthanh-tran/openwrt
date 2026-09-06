@@ -410,19 +410,49 @@ về 0 không được tin. Kết quả mở trong hộp log:
 
 | Dòng | Ý nghĩa |
 |---|---|
-| `Đang chạy: có (pid …)` | Đã lên. Phiên đang mở trên các WiFi proxy sẽ nối lại. |
+| `Đang chạy: có (pid …) · đã chạy …` | Đã lên. Phiên đang mở trên các WiFi proxy sẽ nối lại. |
+| `Đã sửa: …` | Router vừa tự sửa một lỗi (bật lại service, hoặc chuyển service sang chạy bằng root vì nó không đọc được config). |
 | `Service được bật: không` | `/etc/config/sing-box` còn `enabled=0`; script đã tự bật, khởi động lại thêm lần nữa. |
 | `config.json hợp lệ: không` | `sing-box check` từ chối file cấu hình → bấm **⇪ Đẩy & Áp** để sinh lại. |
 | `Gợi ý: install the sing-box package…` | Gói `sing-box` chưa cài → `sh scripts/install-deps.sh` trên router. |
+| `Gợi ý: … cannot read …` | sing-box chạy dưới user không phải root và không đọc được `config.json`. Nút Khởi động lại **tự sửa** (xem dưới); nếu vẫn còn thì kiểm tra `uci get sing-box.main.user` và chủ sở hữu file. |
 | Đoạn `logread -e sing-box` | 15 dòng log gần nhất — lý do crash thường nằm ở đây (proxy sai, cổng bận, thiếu kmod). |
+
+#### "Đang chạy: có" nhưng WiFi vẫn không có mạng
+
+Đây là **crash loop**: procd bật lại sing-box mỗi vài giây, nên lúc nào nhìn
+cũng thấy có tiến trình, mà nó không bao giờ trụ được. Console nhận ra bằng
+cách so **thời gian chạy** giữa hai lần poll — thấy số này tụt xuống nghĩa là
+tiến trình vừa bị thay — và thẻ sẽ đỏ với chữ **KHỞI ĐỘNG LẠI LIÊN TỤC**.
+
+Nguyên nhân hay gặp nhất là **sing-box không đọc được `config.json`**:
+
+```
+FATAL read config at /etc/sing-box/config.json: permission denied
+```
+
+Gói sing-box của OpenWrt có thể chạy service dưới **user không phải root**
+(procd cấp riêng quyền cho TPROXY), trong khi `config.json` chứa mật khẩu proxy
+nên được ghi ở chế độ chỉ root đọc. Từ 0.5.26 việc này được xử lý ở ba lớp:
+
+- `apply.sh` luôn đặt quyền cho `config.json` **một cách tường minh** và trao
+  file cho đúng user mà service đang chạy — không còn phụ thuộc `umask` của
+  tiến trình gọi nó (agent CGI chạy dưới `umask 077`, nên apply từ web từng
+  sinh ra file 0600 của root mà service không đọc được, trong khi apply qua SSH
+  lại bình thường).
+- Nút **↻ Khởi động lại sing-box** sửa lại quyền trước khi restart.
+- Nếu vẫn "permission denied", nút đó **chuyển service sang chạy bằng root**
+  (`uci set sing-box.main.user=root`) rồi thử lại đúng một lần, và báo trong ô
+  `Đã sửa:` là nó đã làm gì.
 
 Vẫn không lên: bấm **🩺** trên một hàng WiFi (chẩn đoán từng mắt xích:
 service, tiến trình, cổng lắng nghe, config, proxy), hoặc SSH:
 
 ```sh
-/etc/init.d/sing-box restart; sleep 3; pgrep -f sing-box
+sh /root/sbproxy/scripts/restart-singbox.sh   # sửa + restart + xác nhận, trả JSON
 logread -e sing-box | tail -n 30
-sh /root/sbproxy/scripts/doctor.sh
+sh /root/sbproxy/scripts/doctor.sh            # báo cả chủ sở hữu config.json
+ls -l /etc/sing-box/config.json; uci get sing-box.main.user
 ```
 
 > **Trang không bao giờ tự vẽ lại toàn bộ.** Mỗi 10 giây chỉ các ô *Sức khỏe*,

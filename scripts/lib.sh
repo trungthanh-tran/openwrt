@@ -1045,19 +1045,114 @@ ensure_singbox_service() {
   fi
 }
 
+# The PID of the running sing-box, or nothing.
+#
+# `pgrep -f sing-box` is too loose to trust: it also matches `logread -e
+# sing-box`, `sh scripts/restart-singbox.sh` and any other command line that
+# merely mentions the name, so a console asking "is the proxy engine alive?"
+# could be answered by its own diagnostics. /proc/<pid>/comm is the process
+# name itself, read with the shell builtin so this costs no forks.
+singbox_pid() {
+  for _sp_proc in "${PROC_DIR:-/proc}"/[0-9]*; do
+    [ -r "$_sp_proc/comm" ] || continue
+    read -r _sp_comm < "$_sp_proc/comm" 2>/dev/null || continue
+    [ "$_sp_comm" = "sing-box" ] || continue
+    printf '%s\n' "${_sp_proc##*/}"
+    return 0
+  done
+  return 1
+}
+
+# True only when the SAME sing-box is still there a moment later.
+#
+# procd respawns a crashing service every few seconds, so a single sample
+# finds a live PID and calls a crash loop healthy — exactly how a router whose
+# sing-box could not read its config reported "Running: yes (pid 17956)" while
+# the log filled with FATAL lines.
+singbox_running_stable() {
+  _srs_first="$(singbox_pid)" || return 1
+  sleep "${SINGBOX_STABLE_WAIT:-3}"
+  _srs_second="$(singbox_pid)" || return 1
+  [ "$_srs_first" = "$_srs_second" ]
+}
+
+# How long the running sing-box has been up, in seconds ("" when it is down).
+# A value that keeps resetting is the signature of a crash loop.
+singbox_uptime_s() {
+  _su_pid="$(singbox_pid)" || return 1
+  _su_proc="${PROC_DIR:-/proc}"
+  [ -r "$_su_proc/$_su_pid/stat" ] && [ -r "$_su_proc/uptime" ] || return 1
+  _su_start="$(awk '{ print $22 }' "$_su_proc/$_su_pid/stat" 2>/dev/null)"
+  case "$_su_start" in ''|*[!0-9]*) return 1 ;; esac
+  awk -v start="$_su_start" -v hz="${USER_HZ:-100}" \
+      '{ printf "%d", ($1 - start / hz) + 0.5; exit }' "$_su_proc/uptime"
+}
+
+# Let the service read its own configuration.
+#
+# The OpenWrt package can run sing-box as an unprivileged user (procd hands it
+# the capabilities TPROXY needs), so a config.json only root can read makes it
+# crash-loop on "permission denied". That is easy to create by accident: the
+# agent CGI reads request bodies under `umask 077`, and an apply run through
+# it wrote a 0600 root-owned file, while the same apply over SSH (umask 022)
+# produced a readable one.
+#
+# The file carries proxy passwords, so it is never made world-readable: it is
+# handed to whatever user the service actually runs as and kept at 0600.
+ensure_singbox_conf_access() {
+  _sca_conf="${1:-${SINGBOX_CONF:-/etc/sing-box/config.json}}"
+  [ -f "$_sca_conf" ] || return 0
+  command -v uci >/dev/null 2>&1 || return 0
+  _sca_user="$(uci -q get sing-box.main.user 2>/dev/null || true)"
+  case "$_sca_user" in
+    root)
+      # root reads anything, so the file can be as private as its contents
+      # deserve.
+      run "chmod 600 '$_sca_conf'"
+      return 0 ;;
+    "")
+      # No service user is declared, so the account that opens this file is
+      # unknown, and tightening it here could break the routers that work
+      # today. The mode is left as the caller's umask made it -- every path
+      # that writes it now runs at 022 -- and a service that still cannot read
+      # its config is repaired by scripts/restart-singbox.sh.
+      return 0 ;;
+    *[!A-Za-z0-9_.-]*)
+      warn "Refusing to chown to an odd service user: $_sca_user"; return 0 ;;
+  esac
+  # A named unprivileged user: hand it the file, then make the file private --
+  # it carries proxy passwords and nobody else needs to read it. The cache sits
+  # in the same directory and sing-box writes it, so that comes along.
+  _sca_dir="$(dirname "$_sca_conf")"
+  run "chown '$_sca_user' '$_sca_conf' '$_sca_dir'" \
+    || { warn "Could not give $_sca_user access to $_sca_conf"; return 0; }
+  run "chmod 600 '$_sca_conf'"
+  _sca_cache="${SINGBOX_CACHE:-}"
+  if [ -n "$_sca_cache" ] && [ -f "$_sca_cache" ]; then
+    run "chown '$_sca_user' '$_sca_cache'" || true
+  fi
+  log "sing-box runs as '$_sca_user'; gave it access to $_sca_conf"
+}
+
 # After `/etc/init.d/sing-box restart`, prove the process is up. A silent
 # failure here is the worst kind: apply reports success and the SSIDs hang.
 verify_singbox_running() {
   [ "${DRYRUN:-0}" = "1" ] && return 0
   _vsr_wait="${SINGBOX_START_WAIT:-6}"
   while [ "$_vsr_wait" -gt 0 ]; do
-    pgrep -f sing-box >/dev/null 2>&1 && { log "sing-box is running."; return 0; }
+    # Stability, not mere presence: a respawning crash loop always has a pid.
+    singbox_running_stable && { log "sing-box is running (pid $(singbox_pid))."; return 0; }
     sleep 1; _vsr_wait=$((_vsr_wait - 1))
   done
   warn "sing-box is NOT running after restart. Recent log:"
   command -v logread >/dev/null 2>&1 && logread -e sing-box 2>/dev/null | tail -n 15 >&2
   if [ "$(uci -q get sing-box.main.enabled 2>/dev/null)" = "0" ]; then
     warn "/etc/config/sing-box still has enabled=0."
+  fi
+  if command -v logread >/dev/null 2>&1 && \
+     logread -e sing-box 2>/dev/null | tail -n 40 | grep -qi 'permission denied'; then
+    warn "sing-box cannot read ${SINGBOX_CONF:-/etc/sing-box/config.json}: it runs as an unprivileged user."
+    warn "Repair it with: sh $SB_ROOT/scripts/restart-singbox.sh"
   fi
   die "sing-box did not start; every proxied SSID would have no Internet. Fix the cause above and re-run apply."
 }
@@ -1153,6 +1248,9 @@ build_singbox() {
   }
 }
 EOF
+  # Never leave the mode to the caller's umask: run through the agent CGI it
+  # is 077, and a 0600 root-owned config is unreadable to the service user.
+  ensure_singbox_conf_access "$SINGBOX_CONF"
   log "Wrote $SINGBOX_CONF"
 }
 

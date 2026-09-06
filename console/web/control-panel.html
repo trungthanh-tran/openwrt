@@ -1417,7 +1417,17 @@
       applyRouterSettings(d.meta);
       recordHistory();
       const run = !!(d.meta && d.meta.singbox_running);
-      agent.singbox = { running: run, checked: Date.now() };
+      const up = (d.meta && typeof d.meta.singbox_uptime_s === "number") ? d.meta.singbox_uptime_s : null;
+      // Uptime running backwards means procd replaced the process between two
+      // polls: it is alive at every glance yet never actually stays up. That
+      // is the crash loop a single "is there a pid?" check reported as
+      // healthy, so the card gets to say so.
+      const was = agent.singbox;
+      const restarted = !!(was && was.running && run && was.uptime != null && up != null && up < was.uptime);
+      agent.singbox = {
+        running: run, uptime: up, checked: Date.now(),
+        flapping: restarted || !!(was && was.flapping && run && (up == null || up < 60))
+      };
       updateLiveUI();
       // Only what a poll can change is touched: the health cells and the
       // sing-box indicator. The rows come from the local SSID list, so they
@@ -1443,11 +1453,18 @@
     if (!agent.connected || !sb) {
       return `<div class="stat sb" id="sbCard"><div class="label">sing-box</div><div class="val"><small>—</small></div></div>`;
     }
+    if (sb.running && sb.flapping) {
+      return `<div class="stat sb warnstate" id="sbCard">
+        <div class="label">sing-box</div>
+        <div class="val" style="color:var(--crit)">${pick("RESTARTING", "KHỞI ĐỘNG LẠI LIÊN TỤC")}</div>
+        <div class="sub">${pick("it starts and dies again — the proxy engine never settles", "cứ chạy lên rồi chết — engine proxy không trụ được")}</div>
+        <button class="btn primary" id="sbRestartBtn">↻ ${pick("Restart sing-box", "Khởi động lại sing-box")}</button></div>`;
+    }
     if (sb.running) {
       return `<div class="stat sb" id="sbCard" title="${pick("Click to restart sing-box", "Bấm để khởi động lại sing-box")}">
         <div class="label">sing-box</div>
         <div class="val" style="color:var(--good)">${pick("running", "đang chạy")}</div>
-        <div class="sub">${pick("proxy engine", "engine proxy")}</div></div>`;
+        <div class="sub">${sb.uptime != null ? pick(`up ${fmtDuration(sb.uptime)}`, `đã chạy ${fmtDuration(sb.uptime)}`) : pick("proxy engine", "engine proxy")}</div></div>`;
     }
     return `<div class="stat sb warnstate" id="sbCard">
       <div class="label">sing-box</div>
@@ -1462,11 +1479,14 @@
     const sb = agent.singbox;
     chip.hidden = !(agent.connected && sb);
     if (chip.hidden) return;
-    chip.className = "chip sbchip " + (sb.running ? "ok" : "down");
-    chip.textContent = sb.running ? "sing-box ✓" : pick("sing-box DOWN", "sing-box KHÔNG CHẠY");
-    chip.title = sb.running
+    const healthy = sb.running && !sb.flapping;
+    chip.className = "chip sbchip " + (healthy ? "ok" : "down");
+    chip.textContent = healthy ? "sing-box ✓"
+      : sb.running ? pick("sing-box RESTARTING", "sing-box CHẠY LẠI LIÊN TỤC")
+      : pick("sing-box DOWN", "sing-box KHÔNG CHẠY");
+    chip.title = healthy
       ? pick("The proxy engine is running — click to re-check", "Engine proxy đang chạy — bấm để kiểm tra lại")
-      : pick("sing-box is not running — click to restart it", "sing-box không chạy — bấm để khởi động lại");
+      : pick("sing-box is not staying up — click to restart and repair it", "sing-box không trụ được — bấm để khởi động lại và tự sửa");
   }
   // Patch only the health cells: the rows themselves come from the local SSID
   // list, which a status poll never changes.
@@ -1479,7 +1499,9 @@
   function formatSingbox(d) {
     const yn = v => v === true ? pick("yes", "có") : v === false ? pick("no", "không") : "?";
     return [
-      `${pick("Running", "Đang chạy")}: ${yn(d.running)}${d.pid ? " (pid " + d.pid + ")" : ""}`,
+      `${pick("Running", "Đang chạy")}: ${yn(d.running)}${d.pid ? " (pid " + d.pid + ")" : ""}` +
+        (d.uptime_s != null ? ` · ${pick("up", "đã chạy")} ${fmtDuration(d.uptime_s)}` : ""),
+      d.repaired ? `${pick("Repaired", "Đã sửa")}: ${d.repaired}` : "",
       `${pick("Service enabled", "Service được bật")}: ${yn(d.enabled)}`,
       `${pick("config.json valid", "config.json hợp lệ")}: ${yn(d.config_ok)}`,
       d.hint ? `${pick("Hint", "Gợi ý")}: ${d.hint}` : "",
@@ -1493,7 +1515,9 @@
     toast(pick("Restarting sing-box…", "Đang khởi động lại sing-box…"));
     api("restart_singbox", "POST", {}).then(d => {
       if (!d) throw new Error(pick("empty answer", "không có phản hồi"));
-      agent.singbox = { running: !!d.running, checked: Date.now() };
+      // A fresh start is not flapping: the operator just asked for it.
+      agent.singbox = { running: !!d.running, uptime: (typeof d.uptime_s === "number" ? d.uptime_s : null),
+                        flapping: false, checked: Date.now() };
       updateSingboxUI();
       showLog("sing-box restart", { ok: !!d.ok, log: formatSingbox(d) || d.error || "" });
       poll();
@@ -3204,7 +3228,10 @@
     showInline("connBackdrop");
   };
   $("connectBtn").onclick = connect;
-  $("sbChip").onclick = () => { if (agent.singbox && !agent.singbox.running) restartSingbox(); else poll(); };
+  $("sbChip").onclick = () => {
+    const sb = agent.singbox;
+    if (sb && (!sb.running || sb.flapping)) restartSingbox(); else poll();
+  };
   $("stats").onclick = e => { if (e.target.closest("#sbCard") && agent.connected) restartSingbox(); };
   $("disconnectBtn").onclick = disconnect;
   $("logoutBtn").onclick = logout;

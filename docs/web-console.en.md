@@ -394,19 +394,50 @@ result opens in the log box:
 
 | Line | Meaning |
 |---|---|
-| `Running: yes (pid …)` | It is up. Open sessions on proxied Wi-Fi reconnect. |
+| `Running: yes (pid …) · up …` | It is up. Open sessions on proxied Wi-Fi reconnect. |
+| `Repaired: …` | The router just fixed something itself (re-enabled the service, or moved it to root because it could not read its config). |
 | `Service enabled: no` | `/etc/config/sing-box` still has `enabled=0`; the script turned it on — restart once more. |
 | `config.json valid: no` | `sing-box check` rejects the config → press **⇪ Push & Apply** to regenerate it. |
 | `Hint: install the sing-box package…` | The `sing-box` package is missing → `sh scripts/install-deps.sh` on the router. |
+| `Hint: … cannot read …` | sing-box runs as a non-root user and cannot read `config.json`. The Restart button **repairs this** (below); if it persists, check `uci get sing-box.main.user` and the file's owner. |
 | The `logread -e sing-box` block | The last 15 log lines — the crash reason is usually here (bad proxy, busy port, missing kmod). |
+
+#### "Running: yes" while the Wi-Fi still has no Internet
+
+That is a **crash loop**: procd respawns sing-box every few seconds, so there
+is a process at every glance and it never actually stays up. The console spots
+it by comparing **uptime** between two polls — a value that went backwards
+means the process was replaced — and the card turns red with **RESTARTING**.
+
+The most common cause is that **sing-box cannot read `config.json`**:
+
+```
+FATAL read config at /etc/sing-box/config.json: permission denied
+```
+
+The OpenWrt sing-box package can run the service as a **non-root user** (procd
+grants it the capabilities TPROXY needs), while `config.json` holds proxy
+passwords and is therefore written root-readable only. Since 0.5.26 this is
+handled in three places:
+
+- `apply.sh` always sets the config's access **explicitly** and hands the file
+  to whichever user the service runs as, instead of inheriting the caller's
+  umask (the agent CGI runs under `umask 077`, so an apply from the web used
+  to produce a 0600 root-owned file the service could not read, while the same
+  apply over SSH was fine).
+- The **↻ Restart sing-box** button repairs the access before restarting.
+- If it is still "permission denied", that button **moves the service to root**
+  (`uci set sing-box.main.user=root`) and retries exactly once, reporting what
+  it did in the `Repaired:` line.
 
 Still down: press **🩺** on a Wi-Fi row (walks every link: service, process,
 listening port, config, proxy), or over SSH:
 
 ```sh
-/etc/init.d/sing-box restart; sleep 3; pgrep -f sing-box
+sh /root/sbproxy/scripts/restart-singbox.sh   # repair, restart, verify; answers JSON
 logread -e sing-box | tail -n 30
-sh /root/sbproxy/scripts/doctor.sh
+sh /root/sbproxy/scripts/doctor.sh            # also reports the config.json owner
+ls -l /etc/sing-box/config.json; uci get sing-box.main.user
 ```
 
 > **The page never redraws itself wholesale.** Every 10 seconds only the

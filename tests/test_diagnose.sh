@@ -38,7 +38,7 @@ case "$tool" in
              rule*) [ "${IP_RULE:-1}" = 1 ] && echo "32765:	from all fwmark 0x1 lookup 100" ;;
              "route show table 100"*) [ "${IP_ROUTE:-1}" = 1 ] && echo "local default dev lo scope host" ;;
            esac ;;
-  pgrep)   [ "${SINGBOX_RUNNING:-1}" = 1 ] && { echo 4242; exit 0; }; exit 1 ;;
+  pgrep)   exit 1 ;;
   netstat) [ "${SINGBOX_LISTEN:-1}" = 1 ] && echo "tcp        0      0 0.0.0.0:12001           0.0.0.0:*               LISTEN" ;;
   iw)      printf 'Station aa:bb:cc:dd:ee:ff (on phy0-ap0)\n' ;;
   logread) printf '%s\n' "${SINGBOX_LOG:-INFO sing-box started}" ;;
@@ -84,7 +84,14 @@ chmod +x "$BIN"/*
 mkdir -p "$TMP/etc/sing-box"; : > "$TMP/etc/sing-box/config.json"
 export PATH="$BIN:$PATH"
 
-run() { ( cd "$SB" && DHCP_LEASES="$LEASES" "$@" sh scripts/diagnose-ssid.sh 1 2>/dev/null ); }
+# A running sing-box is a process named sing-box in /proc; a stopped one is an
+# empty /proc. Callers that need the second case pass PROC_DIR="$PROC_DOWN".
+PROC_UP="$TMP/proc-up"; PROC_DOWN="$TMP/proc-down"
+mkdir -p "$PROC_UP/4242" "$PROC_DOWN"
+printf 'sing-box\n' > "$PROC_UP/4242/comm"
+printf '4242 (sing-box) S %s 900\n' "$(i=0; while [ $i -lt 18 ]; do printf '0 '; i=$((i+1)); done)" > "$PROC_UP/4242/stat"
+printf '1000.00 900.00\n' > "$PROC_UP/uptime"
+run() { ( cd "$SB" && DHCP_LEASES="$LEASES" PROC_DIR="$PROC_UP" "$@" sh scripts/diagnose-ssid.sh 1 2>/dev/null ); }
 field() { printf '%s' "$1" | jq -r "$2"; }
 check_ok() { printf '%s' "$1" | jq -r --arg n "$2" '.checks[] | select(.name == $n) | .ok'; }
 
@@ -101,6 +108,9 @@ eq "proxy passes"                  "$(check_ok "$out" proxy)" "true"
 eq "verdict is ok"                 "$(field "$out" .verdict | cut -d: -f1)" "ok"
 eq "report is rendered"            "$(field "$out" .report | grep -c '^  ok')" "$(field "$out" '[.checks[] | select(.ok)] | length')"
 
+eq "the process check reports how long it has been up" \
+   "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "singbox_process") | .detail' | grep -c 'up 991s')" "1"
+
 echo "== diagnose: each broken link is named first =="
 out="$(run env BRNF_PATH=/nonexistent WIFI_DOWN=1)"
 eq "no wifi-iface -> wifi verdict"     "$(field "$out" .verdict | cut -d: -f1)" "wifi"
@@ -113,9 +123,9 @@ out="$(run env BRNF_PATH=/nonexistent NFT_LOADED=0)"
 eq "no nft table -> nft_table"         "$(field "$out" .verdict | cut -d: -f1)" "nft_table"
 out="$(run env BRNF_PATH=/nonexistent IP_RULE=0)"
 eq "no fwmark rule -> ip_rule"         "$(field "$out" .verdict | cut -d: -f1)" "ip_rule"
-out="$(run env BRNF_PATH=/nonexistent SINGBOX_RUNNING=0)"
+out="$(run env BRNF_PATH=/nonexistent PROC_DIR="$PROC_DOWN")"
 eq "sing-box down -> singbox_process"  "$(field "$out" .verdict | cut -d: -f1)" "singbox_process"
-out="$(run env BRNF_PATH=/nonexistent SINGBOX_ENABLED=0 SINGBOX_RUNNING=0)"
+out="$(run env BRNF_PATH=/nonexistent SINGBOX_ENABLED=0 PROC_DIR="$PROC_DOWN")"
 eq "service disabled -> singbox_service first" "$(field "$out" .verdict | cut -d: -f1)" "singbox_service"
 eq "service verdict tells the uci fix"  "$(field "$out" .verdict | grep -c 'sing-box.main.enabled=1')" "1"
 out="$(run env BRNF_PATH=/nonexistent SINGBOX_LISTEN=0)"

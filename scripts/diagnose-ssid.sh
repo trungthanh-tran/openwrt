@@ -120,8 +120,11 @@ if command -v uci >/dev/null 2>&1 && uci -q get sing-box.main >/dev/null 2>&1; t
     add "singbox_service" false "/etc/config/sing-box has enabled=0, so '/etc/init.d/sing-box restart' starts nothing; re-run apply (0.5.17+) or: uci set sing-box.main.enabled=1; uci commit sing-box; /etc/init.d/sing-box restart"
   fi
 fi
-if pgrep -f sing-box >/dev/null 2>&1; then
-  add "singbox_process" true "sing-box is running (pid $(pgrep -f sing-box | head -n1))"
+if singbox_pid >/dev/null 2>&1; then
+  # A crash loop always has a pid, so say how long this one has lasted: a
+  # figure that stays under a few seconds is a service that keeps dying.
+  _sb_pid="$(singbox_pid)"; _sb_up="$(singbox_uptime_s 2>/dev/null || true)"
+  add "singbox_process" true "sing-box is running (pid $_sb_pid${_sb_up:+, up ${_sb_up}s})"
   if netstat -ln 2>/dev/null | grep -q ":$tp "; then
     add "singbox_listen" true "listening on :$tp"
   else
