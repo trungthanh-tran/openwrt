@@ -2034,8 +2034,15 @@ class ProvisionRunner:
             pushed.append("settings.sh")
         if not pushed:
             return self.seed_empty_config()
-        self.ssh(f"chmod 600 {remote}/config/wifi-socks.conf 2>/dev/null; exit 0",
-                 "Đặt quyền cấu hình", timeout=60)
+        # A file written by a Windows editor arrives with CRLF, and the router's
+        # shell then reads the carriage return as part of the value: WIFI_COUNTRY
+        # becomes "VN\r" and preflight rejects a file that looks correct here.
+        self.ssh(
+            f"cd {remote}/config 2>/dev/null || exit 0; "
+            "for f in wifi-socks.conf settings.sh proxy-pools.conf; do "
+            "[ -f $f ] || continue; sed -i 's/\\r$//' $f 2>/dev/null || true; done; "
+            f"chmod 600 {remote}/config/wifi-socks.conf 2>/dev/null; exit 0",
+            "Đặt quyền cấu hình", timeout=60)
         return " + ".join(pushed)
 
     def seed_empty_config(self) -> str:

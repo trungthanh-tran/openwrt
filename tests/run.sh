@@ -115,6 +115,50 @@ else
   no "a plain resolver passes validation"
 fi
 
+echo "== settings.sh with Windows line endings =="
+# A settings.sh saved by a Windows editor (or pushed from one) keeps CRLF, and
+# sourcing it put a carriage return at the end of every value: a correct
+# WIFI_COUNTRY="VN" was rejected as "not a two-letter uppercase country code",
+# a message that names the rule but never what was actually read.
+CRLF_DIR="$STUB/crlf"; mkdir -p "$CRLF_DIR"
+printf 'WIFI_COUNTRY="VN"\r\nIPV6_MODE=disable\r\nDNS_UPSTREAM="9.9.9.9"\r\n' > "$CRLF_DIR/settings.sh"
+printf 'WIFI_COUNTRY="VN"\nIPV6_MODE=disable\n' > "$CRLF_DIR/lf-settings.sh"
+run_settings() {  # source lib.sh from a chosen settings.sh, then run a snippet
+  SETTINGS="$1" CONF=/dev/null POOLS=/dev/null \
+    sh -c '. "$SB_ROOT/scripts/lib.sh"; '"$2" 2>&1
+}
+out="$(run_settings "$CRLF_DIR/settings.sh" 'printf "[%s]\n" "$WIFI_COUNTRY"')"
+match "CRLF settings.sh yields clean values" "$out" '\[VN\]'
+out="$(run_settings "$CRLF_DIR/settings.sh" 'validate_settings')"
+match "CRLF settings.sh is reported"         "$out" 'CRLF.*line endings'
+match "the CRLF hint names the fix"          "$out" "sed -i 's/"
+if run_settings "$CRLF_DIR/settings.sh" 'validate_settings' >/dev/null 2>&1; then
+  ok "a CRLF settings.sh still validates"
+else
+  no "a CRLF settings.sh still validates"
+fi
+out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'validate_settings')"
+nomatch "a plain settings.sh is not accused of CRLF" "$out" 'CRLF'
+
+# The old rejection described the rule only, so an empty value, a lowercase
+# code and a stray character all produced the same sentence.
+out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'WIFI_COUNTRY=vn; validate_settings')"
+match "a rejected country code is quoted back" "$out" "currently 'vn'"
+out="$(run_settings "$CRLF_DIR/lf-settings.sh" 'unset WIFI_COUNTRY; validate_settings')"
+match "a missing country code says so"         "$out" 'currently unset'
+
+# A router whose config/ never arrived reported the country rule instead.
+out="$(run_settings "$CRLF_DIR/absent-settings.sh" 'validate_settings')"
+match "a missing settings.sh is named"   "$out" 'Settings file not found'
+nomatch "and does not blame the country" "$out" 'WIFI_COUNTRY'
+
+# wifi-socks.conf is read directly by a dozen awk callers, so it cannot be
+# stripped centrally the way settings.sh is; it is named instead.
+printf 'Alpha|2g|1|key|1.2.3.4|1080|u|p|1|1|\r\n' > "$CRLF_DIR/wifi.conf"
+out="$(SETTINGS="$CRLF_DIR/lf-settings.sh" CONF="$CRLF_DIR/wifi.conf" POOLS=/dev/null \
+       sh -c '. "$SB_ROOT/scripts/lib.sh"; validate_settings' 2>&1)"
+match "a CRLF wifi-socks.conf is named" "$out" 'wifi-socks.conf has Windows'
+
 echo "== unsupported board override =="
 # ubus and /proc/device-tree/model are absent here, so the board never matches.
 if run_lib 'ALLOW_UNSUPPORTED_BOARD=0; validate_platform' >/dev/null 2>&1; then

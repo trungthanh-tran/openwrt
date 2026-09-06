@@ -520,3 +520,7 @@ trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 | Trang trắng kiểu chữ đơn giản, không có sidebar đẹp | Thiếu `/www/sbproxy/assets/bootstrap.min.css` — chạy lại `install-agent.sh` hoặc `self-update`. Trang vẫn dùng được. |
 | `Mất kết nối … mixed-content?` | Đang mở trang qua https. Mở đúng `http://<router>/sbproxy/`. |
 | Agent cũ không có action `login` | Cập nhật agent (⬆ Cập nhật bằng token, hoặc `self-update.sh`), hoặc đăng nhập bằng token. |
+| `Không đăng nhập được: Unexpected token 'U' … is not valid JSON` (bản ≤ 0.5.26) | uhttpd trả về text thay vì JSON, gần như luôn là **router chưa cài agent**. Từ 0.5.27 web console báo thẳng: cài bằng `sh /root/sbproxy/agent/install-agent.sh`, hoặc dùng **sbproxy Web Deploy → Cài / Cập nhật**. |
+| `HTTP 5xx: phản hồi không phải JSON — …` | Đọc đoạn nội dung in kèm: đó là nguyên văn router trả về (uhttpd lỗi, proxy chặn, agent crash). Kiểm tra `logread -e uhttpd` và `ls -l /www/cgi-bin/sbproxy`. |
+| Preflight báo `WIFI_COUNTRY must be a two-letter uppercase country code` dù file ghi `WIFI_COUNTRY="VN"` | File `config/settings.sh` lưu kiểu Windows (CRLF): giá trị thật là `VN` + ký tự xuống dòng. Từ 0.5.27 lib tự bỏ CR và chỉ cảnh báo; sửa hẳn bằng `sed -i 's/\r$//' /root/sbproxy/config/settings.sh`. Thông báo lỗi mới in kèm giá trị đọc được. |
+| `[WARN] … has Windows (CRLF) line endings` cho `wifi-socks.conf` / `proxy-pools.conf` | Chạy đúng lệnh `sed` in kèm cảnh báo. Hai file này được nhiều script đọc trực tiếp nên không tự sửa. |

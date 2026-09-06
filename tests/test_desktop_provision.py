@@ -197,6 +197,18 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.assertIn("/root/sbproxy/config/wifi-socks.conf", uploads)
         self.assertIn("/root/sbproxy/config/settings.sh", uploads)
 
+    def test_pushed_configuration_loses_its_windows_line_endings(self):
+        """Notepad saves CRLF; the router's shell reads the CR as a value."""
+        self.settings.settings_path = str(self.tmp / "settings.sh")
+        Path(self.settings.settings_path).write_bytes(b'WIFI_COUNTRY="VN"\r\n')
+        runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", "")})
+        ok, _provisioner = self.run_full(runner)
+        self.assertTrue(ok)
+        commands = "\n".join(" ".join(call) for call in runner.calls)
+        self.assertIn("sed -i 's/\\r$//'", commands)
+        for filename in ("settings.sh", "wifi-socks.conf"):
+            self.assertIn(filename, commands)
+
     def test_steps_without_work_report_skipped(self):
         self.settings.config_path = ""
         self.settings.run_apply = False

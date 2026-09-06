@@ -82,6 +82,32 @@ class UpdateSafetyTests(unittest.TestCase):
         self.assertIsInstance(result, deployer.core.Skipped)
         self.assertIn("không apply lại Wi-Fi", result)
 
+    def test_a_failing_preflight_never_blocks_an_update(self):
+        """The router keeps its config; the update only refreshes web + agent.
+
+        A settings.sh that preflight rejects used to stop the run before the
+        agent was installed, and the web console then answered the login with
+        uhttpd's plain-text CGI error instead of JSON.
+        """
+        runner = deployer.WebDeployRunner(self.settings)
+        runner.inventory["code"] = True
+        failure = deployer.core.ProvisionError(
+            "Chạy preflight: [sbproxy][ERR] WIFI_COUNTRY must be a two-letter uppercase country code"
+        )
+        with mock.patch.object(deployer.core.ProvisionRunner, "step_preflight", side_effect=failure):
+            result = runner.step_preflight()
+        self.assertIsInstance(result, deployer.core.Skipped)
+        self.assertIn("WIFI_COUNTRY", result)
+
+    def test_a_first_install_still_fails_on_a_bad_configuration(self):
+        """Nothing is running yet, so a broken config must stop the wizard."""
+        runner = deployer.WebDeployRunner(self.settings)
+        runner.inventory["code"] = False
+        with mock.patch.object(deployer.core.ProvisionRunner, "step_preflight",
+                               side_effect=deployer.core.ProvisionError("preflight failed")):
+            with self.assertRaises(deployer.core.ProvisionError):
+                runner.step_preflight()
+
     def test_upload_preserves_all_operator_configuration(self):
         package = self.root / "sbproxy-update-0.5.20-SNAPSHOT.tar.gz"
         package.write_bytes(b"payload")
@@ -96,6 +122,10 @@ class UpdateSafetyTests(unittest.TestCase):
         command = "\n".join(commands)
         for filename in ("wifi-socks.conf", "proxy-pools.conf", "settings.sh"):
             self.assertIn(filename, command)
+        # Config kept from an earlier Windows-side push can still carry CRLF,
+        # and the router's shell reads the carriage return as part of every
+        # value -- WIFI_COUNTRY="VN" then fails preflight as an invalid code.
+        self.assertIn("sed -i 's/\\r$//'", command)
 
 
 if __name__ == "__main__":

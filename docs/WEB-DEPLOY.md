@@ -324,6 +324,9 @@ unset TOKEN
 | Thiết bị có Wi-Fi nhưng không có mạng | Chạy Chẩn đoán trên SSID; kiểm tra health của slot proxy và default route. |
 | Apply lỗi hoặc mất mạng | Cắm LAN dây, chạy `cd /root/sbproxy && sh scripts/rollback.sh`. |
 | Quên mật khẩu web | Chạy `sbproxy-webauth set admin` qua SSH. |
+| Dừng ở bước **Chạy preflight** với `WIFI_COUNTRY must be a two-letter uppercase country code` | `config/settings.sh` trên router lưu kiểu Windows (CRLF). Bản 0.5.27 trở đi tự chuẩn hoá khi đẩy code; nếu đang dùng bản cũ: `sed -i 's/\r$//' /root/sbproxy/config/settings.sh`. |
+| Bước **Chạy preflight** hiện `bỏ qua preflight lỗi: …` | Đúng như thiết kế từ 0.5.27 với router **đã cài**: cập nhật web/agent không đụng Wi-Fi nên không bị cấu hình cũ chặn. Vẫn nên sửa lỗi in kèm trước lần apply tiếp theo. |
+| Web console báo `Unexpected token 'U' … is not valid JSON` khi đăng nhập | Agent chưa được cài (deploy dừng trước bước **Cài / cập nhật agent**). Chạy lại **Cài / Cập nhật**, hoặc SSH `sh /root/sbproxy/agent/install-agent.sh`. |
 
 ## 10. Các file cần biết
 

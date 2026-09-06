@@ -5,6 +5,38 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.27] - 2026-09-06
+
+### Fixed
+- **Web console báo `Unexpected token 'U' … is not valid JSON` khi đăng nhập.**
+  Router chưa cài agent thì uhttpd trả về text thuần
+  (`Unable to launch the requested CGI program: /www/cgi-bin/sbproxy`), console
+  gọi thẳng `.json()` nên người dùng chỉ thấy lỗi cú pháp JSON của trình duyệt —
+  không có mã HTTP, không biết phải làm gì. Nay mọi lời gọi agent đi qua
+  `readJson`: body không phải JSON thì hiện đúng nguyên nhân, kèm lệnh cài
+  `sh /root/sbproxy/agent/install-agent.sh` cho trường hợp thiếu CGI (hoặc 404),
+  còn các trường hợp khác in mã HTTP và trích nguyên văn phản hồi.
+- **Preflight từ chối `WIFI_COUNTRY="VN"` hoàn toàn đúng.** `config/settings.sh`
+  lưu kiểu Windows (CRLF) thì giá trị đọc được là `VN` + ký tự CR, và thông báo
+  cũ chỉ nhắc lại quy tắc nên không thể lần ra. Nay `lib.sh` source bản đã bỏ
+  CR (và cảnh báo kèm lệnh `sed` để sửa hẳn file), thông báo lỗi in kèm giá
+  trị thực đọc được, `wifi-socks.conf` / `proxy-pools.conf` có CRLF thì được
+  gọi tên rõ ràng — hai file này nhiều script đọc trực tiếp nên không tự sửa.
+  Cả Web Deploy lẫn console desktop chuẩn hoá xuống dòng của config ngay khi
+  đẩy lên router, để lỗi này không quay lại.
+- **Cập nhật bị chặn bởi chính cấu hình mà nó không đụng tới.** Web Deploy chạy
+  preflight cả khi router đã cài sẵn (lúc đó bước apply vốn đã bỏ qua, không
+  reload Wi-Fi). Một `settings.sh` cũ bị preflight từ chối làm cả phiên dừng
+  **trước** bước "Cài / cập nhật agent", nên router có trang web mà không có
+  CGI phía sau — và đó là lý do đăng nhập trả về text của uhttpd thay vì JSON.
+  Nay với router đã cài, preflight chỉ còn là cảnh báo: bước hiện "bỏ qua
+  preflight lỗi: …" kèm nguyên văn lỗi, agent vẫn được cập nhật. Cài mới thì
+  preflight vẫn chặn như cũ.
+- **`settings.sh` không tồn tại nay được gọi tên.** Trước đây thiếu file thì mọi
+  biến đều rỗng và `WIFI_COUNTRY` lãnh đủ; nay báo thẳng `Settings file not
+  found: …`.
+
+
 ## [0.5.26] - 2026-09-06
 
 ### Fixed

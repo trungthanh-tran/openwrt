@@ -7,8 +7,32 @@ CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 POOLS="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
 SETTINGS="${SETTINGS:-$SB_ROOT/config/settings.sh}"
 
-# shellcheck source=/dev/null
-[ -f "$SETTINGS" ] && . "$SETTINGS"
+# A settings.sh edited on Windows -- or copied there and back by a Windows
+# deploy tool -- keeps CRLF line endings, and sourcing such a file hides a
+# carriage return at the end of every value: WIFI_COUNTRY becomes "VN<CR>" and
+# validation then rejects a file that looks perfectly correct on screen.
+# Source a stripped copy instead, and remember it so validate_settings can tell
+# the operator where the real problem is.
+SETTINGS_CRLF=0
+if [ -f "$SETTINGS" ]; then
+  if [ -n "$(tr -dc '\r' < "$SETTINGS" 2>/dev/null)" ]; then
+    _sb_set_tmp="$(mktemp "${TMPDIR:-/tmp}/sbproxy-settings.XXXXXX" 2>/dev/null || true)"
+    if [ -n "$_sb_set_tmp" ] && tr -d '\r' < "$SETTINGS" > "$_sb_set_tmp" 2>/dev/null; then
+      SETTINGS_CRLF=1
+      # shellcheck source=/dev/null
+      . "$_sb_set_tmp"
+      rm -f "$_sb_set_tmp"
+    else
+      [ -z "$_sb_set_tmp" ] || rm -f "$_sb_set_tmp"
+      # shellcheck source=/dev/null
+      . "$SETTINGS"
+    fi
+    unset _sb_set_tmp
+  else
+    # shellcheck source=/dev/null
+    . "$SETTINGS"
+  fi
+fi
 
 # --- Logging ----------------------------------------------------------------
 log()  { printf '[sbproxy] %s\n' "$*" >&2; }
@@ -56,10 +80,30 @@ validate_platform() {
   [ -z "$(cat /etc/glversion 2>/dev/null)" ] || warn "GL.iNet OEM firmware detected; support is experimental and requires separate testing."
 }
 
+# CRLF in the pipe-separated config files cannot be stripped centrally the way
+# settings.sh can -- a dozen awk readers open them directly -- so name the
+# problem instead of letting it surface as a stray control character.
+check_crlf() {
+  [ -f "$1" ] || return 0
+  [ -n "$(tr -dc '\r' < "$1" 2>/dev/null)" ] || return 0
+  warn "$2 has Windows (CRLF) line endings; values end with a carriage return. Fix it with: sed -i 's/\r\$//' $1"
+}
+
 validate_settings() {
+  # Without this file every setting reads as unset, and the first one checked
+  # (WIFI_COUNTRY) took the blame for it.
+  [ -f "$SETTINGS" ] || die "Settings file not found: $SETTINGS (copy config/settings.sh from the package, or re-push the code)."
+  [ "${SETTINGS_CRLF:-0}" = "1" ] && warn "config/settings.sh has Windows (CRLF) line endings; it was read without them. Fix it once with: sed -i 's/\r\$//' $SETTINGS"
+  check_crlf "$CONF" "config/wifi-socks.conf"
+  check_crlf "$POOLS" "config/proxy-pools.conf"
   case "${WIFI_COUNTRY:-}" in
     [A-Z][A-Z]) : ;;
-    *) die "WIFI_COUNTRY must be a two-letter uppercase country code in config/settings.sh (for example, VN)." ;;
+    *)
+      # Showing the value turns "your file is wrong" into something the
+      # operator can act on -- an empty line, a lowercase code and a stray
+      # character all read the same in the old message.
+      if [ -n "${WIFI_COUNTRY:-}" ]; then _vs_shown="'$WIFI_COUNTRY'"; else _vs_shown="unset"; fi
+      die "WIFI_COUNTRY must be a two-letter uppercase country code in $SETTINGS (for example, VN); it is currently $_vs_shown." ;;
   esac
   [ "${IPV6_MODE:-disable}" = "disable" ] || die "v0.2 only supports IPV6_MODE=disable."
   # Empty means "use the built-in default", the same as everywhere else here.

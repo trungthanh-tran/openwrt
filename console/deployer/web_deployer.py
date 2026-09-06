@@ -78,6 +78,12 @@ class WebDeployRunner(core.ProvisionRunner):
                 f"tar xzf /tmp/sbproxy-web-deploy.tar.gz -C {remote}; "
                 f"for f in wifi-socks.conf proxy-pools.conf settings.sh; do "
                 f"[ ! -f $KEEP/$f ] || cp $KEEP/$f {remote}/config/$f; done; "
+                # Config kept from an earlier Windows-side push can carry CRLF,
+                # which the router's shell reads as part of every value -- that
+                # is what turned a correct WIFI_COUNTRY="VN" into a preflight
+                # failure. Normalise once, here, where the files land.
+                f"for f in wifi-socks.conf proxy-pools.conf settings.sh; do "
+                f"[ ! -f {remote}/config/$f ] || sed -i 's/\\r$//' {remote}/config/$f; done; "
                 f"chmod +x {remote}/scripts/*.sh {remote}/agent/install-agent.sh; "
                 "rm -rf $KEEP /tmp/sbproxy-web-deploy.tar.gz"
             )
@@ -86,6 +92,21 @@ class WebDeployRunner(core.ProvisionRunner):
             return f"{remote} · v{self.pushed_version or '?'}"
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
+
+    def step_preflight(self) -> str:
+        # An update to an existing install only refreshes the web UI and the
+        # agent; step_apply below never reloads its Wi-Fi. So a configuration
+        # the router has been living with must not abort the run -- it did:
+        # preflight rejected an old settings.sh and the deploy stopped two
+        # steps before "Cài / cập nhật agent", leaving the router with a web
+        # page and no CGI behind it.
+        if not self.inventory.get("code"):
+            return super().step_preflight()
+        try:
+            return super().step_preflight()
+        except core.ProvisionError as error:
+            detail = " ".join(str(error).split())[:160]
+            return core.Skipped(f"Cập nhật web/agent · bỏ qua preflight lỗi: {detail}")
 
     def step_apply(self) -> str:
         # Existing installations are code/web updates only. Never reload their

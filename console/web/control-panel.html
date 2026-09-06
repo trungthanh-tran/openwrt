@@ -1319,13 +1319,42 @@
     connected: false, health: {}, timer: null, version: ""
   };
   const apiUrl = a => (agent.base || "") + "/cgi-bin/sbproxy?action=" + a;
+
+  // Every answer from the agent is JSON. When it is not -- uhttpd replying
+  // "Unable to launch the requested CGI program" because the agent was never
+  // installed, a 404 from a router without the CGI, an empty 502 from a
+  // reloading uhttpd -- the browser's own "Unexpected token 'U'" message hides
+  // what actually happened, so translate the body into something actionable.
+  function agentBodyError(res, text) {
+    const body = String(text || "").replace(/\s+/g, " ").trim();
+    if (/Unable to launch the requested CGI/i.test(body) || res.status === 404) {
+      return pick(
+        "The router has no sbproxy agent: uhttpd cannot run /cgi-bin/sbproxy. Install it over SSH with: sh /root/sbproxy/agent/install-agent.sh (or use sbproxy Web Deploy → Install / Update).",
+        "Router chưa cài agent sbproxy: uhttpd không chạy được /cgi-bin/sbproxy. Cài qua SSH: sh /root/sbproxy/agent/install-agent.sh (hoặc dùng sbproxy Web Deploy → Cài / Cập nhật).");
+    }
+    if (!body) {
+      return pick(`HTTP ${res.status}: the router answered with an empty body.`,
+                  `HTTP ${res.status}: router trả về rỗng.`);
+    }
+    const short = body.length > 200 ? body.slice(0, 200) + "…" : body;
+    return pick(`HTTP ${res.status}: the answer is not JSON — ${short}`,
+                `HTTP ${res.status}: phản hồi không phải JSON — ${short}`);
+  }
+  function readJson(res) {
+    return res.text().then(text => {
+      let data;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+      if (data && typeof data === "object") return data;
+      throw new Error(agentBodyError(res, text));
+    });
+  }
   function api(action, method, body, isText) {
     const headers = { "Authorization": `Bearer ${agent.token}` };
     if (body != null) headers["Content-Type"] = isText ? "text/plain" : "application/json";
     return fetch(apiUrl(action), {
       method: method || "GET", headers,
       body: body == null ? undefined : (isText ? body : JSON.stringify(body))
-    }).then(r => isText === "resp" ? r.text() : r.json());
+    }).then(r => isText === "resp" ? r.text() : readJson(r));
   }
 
   const healthHistory = {};   // idx -> [{ms,state}], accumulated on each poll
@@ -1529,7 +1558,7 @@
     return fetch(apiUrl(action), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
-    }).then(r => r.json());
+    }).then(readJson);
   }
   // ---- first-run: the router has no web account yet ------------------------
   function openSetup() {
@@ -1828,7 +1857,7 @@
       method: "POST",
       headers: { "Authorization": `Bearer ${agent.token}`, "Content-Type": "application/octet-stream" },
       body: f
-    }).then(r => r.json()).then(d => {
+    }).then(readJson).then(d => {
       hideInline("upBackdrop");
       showLog("self-update.sh" + (d && d.ok ? ` (${d.from} → ${d.to})` : ""), d);
       // uhttpd may reload; re-poll shortly after to pick up the new version.
@@ -1975,7 +2004,7 @@
     $("dailyLogBox").textContent = pick("Loading…", "Đang tải…");
     fetch(apiUrl("logs") + (date ? "&date=" + encodeURIComponent(date) : ""), {
       headers: { "Authorization": `Bearer ${agent.token}` }
-    }).then(r => r.json()).then(d => {
+    }).then(readJson).then(d => {
       if (!d || d.ok === false) throw new Error((d && d.error) || "logs failed");
       const select = $("dailyLogDate");
       const dates = d.dates || [];
@@ -2098,10 +2127,7 @@
       : pick("Loading…", "Đang tải…");
     fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), {
       headers: { "Authorization": `Bearer ${agent.token}` }, signal: controller.signal
-    }).then(r => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(d => {
+    }).then(readJson).then(d => {
         if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
         if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
         activePool = d.proxies || [];
@@ -2549,7 +2575,7 @@
     deviceAction("ban", idx, mac);
   }
   function changeClientProxy(idx, mac) {
-    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), { headers: { "Authorization": `Bearer ${agent.token}` } }).then(r => r.json())
+    fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), { headers: { "Authorization": `Bearer ${agent.token}` } }).then(readJson)
       .then(d => {
         const pool = (d && d.proxies) || [];
         if (!pool.length) throw new Error(pick("This SSID has no proxy pool.", "SSID này chưa có proxy pool."));
@@ -2621,10 +2647,7 @@
   function fetchPoolForIdx(idx) {
     return fetch(apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx), {
       headers: { "Authorization": `Bearer ${agent.token}` }
-    }).then(r => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(d => {
+    }).then(readJson).then(d => {
       if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
       return d.proxies || [];
     });
@@ -3459,7 +3482,7 @@
     if (!agent.token) {
       // First run: when the router has no web account at all, open the
       // setup form right away instead of a login that can only fail.
-      fetch(apiUrl("login_state")).then(r => r.json()).then(d => {
+      fetch(apiUrl("login_state")).then(readJson).then(d => {
         if (d && d.ok && d.account_configured === false) openSetup();
       }).catch(() => {});
       return;
