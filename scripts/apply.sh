@@ -76,6 +76,11 @@ uci commit wireless
 
 wire_dhcp_hook
 
+# The package init script can restart sing-box when this logical uplink comes
+# up. Persist it while the current route is still known, before network reload
+# briefly removes dynamic routes.
+ensure_singbox_uplink_trigger
+
 # Re-apply persistent MAC bans so they survive this re-apply (before wifi reload).
 apply_bans
 
@@ -102,13 +107,22 @@ mv /etc/sbproxy.env.new /etc/sbproxy.env
 ensure_singbox_compat_env
 
 # 3) Reload services in dependency order: network, firewall, TPROXY, proxy, Wi-Fi.
+# Do not restart dnsmasq here. The DHCP init script already subscribes to the
+# managed interface events emitted by network/wifi reload. An explicit restart
+# caused a second ujail teardown and an extra, harmless
+# "procd: Got unexpected signal 1" on current OpenWrt snapshots.
 log "Reloading services..."
 run "/etc/init.d/network reload"
-run "/etc/init.d/dnsmasq restart"
 run "/etc/init.d/firewall reload"
 run "/etc/init.d/sbproxy restart"
 ensure_singbox_privileges
 ensure_singbox_service
+# A dynamic uplink may need a few seconds to reacquire DHCP after network
+# reload. Starting sing-box before that produced "missing default interface"
+# and left fake-IP DNS unavailable until another restart.
+if ! wait_for_default_route; then
+  warn "No IPv4 default route after ${SINGBOX_ROUTE_WAIT:-15}s; starting sing-box anyway. Its uplink trigger will retry when the route appears."
+fi
 run "/etc/init.d/sing-box restart"
 run "wifi reload"
 recover_wifi_networks

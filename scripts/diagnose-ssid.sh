@@ -10,7 +10,8 @@
 set -u
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
-[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
 
 command -v jq >/dev/null 2>&1 || { echo '{"ok":false,"error":"missing jq"}'; exit 1; }
 idx="${1:-}"
@@ -65,8 +66,10 @@ leases="$(awk -v s="$subnet." 'index($3, s) == 1 { print $2 " " $3 " " $4 }' "${
 nl="$(printf '%s' "$leases" | grep -c .)"
 if [ "$nl" -gt 0 ]; then
   add "dhcp" true "$nl lease(s): $(printf '%s' "$leases" | tr '\n' ';' | cut -c1-200)"
+elif [ "${n:-0}" -eq 0 ]; then
+  add "dhcp" true "no DHCP lease expected: no station is currently associated with $ifn"
 else
-  add "dhcp" false "no DHCP lease in $subnet.0/24 (device has no IP: dnsmasq not serving br-w$idx, or the device never associated)"
+  add "dhcp" false "${n} station(s) associated but no DHCP lease exists in $subnet.0/24 (dnsmasq may not be serving br-w$idx, or the client may use a static address)"
 fi
 
 # --- 5. bridge netfilter is not diverting the bridge ---------------------------

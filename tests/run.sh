@@ -730,6 +730,11 @@ match "apply verifies sing-box came up"    "$apply_script" 'verify_singbox_runni
 apply_order="$(grep -n 'ensure_singbox_service\|/etc/init.d/sing-box restart\|verify_singbox_running\|recover_wifi_networks' "$ROOT/scripts/apply.sh" | cut -d: -f2- | tr -d ' ' | tr '\n' ' ')"
 eq "apply orders enable -> restart -> wifi recovery -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" recover_wifi_networks verify_singbox_running '
 match "install-deps enables the sing-box service" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_service'
+match "apply persists the current sing-box uplink trigger" "$apply_script" 'ensure_singbox_uplink_trigger'
+match "apply bounds its wait for a default route" "$apply_script" 'wait_for_default_route'
+nomatch "apply does not restart dnsmasq in addition to interface reloads" "$apply_script" '/etc/init.d/dnsmasq restart'
+match "install-deps persists the sing-box uplink trigger" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_uplink_trigger'
+match "gateway switching updates the sing-box uplink trigger" "$(cat "$ROOT/scripts/switch-gateway.sh")" 'sing-box.main.ifaces'
 match "doctor reports a disabled sing-box service" "$(cat "$ROOT/scripts/doctor.sh")" 'enabled=0: the init script never starts sing-box'
 SBS="$STUB/sbs"; mkdir -p "$SBS/bin"
 cat > "$SBS/bin/uci" <<'SH'

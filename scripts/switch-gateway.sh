@@ -34,6 +34,15 @@ has_default="$(printf '%s' "$status" | jq -r \
   '[(.route // [])[] | select(((.target // "") == "0.0.0.0") and ((.mask // 0) == 0))] | length > 0')"
 [ "$has_default" = "true" ] || fail "interface $want has no default route; it cannot be the uplink"
 
+# OpenWrt's packaged sing-box init script watches this logical interface and
+# restarts after it comes up. Set it before network reload so a switched or
+# boot-time uplink cannot leave sing-box running from before the default route
+# existed.
+if uci -q get sing-box.main >/dev/null 2>&1; then
+  uci set "sing-box.main.ifaces=$want" || fail "cannot set sing-box uplink trigger to $want"
+  uci commit sing-box || fail "cannot commit sing-box uplink trigger"
+fi
+
 # Every other interface that offers a default route steps behind the choice.
 dump="$(ubus call network.interface dump 2>/dev/null || true)"
 others="$(printf '%s' "$dump" | jq -r --arg want "$want" '

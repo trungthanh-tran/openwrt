@@ -44,6 +44,7 @@ fi
 [ -f /etc/init.d/sing-box ] && run "/etc/init.d/sing-box enable" || warn "/etc/init.d/sing-box was not found"
 ensure_singbox_privileges
 ensure_singbox_service
+ensure_singbox_uplink_trigger
 
 # Register project files that standard OpenWrt sysupgrade backups must preserve.
 log "Registering files in /etc/sysupgrade.conf (to preserve sbproxy configuration during backup/upgrades)..."

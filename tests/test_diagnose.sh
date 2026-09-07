@@ -40,7 +40,7 @@ case "$tool" in
            esac ;;
   pgrep)   exit 1 ;;
   netstat) [ "${SINGBOX_LISTEN:-1}" = 1 ] && echo "tcp        0      0 0.0.0.0:12001           0.0.0.0:*               LISTEN" ;;
-  iw)      printf 'Station aa:bb:cc:dd:ee:ff (on phy0-ap0)\n' ;;
+  iw)      [ "${WIFI_STATIONS:-1}" = 1 ] && printf 'Station aa:bb:cc:dd:ee:ff (on phy0-ap0)\n' ;;
   logread) printf '%s\n' "${SINGBOX_LOG:-INFO sing-box started}" ;;
 esac
 exit 0
@@ -91,7 +91,7 @@ mkdir -p "$PROC_UP/4242" "$PROC_DOWN"
 printf 'sing-box\n' > "$PROC_UP/4242/comm"
 printf '4242 (sing-box) S %s 900\n' "$(i=0; while [ $i -lt 18 ]; do printf '0 '; i=$((i+1)); done)" > "$PROC_UP/4242/stat"
 printf '1000.00 900.00\n' > "$PROC_UP/uptime"
-run() { ( cd "$SB" && DHCP_LEASES="$LEASES" PROC_DIR="$PROC_UP" "$@" sh scripts/diagnose-ssid.sh 1 2>/dev/null ); }
+run() { ( cd "$SB" && ENV_FILE=/nonexistent DHCP_LEASES="$LEASES" PROC_DIR="$PROC_UP" "$@" sh scripts/diagnose-ssid.sh 1 2>/dev/null ); }
 field() { printf '%s' "$1" | jq -r "$2"; }
 check_ok() { printf '%s' "$1" | jq -r --arg n "$2" '.checks[] | select(.name == $n) | .ok'; }
 
@@ -110,6 +110,16 @@ eq "report is rendered"            "$(field "$out" .report | grep -c '^  ok')" "
 
 eq "the process check reports how long it has been up" \
    "$(printf '%s' "$out" | jq -r '.checks[] | select(.name == "singbox_process") | .detail' | grep -c 'up 991s')" "1"
+
+echo "== diagnose: DHCP needs an associated client before absence is a fault =="
+: > "$LEASES"
+out="$(run env BRNF_PATH=/nonexistent WIFI_STATIONS=0)"
+eq "no station makes an empty lease table expected" "$(check_ok "$out" dhcp)" "true"
+eq "no station does not become the verdict" "$(field "$out" .verdict | cut -d: -f1)" "ok"
+out="$(run env BRNF_PATH=/nonexistent WIFI_STATIONS=1)"
+eq "an associated station without a lease fails DHCP" "$(check_ok "$out" dhcp)" "false"
+eq "the missing lease becomes the verdict" "$(field "$out" .verdict | cut -d: -f1)" "dhcp"
+printf '1 aa:bb:cc:dd:ee:ff 192.168.11.23 phone *\n' > "$LEASES"
 
 echo "== diagnose: each broken link is named first =="
 out="$(run env BRNF_PATH=/nonexistent WIFI_DOWN=1)"
@@ -163,9 +173,9 @@ eq "pool slots are counted"                "$(printf '%s' "$out" | jq -r '.check
 rm -f "$SB/config/proxy-pools.conf"
 
 echo "== diagnose: unknown idx =="
-out="$(cd "$SB" && sh scripts/diagnose-ssid.sh 7 2>/dev/null)"
+out="$(cd "$SB" && ENV_FILE=/nonexistent sh scripts/diagnose-ssid.sh 7 2>/dev/null)"
 eq "unknown idx -> config verdict"     "$(field "$out" .verdict | cut -d: -f1)" "config"
-out="$(cd "$SB" && sh scripts/diagnose-ssid.sh 'x;y' 2>/dev/null)"
+out="$(cd "$SB" && ENV_FILE=/nonexistent sh scripts/diagnose-ssid.sh 'x;y' 2>/dev/null)"
 eq "dirty idx is refused"              "$(field "$out" .ok)" "false"
 
 echo

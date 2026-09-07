@@ -5,6 +5,22 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Apply không còn restart dnsmasq trùng.** `network reload` và `wifi reload` đã
+  phát interface event mà init script dnsmasq theo dõi. Lệnh restart riêng trước
+  đó chỉ tạo thêm một lần dựng/lập `ujail`, làm OpenWrt snapshot ghi
+  thêm `procd: Got unexpected signal 1`. Cấu hình DHCP vẫn được nạp qua
+  trigger interface chuẩn của OpenWrt.
+- **sing-box khởi động trước khi uplink có default route.** Trên uplink Wi-Fi,
+  sing-box từng ghi `network: missing default interface` khoảng mười giây trước
+  khi `wwan` nhận lease. Apply nay chờ route trong thời gian hữu hạn, và lưu
+  logical uplink vào `sing-box.main.ifaces` để trigger có sẵn của gói sing-box
+  tự restart khi interface lên. Upstream DNS vẫn dùng TCP; fake-IP và hijack
+  DNS cổng 53 của client không đổi.
+- **SSID chưa có client không còn bị báo hỏng DHCP.** Chẩn đoán chỉ báo FAIL khi
+  đã có station associated mà subnet vẫn chưa có lease; `0 station` được ghi
+  là trạng thái chưa có lease như mong đợi.
+
 ## [0.5.29] - 2026-09-07
 
 ### Fixed

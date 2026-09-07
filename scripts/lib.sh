@@ -298,6 +298,61 @@ wire_dhcp_hook() {
   run "uci commit dhcp"
   log "dnsmasq will now pin each device as its lease is handed out."
 }
+
+# The logical OpenWrt interface that currently owns the IPv4 default route.
+# Return the UCI/ubus name (for example wan or wwan), never the kernel device
+# name: the packaged sing-box init script consumes logical names in its
+# `ifaces` option and restarts the service on interface.*.up.
+default_route_interface() {
+  command -v ubus >/dev/null 2>&1 || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  ubus call network.interface dump 2>/dev/null \
+    | jq -r '
+        .interface[]?
+        | select(.up == true)
+        | select(([ (.route // [])[]?
+                    | select((.target // "") == "0.0.0.0"
+                             and ((.mask // 0) == 0)) ] | length) > 0)
+        | (.interface // empty)' 2>/dev/null \
+    | head -n 1
+}
+
+default_route_ready() {
+  command -v ip >/dev/null 2>&1 || return 1
+  ip -4 route show default 2>/dev/null | grep -q '^default '
+}
+
+# Network reload may return before a Wi-Fi/USB uplink has reacquired its
+# lease. Keep the wait bounded: apply must still finish on an intentionally
+# offline router, while an ordinary reload gets enough time to avoid starting
+# sing-box with "network: missing default interface".
+wait_for_default_route() { # [seconds]
+  _wdr_left="${1:-${SINGBOX_ROUTE_WAIT:-15}}"
+  case "$_wdr_left" in ''|*[!0-9]*) _wdr_left=15 ;; esac
+  while [ "$_wdr_left" -gt 0 ]; do
+    default_route_ready && return 0
+    sleep 1
+    _wdr_left=$((_wdr_left - 1))
+  done
+  default_route_ready
+}
+
+# Use the restart trigger already provided by OpenWrt's sing-box init script.
+# Persisting the logical uplink fixes the boot race too: sing-box may start
+# before DHCP has installed a default route, then gets restarted by procd when
+# that interface reaches interface.*.up.
+ensure_singbox_uplink_trigger() { # [logical interface]
+  command -v uci >/dev/null 2>&1 || return 0
+  uci -q get sing-box.main >/dev/null 2>&1 || return 0
+  _sut_iface="${1:-$(default_route_interface)}"
+  case "$_sut_iface" in ''|*[!A-Za-z0-9_.-]*) return 0 ;; esac
+  case "$_sut_iface" in w[0-9]*|br-w[0-9]*) return 0 ;; esac
+  [ "$(uci -q get sing-box.main.ifaces 2>/dev/null)" = "$_sut_iface" ] && return 0
+  run "uci set sing-box.main.ifaces='$_sut_iface'"
+  run "uci commit sing-box"
+  log "sing-box will restart when uplink $_sut_iface comes up."
+}
+
 tproxy_port()  { echo $(( TPROXY_PORT_BASE + $1 )); }
 # TPROXY port of one pool slot: pool_port <idx> <slot>.
 pool_port()    { echo $(( ${POOL_PORT_BASE:-13000} + $1 * ${POOL_PORT_STRIDE:-256} + $2 )); }
