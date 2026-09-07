@@ -138,6 +138,11 @@ out="$(report SB_LOG='daemon.err sing-box: FATAL read config: permission denied'
 match "permission denied is named"   "$(ids "$out")" 'singbox_denied'
 eq "and points at the restart"       "$(fixof "$out" singbox_denied)" "singbox_restart"
 
+out="$(report SB_LOG='daemon.err sing-box: FATAL start inbound/tproxy[in-w1]: listen tcp4 0.0.0.0:12001: operation not permitted')"
+match "a TPROXY bind failure is found" "$(ids "$out")" 'singbox_no_privilege'
+eq "and it offers the restart"         "$(fixof "$out" singbox_no_privilege)" "singbox_restart"
+nomatch "and is not read as an unreadable config" "$(ids "$out")" 'singbox_denied'
+
 out="$(report SB_ENABLED=0)"
 match "a disabled service is found"  "$(ids "$out")" 'singbox_disabled'
 out="$(report SB_USER=sing-box)"

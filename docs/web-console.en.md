@@ -544,6 +544,7 @@ column above, so removing one of these features turns the suite red.
 | Symptom | Cause / fix |
 |---|---|
 | **sing-box: NOT RUNNING** card (red), Wi-Fi broadcasts but has no Internet | Press **↻ Restart sing-box** and read the log box (§5.7). Still down → 🩺 diagnose one Wi-Fi, or `logread -e sing-box` over SSH. |
+| The sing-box log repeats `listen tcp4 0.0.0.0:120xx: operation not permitted` | The service runs as a user without `net_admin`, so it cannot open a TPROXY port -- common on a freshly flashed router. Press **↻ Restart sing-box**: from 0.5.29 it moves the service to root and says so. Over SSH: `uci set sing-box.main.user=root; uci commit sing-box; /etc/init.d/sing-box restart`. |
 | No sing-box card/chip at all | Not connected (Live badge off), or an old agent: update it (§3). |
 | `403 — no web account yet` (`setup_required`) | The router has no `/etc/sbproxy/webauth`: the page opens the **Create the first admin account** form by itself. If the form does not appear: SSH `sbproxy-webauth set admin`, or use a token under Advanced. |
 | `401 — wrong current password` (change password) | Re-enter the password in use; forgotten → SSH `sbproxy-webauth set <user>`. |

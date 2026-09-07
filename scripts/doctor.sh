@@ -68,6 +68,11 @@ if [ -f "${SINGBOX_CONF:-/etc/sing-box/config.json}" ]; then
     *) [ "$_d_user" = "$_d_owner" ]          && ok "config.json is owned by the service user ($_d_user)"          || bad "config.json is owned by '$_d_owner' but the service runs as '$_d_user' — it cannot read it (scripts/restart-singbox.sh repairs this)" ;;
   esac
 fi
+if singbox_can_tproxy; then
+  ok "the service user can open TPROXY sockets"
+else
+  bad "sing-box runs as '$(singbox_user)' without net_admin in $(singbox_caps_file): TPROXY listeners cannot bind (scripts/restart-singbox.sh moves it to root)"
+fi
 if uci -q get sing-box.main >/dev/null 2>&1; then
   if [ "$(uci -q get sing-box.main.enabled)" = "1" ]; then ok "service is enabled in /etc/config/sing-box"
   else bad "/etc/config/sing-box has enabled=0: the init script never starts sing-box (apply.sh fixes this)"; fi

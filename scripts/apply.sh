@@ -107,6 +107,7 @@ run "/etc/init.d/network reload"
 run "/etc/init.d/dnsmasq restart"
 run "/etc/init.d/firewall reload"
 run "/etc/init.d/sbproxy restart"
+ensure_singbox_privileges
 ensure_singbox_service
 run "/etc/init.d/sing-box restart"
 run "wifi reload"

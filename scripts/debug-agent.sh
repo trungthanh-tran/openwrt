@@ -157,6 +157,14 @@ else
       "procd respawns it every few seconds, so there is always a pid even though the service never survives. Read the log below." \
       "$(sb_log)"
   fi
+  if sb_log | grep -qi 'operation not permitted'; then
+    add "singbox_no_privilege" "crit" "singbox_restart" \
+      "sing-box không mở được cổng TPROXY" \
+      "sing-box cannot open its TPROXY ports" \
+      "Service đang chạy dưới user không có quyền net_admin nên không bind được listener trong suốt (lỗi 'operation not permitted'), và procd bật lại liên tục. Khởi động lại từ đây sẽ chuyển service sang root." \
+      "The service runs as a user without net_admin, so it cannot bind a transparent listener ('operation not permitted') and procd respawns it forever. Restarting from here moves the service to root." \
+      "$(sb_log)"
+  fi
   if sb_log | grep -qi 'permission denied'; then
     add "singbox_denied" "crit" "singbox_restart" \
       "Log sing-box báo 'permission denied'" \

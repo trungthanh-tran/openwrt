@@ -833,6 +833,39 @@ out="$(SBP_USER='evil; reboot' acc)"
 nomatch "an odd service user is refused, not run"  "$out" 'DRYRUN> chown'
 match "and the refusal says so"                    "$out" 'Refusing to chown'
 
+echo "== the privilege a TPROXY listener needs =="
+# A freshly flashed router ran sing-box as the packaged unprivileged user and
+# crash-looped on every start:
+#   FATAL start inbound/tproxy[in-w1]: listen tcp4 0.0.0.0:12001:
+#   operation not permitted
+# No chown fixes that -- binding a transparent socket needs net_admin, which
+# procd grants from /etc/capabilities/sing-box.json.
+CAPS_YES="$SBP/caps-yes.json"; printf '{"net_admin": true}\n' > "$CAPS_YES"
+CAPS_NO="$SBP/caps-no.json";  printf '{"net_bind_service": true}\n' > "$CAPS_NO"
+priv() { ( PATH="$SBP/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
+           DRYRUN=1 SINGBOX_CAPS="$1" \
+           sh -c '. "$0/scripts/lib.sh"; ensure_singbox_privileges' "$ROOT" 2>&1 ); }
+out="$(SBP_USER=root priv "$CAPS_NO")"
+nomatch "a root service is left alone"             "$out" 'DRYRUN> uci set'
+out="$(SBP_USER='' priv "$CAPS_NO")"
+nomatch "an undeclared service user is left alone too" "$out" 'DRYRUN> uci set'
+out="$(SBP_USER=sing-box priv "$CAPS_YES")"
+nomatch "net_admin in the capability file is enough" "$out" 'DRYRUN> uci set'
+out="$(SBP_USER=sing-box priv "$CAPS_NO")"
+match "without net_admin the service moves to root" "$out" "uci set sing-box.main.user='root'"
+match "and the change is committed"                 "$out" 'uci commit sing-box'
+match "and the reason is stated"                    "$out" 'net_admin'
+out="$(SBP_USER=sing-box priv "$SBP/absent-caps.json")"
+match "a missing capability file counts as no privilege" "$out" "uci set sing-box.main.user='root'"
+match "apply grants the privilege before it starts sing-box" \
+  "$(cat "$ROOT/scripts/apply.sh")" 'ensure_singbox_privileges'
+match "install-deps grants it too, before the first start" \
+  "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_privileges'
+match "escalating to root takes the config back" \
+  "$(sed -n '/^force_singbox_root/,/^}/p' "$ROOT/scripts/lib.sh")" 'ensure_singbox_conf_access'
+match "a failed start is repaired and retried" \
+  "$(sed -n '/^verify_singbox_running/,/^}/p' "$ROOT/scripts/lib.sh")" 'singbox_privilege_error_recently && force_singbox_root'
+
 echo "== restart-singbox.sh: restart, then prove the process is up =="
 if ! command -v jq >/dev/null 2>&1; then
   sk "restart-singbox behavior tests" "jq is not installed"
@@ -848,7 +881,7 @@ SH
 chmod +x "$SBS/bin/sing-box-init"
 rs() { ( cd "$ROOT" && PATH="$SBS/bin:$PATH" SB_ROOT="$ROOT" CONF="$ROOT/config/wifi-socks.conf.example" \
         SINGBOX_INIT="$SBS/bin/sing-box-init" SINGBOX_CONF="$STUB/no-such-config.json" \
-        SINGBOX_START_WAIT=1 SINGBOX_STABLE_WAIT=0 \
+        SINGBOX_START_WAIT=1 SINGBOX_STABLE_WAIT=0 SINGBOX_CAPS="$CAPS_YES" \
         env "$@" sh scripts/restart-singbox.sh 2>/dev/null ); }
 : > "$SBS_LOG"
 out="$(rs PROC_DIR="$SBS/proc-up" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json)"
@@ -874,7 +907,9 @@ echo "== restart-singbox.sh repairs the permission crash loop =="
 # config.json. The restart has to repair that, not report success.
 cat > "$SBS/bin/logread" <<'SH'
 #!/bin/sh
-if [ "${SBS_DENIED:-0}" = 1 ]; then
+if [ "${SBS_TPROXY:-0}" = 1 ]; then
+  echo "daemon.err sing-box[8904]: FATAL[0000] start service: start inbound/tproxy[in-w1]: listen tcp4 0.0.0.0:12001: operation not permitted"
+elif [ "${SBS_DENIED:-0}" = 1 ]; then
   echo "daemon.err sing-box[8462]: FATAL[0000] read config at /etc/sing-box/config.json: open /etc/sing-box/config.json: permission denied"
 else
   echo "daemon.err sing-box: FATAL[0000] start service: open /etc/sing-box/config.json: no such file"
@@ -893,6 +928,24 @@ match "the repair is reported to the operator"     "$(printf '%s' "$out" | jq -r
 out="$(rs PROC_DIR="$SBS/proc-up" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json SBS_DENIED=1 SBS_USER=sing-box)"
 eq "a healthy engine is never handed to root"      "$(grep -c "uci set sing-box.main.user" "$SBS_LOG")" "0"
 eq "and it restarts exactly once"                  "$(grep -c '^init restart$' "$SBS_LOG")" "1"
+
+# A router with no capability file at all: the privilege is repaired before
+# the first start, so the service comes up on the first try.
+: > "$SBS_LOG"
+out="$(rs PROC_DIR="$SBS/proc-down" SBS_ENABLED=1 SBS_USER=sing-box SINGBOX_CAPS="$SBP/absent-caps.json")"
+eq "a missing capability file is repaired up front" "$(grep -c 'uci set sing-box.main.user=root' "$SBS_LOG")" "1"
+eq "and one restart is enough"                      "$(grep -c '^init restart$' "$SBS_LOG")" "1"
+match "the repair is named before the start"        "$(printf '%s' "$out" | jq -r .repaired)" 'net_admin'
+
+# The freshly flashed router: the same crash loop, a different cause. A chown
+# cannot help; the service user simply cannot bind a transparent socket.
+: > "$SBS_LOG"
+out="$(rs PROC_DIR="$SBS/proc-down" SBS_ENABLED=1 SBS_CONFFILE=/etc/sing-box/config.json SBS_TPROXY=1 SBS_USER=sing-box)"
+eq "a TPROXY bind failure is ok:false"             "$(printf '%s' "$out" | jq -r .ok)" "false"
+match "the hint names the missing privilege"       "$(printf '%s' "$out" | jq -r .hint)" 'net_admin'
+match "and the log says which port could not bind" "$(printf '%s' "$out" | jq -r .log)" '12001'
+eq "the service is handed to root"                 "$(grep -c 'uci set sing-box.main.user=root' "$SBS_LOG")" "1"
+match "and the repair says why"                    "$(printf '%s' "$out" | jq -r .repaired)" 'root'
 fi
 
 echo "== shellcheck (same file list as CI) =="

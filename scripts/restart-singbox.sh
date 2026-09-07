@@ -34,8 +34,12 @@ recent_log() {
   command -v logread >/dev/null 2>&1 || return 0
   logread -e sing-box 2>/dev/null | tail -n "${1:-15}" | tr -d '\r'
 }
-# The service reads its config as some user; ask the log whether that failed.
-denied_recently() { recent_log 40 | grep -qi 'permission denied'; }
+# Both ways the service user can be too weak for the job: it cannot read the
+# config ("permission denied"), or it cannot bind a transparent listener
+# ("operation not permitted", from TPROXY without net_admin). Either way the
+# answer is the same -- give the service the privileges it needs.
+denied_recently() { recent_log 40 | grep -qiE 'permission denied|operation not permitted'; }
+tproxy_denied_recently() { recent_log 40 | grep -qi 'operation not permitted'; }
 
 start_once() { # -> sets restart_rc
   if [ -x "$SINGBOX_INIT" ]; then
@@ -65,7 +69,16 @@ svc_out="$( (ensure_singbox_service) 2>&1 )"
 [ -z "$svc_out" ] || note "$svc_out"
 [ "$was_enabled" = "0" ] && did "enabled the sing-box service (it was off)"
 
-# 2. Make sure the service user can read its own configuration, then start.
+# 2. Make sure the service user can bind TPROXY sockets and read its own
+#    configuration, then start.
+priv_repaired=0
+priv_out="$( (ensure_singbox_privileges) 2>&1 )"
+[ -z "$priv_out" ] || note "$priv_out"
+case "$priv_out" in
+  *"will run as root"*)
+    priv_repaired=1
+    did "set the sing-box service to run as root (TPROXY needs net_admin)" ;;
+esac
 acc_out="$( (ensure_singbox_conf_access "$SINGBOX_CONF") 2>&1 )"
 [ -z "$acc_out" ] || note "$acc_out"
 start_once
@@ -75,8 +88,12 @@ running=false; settled && running=true
 #    user that has no access to a file full of proxy passwords. Hand the
 #    service to root — this project needs a privileged sing-box anyway (TPROXY
 #    sockets, a cache file under /etc) — and try exactly once more.
-if [ "$running" = false ] && denied_recently; then
-  note "sing-box cannot read $SINGBOX_CONF (permission denied)"
+if [ "$running" = false ] && [ "$priv_repaired" = 0 ] && denied_recently; then
+  if tproxy_denied_recently; then
+    note "sing-box cannot bind its TPROXY listeners as this user (operation not permitted)"
+  else
+    note "sing-box cannot read $SINGBOX_CONF (permission denied)"
+  fi
   svc_user="$(uci -q get sing-box.main.user 2>/dev/null || true)"
   if command -v uci >/dev/null 2>&1 && [ "$svc_user" != "root" ]; then
     uci set sing-box.main.user='root' 2>/dev/null && uci commit sing-box 2>/dev/null \
@@ -106,6 +123,8 @@ elif [ "$restart_rc" -eq 127 ]; then
   hint="install the sing-box package (scripts/install-deps.sh) and re-run apply"
 elif [ "$enabled" = "0" ]; then
   hint="/etc/config/sing-box still has enabled=0: uci set sing-box.main.enabled=1; uci commit sing-box; then restart again"
+elif tproxy_denied_recently; then
+  hint="sing-box cannot open its TPROXY sockets: the service user needs net_admin. Run it as root (uci set sing-box.main.user=root; uci commit sing-box) or add net_admin to $(singbox_caps_file)"
 elif denied_recently; then
   hint="sing-box still cannot read $SINGBOX_CONF; check its owner and the service user (uci get sing-box.main.user)"
 elif [ "$config_ok" = false ]; then

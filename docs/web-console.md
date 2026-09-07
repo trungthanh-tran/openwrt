@@ -558,6 +558,7 @@ trong bảng trên, nên một tính năng bị gỡ đi sẽ làm đỏ test.
 | Hiện tượng | Nguyên nhân / cách xử lý |
 |---|---|
 | Thẻ **sing-box: KHÔNG CHẠY** (đỏ), WiFi vẫn phát nhưng không có mạng | Bấm **↻ Khởi động lại sing-box** rồi đọc hộp log (§5.8). Không lên → 🩺 chẩn đoán một WiFi, hoặc `logread -e sing-box` qua SSH. |
+| Log sing-box lặp lại `listen tcp4 0.0.0.0:120xx: operation not permitted` | Service chạy dưới user không có `net_admin` nên không mở được cổng TPROXY (thường gặp trên router vừa flash). Bấm **↻ Khởi động lại sing-box** — bản 0.5.29 chuyển service sang root và nói rõ đã làm gì. Qua SSH: `uci set sing-box.main.user=root; uci commit sing-box; /etc/init.d/sing-box restart`. |
 | Không thấy thẻ/chip sing-box | Chưa kết nối (badge Live tắt), hoặc agent cũ: cập nhật agent (§3). |
 | `403 — chưa có tài khoản web` (`setup_required`) | Router chưa có `/etc/sbproxy/webauth`: trang sẽ tự mở form **Tạo tài khoản quản trị đầu tiên**. Nếu không thấy form: SSH `sbproxy-webauth set admin`, hoặc dùng token ở mục Nâng cao. |
 | `401 — mật khẩu hiện tại không đúng` (đổi mật khẩu) | Nhập lại mật khẩu đang dùng; quên → SSH `sbproxy-webauth set <user>`. |

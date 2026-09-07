@@ -1185,25 +1185,96 @@ ensure_singbox_conf_access() {
   log "sing-box runs as '$_sca_user'; gave it access to $_sca_conf"
 }
 
+# Can the service user open a TPROXY socket at all?
+#
+# procd grants capabilities from /etc/capabilities/<service>.json. Without
+# net_admin in there, an unprivileged sing-box cannot bind a transparent
+# listener and dies with "operation not permitted" on every start -- a
+# different failure from an unreadable config, and one no chown can fix.
+singbox_caps_file() { printf '%s' "${SINGBOX_CAPS:-/etc/capabilities/sing-box.json}"; }
+singbox_user() { command -v uci >/dev/null 2>&1 && uci -q get sing-box.main.user 2>/dev/null || true; }
+singbox_can_tproxy() {
+  _sct_user="$(singbox_user)"
+  case "$_sct_user" in ''|root) return 0 ;; esac   # root needs no capability
+  _sct_caps="$(singbox_caps_file)"
+  [ -f "$_sct_caps" ] || return 1
+  grep -qi 'net_admin' "$_sct_caps" 2>/dev/null
+}
+
+# Give the service the privilege TPROXY needs, or stop pretending it has it.
+#
+# The capability file belongs to the sing-box package; this project does not
+# rewrite it. When it cannot grant net_admin, the service is moved to root --
+# which is what this project needs anyway (transparent listeners, a cache under
+# /etc) -- and the change is stated, never silent.
+force_singbox_root() {
+  command -v uci >/dev/null 2>&1 || return 1
+  _fsr_user="$(singbox_user)"
+  [ "$_fsr_user" = "root" ] && return 1
+  run "uci set sing-box.main.user='root'" || { warn "Could not change the sing-box service user."; return 1; }
+  run "uci commit sing-box" || true
+  # The file was handed to the old service user so it could read it. That
+  # account no longer runs anything, and the file holds every proxy password,
+  # so take it back now that root is the reader.
+  ensure_singbox_conf_access "${SINGBOX_CONF:-/etc/sing-box/config.json}"
+  log "sing-box will run as root so its TPROXY inbounds can bind (was '${_fsr_user:-package default}')."
+}
+
+ensure_singbox_privileges() {
+  command -v uci >/dev/null 2>&1 || return 0
+  _ssp_user="$(singbox_user)"
+  case "$_ssp_user" in ''|root) return 0 ;; esac
+  # A sing-box that is running right now has already bound its TPROXY ports,
+  # whatever this file says: some firmwares grant the capability by other
+  # means. Evidence beats inference, and moving a working service to root
+  # would be a privilege escalation nobody asked for.
+  singbox_pid >/dev/null 2>&1 && return 0
+  singbox_can_tproxy && return 0
+  warn "sing-box runs as '$_ssp_user' but $(singbox_caps_file) does not grant net_admin: TPROXY listeners cannot bind."
+  force_singbox_root || true
+}
+
+# Did the last start fail because the service user is too weak, rather than
+# because the configuration is wrong? Both privilege failures look like this.
+singbox_privilege_error_recently() {
+  command -v logread >/dev/null 2>&1 || return 1
+  logread -e sing-box 2>/dev/null | tail -n 40 \
+    | grep -qiE 'operation not permitted|permission denied'
+}
+
+_singbox_wait_stable() {
+  _sws_wait="${SINGBOX_START_WAIT:-6}"
+  while [ "$_sws_wait" -gt 0 ]; do
+    # Stability, not mere presence: a respawning crash loop always has a pid.
+    singbox_running_stable && return 0
+    sleep 1; _sws_wait=$((_sws_wait - 1))
+  done
+  return 1
+}
+
 # After `/etc/init.d/sing-box restart`, prove the process is up. A silent
 # failure here is the worst kind: apply reports success and the SSIDs hang.
 verify_singbox_running() {
   [ "${DRYRUN:-0}" = "1" ] && return 0
-  _vsr_wait="${SINGBOX_START_WAIT:-6}"
-  while [ "$_vsr_wait" -gt 0 ]; do
-    # Stability, not mere presence: a respawning crash loop always has a pid.
-    singbox_running_stable && { log "sing-box is running (pid $(singbox_pid))."; return 0; }
-    sleep 1; _vsr_wait=$((_vsr_wait - 1))
-  done
+  _singbox_wait_stable && { log "sing-box is running (pid $(singbox_pid))."; return 0; }
   warn "sing-box is NOT running after restart. Recent log:"
   command -v logread >/dev/null 2>&1 && logread -e sing-box 2>/dev/null | tail -n 15 >&2
   if [ "$(uci -q get sing-box.main.enabled 2>/dev/null)" = "0" ]; then
     warn "/etc/config/sing-box still has enabled=0."
   fi
-  if command -v logread >/dev/null 2>&1 && \
-     logread -e sing-box 2>/dev/null | tail -n 40 | grep -qi 'permission denied'; then
-    warn "sing-box cannot read ${SINGBOX_CONF:-/etc/sing-box/config.json}: it runs as an unprivileged user."
-    warn "Repair it with: sh $SB_ROOT/scripts/restart-singbox.sh"
+  # A capability file can exist and still not be applied (an older procd, a
+  # firmware that ships none at all), so the check before the start is not
+  # proof. When the log says the service user was the problem, repair it here
+  # and try once more: an install that ends with a dead engine and a message
+  # to look up is how this fault kept coming back after every fresh flash.
+  if singbox_privilege_error_recently && force_singbox_root; then
+    run "/etc/init.d/sing-box restart"
+    _singbox_wait_stable && {
+      log "sing-box is running (pid $(singbox_pid)) after being given root."
+      return 0
+    }
+    warn "sing-box still does not stay up as root. Recent log:"
+    command -v logread >/dev/null 2>&1 && logread -e sing-box 2>/dev/null | tail -n 15 >&2
   fi
   die "sing-box did not start; every proxied SSID would have no Internet. Fix the cause above and re-run apply."
 }
