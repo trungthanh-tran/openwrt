@@ -11,6 +11,8 @@ set -u
 SB_ROOT="$(cd "$(dirname "$0")/.." && pwd)"; export SB_ROOT
 . "$SB_ROOT/scripts/lib.sh"
 ENV_FILE="${ENV_FILE:-/etc/sbproxy/env}"
+# Runtime and tests deliberately select this file through ENV_FILE.
+# shellcheck source=/dev/null
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 
 command -v jq >/dev/null 2>&1 || { echo '{"ok":false,"error":"missing jq"}'; exit 1; }
