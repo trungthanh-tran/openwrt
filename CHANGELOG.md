@@ -5,6 +5,45 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+## [0.5.29] - 2026-09-07
+
+### Fixed
+- **Router vừa flash: sing-box không mở nổi cổng TPROXY và treo trong vòng lặp
+  khởi động lại.** Trên máy mới tinh, service chạy dưới user của gói mà user đó
+  không có `net_admin`, nên mọi inbound tproxy chết với `listen tcp4
+  0.0.0.0:12001: operation not permitted` — WiFi vẫn phát nhưng không gì ra được
+  Internet. Bản 0.5.26 từng có cơ chế tự leo quyền, nhưng chính việc 0.5.26 đổi
+  quyền sở hữu file cấu hình đã làm sing-box đi qua được bước đọc config rồi mới
+  chết ở chỗ khác, với một chuỗi lỗi mà cơ chế ấy không khớp: bản sửa tự vô hiệu
+  hoá cái bẫy của chính nó. Nay quyền được cấp **trước lần khởi động đầu tiên**
+  (`install-deps.sh`, `apply.sh`) và được sửa lại **sau một lần khởi động hỏng**
+  (`verify_singbox_running`, `restart-singbox.sh`): service chuyển sang root và
+  nói rõ vì sao. Một service đang chạy thì không bị đụng vào — nó đã chứng minh
+  là bind được, bất kể file capability ghi gì. Khi leo lên root, `config.json`
+  cũng được lấy lại từ user cũ: tài khoản đó không còn chạy gì nữa mà file thì
+  chứa toàn bộ mật khẩu proxy.
+
+### Added
+- **Lần cài kết thúc bằng việc nói router có chạy thật hay không.** Trước đây
+  câu cuối cùng một lần cài nói ra là "Kiểm tra agent API" — và một router có
+  sing-box chết vẫn qua được bước đó trong khi mọi SSID đều hỏng. Nay có thêm
+  bước cuối chạy chính trợ lý gỡ lỗi trên router qua SSH và in ra từng phát hiện
+  nặng/cảnh báo kèm **chỗ bấm để sửa** (Web Console → 🤖 Trợ lý gỡ lỗi → …).
+  Phát hiện không làm hỏng bản cài — code đã nằm trên router rồi — nó chỉ được
+  báo ra. Web Deployer dùng chung bước này.
+- **Trợ lý gỡ lỗi đọc được bằng Claude, OpenAI hoặc Gemini.** Bộ luật trên
+  router vẫn là chủ: không cần khoá, không cần Internet, và là thứ duy nhất được
+  phép sửa. Tab **Trợ lý gỡ lỗi** trong console desktop thêm một nửa **tuỳ
+  chọn** — một mô hình đọc đúng báo cáo ấy và giải thích bằng tiếng Việt. Mô
+  hình chỉ được *đề xuất*: danh sách `fixes` nó trả về bị lọc qua đúng các repair
+  mà `debug-agent.sh` cài đặt trước khi nút xuất hiện, nên id bịa ra hay lệnh
+  shell tự nghĩ không chạm được vào đâu; trả lời bằng văn xuôi thay vì JSON vẫn
+  hiện bình thường, chỉ là không đề xuất nút nào. Trước khi gửi, tên WiFi và địa
+  chỉ proxy công cộng được thay bằng nhãn, mật khẩu bị xoá — địa chỉ loopback và
+  LAN giữ nguyên vì "proxy trỏ về 127.0.0.1" chính là chẩn đoán. API key nằm
+  trên máy người dùng, niêm bằng DPAPI như token router, và **không bao giờ được
+  đẩy xuống router**.
+
 ## [0.5.28] - 2026-09-06
 
 ### Added
