@@ -169,9 +169,8 @@ else
   tags() { jq -c "[.$2[].tag]" "$1"; }
 
   # The invariant for every step: an SSID with no pool generates exactly what
-  # it did before the pool feature existed. The golden file was produced by the
-  # pre-F2 generator; if this ever fails, the change was not backwards
-  # compatible and the fixture must not simply be refreshed to match.
+  # the current pre-pool generator produces. Keep intentional generator changes
+  # (such as the TCP DNS upstream) reflected in the golden file.
   CONF="$ROOT/config/wifi-socks.conf.example"
   gen - >/dev/null
   if cmp -s "$SINGBOX_CONF" "$ROOT/tests/fixtures/singbox-nopool.json"; then

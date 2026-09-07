@@ -3,7 +3,7 @@
   "dns": {
     "servers": [
       { "type": "fakeip", "tag": "fakeip", "inet4_range": "198.18.0.0/15" },
-      { "type": "udp", "tag": "upstream", "server": "1.1.1.1" }
+      { "type": "tcp", "tag": "upstream", "server": "1.1.1.1" }
     ],
     "rules": [
       { "query_type": ["HTTPS", "SVCB"], "action": "predefined", "rcode": "NOTIMP" },
