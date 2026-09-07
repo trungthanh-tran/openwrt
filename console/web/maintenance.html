@@ -952,6 +952,35 @@
   body.authenticated #featurePage > .modal.inline-feature textarea {
     min-height: 150px; font-size: 13px; line-height: 1.55;
   }
+  /* Proxy pool: keep the dense controls readable at normal desktop zoom. */
+  body.authenticated #featurePage > .modal.inline-feature .conn-status,
+  body.authenticated #featurePage > .modal.inline-feature .filterbar,
+  body.authenticated #featurePage > .modal.inline-feature .tg,
+  body.authenticated #featurePage > .modal.inline-feature .filterbar .btn,
+  body.authenticated #featurePage > .modal.inline-feature .filterbar select,
+  body.authenticated #featurePage > .modal.inline-feature .filterbar input,
+  body.authenticated #featurePage > .modal.inline-feature .pool-input-stack > .btn {
+    font-size: 16px;
+  }
+  body.authenticated #featurePage > .modal.inline-feature .pool-list {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  body.authenticated #featurePage > .modal.inline-feature .pool-select-row {
+    padding: 11px 12px;
+    gap: 11px;
+  }
+  body.authenticated #featurePage > .modal.inline-feature .pool-input-help,
+  body.authenticated #featurePage > .modal.inline-feature .sub {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  body.authenticated #featurePage > .modal.inline-feature textarea {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  body.authenticated #featurePage > .modal.inline-feature > h2 { font-size: 24px; }
+  body.authenticated #featurePage > .modal.inline-feature > .foot .btn { font-size: 16px; }
   @media (max-width: 600px) {
     body.authenticated .wrap { padding: 18px 12px 40px; }
     body.authenticated header.top { min-height: 64px; padding: 10px 12px; }
