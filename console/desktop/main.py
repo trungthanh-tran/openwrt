@@ -575,6 +575,10 @@ EN_TRANSLATIONS = {
     'Cài / cập nhật agent': 'Install / update the agent',
     'Lấy token agent': 'Fetch the agent token',
     'Kiểm tra agent API': 'Check the agent API',
+    'Kiểm tra sức khoẻ router': 'Check the router health',
+    'Không phát hiện vấn đề nào': 'No problems found',
+    'Chẩn đoán không trả về JSON': 'The diagnosis did not return JSON',
+    'Không chạy được chẩn đoán': 'The diagnosis could not run',
     'Đóng gói mã nguồn': 'Package the code',
     'Đẩy mã nguồn': 'Upload the code',
     'Giải nén mã nguồn': 'Extract the code',
@@ -1301,6 +1305,18 @@ SSH_CONNECT_TIMEOUT = 12
 REMOTE_DIR_DEFAULT = "/root/sbproxy"
 REMOTE_TOKEN_FILE = "/etc/sbproxy/token"
 # Same router-side file list as pc/update.sh; pc/ may hold local secrets.
+# The assistant names a repair; these say where to press it. Anything it can
+# fix, the Web Console can fix with one button, so the install never leaves an
+# operator hunting through documentation.
+PROVISION_FIX_HINTS = {
+    "singbox_restart": "Web Console → 🤖 Trợ lý gỡ lỗi → Khởi động lại sing-box "
+                       "(hoặc SSH: sh /root/sbproxy/scripts/restart-singbox.sh)",
+    "config_eol": "Web Console → 🤖 Trợ lý gỡ lỗi → Bỏ ký tự CR",
+    "bridge_nf": "Web Console → 🤖 Trợ lý gỡ lỗi → Tắt bridge-nf",
+    "apply": "Web Console → ⇪ Đẩy & Áp lên router",
+    "install_agent": "Chạy lại Cài / Cập nhật ở công cụ này",
+}
+
 PAYLOAD_ENTRIES = ("README.md", "VERSION", "agent", "config", "console", "docs", "etc", "scripts")
 KNOWN_HOSTS_FILE = CONFIG_DIR / "known_hosts"
 
@@ -1868,6 +1884,7 @@ class ProvisionRunner:
             ("Cài / cập nhật agent", self.step_install_agent),
             ("Lấy token agent", self.step_fetch_token),
             ("Kiểm tra agent API", self.step_verify_agent),
+            ("Kiểm tra sức khoẻ router", self.step_health_check),
         ]
 
     # -- process plumbing ---------------------------------------------------
@@ -2156,6 +2173,40 @@ class ProvisionRunner:
                 f"{reported} ≠ {expected}"
             )
         return f"status ok · agent v{reported}" if reported else "status ok"
+
+    def step_health_check(self) -> str:
+        """Ask the router's own assistant whether the install actually works.
+
+        "Agent API ok" was the last word an install said, and a router whose
+        sing-box could not bind its TPROXY ports passed that check while every
+        SSID was dead. The assistant walks the same evidence an operator would
+        and names the fix for whatever it finds; a finding never fails the
+        install -- the code is on the router either way -- it is reported.
+        """
+        remote = self.settings.remote_dir
+        try:
+            raw = self.ssh(f"cd {remote}; sh scripts/debug-agent.sh report",
+                           "Kiểm tra sức khoẻ router", timeout=180)
+        except ProvisionError as error:
+            return Skipped(f"Không chạy được chẩn đoán: {failure_line(str(error))}")  # head: detail
+        try:
+            report = json.loads(raw[raw.index("{"):])
+        except ValueError:
+            return Skipped("Chẩn đoán không trả về JSON")
+        summary = report.get("summary") or {}
+        crit, warn = int(summary.get("crit") or 0), int(summary.get("warn") or 0)
+        if not crit and not warn:
+            return "Không phát hiện vấn đề nào"
+        lines = []
+        for finding in report.get("findings") or []:
+            if finding.get("severity") not in ("crit", "warn"):
+                continue
+            fix = finding.get("fix") or ""
+            hint = PROVISION_FIX_HINTS.get(fix, "")
+            lines.append(f"[{finding.get('severity')}] {finding.get('title')}"
+                         f"\n    {finding.get('detail')}" + (f"\n    → {hint}" if hint else ""))
+        self.on_output("\n".join(lines))
+        return f"{crit} lỗi nặng, {warn} cảnh báo — xem nhật ký, mở Trợ lý gỡ lỗi để sửa"
 
     # -- orchestration ------------------------------------------------------
 

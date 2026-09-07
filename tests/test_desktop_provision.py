@@ -50,6 +50,13 @@ class FakeRunner:
         for needle, result in self.results.items():
             if any(needle in part for part in argv):
                 return result
+        if "debug-agent.sh report" in command:
+            # A healthy router: the install ends by saying so, and the step is
+            # part of every sequence these tests compare.
+            return (0, json.dumps({
+                "ok": True, "summary": {"crit": 0, "warn": 0, "info": 0},
+                "verdict": "Không phát hiện vấn đề nào", "findings": [],
+            }), "")
         if "echo state=created" in command:      # the seeding command
             if self.has_config or any(
                     remote.endswith("config/wifi-socks.conf") for _local, remote in self.uploads):
@@ -156,17 +163,18 @@ class ProvisionRunnerTests(unittest.TestCase):
         self.events = []
         self.saved = []
 
-    def build(self, runner, prober=None, version_reader=None):
+    def build(self, runner, prober=None, version_reader=None, on_output=None):
         return appmod.ProvisionRunner(
             self.settings,
             emit=lambda index, state, detail: self.events.append((index, state, detail)),
             runner=runner,
             prober=prober or (lambda *_args, **_kwargs: "ok"),
             version_reader=version_reader or (lambda *_args, **_kwargs: appmod.APP_VERSION),
+            on_output=on_output,
         )
 
-    def run_full(self, runner, prober=None, version_reader=None):
-        provisioner = self.build(runner, prober, version_reader)
+    def run_full(self, runner, prober=None, version_reader=None, on_output=None):
+        provisioner = self.build(runner, prober, version_reader, on_output)
         with mock.patch.object(appmod, "save_connection", lambda base, token: self.saved.append((base, token))):
             return provisioner.run(), provisioner
 
@@ -219,7 +227,37 @@ class ProvisionRunnerTests(unittest.TestCase):
         skipped = {labels[index] for index, state, _detail in self.events if state == appmod.STEP_SKIPPED}
         # The configuration step seeds an empty file, so only apply is skipped.
         self.assertEqual(skipped, {"Chạy apply.sh khởi tạo"})
+        # The health check runs even here: an install that reports success while
+        # the engine is dead is the failure this step exists for.
+        self.assertIn("debug-agent.sh report", " ".join(runner.remote_commands()))
         self.assertNotIn("sh scripts/apply.sh", " ".join(runner.remote_commands()).replace("DRYRUN=1 sh scripts/apply.sh", ""))
+
+    def test_a_broken_router_is_named_at_the_end_of_the_install(self):
+        """The install used to end at "agent API ok" while every SSID was dead.
+
+        A router whose sing-box cannot bind its TPROXY ports passes every
+        earlier step, so the last word has to come from the assistant -- and it
+        must name the repair without failing the install: the code IS on the
+        router, and the operator needs to know what to press next.
+        """
+        report = json.dumps({
+            "ok": True, "summary": {"crit": 1, "warn": 0, "info": 0},
+            "verdict": "sing-box khong mo duoc cong TPROXY",
+            "findings": [{"id": "singbox_no_privilege", "severity": "crit",
+                          "fix": "singbox_restart", "title": "sing-box khong mo duoc cong TPROXY",
+                          "detail": "user khong co net_admin", "evidence": ""}],
+        })
+        runner = FakeRunner({"/etc/sbproxy/token": (0, "0123456789abcdef0123", ""),
+                             "debug-agent.sh report": (0, report, "")})
+        logged = []
+        ok, provisioner = self.run_full(runner, on_output=logged.append)
+        self.assertTrue(ok, "a finding must not fail an install that put the code there")
+        detail = [d for index, state, d in self.events
+                  if state == appmod.STEP_OK and provisioner.steps[index][0] == "Kiểm tra sức khoẻ router"]
+        self.assertTrue(detail and "1 lỗi nặng" in detail[0], detail)
+        joined = chr(10).join(logged)
+        self.assertIn("sing-box khong mo duoc cong TPROXY", joined)
+        self.assertIn("Trợ lý gỡ lỗi", joined, "the log has to say where the fix button is")
 
     def test_agent_only_reinstall_never_touches_dependencies_or_configuration(self):
         self.settings.agent_only = True
