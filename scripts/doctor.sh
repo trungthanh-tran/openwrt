@@ -91,7 +91,9 @@ fi
 sec "nftables TPROXY + DNS hijack"
 if nft list table inet sbproxy >/dev/null 2>&1; then
   ok "table inet sbproxy exists"
-  if nft list chain inet sbproxy prerouting 2>/dev/null | grep -q 'dport 53'; then
+  # prerouting only dispatches to w<idx>; the DNS rule lives in those child
+  # chains, so inspect the complete table rather than the dispatcher alone.
+  if nft list table inet sbproxy 2>/dev/null | grep -q 'dport 53'; then
     ok "DNS interception rule (dport 53) is loaded"
   else
     wn "DNS interception rule for port 53 was not found (clients may leak DNS)"

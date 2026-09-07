@@ -200,24 +200,27 @@ ifname_of_idx() {
 # bridge and BSS after the reload.  All operations are best-effort so a radio
 # that is genuinely unavailable does not make ban/unban/apply fail halfway.
 recover_wifi_networks() {
-  sleep "${WIFI_RECOVER_WAIT:-2}"
-  for _rw_idx in $(desired_idx); do
-    ifup "w$_rw_idx" >/dev/null 2>&1 || true
+  # Do not ifup individual BSSes or reload hostapd objects on a shared radio.
+  # MediaTek can rename phy*-apN while hostapd is being reloaded; that race
+  # leaves one BSS at channel 0/NO-CARRIER and makes it invisible.  Let netifd
+  # settle first, then recover the whole radio once only when an AP is really
+  # missing carrier.
+  sleep "${WIFI_RECOVER_WAIT:-4}"
+  _rw_bad=0
+  for _rw_if in $(iw dev 2>/dev/null | awk '$1 == "Interface" && $2 ~ /^phy[0-9]+-ap[0-9]+$/ { print $2 }'); do
+    ip link show "$_rw_if" 2>/dev/null | grep -q 'LOWER_UP' || _rw_bad=1
   done
-  # Do not depend on network.wireless status while the reload is settling:
-  # on this driver it can briefly omit the section/ifname pair even though the
-  # AP exists.  Reload every hostapd AP BSS discovered from iw instead.
-  _rw_ifs="$(iw dev 2>/dev/null | awk '$1 == "Interface" && $2 ~ /^phy[0-9]+-ap[0-9]+$/ { print $2 }')"
-  for _rw_if in $_rw_ifs; do
-    ubus call "hostapd.$_rw_if" reload >/dev/null 2>&1 || true
-  done
-  sleep 1
+  if [ "$_rw_bad" = 1 ]; then
+    warn "A Wi-Fi AP has no carrier after reload; restarting all radios once to avoid a shared-radio BSS rename race."
+    wifi down >/dev/null 2>&1 || true
+    sleep 2
+    wifi up >/dev/null 2>&1 || true
+    sleep "${WIFI_RADIO_RECOVER_WAIT:-6}"
+  fi
   for _rw_idx in $(desired_idx); do
-    # hostapd reload can detach the BSS from its network section again;
-    # re-running ifup after that reload restores the L3 address and bridge
-    # membership before the final link-up assertion.
-    ifup "w$_rw_idx" >/dev/null 2>&1 || true
-    for _rw_if in $_rw_ifs; do ip link set "$_rw_if" up >/dev/null 2>&1 || true; done
+    # `wifi up` already recreates the network sections. Calling ifup on an
+    # individual BSS here can make netifd rename shared-radio interfaces while
+    # hostapd is still attaching them, undoing the radio recovery.
     ip link set "br-w$_rw_idx" up >/dev/null 2>&1 || true
   done
 }
@@ -1346,7 +1349,7 @@ build_singbox() {
   "dns": {
     "servers": [
       { "type": "fakeip", "tag": "fakeip", "inet4_range": "$FAKEIP_RANGE" },
-      { "type": "udp", "tag": "upstream", "server": $dns_upstream_json }
+      { "type": "tcp", "tag": "upstream", "server": $dns_upstream_json }
     ],
     "rules": [
       { "query_type": ["HTTPS", "SVCB"], "action": "predefined", "rcode": "NOTIMP" },

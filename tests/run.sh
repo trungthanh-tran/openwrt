@@ -540,6 +540,7 @@ B|5g|2|password12|5.6.7.8|8080|||1|0||http'
   match   "HTTPS/SVCB predefined NOTIMP" "$cfg" 'NOTIMP'
   nomatch "no inet6_range (IPv4-only)"   "$cfg" 'inet6_range'
   match   "cache_file store_fakeip"      "$cfg" 'store_fakeip'
+  eq      "DNS upstream uses TCP"         "$(printf '%s' "$cfg" | jq -r '.dns.servers[]|select(.tag=="upstream")|.type')" "tcp"
   match   "hijack-dns route rule"        "$cfg" 'hijack-dns'
   eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "1"
   eq      "http outbound count"   "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="http")]|length')" "1"

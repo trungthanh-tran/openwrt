@@ -94,6 +94,9 @@ chmod 755 /www/cgi-bin/sbproxy
 log "5) UI self-host -> /www/sbproxy/ (index.html + offline Bootstrap assets)"
 mkdir -p /www/sbproxy/assets
 cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
+for page in config devices analytics settings status egress diagnose maintenance; do
+  cp "$SB_ROOT/console/web/${page}.html" "/www/sbproxy/${page}.html"
+done
 cp "$SB_ROOT/console/web/assets/"* /www/sbproxy/assets/ 2>/dev/null \
   || echo "  warning: console/web/assets/ was not found — the UI falls back to its built-in styling"
 
@@ -126,6 +129,9 @@ done
 /etc/init.d/uhttpd reload 2>/dev/null || true
 
 IP="$(uci -q get network.lan.ipaddr || echo 192.168.8.1)"
+# UCI may return the LAN address with its CIDR suffix (192.168.8.1/24),
+# which is valid configuration but not a usable HTTP URL.
+IP="${IP%%/*}"
 if [ -n "$WEB_USER" ]; then
   WEB_LOGIN_1="user: $WEB_USER"
   WEB_LOGIN_2="pass: ${WEB_PASS_SHOWN:-(unchanged — reset with: sbproxy-webauth set $WEB_USER)}"
