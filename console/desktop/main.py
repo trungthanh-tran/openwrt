@@ -575,6 +575,22 @@ EN_TRANSLATIONS = {
     'Cài / cập nhật agent': 'Install / update the agent',
     'Lấy token agent': 'Fetch the agent token',
     'Kiểm tra agent API': 'Check the agent API',
+    'Trợ lý gỡ lỗi': 'Troubleshooting assistant',
+    'Chẩn đoán router': 'Diagnose the router',
+    'Mô hình AI': 'AI model',
+    'Lưu khoá': 'Save key',
+    'Hỏi AI': 'Ask the AI',
+    'Sửa lỗi': 'Repair',
+    'Tên WiFi và địa chỉ proxy công cộng được thay bằng nhãn trước khi gửi.':
+        'Wi-Fi names and public proxy addresses are replaced by labels before anything is sent.',
+    'Đang chẩn đoán router…': 'Diagnosing the router…',
+    'Đang hỏi mô hình AI…': 'Asking the AI model…',
+    'Chưa có API key': 'No API key yet',
+    'Không có cách sửa tự động nào được đề xuất.': 'No automatic repair is on offer.',
+    'Chưa có báo cáo chẩn đoán — đang chẩn đoán trước.':
+        'No diagnosis yet — running one first.',
+    'Đã lưu thiết lập AI (khoá được mã hoá theo tài khoản Windows).':
+        'AI settings saved (the key is sealed to this Windows account).',
     'Kiểm tra sức khoẻ router': 'Check the router health',
     'Không phát hiện vấn đề nào': 'No problems found',
     'Chẩn đoán không trả về JSON': 'The diagnosis did not return JSON',
@@ -974,6 +990,260 @@ def save_preferences(language: str, theme: str) -> None:
     payload["language"] = language if language in ("en", "vi") else "en"
     payload["theme"] = theme if theme in PALETTES else "dark"
     _write_config_payload(payload)
+
+
+# --- The AI layer over the rule-based assistant -----------------------------
+# scripts/debug-agent.sh runs on the router with no network and no key, and it
+# is the only thing allowed to change anything. This layer is a reader: it takes
+# that report, asks a model to explain it in plain language, and lets the model
+# point at one of the repairs the rules already implement. Anything else the
+# model names is dropped -- the whitelist below is the entire vocabulary.
+LLM_FIX_IDS = ("singbox_restart", "config_eol", "bridge_nf", "apply", "install_agent")
+
+# The key never reaches the router: the router is the thing being diagnosed,
+# it has no TLS story worth trusting, and a network appliance is the last place
+# to leave an API credential.
+LLM_PROVIDERS = {
+    "claude": {
+        "label": "Claude (Anthropic)",
+        "model": "claude-sonnet-5",
+        "key_url": "https://console.anthropic.com/settings/keys",
+        "url": lambda model: "https://api.anthropic.com/v1/messages",
+        "headers": lambda key: {"x-api-key": key, "anthropic-version": "2023-06-01"},
+        "body": lambda model, system, prompt: {
+            "model": model, "max_tokens": 1024, "system": system,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        "extract": lambda payload: "".join(
+            part.get("text") or "" for part in (payload.get("content") or [])
+            if isinstance(part, dict) and part.get("type") == "text"),
+    },
+    "openai": {
+        "label": "OpenAI",
+        "model": "gpt-4.1-mini",
+        "key_url": "https://platform.openai.com/api-keys",
+        "url": lambda model: "https://api.openai.com/v1/chat/completions",
+        "headers": lambda key: {"Authorization": f"Bearer {key}"},
+        "body": lambda model, system, prompt: {
+            "model": model,
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": prompt}],
+        },
+        "extract": lambda payload: str(
+            ((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""),
+    },
+    "gemini": {
+        "label": "Gemini (Google)",
+        "model": "gemini-2.5-flash",
+        "key_url": "https://aistudio.google.com/app/apikey",
+        "url": lambda model: (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent"),
+        "headers": lambda key: {"x-goog-api-key": key},
+        "body": lambda model, system, prompt: {
+            "system_instruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        },
+        "extract": lambda payload: "".join(
+            part.get("text") or "" for part in
+            (((payload.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+            if isinstance(part, dict)),
+    },
+}
+DEFAULT_LLM_PROVIDER = "claude"
+
+LLM_SYSTEM_PROMPT = (
+    "You diagnose an OpenWrt router running sing-box, which routes each Wi-Fi "
+    "SSID through its own SOCKS5/HTTP proxy using TPROXY. You are given the "
+    "JSON report of an on-router rule-based checker. Explain, in Vietnamese, "
+    "what is wrong and what the operator should do, concretely and briefly. "
+    "Answer with a JSON object and nothing else:\n"
+    '{"diagnosis": "<vi>", "steps": ["<vi>", ...], "fixes": ["<id>", ...]}\n'
+    "The only ids allowed in \"fixes\" are: " + ", ".join(LLM_FIX_IDS) + ". "
+    "Use an id only when that exact repair is the right next action; leave the "
+    "list empty otherwise. Never invent an id and never propose shell commands "
+    "that destroy configuration."
+)
+
+# Names of Wi-Fi networks and the addresses of paid proxies identify a customer;
+# neither helps the model diagnose anything. Replace them with stable labels so
+# the report still reads coherently -- the same SSID is the same token twice.
+_PRIVATE_HOST = re.compile(
+    r"^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|localhost$|::1$)")
+
+
+def _is_private_host(host: str) -> bool:
+    """True for an address that is evidence, not a secret (loopback, LAN)."""
+    return bool(_PRIVATE_HOST.match(str(host or "").strip()))
+
+
+class Anonymiser:
+    """Consistent, reversible-for-nobody labels for the things we will not send."""
+
+    def __init__(self):
+        self._seen = {}
+
+    def label(self, kind: str, value: str) -> str:
+        value = str(value or "")
+        if not value:
+            return value
+        known = self._seen.get((kind, value))
+        if known:
+            return known
+        known = f"<{kind}-{sum(1 for k in self._seen if k[0] == kind) + 1}>"
+        self._seen[(kind, value)] = known
+        return known
+
+
+def redact_for_llm(report: dict) -> dict:
+    """The report with SSIDs and public proxy endpoints replaced by labels.
+
+    Loopback and LAN addresses survive: "the proxy is 127.0.0.1" is the whole
+    diagnosis in the most common misconfiguration, and there is nothing private
+    about an address that means "this router".
+    """
+    names = Anonymiser()
+
+    def endpoint(value: str) -> str:
+        text = str(value or "")
+        host = text.rsplit(":", 1)[0] if ":" in text else text
+        port = text.rsplit(":", 1)[1] if ":" in text else ""
+        if _is_private_host(host):
+            return text
+        masked = names.label("proxy", host)
+        return f"{masked}:{port}" if port else masked
+
+    def walk(node):
+        if isinstance(node, dict):
+            out = {}
+            for key, value in node.items():
+                if key == "ssid" and isinstance(value, str):
+                    out[key] = names.label("ssid", value)
+                elif key in ("endpoint", "host") and isinstance(value, str):
+                    out[key] = endpoint(value)
+                else:
+                    out[key] = walk(value)
+            return out
+        if isinstance(node, list):
+            return [walk(item) for item in node]
+        if isinstance(node, str):
+            return redact(node)
+        return node
+
+    return walk(report if isinstance(report, dict) else {})
+
+
+def llm_prompt(report: dict, question: str = "") -> str:
+    """What we actually send: the sanitised report, plus the operator's words."""
+    body = json.dumps(redact_for_llm(report), ensure_ascii=False, indent=1)
+    asked = str(question or "").strip()
+    if asked:
+        return f"Câu hỏi của người dùng: {asked}\n\nBáo cáo chẩn đoán:\n{body}"
+    return f"Báo cáo chẩn đoán:\n{body}"
+
+
+def parse_llm_answer(text: str) -> dict:
+    """The model's reply, with its fix list cut down to repairs that exist.
+
+    A model that answers in prose instead of JSON is not an error: the prose is
+    still the answer, it simply proposes no repair.
+    """
+    raw = str(text or "").strip()
+    if raw.startswith("```"):                       # fenced JSON is common
+        raw = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", raw).strip()
+    payload = None
+    if raw.startswith("{"):
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            payload = None
+    if not isinstance(payload, dict):
+        return {"diagnosis": raw, "steps": [], "fixes": [], "structured": False}
+    steps = [str(step) for step in (payload.get("steps") or []) if str(step).strip()]
+    fixes = [fix for fix in (payload.get("fixes") or []) if fix in LLM_FIX_IDS]
+    return {
+        "diagnosis": str(payload.get("diagnosis") or "").strip(),
+        "steps": steps,
+        # Duplicates would show the same button twice.
+        "fixes": list(dict.fromkeys(fixes)),
+        "structured": True,
+    }
+
+
+class LlmError(Exception):
+    """The model could not be asked, or answered with an error."""
+
+
+def ask_llm(provider: str, model: str, api_key: str, report: dict,
+            question: str = "", timeout: int = 60, opener=None) -> dict:
+    """Ask one provider to read the report. Returns the parsed answer."""
+    spec = LLM_PROVIDERS.get(provider)
+    if not spec:
+        raise LlmError(f"Không hỗ trợ nhà cung cấp: {provider}")
+    key = str(api_key or "").strip()
+    if not key:
+        raise LlmError("Chưa có API key")
+    model = str(model or "").strip() or spec["model"]
+    data = json.dumps(spec["body"](model, LLM_SYSTEM_PROMPT, llm_prompt(report, question))
+                      ).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    headers.update(spec["headers"](key))
+    request = Request(spec["url"](model), data=data, headers=headers, method="POST")
+    send = opener or urlopen
+    log.info("llm ask provider=%s model=%s bytes=%s", provider, model, len(data))
+    try:
+        with send(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        # An API key in the error text would land in the log file.
+        raise LlmError(f"HTTP {exc.code}: {redact(detail)}") from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise LlmError(f"Không gọi được {spec['label']}: {exc}") from exc
+    except ValueError as exc:
+        raise LlmError(f"{spec['label']} trả dữ liệu không phải JSON") from exc
+    if isinstance(payload, dict) and payload.get("error"):
+        error = payload["error"]
+        message = error.get("message") if isinstance(error, dict) else error
+        raise LlmError(f"{spec['label']}: {redact(message)}")
+    text = spec["extract"](payload) if isinstance(payload, dict) else ""
+    if not str(text).strip():
+        raise LlmError(f"{spec['label']} trả lời rỗng")
+    answer = parse_llm_answer(text)
+    answer["provider"] = provider
+    answer["model"] = model
+    return answer
+
+
+def save_llm_settings(provider: str, model: str, api_key: str) -> None:
+    """Store the provider choice, and seal the key the way the router token is."""
+    payload = _read_config_payload()
+    payload.pop("llm_key_dpapi", None)
+    payload.pop("llm_key_plain", None)
+    payload["llm_provider"] = provider if provider in LLM_PROVIDERS else DEFAULT_LLM_PROVIDER
+    payload["llm_model"] = str(model or "").strip()
+    key = str(api_key or "").strip()
+    if key:
+        try:
+            payload["llm_key_dpapi"] = _dpapi_protect(key)
+        except Exception:
+            payload["llm_key_plain"] = key
+    _write_config_payload(payload)
+
+
+def load_llm_settings() -> tuple[str, str, str]:
+    """(provider, model, key). An unreadable key reads back empty, never raises."""
+    payload = _read_config_payload()
+    provider = str(payload.get("llm_provider") or DEFAULT_LLM_PROVIDER)
+    if provider not in LLM_PROVIDERS:
+        provider = DEFAULT_LLM_PROVIDER
+    model = str(payload.get("llm_model") or "").strip() or LLM_PROVIDERS[provider]["model"]
+    try:
+        sealed = str(payload.get("llm_key_dpapi") or "")
+        key = _dpapi_unprotect(sealed) if sealed else str(payload.get("llm_key_plain") or "")
+    except Exception:
+        key = ""
+    return provider, model, key
 
 
 # --- Proxy pool ------------------------------------------------------------
@@ -2336,6 +2606,15 @@ class AgentClient:
 
     def get_conf(self) -> str:
         return self._request("get_conf", text=True, timeout=20)
+
+    def debug_report(self):
+        """The rule-based diagnosis, straight from the router."""
+        return self._request("debug", timeout=120)
+
+    def debug_fix(self, fix_id: str):
+        """Run one repair. The agent refuses any id it does not implement, so a
+        typo here fails on the router rather than doing something else."""
+        return self._request("debug_fix", "POST", {"id": fix_id}, timeout=180)
 
     def dryrun_conf(self, content: str):
         return self._request("dryrun_conf", "POST", content, timeout=60)
@@ -4573,11 +4852,20 @@ class NativeApp:
         ttk.Label(gateway_detail, textvariable=self.gateway_link_var, style="MetricBlue.TLabel").pack(side="left", padx=(0, 28))
         ttk.Label(gateway_detail, textvariable=self.gateway_http_var, style="MetricBlue.TLabel").pack(side="left")
 
+        provider, model, stored_key = load_llm_settings()
+        self.last_diagnosis = {}
+        self.diagnosis_summary_var = tk.StringVar(value="")
+        self.llm_provider_var = tk.StringVar(value=LLM_PROVIDERS[provider]["label"])
+        self.llm_model_var = tk.StringVar(value=model)
+        self.llm_key_var = tk.StringVar(value=stored_key)
+        self.llm_question_var = tk.StringVar(value="")
+
         self.tabs = ttk.Notebook(self.root, style="Chrome.TNotebook")
         self.tabs.pack(fill="both", expand=True, padx=14, pady=(6, 14))
         self._build_wifi_tab()
         self._build_clients_tab()
         self._build_backup_tab()
+        self._build_assistant_tab()
         localize_widget_tree(self.root, self.language)
         self.update_setup_banner()
         self._apply_lock_state()
@@ -4817,6 +5105,187 @@ class NativeApp:
         self.client_context_menu.add_command(label=self.t("Gán proxy…"), command=self.assign_one_proxy)
         self.client_context_menu.add_command(label=self.t("Thêm proxy…"),
                                              command=self.add_proxy_to_selected)
+
+    def _build_assistant_tab(self):
+        """Diagnosis on the left, explanation on the right.
+
+        The left half is the router talking: findings from scripts/debug-agent.sh
+        with a button for each repair it offers. The right half is optional --
+        a model reads the same findings and says what they mean. The model can
+        only point back at the left half's buttons.
+        """
+        tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)
+        self.tabs.add(tab, text="Trợ lý gỡ lỗi")
+
+        left = ttk.Frame(tab, style="Card.TFrame")
+        left.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        ttk.Button(left, text="Chẩn đoán router", command=self.run_diagnosis,
+                   style="Primary.TButton").pack(fill="x")
+        ttk.Label(left, textvariable=self.diagnosis_summary_var,
+                  style="Toolbar.TLabel").pack(anchor="w", pady=(7, 4))
+        self.diagnosis_text = tk.Text(
+            left, wrap="word", state="disabled", height=18,
+            bg=self.palette["input"], fg=self.palette["log_text"],
+            insertbackground=self.palette["text"], borderwidth=0,
+            highlightthickness=1, highlightbackground=self.palette["border"],
+            padx=10, pady=10, font=("Cascadia Mono", 9))
+        self.diagnosis_text.pack(fill="both", expand=True)
+        self.fix_bar = ttk.Frame(left, style="Toolbar.TFrame", padding=8)
+        self.fix_bar.pack(fill="x", pady=(8, 0))
+
+        right = ttk.Frame(tab, style="Card.TFrame")
+        right.pack(side="left", fill="both", expand=True)
+        setup = ttk.Frame(right, style="Toolbar.TFrame", padding=8)
+        setup.pack(fill="x")
+        ttk.Label(setup, text="Mô hình AI", style="Toolbar.TLabel").grid(row=0, column=0, sticky="w")
+        self.llm_provider_combo = ttk.Combobox(
+            setup, textvariable=self.llm_provider_var, state="readonly", width=20,
+            values=[LLM_PROVIDERS[name]["label"] for name in LLM_PROVIDERS])
+        self.llm_provider_combo.grid(row=0, column=1, sticky="w", padx=(6, 12))
+        self.llm_provider_combo.bind("<<ComboboxSelected>>", self._on_llm_provider_changed)
+        ttk.Label(setup, text="Model", style="Toolbar.TLabel").grid(row=0, column=2, sticky="w")
+        ttk.Entry(setup, textvariable=self.llm_model_var, width=24).grid(
+            row=0, column=3, sticky="w", padx=(6, 12))
+        ttk.Label(setup, text="API key", style="Toolbar.TLabel").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Entry(setup, textvariable=self.llm_key_var, width=44, show="•").grid(
+            row=1, column=1, columnspan=3, sticky="we", padx=(6, 12), pady=(6, 0))
+        ttk.Button(setup, text="Lưu khoá", command=self.save_llm_key).grid(
+            row=1, column=4, sticky="w", pady=(6, 0))
+
+        ask = ttk.Frame(right, style="Card.TFrame")
+        ask.pack(fill="x", pady=(8, 0))
+        ttk.Entry(ask, textvariable=self.llm_question_var).pack(
+            side="left", fill="x", expand=True)
+        ttk.Button(ask, text="Hỏi AI", command=self.ask_assistant,
+                   style="Primary.TButton").pack(side="left", padx=(6, 0))
+        ttk.Label(right,
+                  text="Tên WiFi và địa chỉ proxy công cộng được thay bằng nhãn trước khi gửi.",
+                  style="Toolbar.TLabel", wraplength=460).pack(anchor="w", pady=(6, 4))
+        self.llm_text = tk.Text(
+            right, wrap="word", state="disabled",
+            bg=self.palette["input"], fg=self.palette["log_text"],
+            insertbackground=self.palette["text"], borderwidth=0,
+            highlightthickness=1, highlightbackground=self.palette["border"],
+            padx=10, pady=10, font=("Segoe UI", 9))
+        self.llm_text.pack(fill="both", expand=True)
+
+    # -- the assistant ------------------------------------------------------
+    def _write_pane(self, widget, text):
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("end", str(text))
+        widget.configure(state="disabled")
+
+    def _on_llm_provider_changed(self, _event=None):
+        """Switching provider offers that provider's default model, not the
+        model name left over from the previous one."""
+        name = self.llm_provider_name()
+        self.llm_model_var.set(LLM_PROVIDERS[name]["model"])
+
+    def llm_provider_name(self) -> str:
+        """The id behind the label shown in the combo box."""
+        label = self.llm_provider_var.get()
+        for name, spec in LLM_PROVIDERS.items():
+            if spec["label"] == label:
+                return name
+        return DEFAULT_LLM_PROVIDER
+
+    def save_llm_key(self):
+        save_llm_settings(self.llm_provider_name(), self.llm_model_var.get(),
+                          self.llm_key_var.get())
+        self.append_log("Đã lưu thiết lập AI (khoá được mã hoá theo tài khoản Windows).")
+        self.status_var.set(self.t("Hoàn tất"))
+
+    def run_diagnosis(self):
+        self.run_task("Đang chẩn đoán router…", lambda: self.require_client().debug_report(),
+                      self.show_diagnosis, show_loading=True)
+
+    def show_diagnosis(self, report):
+        self.last_diagnosis = report if isinstance(report, dict) else {}
+        findings = self.last_diagnosis.get("findings") or []
+        summary = self.last_diagnosis.get("summary") or {}
+        self.diagnosis_summary_var.set(
+            f"{summary.get('crit', 0)} lỗi nặng · {summary.get('warn', 0)} cảnh báo "
+            f"· {summary.get('info', 0)} ghi chú")
+        marks = {"crit": "[!]", "warn": "[*]", "info": "[-]"}
+        lines = []
+        for finding in findings:
+            title = finding.get("title") if self.language != "en" else (
+                finding.get("title_en") or finding.get("title"))
+            detail = finding.get("detail") if self.language != "en" else (
+                finding.get("detail_en") or finding.get("detail"))
+            lines.append(f"{marks.get(finding.get('severity'), '[-]')} {title}\n    {detail}")
+        self._write_pane(self.diagnosis_text,
+                         "\n\n".join(lines) or self.t("Không phát hiện vấn đề nào"))
+        self.render_fix_buttons([f.get("fix") for f in findings if f.get("fix")])
+
+    def render_fix_buttons(self, fix_ids):
+        """One button per repair on offer -- and nothing else can appear here.
+
+        Whatever proposed these ids (the rules, or a model), they are filtered
+        against the repairs debug-agent.sh actually implements before a button
+        exists, and pressing one still asks for confirmation.
+        """
+        for child in self.fix_bar.winfo_children():
+            child.destroy()
+        allowed = [fix for fix in dict.fromkeys(fix_ids or []) if fix in LLM_FIX_IDS]
+        if not allowed:
+            ttk.Label(self.fix_bar, text="Không có cách sửa tự động nào được đề xuất.",
+                      style="Toolbar.TLabel").pack(anchor="w")
+            return
+        for fix in allowed:
+            ttk.Button(self.fix_bar, text=f"Sửa: {fix}",
+                       command=lambda name=fix: self.apply_fix(name),
+                       style="Warning.TButton").pack(side="left", padx=(0, 6))
+
+    def apply_fix(self, fix_id: str):
+        if fix_id not in LLM_FIX_IDS:                 # belt and braces
+            return
+        if not self.confirm_important("Sửa lỗi", f"chạy cách sửa '{fix_id}' trên router",
+                                      "Router có thể khởi động lại sing-box hoặc reload WiFi."):
+            return
+        self.run_task(f"Đang chạy cách sửa {fix_id}…",
+                      lambda: self.require_client().debug_fix(fix_id),
+                      self.show_fix_result, show_loading=True)
+
+    def show_fix_result(self, result):
+        result = result if isinstance(result, dict) else {}
+        self.append_log(f"Sửa {result.get('id')}: "
+                        f"{'thành công' if result.get('ok') else 'thất bại'} — "
+                        f"{result.get('log') or ''}")
+        self.run_diagnosis()
+
+    def ask_assistant(self):
+        """Hand the last diagnosis to the chosen model.
+
+        There is nothing to explain before the router has been asked, so a
+        missing diagnosis runs one first rather than sending an empty report.
+        """
+        if not getattr(self, "last_diagnosis", None):
+            self.append_log("Chưa có báo cáo chẩn đoán — đang chẩn đoán trước.")
+            self.run_diagnosis()
+            return
+        key = self.llm_key_var.get().strip()
+        if not key:
+            messagebox.showinfo("sbproxy", self.t("Chưa có API key"), parent=self.root)
+            return
+        provider, model = self.llm_provider_name(), self.llm_model_var.get()
+        question, report = self.llm_question_var.get(), self.last_diagnosis
+        self.run_task("Đang hỏi mô hình AI…",
+                      lambda: ask_llm(provider, model, key, report, question),
+                      self.show_llm_answer, show_loading=True)
+
+    def show_llm_answer(self, answer):
+        answer = answer if isinstance(answer, dict) else {}
+        parts = [answer.get("diagnosis") or ""]
+        for index, step in enumerate(answer.get("steps") or [], start=1):
+            parts.append(f"{index}. {step}")
+        self._write_pane(self.llm_text, "\n\n".join(part for part in parts if part))
+        # The model may only point at repairs the router already offers; this
+        # merges its picks into the same button bar, filtered the same way.
+        proposed = [f.get("fix") for f in (self.last_diagnosis.get("findings") or [])
+                    if f.get("fix")]
+        self.render_fix_buttons(proposed + list(answer.get("fixes") or []))
 
     def _build_backup_tab(self):
         tab = ttk.Frame(self.tabs, style="Card.TFrame", padding=12)

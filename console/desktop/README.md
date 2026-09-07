@@ -61,6 +61,31 @@ with no Python and no repository checkout on the operator's machine.
 - The router URL and token are stored with Windows DPAPI for the current user
   (`chmod 600` on Linux/macOS).
 
+## Troubleshooting assistant
+
+The **Troubleshooting assistant** tab has two halves.
+
+The left half is **the router speaking for itself**: press *Diagnose the router*
+to run `scripts/debug-agent.sh` on the device. These are rules, not a model --
+no key, no Internet, and they still work with the uplink down; they are also the
+only thing allowed to change anything. Each finding brings its repair button
+(`singbox_restart`, `config_eol`, `bridge_nf`, `apply`, `install_agent`); a press
+still asks for confirmation, and the router refuses any id outside that list.
+
+The right half is **optional**: a model reads that same report and explains it.
+Pick Claude (Anthropic), OpenAI or Gemini, paste an API key and press *Save key*
+-- the key is sealed with Windows DPAPI for the current account, like the router
+token, and is **never pushed to the router**. The model may only *suggest*: it
+can point at one of the left half's buttons, and any other id is dropped before
+a button exists.
+
+The report is cleaned before it is sent: Wi-Fi names become `<ssid-1>`, public
+proxy addresses become `<proxy-1>`, passwords are stripped. Loopback and LAN
+addresses survive -- "the proxy points at 127.0.0.1" *is* the diagnosis, and
+there is nothing private about an address meaning "this router".
+
+With no key configured the left half still works in full.
+
 ## Post-flash setup
 
 New router, start to finish? Follow the four-step

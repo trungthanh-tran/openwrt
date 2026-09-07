@@ -60,6 +60,31 @@ không cần mã nguồn.
 - URL router và token được bảo vệ bằng Windows DPAPI cho đúng tài khoản hiện
   tại (Linux/macOS dùng `chmod 600`).
 
+## Trợ lý gỡ lỗi
+
+Tab **Trợ lý gỡ lỗi** có hai nửa.
+
+Nửa trái là **router tự nói**: bấm *Chẩn đoán router* để chạy
+`scripts/debug-agent.sh` trên chính thiết bị. Đây là bộ luật, không phải AI —
+không cần khoá, không cần Internet, chạy được cả khi router đứt mạng, và nó là
+thứ duy nhất được phép sửa. Mỗi phát hiện kèm nút sửa tương ứng
+(`singbox_restart`, `config_eol`, `bridge_nf`, `apply`, `install_agent`); bấm
+nút vẫn phải xác nhận, và router tự từ chối mọi id nằm ngoài danh sách đó.
+
+Nửa phải là **tuỳ chọn**: một mô hình đọc đúng báo cáo ấy và giải thích bằng
+tiếng Việt. Chọn Claude (Anthropic), OpenAI hoặc Gemini, dán API key rồi bấm
+*Lưu khoá* — khoá được niêm bằng Windows DPAPI theo tài khoản hiện tại, giống
+token router, và **không bao giờ được đẩy xuống router**. Mô hình chỉ được
+*đề xuất*: nó có thể chỉ vào một trong các nút sửa ở nửa trái, mọi id khác bị
+loại bỏ trước khi nút xuất hiện.
+
+Trước khi gửi, báo cáo được làm sạch: tên WiFi thành `<ssid-1>`, địa chỉ proxy
+công cộng thành `<proxy-1>`, mật khẩu bị xoá. Địa chỉ loopback và LAN giữ
+nguyên — "proxy trỏ về 127.0.0.1" chính là chẩn đoán, và không có gì bí mật ở
+một địa chỉ nghĩa là "chính router này".
+
+Không đặt khoá thì tab vẫn dùng được đầy đủ ở nửa trái.
+
 ## Cài đặt sau khi flash
 
 Router mới, làm từ đầu tới cuối? Theo
