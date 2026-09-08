@@ -83,6 +83,7 @@ contains() { if printf '%s' "$2" | grep -Fq "$3"; then ok "$1"; else no "$1 — 
 
 echo "== health daemon probe states =="
 export CONF POOLS HEALTH_FILE CURL_CALLS
+export SBPROXY_SKIP_ENV=1
 export PATH="$BIN:$PATH"
 export PROBE_URL='https://probe.example/204' PROBE_TIMEOUT=3 SLOW_MS=800
 if sh "$HEALTHD" --once; then ok "--once succeeds"; else no "--once succeeds"; fi
@@ -107,6 +108,13 @@ eq "a healthy probe carries no error" "$(jq -r '.probes["1"] | has("error")' "$H
 eq "healthy pool slot is published" "$(jq -r '.pool_probes["1"]["0"].state' "$HEALTH_FILE")" 'ok'
 eq "failed pool slot is published" "$(jq -r '.pool_probes["1"]["1"].state' "$HEALTH_FILE")" 'fail'
 eq "pool slot carries its endpoint" "$(jq -r '.pool_probes["1"]["1"].endpoint' "$HEALTH_FILE")" 'offline.example:5080'
+eq "healthy slots wait five minutes" "$(jq -r '.pool_probes["1"]["0"] | .next_check - .checked_at' "$HEALTH_FILE")" '300'
+eq "slow slots wait two minutes" "$(jq -r '.pool_probes["2"]["0"] | .next_check - .checked_at' "$HEALTH_FILE")" '120'
+eq "failed slots retry after fifteen seconds" "$(jq -r '.pool_probes["1"]["1"] | .next_check - .checked_at' "$HEALTH_FILE")" '15'
+calls_before="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
+sh "$HEALTHD" --once
+calls_after="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
+eq "a second immediate pass reuses every fresh result" "$(( calls_after - calls_before ))" '0'
 
 echo "== probe-proxy.sh: one proxy, with the reason =="
 PROBE="$ROOT/scripts/probe-proxy.sh"

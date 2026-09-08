@@ -397,6 +397,10 @@ app desktop. Cấu hình daemon ở `/etc/sbproxy/env`:
 |---|---|---|
 | `INTERVAL` | 15 | Giây giữa các lần probe. |
 | `SLOW_MS` | 800 | Ngưỡng coi là "chậm". |
+| `HEALTHY_INTERVAL` | 300 | Chu kỳ kiểm tra lại slot `OK`. |
+| `SLOW_INTERVAL` | 120 | Chu kỳ kiểm tra lại slot `SLOW`. |
+| `FAIL_RETRY_BASE` / `FAIL_RETRY_MAX` | 15 / 300 | Backoff kiểm tra slot lỗi. |
+| `MAX_POOL_PROBES_PER_RUN` | 4 | Số slot pool tối đa được probe trong một vòng. |
 | `DNS_UPSTREAM` | `1.1.1.1` | Resolver sing-box hỏi thật qua **TCP** (IP hoặc hostname). Đổi khi bị chặn hoặc cần DNS nội bộ. |
 | `ALLOW_UNSUPPORTED_BOARD` | `0` | `1` = chỉ cảnh báo thay vì dừng trên board không phải GL-MT6000. |
 | `PROBE_URL` | gstatic /generate_204 | URL đo latency. |

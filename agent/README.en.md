@@ -53,6 +53,16 @@ headers.
 | POST | `update` | Upload a `sbproxy-update-<version>.tar.gz`; `scripts/self-update.sh` keeps `wifi-socks.conf` and `settings.sh` and refuses downgrades unless `force=1` |
 | POST | `uninstall` | Remove the project-managed configuration |
 
+## Adaptive proxy health
+
+New pool proxies are checked by the Web UI before they are saved. The daemon
+then caches each slot result: `ok` is checked again after 300 seconds, `slow`
+after 120 seconds, and failures retry with 15/30/60/120/300-second backoff.
+At most four pool slots are probed per daemon pass. A sing-box error naming an
+`out-w<idx>-s<slot>` outbound schedules that slot for an immediate recheck.
+These intervals and `MAX_POOL_PROBES_PER_RUN` can be overridden in
+`/etc/sbproxy/env`.
+
 ## Security
 
 - LAN or trusted management VPN only; never expose uhttpd/agent to the WAN.

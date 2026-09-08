@@ -7,19 +7,31 @@
 #     "probes": { "1": {"state":"ok","latency_ms":123,"code":204}, ... } }
 # state: ok | slow | fail
 
-[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+if [ "${SBPROXY_SKIP_ENV:-0}" != "1" ] && [ -f /etc/sbproxy/env ]; then
+  . /etc/sbproxy/env
+fi
 SB_ROOT="${SB_ROOT:-/root/sbproxy}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 POOLS="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
 LOG_DIR="${LOG_DIR:-/etc/sbproxy/logs}"
 HEALTH_LOG_STATE="${HEALTH_LOG_STATE:-/tmp/sbproxy-health-log-state}"
+RUNTIME_ERROR_CURSOR="${RUNTIME_ERROR_CURSOR:-/tmp/sbproxy-health-error-cursor}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 case "$LOG_RETENTION_DAYS" in ''|*[!0-9]*|0) LOG_RETENTION_DAYS=7;; esac
 PROBE_URL="${PROBE_URL:-https://www.gstatic.com/generate_204}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-8}"
 INTERVAL="${INTERVAL:-15}"
 SLOW_MS="${SLOW_MS:-800}"
+HEALTHY_INTERVAL="${HEALTHY_INTERVAL:-300}"
+SLOW_INTERVAL="${SLOW_INTERVAL:-120}"
+FAIL_RETRY_BASE="${FAIL_RETRY_BASE:-15}"
+FAIL_RETRY_MAX="${FAIL_RETRY_MAX:-300}"
+MAX_POOL_PROBES_PER_RUN="${MAX_POOL_PROBES_PER_RUN:-4}"
+for _n in HEALTHY_INTERVAL SLOW_INTERVAL FAIL_RETRY_BASE FAIL_RETRY_MAX MAX_POOL_PROBES_PER_RUN; do
+  eval "_v=\${$_n}"
+  case "$_v" in ''|*[!0-9]*|0) echo "healthd: $_n must be a positive integer" >&2; exit 1;; esac
+done
 
 command -v jq   >/dev/null 2>&1 || { echo "healthd: jq is missing";   exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "healthd: curl is missing"; exit 1; }
@@ -95,11 +107,52 @@ probe_one() {
   esac
 }
 
+schedule_probe_result() { # endpoint previous-fail-count
+  _spr_ep="$1"; _spr_fail="${2:-0}"
+  case "$_spr_fail" in ''|*[!0-9]*) _spr_fail=0;; esac
+  case "$PROBE_STATE" in
+    ok)   _spr_fail=0; _spr_delay="$HEALTHY_INTERVAL" ;;
+    slow) _spr_fail=0; _spr_delay="$SLOW_INTERVAL" ;;
+    *)
+      _spr_fail=$(( _spr_fail + 1 )); _spr_delay="$FAIL_RETRY_BASE"; _spr_i=1
+      while [ "$_spr_i" -lt "$_spr_fail" ] && [ "$_spr_delay" -lt "$FAIL_RETRY_MAX" ]; do
+        _spr_delay=$(( _spr_delay * 2 )); _spr_i=$(( _spr_i + 1 ))
+      done
+      [ "$_spr_delay" -le "$FAIL_RETRY_MAX" ] || _spr_delay="$FAIL_RETRY_MAX"
+      ;;
+  esac
+  _spr_next=$(( now + _spr_delay ))
+  PROBE_JSON="$(jq -n --arg st "$PROBE_STATE" --arg ep "$_spr_ep" --arg e "${PROBE_ERROR:-}" \
+    --argjson ms "${PROBE_MS:-0}" --argjson c "${PROBE_CODE:-0}" --argjson checked "$now" \
+    --argjson next "$_spr_next" --argjson fails "$_spr_fail" \
+    '{state:$st,latency_ms:$ms,code:$c,endpoint:$ep,checked_at:$checked,next_check:$next,fail_count:$fails} + (if $e == "" then {} else {error:$e} end)')"
+}
+
 run_once() {
   [ -r "$CONF" ] || { echo "healthd: cannot read config $CONF" >&2; return 1; }
   purge_daily_logs
+  now="$(date +%s)"
+  case "$now" in ''|*[!0-9]*) now=0;; esac
   probes="{}"
   pool_probes="{}"
+  old_probes="$(jq -c '.probes // {}' "$HEALTH_FILE" 2>/dev/null || printf '{}')"
+  old_pool_probes="$(jq -c '.pool_probes // {}' "$HEALTH_FILE" 2>/dev/null || printf '{}')"
+  runtime_bad=""
+  if command -v logread >/dev/null 2>&1; then
+    runtime_tmp="${TMPDIR:-/tmp}/sbproxy-health-errors.$$"
+    logread 2>/dev/null | grep -E 'sing-box.*(ERROR|error).*out-w[0-9]+-s[0-9]+' > "$runtime_tmp" || true
+    runtime_count="$(wc -l < "$runtime_tmp" | tr -d ' ')"
+    runtime_seen="$(cat "$RUNTIME_ERROR_CURSOR" 2>/dev/null || printf '0')"
+    case "$runtime_seen" in ''|*[!0-9]*) runtime_seen=0;; esac
+    case "$runtime_count" in ''|*[!0-9]*) runtime_count=0;; esac
+    [ "$runtime_count" -ge "$runtime_seen" ] || runtime_seen=0
+    if [ "$runtime_count" -gt "$runtime_seen" ]; then
+      runtime_bad="$(sed -n "$(( runtime_seen + 1 )),${runtime_count}p" "$runtime_tmp" 2>/dev/null \
+        | sed -n 's/.*out-w\([0-9][0-9]*\)-s\([0-9][0-9]*\).*/\1|\2/p' | sort -u)"
+    fi
+    printf '%s\n' "$runtime_count" > "$RUNTIME_ERROR_CURSOR" 2>/dev/null || true
+    rm -f "$runtime_tmp"
+  fi
   state_tmp="$HEALTH_LOG_STATE.tmp.$$"
   : > "$state_tmp" 2>/dev/null || state_tmp=""
   # Read the source configuration.
@@ -127,8 +180,21 @@ run_once() {
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || continue
     # probe_one answers through globals — no subshell, no temp file, so the
     # result and PROBE_ERROR stay bound to THIS proxy even when /tmp is full.
-    probe_one "$host" "$port" "$user" "$pass" "$proxy_type"
-    state="$PROBE_STATE"; ms="$PROBE_MS"; code="$PROBE_CODE"
+    ep="$host:$port"
+    previous_json="$(printf '%s' "$old_probes" | jq -c --arg i "$idx" '.[$i] // {}')"
+    previous_ep="$(printf '%s' "$previous_json" | jq -r '.endpoint // ""')"
+    previous_next="$(printf '%s' "$previous_json" | jq -r '.next_check // 0')"
+    case "$previous_next" in ''|*[!0-9]*) previous_next=0;; esac
+    if [ "$previous_ep" = "$ep" ] && [ "$previous_next" -gt "$now" ]; then
+      PROBE_JSON="$previous_json"
+    else
+      previous_fail="$(printf '%s' "$previous_json" | jq -r '.fail_count // 0')"
+      probe_one "$host" "$port" "$user" "$pass" "$proxy_type"
+      schedule_probe_result "$ep" "$previous_fail"
+    fi
+    state="$(printf '%s' "$PROBE_JSON" | jq -r '.state // "pending"')"
+    ms="$(printf '%s' "$PROBE_JSON" | jq -r '.latency_ms // 0')"
+    code="$(printf '%s' "$PROBE_JSON" | jq -r '.code // 0')"
     previous="$(awk -v i="$idx" '$1 == i {print $2; exit}' "$HEALTH_LOG_STATE" 2>/dev/null)"
     if [ "$state" != "$previous" ]; then
       health_daily_log "idx=$idx endpoint=$host:$port state=$state latency_ms=$ms code=$code"
@@ -136,16 +202,14 @@ run_once() {
     [ -z "$state_tmp" ] || printf '%s %s\n' "$idx" "$state" >> "$state_tmp"
     # The endpoint travels with the result: "fail" on its own hid the whole
      # point of these lines, which is WHICH proxy did not answer.
-    probes="$(echo "$probes" | jq --arg i "$idx" --arg s "$state" --arg e "${PROBE_ERROR:-}" \
-              --arg ep "$host:$port" \
-              --argjson ms "${ms:-0}" --argjson c "${code:-0}" \
-              '.[$i] = {state:$s, latency_ms:$ms, code:$c, endpoint:$ep} + (if $e == "" then {} else {error:$e} end)')"
+    probes="$(printf '%s' "$probes" | jq --arg i "$idx" --argjson result "$PROBE_JSON" '.[$i] = $result')"
   done < "$CONF"
 
   # Probe every pool slot as well as each SSID's default proxy.  Pool slots are
   # what the DHCP assigner actually chooses, so a healthy SSID-level probe is
   # not enough to prevent a dead slot from being selected.
   if [ -r "$POOLS" ]; then
+    pool_probe_count=0
     pool_tmp="${TMPDIR:-/tmp}/sbproxy-health-pool.$$"
     awk -F'|' '{ sub(/\r$/, ""); if ($0 ~ /^[[:space:]]*#/ || $0 ~ /^[[:space:]]*$/ || NF < 6 || NF > 7) next; i=$1; printf "%s|%d|%s|%s|%s|%s|%s|%s\n", i, seen[i]++, $2, $3, $4, $5, $6, (NF >= 7 ? $7 : "") }' "$POOLS" > "$pool_tmp" 2>/dev/null || :
     while IFS='|' read -r pidx pslot ptype phost pport puser ppass plabel pextra; do
@@ -158,18 +222,35 @@ run_once() {
       [ "$pport" -ge 1 ] 2>/dev/null && [ "$pport" -le 65535 ] 2>/dev/null || continue
       [ "${#puser}" -le 255 ] && [ "${#ppass}" -le 255 ] || continue
       case "$pslot" in ''|*[!0-9]*) continue;; esac
-      probe_one "$phost" "$pport" "$puser" "$ppass" "$ptype"
-      pool_probes="$(echo "$pool_probes" | jq --arg i "$pidx" --arg s "$pslot" \
-        --arg st "$PROBE_STATE" --arg ep "$phost:$pport" --argjson ms "${PROBE_MS:-0}" \
-        --argjson c "${PROBE_CODE:-0}" --arg e "${PROBE_ERROR:-}" \
-        '.[$i] = (.[$i] // {}) | .[$i][$s] = ({state:$st,latency_ms:$ms,code:$c,endpoint:$ep} + (if $e == "" then {} else {error:$e} end))')"
+      pep="$phost:$pport"
+      previous="$(printf '%s' "$old_pool_probes" | jq -c --arg i "$pidx" --arg s "$pslot" '.[$i][$s] // {}')"
+      previous_ep="$(printf '%s' "$previous" | jq -r '.endpoint // ""')"
+      previous_next="$(printf '%s' "$previous" | jq -r '.next_check // 0')"
+      case "$previous_next" in ''|*[!0-9]*) previous_next=0;; esac
+      if printf '%s\n' "$runtime_bad" | grep -qx "$pidx|$pslot"; then
+        previous_next=0
+        health_daily_log "idx=$pidx slot=$pslot endpoint=$pep runtime-error=reprobe"
+      fi
+      if [ "$previous_ep" = "$pep" ] && [ "$previous_next" -gt "$now" ]; then
+        PROBE_JSON="$previous"
+      elif [ "$pool_probe_count" -ge "$MAX_POOL_PROBES_PER_RUN" ]; then
+        PROBE_JSON="$previous"
+        [ "$PROBE_JSON" != "{}" ] || PROBE_JSON="$(jq -n --arg ep "$pep" '{state:"pending",latency_ms:0,code:0,endpoint:$ep}')"
+      else
+        previous_fail="$(printf '%s' "$previous" | jq -r '.fail_count // 0')"
+        probe_one "$phost" "$pport" "$puser" "$ppass" "$ptype"
+        schedule_probe_result "$pep" "$previous_fail"
+        pool_probe_count=$(( pool_probe_count + 1 ))
+      fi
+      pool_probes="$(printf '%s' "$pool_probes" | jq --arg i "$pidx" --arg s "$pslot" --argjson result "$PROBE_JSON" \
+        '.[$i] = (.[$i] // {}) | .[$i][$s] = $result')"
     done < "$pool_tmp"
     rm -f "$pool_tmp"
   fi
 
   [ -z "$state_tmp" ] || mv "$state_tmp" "$HEALTH_LOG_STATE" 2>/dev/null || true
 
-  ts="$(date +%s)"
+  ts="$now"
   tmp="$HEALTH_FILE.tmp.$$"
   jq -n --argjson ts "$ts" --argjson p "$probes" --argjson pp "$pool_probes" \
     '{ts:$ts, probes:$p, pool_probes:$pp}' > "$tmp" && mv "$tmp" "$HEALTH_FILE"

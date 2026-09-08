@@ -89,6 +89,12 @@ Trình duyệt **chặn** trang https gọi tới router http. Vì vậy:
 
 ## Cấu hình
 `/etc/sbproxy/env` (do install-agent tạo): `SB_ROOT`, `CONF`, `PROBE_URL`, `INTERVAL` (giây giữa các lần probe), `SLOW_MS` (ngưỡng "chậm"), `PROBE_TIMEOUT`.
+Health proxy pool dùng lịch adaptive: proxy mới được WebUI kiểm tra trước khi
+lưu; `OK` kiểm tra lại sau 300 giây, `SLOW` sau 120 giây, còn `FAIL` retry theo
+15/30/60/120/300 giây. Mỗi vòng probe tối đa 4 slot; lỗi sing-box có tên
+`out-w<idx>-s<slot>` sẽ yêu cầu kiểm tra lại slot đó ngay. Có thể chỉnh bằng
+`HEALTHY_INTERVAL`, `SLOW_INTERVAL`, `FAIL_RETRY_BASE`, `FAIL_RETRY_MAX` và
+`MAX_POOL_PROBES_PER_RUN` trong `/etc/sbproxy/env`.
 `GATEWAY_EXPECTED_INTERFACE` để trống nghĩa là chấp nhận mọi uplink; đặt tên một
 interface (`wan`, `wwan`, …) nếu muốn ép đúng một đường ra. File này được agent
 nạp trước mọi script nên **giá trị trong đó thắng mặc định trong code**;
