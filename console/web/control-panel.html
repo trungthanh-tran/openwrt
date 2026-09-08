@@ -2944,11 +2944,43 @@
     });
   }
   function testAllPool() { testPoolSlots(null); }
+  const poolProbeIdentity = p => [String(p.type || "socks5").toLowerCase(), String(p.host || "").toLowerCase(),
+    Number(p.port), p.user || "", p.pass || ""].join("|");
+  function probeNewPoolRows(rows) {
+    const known = new Set(activePool.map(poolProbeIdentity));
+    const targets = rows.map((p, i) => ({ p, i })).filter(x => !known.has(poolProbeIdentity(x.p)));
+    if (!targets.length) return Promise.resolve();
+    let cursor = 0;
+    const failed = [];
+    const worker = () => {
+      const item = targets[cursor++];
+      if (!item) return Promise.resolve();
+      const p = item.p;
+      return api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
+        .then(d => {
+          const state = d && (d.state === "ok" || d.state === "slow") ? d.state : "fail";
+          if (state === "fail") failed.push(`${p.host}:${p.port}`);
+          poolStatus[poolStatusKey(p, item.i)] = state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠";
+        }).catch(() => {
+          failed.push(`${p.host}:${p.port}`);
+          poolStatus[poolStatusKey(p, item.i)] = "FAIL ⚠";
+        }).then(worker);
+    };
+    const workers = Array.from({ length: Math.min(4, targets.length) }, worker);
+    return Promise.all(workers).then(() => {
+      if (failed.length) throw new Error(pick(
+        `Proxy check failed; not saved: ${failed.join(", ")}`,
+        `Kiểm tra proxy lỗi, chưa lưu: ${failed.join(", ")}`));
+    });
+  }
   function savePoolRows(rows) {
     // pool.sh rebuilds sing-box and nftables and restarts them, so this is a
     // router-side apply in every sense except that Wi-Fi is not reloaded.
-    busy(pick("Saving the pool on the router…", "Đang lưu pool lên router…"));
-    return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows }).then(d => {
+    busy(pick("Checking new proxies…", "Đang kiểm tra proxy mới…"));
+    return probeNewPoolRows(rows).then(() => {
+      busy(pick("Saving the pool on the router…", "Đang lưu pool lên router…"));
+      return api("save_pool", "POST", { idx: activePoolIdx, proxies: rows });
+    }).then(d => {
       // The script's own output is the only place that says WHY: reading just
       // .error left the operator with "save_pool failed" and nothing to act on.
       if (!d || d.ok === false) throw new Error(routerReason(d, pick("saving the pool failed", "lưu pool thất bại")));

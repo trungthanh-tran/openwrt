@@ -1293,6 +1293,8 @@ match "web console can log out"                     "$web_console" 'id="logoutBt
 match "web console keeps the raw-token fallback"    "$web_console" 'id="c_token"'
 match "web console can diagnose one SSID"           "$web_console" 'api\("diagnose_ssid&idx=" \+ idx\)'
 match "web console can probe a proxy from the form" "$web_console" 'api\("probe_proxy", "POST"'
+match "web console probes new pool proxies before saving" "$web_console" 'function probeNewPoolRows\(rows\)'
+match "web console limits immediate pool probes" "$web_console" 'Math\.min\(4, targets\.length\)'
 match "pool loading has a timeout"                   "$web_console" 'setTimeout\(\(\) => controller\.abort\(\), 8000\)'
 match "pool loading retries once"                    "$web_console" 'loadPool\(1\)'
 match "pool dialog has a manual retry"               "$web_console" 'id="poolRefresh"'
