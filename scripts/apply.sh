@@ -16,6 +16,7 @@ validate_settings
 validate_conf
 validate_pools
 validate_routes
+validate_traffic_stats
 check_unique_idx
 check_bssid_limit
 # A pool that shrank leaves pins pointing at slots that no longer exist. Heal

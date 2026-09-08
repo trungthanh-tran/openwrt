@@ -86,7 +86,7 @@ case "$(dhcp_hook_state "$_dhcpscript")" in
 esac
 
 echo; echo "==== 8. Config ===="
-if [ -f "$CONF" ]; then validate_settings; validate_conf; validate_pools; validate_routes; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
+if [ -f "$CONF" ]; then validate_settings; validate_conf; validate_pools; validate_routes; validate_traffic_stats; check_unique_idx; check_bssid_limit; echo "  [OK] $CONF is valid."
 else warn "$CONF does not exist — copy it from config/wifi-socks.conf.example"; fi
 
 echo; echo "Preflight complete. Review all [MISSING]/[WARN] items above before running apply.sh."

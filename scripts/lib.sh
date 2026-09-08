@@ -525,6 +525,43 @@ socks_udp_enabled() { [ "${SOCKS_UDP:-1}" = "1" ]; }
 # turning this on leaves every unpinned wired machine exactly as it was.
 lan_proxy_enabled() { [ "${LAN_PROXY:-0}" = "1" ] && pool_enabled 0; }
 
+# --- Traffic stats ----------------------------------------------------------
+traffic_stats_enabled() { [ "${TRAFFIC_STATS:-0}" = "1" ]; }
+
+# The clash_api secret, created on first use. It is not in settings.sh because
+# that file is committed, and the API can reconfigure sing-box, not just report
+# on it — an empty secret would leave that open to anything on the router.
+clash_api_secret() {
+  _cs_file="${CLASH_API_SECRET_FILE:-/etc/sbproxy/clash-secret}"
+  if [ ! -s "$_cs_file" ]; then
+    mkdir -p "$(dirname "$_cs_file")" 2>/dev/null || return 1
+    _cs_tmp="$_cs_file.tmp.$$"
+    # BusyBox carries both, but a stripped image may drop either one.
+    ( umask 077
+      if command -v hexdump >/dev/null 2>&1; then
+        head -c 24 /dev/urandom | hexdump -v -e '/1 "%02x"'
+      else
+        head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'
+      fi > "$_cs_tmp" ) 2>/dev/null || { rm -f "$_cs_tmp"; return 1; }
+    [ -s "$_cs_tmp" ] || { rm -f "$_cs_tmp"; return 1; }
+    chmod 600 "$_cs_tmp" 2>/dev/null || true
+    mv "$_cs_tmp" "$_cs_file" || { rm -f "$_cs_tmp"; return 1; }
+  fi
+  tr -d ' \r\n' < "$_cs_file"
+}
+
+# Refuse an external controller that is reachable from the network: it can
+# change routing, so exposing it would hand the proxy layer to any LAN client.
+validate_traffic_stats() {
+  traffic_stats_enabled || return 0
+  case "${CLASH_API_LISTEN:-127.0.0.1:9090}" in
+    127.0.0.1:*|localhost:*|'[::1]':*) : ;;
+    *) die "CLASH_API_LISTEN must stay on localhost; it controls sing-box, not just reports on it." ;;
+  esac
+  [ -n "$(clash_api_secret 2>/dev/null)" ] \
+    || die "Could not create ${CLASH_API_SECRET_FILE:-/etc/sbproxy/clash-secret} for the stats API."
+}
+
 # Whether any slot of one idx is an HTTP proxy. An HTTP proxy cannot carry UDP,
 # so an SSID that can route a device to one keeps dropping QUIC even when
 # SOCKS_UDP is on — otherwise that device's QUIC would reach sing-box and be
@@ -1513,6 +1550,19 @@ build_singbox() {
   # or a destination could never be taken away from the proxy.
   _sb_routes="$(routes_json "${_sb_pairs# }")"
 
+  # Per-connection accounting for scripts/traffic.sh. Off unless asked for: it
+  # is a control API, so it costs a listening socket and a secret to protect.
+  _sb_clash=""
+  if traffic_stats_enabled; then
+    _sb_secret="$(clash_api_secret 2>/dev/null || true)"
+    if [ -n "$_sb_secret" ]; then
+      _sb_clash=",
+    \"clash_api\": { \"external_controller\": $(jq -Rn --arg v "${CLASH_API_LISTEN:-127.0.0.1:9090}" '$v'), \"secret\": $(jq -Rn --arg v "$_sb_secret" '$v') }"
+    else
+      warn "TRAFFIC_STATS=1 but the API secret could not be created; stats stay off."
+    fi
+  fi
+
   mkdir -p "$(dirname "$SINGBOX_CONF")"
   # Fake-IP DNS: return fake IPs to clients and map them back to hostnames on connect,
   # ensuring that SOCKS outbounds always receive hostnames (remote resolution), not real IPs.
@@ -1546,7 +1596,7 @@ build_singbox() {
     "final": "direct"
   },
   "experimental": {
-    "cache_file": { "enabled": true, "path": "$SINGBOX_CACHE", "store_fakeip": true }
+    "cache_file": { "enabled": true, "path": "$SINGBOX_CACHE", "store_fakeip": true }$_sb_clash
   }
 }
 EOF

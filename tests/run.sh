@@ -627,6 +627,89 @@ else
   sk "routing-rules.conf" "no jq"
 fi
 
+echo "== traffic stats =="
+if command -v jq >/dev/null 2>&1; then
+  mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0||socks5'
+  SECRET_FILE="$STUB/clash-secret"; rm -f "$SECRET_FILE"
+  ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/nostats.json" build_singbox ) >/dev/null 2>&1
+  eq "stats are off by default" \
+    "$(jq 'has("clash_api")' "$STUB/nostats.json" 2>/dev/null || echo error)" "false"
+
+  ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/stats.json" TRAFFIC_STATS=1 \
+    CLASH_API_SECRET_FILE="$SECRET_FILE" build_singbox ) >/dev/null 2>&1
+  eq "TRAFFIC_STATS adds the controller" \
+    "$(jq -r '.experimental.clash_api.external_controller' "$STUB/stats.json")" "127.0.0.1:9090"
+  # An empty secret would leave an API that reconfigures sing-box open to
+  # anything that can reach the loopback, which on a router is every package.
+  eq "the controller always carries a secret" \
+    "$(jq -r '.experimental.clash_api.secret|length > 0' "$STUB/stats.json")" "true"
+  eq "the secret file is created once and reused" \
+    "$(jq -r '.experimental.clash_api.secret' "$STUB/stats.json")" "$(tr -d ' \r\n' < "$SECRET_FILE")"
+  eq "the config is still valid JSON with stats on" \
+    "$(jq -e . "$STUB/stats.json" >/dev/null 2>&1 && echo yes)" "yes"
+  if ( TRAFFIC_STATS=1 CLASH_API_LISTEN="0.0.0.0:9090" CLASH_API_SECRET_FILE="$SECRET_FILE" \
+       validate_traffic_stats ) >/dev/null 2>&1; then
+    no "a controller bound off localhost is refused"
+  else
+    ok "a controller bound off localhost is refused"
+  fi
+  if ( TRAFFIC_STATS=0 CLASH_API_LISTEN="0.0.0.0:9090" validate_traffic_stats ) >/dev/null 2>&1; then
+    ok "the listen guard only applies when stats are on"
+  else
+    no "the listen guard only applies when stats are on"
+  fi
+
+  # traffic.sh against a stubbed API: curl is replaced, so the aggregation and
+  # the routing-rule suggestions are what is actually under test.
+  TSTUB="$STUB/tbin"; mkdir -p "$TSTUB"
+  cat > "$TSTUB/curl" <<'CURL'
+#!/bin/sh
+cat "$TRAFFIC_FIXTURE"
+CURL
+  chmod +x "$TSTUB/curl"
+  cat > "$STUB/conns.json" <<'JSON'
+{"downloadTotal":3000,"uploadTotal":1000,"connections":[
+ {"upload":100,"download":900,"metadata":{"host":"cdn.example.com","inboundTag":"in-w1"}},
+ {"upload":50,"download":150,"metadata":{"host":"cdn.example.com","inboundTag":"in-w1-s2"}},
+ {"upload":10,"download":40,"metadata":{"host":"api.example.com","inboundTag":"in-w3"}},
+ {"upload":5,"download":5,"metadata":{"host":"","destinationIP":"9.9.9.9","inboundTag":"in-w0-s1"}}]}
+JSON
+  # lib.sh sources settings.sh after the environment is already in place, so
+  # these have to arrive through a settings file, not as exported variables.
+  printf '. "%s/config/settings.sh"\nTRAFFIC_STATS=1\nCLASH_API_SECRET_FILE="%s"\n' \
+    "$ROOT" "$SECRET_FILE" > "$STUB/settings-stats.sh"
+  trun() { # extra args -> stdout of traffic.sh
+    PATH="$TSTUB:$PATH" TRAFFIC_FIXTURE="$STUB/conns.json" SB_ROOT="$ROOT" \
+      SETTINGS="$STUB/settings-stats.sh" \
+      sh "$ROOT/scripts/traffic.sh" "$@" 2>&1
+  }
+  tjson="$(trun --json)"
+  eq "hosts are summed across their connections" \
+    "$(printf '%s' "$tjson" | jq -r '.[]|select(.host=="cdn.example.com")|.bytes')" "1200"
+  eq "the busiest host comes first" \
+    "$(printf '%s' "$tjson" | jq -r '.[0].host')" "cdn.example.com"
+  eq "connections are counted per host" \
+    "$(printf '%s' "$tjson" | jq -r '.[]|select(.host=="cdn.example.com")|.conns')" "2"
+  # A slot inbound is still its SSID: in-w1-s2 must report idx 1, not 12.
+  eq "a pool slot reports its own SSID" \
+    "$(printf '%s' "$tjson" | jq -r '.[]|select(.host=="cdn.example.com")|.idx')" "1"
+  # No sniffed host means no domain rule can ever match it, so it is reported
+  # by IP — which is the case ip_cidr exists for.
+  eq "a connection with no host falls back to its destination IP" \
+    "$(printf '%s' "$tjson" | jq -r '.[]|select(.host=="9.9.9.9")|.bytes')" "10"
+  eq "--idx keeps only that SSID" \
+    "$(trun --json --idx 3 | jq -r '[.[].host]|join(",")')" "api.example.com"
+  eq "--top limits the rows" "$(trun --json --top 1 | jq 'length')" "1"
+  match "--suggest emits a domain rule"  "$(trun --suggest)" 'direct\|domain_suffix\|cdn\.example\.com'
+  match "--suggest emits a cidr for a bare IP" "$(trun --suggest)" 'direct\|ip_cidr\|9\.9\.9\.9/32'
+  match "--suggest warns before pasting" "$(trun --suggest)" 'real IP'
+  match "the table shows human byte sizes" "$(trun)" '1\.2K'
+  out="$(TRAFFIC_STATS=0 SB_ROOT="$ROOT" sh "$ROOT/scripts/traffic.sh" 2>&1 || true)"
+  match "traffic.sh explains that stats are off" "$out" 'TRAFFIC_STATS=0'
+else
+  sk "traffic stats" "no jq"
+fi
+
 echo "== clients.sh (integration) =="
 if command -v jq >/dev/null 2>&1; then
   printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"phy0-ap0"}]}}\n' > "$STUB/wifi.json"

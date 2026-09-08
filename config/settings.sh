@@ -31,6 +31,18 @@ NET_BASE=10
 # sing-box TPROXY port = TPROXY_PORT_BASE + idx.
 TPROXY_PORT_BASE=12000
 
+# --- Traffic stats ----------------------------------------------------------
+# 1 = bật API thống kê của sing-box, để `scripts/traffic.sh` biết từng kết nối
+# đang mở tới host nào và đã tải bao nhiêu byte. Dùng để tìm thứ ngốn băng thông
+# proxy rồi cho nó đi thẳng bằng một luật trong config/routing-rules.conf.
+# API này ĐIỀU KHIỂN được sing-box, không chỉ đọc, nên nó chỉ nghe trên
+# localhost và luôn cần secret. Đừng bind ra 0.0.0.0.
+TRAFFIC_STATS=0
+CLASH_API_LISTEN="127.0.0.1:9090"
+# Secret nằm ngoài file này vì file này được commit. apply.sh tự sinh với quyền
+# 0600 nếu chưa có, giống /etc/sbproxy/token.
+CLASH_API_SECRET_FILE="/etc/sbproxy/clash-secret"
+
 # --- Main LAN ---------------------------------------------------------------
 # 1 = thiết bị trên dải LAN chính (máy cắm dây, và SSID nào dùng chung dải đó)
 # cũng gán proxy được, không chỉ các SSID do dự án này tạo.

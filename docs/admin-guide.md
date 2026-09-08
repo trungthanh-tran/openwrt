@@ -162,6 +162,7 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `ZONE_INPUT` | `ACCEPT` mặc định (đã chặn cổng admin từ zone khách). |
 | `WIFI_ENCRYPTION` | `psk2` (WPA2) · `sae`/`sae-mixed` (WPA3). |
 | `STUN_*_PORTS` | Cổng STUN/TURN áp dụng cho `webrtc=1` (chặn) và `webrtc=2` (bypass qua proxy). |
+| `TRAFFIC_STATS` | `1` = bật API thống kê của sing-box cho `scripts/traffic.sh` (host nào đang tải bao nhiêu). Chỉ nghe localhost, luôn có secret. |
 | `LAN_PROXY` / `LAN_BRIDGE` | `1` = máy trên dải LAN chính (cắm dây, hoặc SSID chung dải) gán proxy được qua pool `idx 0`. Chỉ máy đã ghim mới qua proxy. |
 | `ROUTES` | Đường dẫn `config/routing-rules.conf` — luật direct/block/proxy theo domain hoặc IP. Xem `config/routing-rules.conf.example`. |
 | `POOL_UNASSIGNED` | `default` = máy chưa ghim dùng proxy trong `wifi-socks.conf`. `block` = máy chưa ghim không có mạng (kể cả DNS) tới khi được gán proxy. |

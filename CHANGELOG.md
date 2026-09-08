@@ -6,6 +6,17 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Theo dõi traffic theo host (`TRAFFIC_STATS=1` + `scripts/traffic.sh`).**
+  `clients.sh` cho biết mỗi thiết bị tải bao nhiêu, nhưng không cho biết nó tải
+  *cái gì* — mà đó mới là thứ cần để quyết định cho đích nào đi thẳng. Bật
+  `TRAFFIC_STATS=1` để sing-box mở API thống kê, rồi `scripts/traffic.sh` gộp
+  byte theo host của từng kết nối đang mở, kèm SSID (idx) và số kết nối. Kết nối
+  không sniff được tên miền thì báo theo IP đích — đúng trường hợp cần `ip_cidr`.
+  `--suggest` in thẳng ra các dòng cho `config/routing-rules.conf`. API này điều
+  khiển được sing-box chứ không chỉ đọc, nên nó bị ép nghe trên localhost
+  (`apply.sh` từ chối bind khác) và luôn có secret sinh tự động ở
+  `/etc/sbproxy/clash-secret` quyền 0600. Mặc định tắt.
+
 - **Gán proxy cho thiết bị trên dải LAN chính (`LAN_PROXY=1`).** Trước đây chỉ
   các SSID do dự án tạo (`br-w<idx>`) mới đi qua proxy được; máy cắm dây và SSID
   dùng chung dải LAN chính thì không. Nay `br-lan` có chain riêng, dùng pool
