@@ -81,6 +81,13 @@ POOL_MAP_SIZE=512
 #   least-loaded slot ít máy nhất
 #   sticky-hash  băm MAC; cùng máy luôn ra cùng proxy kể cả sau khi xoá state
 POOL_ASSIGN_POLICY="random"
+# Điều gì xảy ra với thiết bị trong SSID có pool nhưng CHƯA được ghim proxy:
+#   default  đi bằng proxy trong wifi-socks.conf (giữ hành vi cũ)
+#   block    không có mạng, kể cả DNS, cho tới khi được gán proxy
+# `block` là lựa chọn cho phone farm: fallback im lặng về một proxy chung khiến
+# hàng loạt tài khoản dùng chung một IP — đúng thất bại sản phẩm này phải ngăn.
+# SSID không có pool không bị ảnh hưởng: chúng không có gì để "chưa gán".
+POOL_UNASSIGNED="default"
 # 1 = bốc proxy mới mỗi lần thiết bị vào lại, thay vì giữ nguyên. Ghim tay
 # không bao giờ bị đổi, kể cả khi bật.
 POOL_ROTATE_ON_RECONNECT=0

@@ -6,6 +6,15 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Chặn thiết bị chưa được gán proxy (`POOL_UNASSIGNED=block`).** Trước đây một
+  máy trong SSID có pool nhưng chưa được ghim sẽ âm thầm dùng proxy trong
+  `wifi-socks.conf` — nghĩa là mọi máy chưa ghim của SSID đó cùng ra một IP,
+  đúng kiểu liên kết mà phone farm phải tránh. Đặt `POOL_UNASSIGNED=block` thì
+  máy chưa ghim không có mạng, kể cả DNS (rule DNS cũng tra pin map), cho tới
+  khi được gán proxy. Rule trả về cho dải nội bộ vẫn đứng trước lệnh drop nên
+  máy vẫn DHCP và tới được gateway. Mặc định `default` giữ nguyên hành vi cũ;
+  SSID không có pool không bị ảnh hưởng.
+
 - **SOCKS5 relay UDP (UDP ASSOCIATE).** Outbound socks trước đây bị ghim
   `"network":"tcp"` nên mọi UDP — QUIC, media WebRTC, game — không bao giờ ra
   được qua proxy; nft phải drop UDP 443 để trình duyệt rơi về TCP. Nay

@@ -132,6 +132,12 @@ validate_pool_settings() {
   case "$_base:$_stride:$_cap:$_legacy" in
     *[!0-9:]*) die "POOL_PORT_BASE, POOL_PORT_STRIDE and POOL_SLOTS_PER_SSID_MAX must be integers." ;;
   esac
+  # A typo here decides whether unpinned devices are served or cut off, so it
+  # fails the run rather than silently picking one of the two.
+  case "${POOL_UNASSIGNED:-default}" in
+    default|block) : ;;
+    *) die "POOL_UNASSIGNED must be default or block." ;;
+  esac
   # cap >= 1 together with cap <= stride is what forces stride >= 1; a separate
   # stride floor here would be unreachable.
   [ "$_cap" -ge 1 ] || die "POOL_SLOTS_PER_SSID_MAX must be at least 1."
@@ -1502,9 +1508,19 @@ build_nft() {
     # One chain per SSID, entered through a verdict map, so a packet evaluates
     # only its own SSID's rules instead of every SSID's in one flat chain. The
     # rule order inside the chain matches the old flat chain exactly.
+    # An SSID with a pool can refuse service to a device that has no proxy
+    # pinned yet, instead of quietly falling back to the wifi-socks.conf one.
+    _r_gate=0
+    if pool_enabled "$_r_idx" && [ "${POOL_UNASSIGNED:-default}" = "block" ]; then _r_gate=1; fi
     _nft_chains="$_nft_chains  chain w$_r_idx {\n"
     _nft_chains="$_nft_chains    # Hijack DNS into sing-box (fake-IP), ahead of the local-net bypass.\n"
-    _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    if [ "$_r_gate" = 1 ]; then
+      # DNS goes through the pinned device's own slot, so an unpinned device
+      # does not even resolve — no name lookup, no fake IP, no connection.
+      _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
+    else
+      _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    fi
     # webrtc=2 ("bypass"): the STUN/TURN exchange is forced into sing-box ahead
     # of every return rule below, so the STUN server answers with the proxy's
     # address and the browser publishes that as its server-reflexive candidate
@@ -1537,16 +1553,21 @@ build_nft() {
     fi
     # A pooled SSID looks up the source IP in its own map and is sent straight
     # to that proxy's port. One rule and one hash lookup, whatever the pool
-    # size. A miss does not match, so the device falls through to the default
-    # rule below and uses the wifi-socks.conf proxy until it is pinned.
+    # size. A miss does not match, so the device falls through to whatever the
+    # POOL_UNASSIGNED policy put at the end of the chain.
     if pool_enabled "$_r_idx"; then
       _nft_elements_w="$(assign_elements "$_r_idx")"
       _nft_maps="$_nft_maps  map w${_r_idx}map { type ipv4_addr : inet_service; size ${POOL_MAP_SIZE:-512}${_nft_elements_w:+; elements = { $_nft_elements_w \}}; }\n"
       _nft_chains="$_nft_chains    # Devices pinned to a pool proxy go to that proxy's port.\n"
       _nft_chains="$_nft_chains    meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
     fi
-    _nft_chains="$_nft_chains    # Send this Wi-Fi to its sing-box TPROXY port.\n"
-    _nft_chains="$_nft_chains    meta l4proto { tcp, udp } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    if [ "$_r_gate" = 1 ]; then
+      _nft_chains="$_nft_chains    # POOL_UNASSIGNED=block: no proxy pinned, no Internet.\n"
+      _nft_chains="$_nft_chains    drop\n"
+    else
+      _nft_chains="$_nft_chains    # Send this Wi-Fi to its sing-box TPROXY port.\n"
+      _nft_chains="$_nft_chains    meta l4proto { tcp, udp } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    fi
     _nft_chains="$_nft_chains  }\n"
   }
   for_each_ssid _nft_row

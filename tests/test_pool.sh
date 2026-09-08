@@ -362,6 +362,32 @@ eq "an SSID without a pool keeps the plain shape" "$(chain_shape w2)" \
 eq "the pin rule covers tcp and udp" \
   "$(chain_body w1 | grep -c 'meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w1map meta mark set 1 accept')" "1"
 
+echo "== POOL_UNASSIGNED=block =="
+# Falling back to the wifi-socks.conf proxy puts every unpinned device of an
+# SSID behind one shared IP, which is the linkage a phone farm is built to
+# avoid. `block` refuses service instead, until the device is pinned.
+POOL_UNASSIGNED=block nftgen "$POOL1"
+eq "an unpinned device is dropped, not sent to the default proxy" \
+  "$(chain_body w1 | grep -c '^    drop$')" "1"
+eq "the drop is the last rule of the chain" \
+  "$(chain_body w1 | grep -v '^ *#' | tail -n 1 | tr -d ' ')" "drop"
+eq "the default tproxy fallback is gone" \
+  "$(chain_body w1 | grep -c "tproxy ip to :$(tproxy_port 1) meta mark set 1 accept")" "0"
+# DNS through the shared inbound would let an unpinned device resolve names and
+# hand it a fake IP it can never connect to, so it follows the pin map too.
+eq "DNS is pinned as well, so an unpinned device cannot resolve" \
+  "$(chain_body w1 | grep -c 'dport 53 tproxy ip to :ip saddr map @w1map')" "1"
+eq "an SSID with no pool is untouched by the policy" "$(chain_shape w2)" \
+  "dns localnet hosts quic tproxy "
+# The local-net return still precedes the drop: without it the device could not
+# even DHCP or reach its own gateway.
+# The DNS rule now carries the pin map too, so it reports as "dns pin".
+eq "local traffic still returns before the drop" "$(chain_shape w1)" \
+  "dns pin localnet hosts pin "
+POOL_UNASSIGNED=default nftgen "$POOL1"
+eq "default policy still falls back to the SSID proxy" \
+  "$(chain_body w1 | grep -c "tproxy ip to :$(tproxy_port 1) meta mark set 1 accept")" "2"
+
 echo "== nftables map elements =="
 # The state file identifies a device by MAC; the map is keyed by the IP that
 # device currently holds, so the two are joined through the DHCP leases.
