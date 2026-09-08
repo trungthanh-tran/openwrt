@@ -1269,7 +1269,7 @@ eq "the merged file still sources cleanly" \
 
 eq "a missing packaged file is not an error" "$(sh "$SU" --merge-settings "$STUB/nope.sh" "$STUB/cur.sh"; echo $?)" "0"
 match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
-web_console="$(cat "$ROOT/console/web/control-panel.html")"
+web_console="$(cat "$ROOT/console/web/control-panel.html"; cat "$ROOT/console/web/i18n.en.js")"
 match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'
 match "web console persists language preference" "$web_console" 'localStorage\.setItem\(LANGUAGE_KEY, language\)'
 match "web console switches language live" "$web_console" 'function setLanguage\(next\)'
