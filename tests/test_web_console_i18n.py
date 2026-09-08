@@ -1,7 +1,7 @@
-"""Static i18n audit for console/web/control-panel.html.
+"""Static i18n audit for console/web/control-panel.html and locale files.
 
-The web console keeps both languages in one file: static markup is translated at
-runtime from EN_TEXT/EN_ATTR/EN_HTML, dynamic strings go through pick(en, vi).
+The web console loads EN_TEXT/EN_ATTR/EN_HTML from the shared English locale;
+static markup is translated at runtime and dynamic strings go through pick(en, vi).
 These checks guard the failure modes that are invisible until someone switches
 the UI to English: a duplicate map key silently overriding another, a label that
 carries a leading icon so it never matches its key, and any new Vietnamese
@@ -15,6 +15,7 @@ import unittest
 from pathlib import Path
 
 PANEL = Path(__file__).resolve().parents[1] / "console" / "web" / "control-panel.html"
+EN_LOCALE = PANEL.with_name("i18n.en.js")
 
 # Vietnamese-specific letters; plain ASCII words need no translation entry.
 VIETNAMESE = re.compile(
@@ -28,7 +29,11 @@ NEVER_TRANSLATED = {"Tiếng Việt"}
 
 
 def source() -> str:
-    return PANEL.read_text(encoding="utf-8")
+    panel = PANEL.read_text(encoding="utf-8")
+    locale = EN_LOCALE.read_text(encoding="utf-8")
+    marker = "<script>"
+    at = panel.index(marker)
+    return panel[:at] + marker + "\n" + locale + "\n</script>\n" + panel[at + len(marker):]
 
 
 def map_keys(text: str, start: str, end: str) -> list[str]:
@@ -135,7 +140,7 @@ class WebConsoleI18nTests(unittest.TestCase):
         English UI. Blanking out the pick() spans leaves only the offenders.
         """
         script = self.text[self.text.index("<script>"):]
-        # The translation maps legitimately hold Vietnamese as their keys.
+        # The shared locale map legitimately holds Vietnamese as its keys.
         maps = slice(script.index("const EN_TEXT = {"), script.index("function localizeStatic"))
         script = script[:maps.start] + script[maps.stop:]
         remaining = strip_calls(script, "pick")

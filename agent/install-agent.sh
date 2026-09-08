@@ -97,6 +97,7 @@ cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
 for page in config devices analytics settings status egress diagnose maintenance; do
   cp "$SB_ROOT/console/web/${page}.html" "/www/sbproxy/${page}.html"
 done
+cp "$SB_ROOT/console/web/i18n.vi.js" "$SB_ROOT/console/web/i18n.en.js" /www/sbproxy/
 cp "$SB_ROOT/console/web/assets/"* /www/sbproxy/assets/ 2>/dev/null \
   || echo "  warning: console/web/assets/ was not found — the UI falls back to its built-in styling"
 

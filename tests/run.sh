@@ -439,6 +439,7 @@ match "Agent install protects token permissions" "$agent_install" 'chmod 600 /et
 match "Agent install deploys native CGI" "$agent_install" 'cp "\$AGENT/cgi/sbproxy" /www/cgi-bin/sbproxy'
 match "Agent install deploys self-hosted web console" "$agent_install" 'control-panel\.html" /www/sbproxy/index\.html'
 match "Agent install ships the offline UI assets" "$agent_install" 'cp "\$SB_ROOT/console/web/assets/"\* /www/sbproxy/assets/'
+match "Agent install ships shared WebUI locales" "$agent_install" 'i18n\.vi\.js.*i18n\.en\.js'
 match "Agent install deploys the webauth helper" "$agent_install" 'cp "\$AGENT/sbproxy-webauth" /usr/sbin/sbproxy-webauth'
 match "Agent install leaves account creation to the first web visit" "$agent_install" 'FIRST visit to the UI asks you to create it'
 match "Agent install can still pre-create the account from env" "$agent_install" 'SBPROXY_WEB_USER'
