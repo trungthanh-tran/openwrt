@@ -101,10 +101,15 @@ healthy_seen=""
 n=0
 while [ "$n" -lt 20 ]; do
   s="$(POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01)"
-  case "$s" in 1|2) healthy_seen=yes ;; *) healthy_seen=no; break ;; esac
+  case "$s" in 1) healthy_seen=yes ;; *) healthy_seen=no; break ;; esac
   n=$(( n + 1 ))
 done
-eq "random excludes failed pool slots when health is available" "$healthy_seen" "yes"
+eq "random prefers OK and excludes SLOW/failed slots when OK exists" "$healthy_seen" "yes"
+cat > "$HEALTH_FILE" <<'EOF'
+{"pool_probes":{"1":{"0":{"state":"fail"},"1":{"state":"fail"},"2":{"state":"slow"},"3":{"state":"fail"}}}}
+EOF
+eq "random falls back to a SLOW slot when no OK slot exists" \
+   "$(POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01)" "2"
 rm -f "$HEALTH_FILE"
 
 eq "the default policy is random" \

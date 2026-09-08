@@ -927,7 +927,10 @@ pool_healthy_slots() { # idx
   _ph_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
   [ -r "$_ph_file" ] || return 0
   jq -r --arg i "$1" \
-    '.pool_probes[$i] // {} | to_entries[] | select(.value.state == "ok" or .value.state == "slow") | .key' \
+    '(.pool_probes[$i] // {} | to_entries) as $slots |
+     ([$slots[] | select(.value.state == "ok") | .key]) as $ok |
+     if ($ok | length) > 0 then $ok[]
+     else $slots[] | select(.value.state == "slow") | .key end' \
     "$_ph_file" 2>/dev/null
 }
 
