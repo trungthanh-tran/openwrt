@@ -56,10 +56,11 @@ ok()      { pass=$((pass + 1)); printf '  ok   %s\n' "$1"; }
 no()      { fail=$((fail + 1)); printf '  FAIL %s\n' "$1"; }
 sk()      { skip=$((skip + 1)); printf '  skip %s (%s)\n' "$1" "$2"; }
 eq()      { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi; }
-match()   { if printf '%s' "$2" | grep -Eq "$3"; then ok "$1"; else no "$1 — no /$3/"; fi; }
-nomatch() { if printf '%s' "$2" | grep -Eq "$3"; then no "$1 — unexpected /$3/"; else ok "$1"; fi; }
-contains() { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
-not_contains() { if printf '%s' "$2" | grep -qF "$3"; then no "$1 — found[$3]"; else ok "$1"; fi; }
+assert_text() { printf '%s' "$2" > "$STUB/assert-input"; }
+match()   { if assert_text "$1" "$2" && grep -Eq "$3" "$STUB/assert-input"; then ok "$1"; else no "$1 — no /$3/"; fi; }
+nomatch() { if assert_text "$1" "$2" && grep -Eq "$3" "$STUB/assert-input"; then no "$1 — unexpected /$3/"; else ok "$1"; fi; }
+contains() { if assert_text "$1" "$2" && grep -qF "$3" "$STUB/assert-input"; then ok "$1"; else no "$1 — missing[$3]"; fi; }
+not_contains() { if assert_text "$1" "$2" && grep -qF "$3" "$STUB/assert-input"; then no "$1 — found[$3]"; else ok "$1"; fi; }
 dies()    { if ( "$@" ) >/dev/null 2>&1; then no "$L — expected non-zero"; else ok "$L"; fi; }
 mkc()     { printf '%s\n' "$1" > "$STUB/c.conf"; }
 # Run a $STUB/c.conf validator (validate_conf/check_unique_idx) in a subshell so
