@@ -326,6 +326,44 @@ sbproxy-assignd --once     # chạy tay một vòng quét
 logread -e assignd
 ```
 
+### 7.3 Xem host nào đang ngốn băng thông proxy
+
+`scripts/clients.sh` cho biết mỗi **thiết bị** tải bao nhiêu, nhưng không cho
+biết nó tải **cái gì** — mà đó mới là thứ cần để quyết định cho đích nào đi thẳng
+(mục 7.0). sing-box biết host đứng sau từng kết nối đang mở, nhưng chỉ qua API
+thống kê của nó.
+
+Đặt `TRAFFIC_STATS=1` trong `settings.sh` rồi `apply`:
+
+```sh
+sh scripts/traffic.sh                # top host theo byte, nhiều nhất trước
+sh scripts/traffic.sh --idx 3        # chỉ một SSID (0 = LAN chính)
+sh scripts/traffic.sh --top 5
+sh scripts/traffic.sh --json         # cho console/script khác
+sh scripts/traffic.sh --suggest      # in ra dòng cho routing-rules.conf
+```
+
+```
+HOST                                             IDX  CONNS    BYTES
+cdn.example.com                                    1      2     1.2K
+9.9.9.9                                            0      1      10B
+```
+
+Kết nối không sniff được tên miền thì báo theo **IP đích** — đúng trường hợp phải
+dùng `ip_cidr` chứ không phải luật domain.
+
+`--suggest` in thẳng các dòng `direct|...` để dán vào `routing-rules.conf`. Đây
+là **ứng viên để xem lại, không phải config để dán mù**: cho một host đi thẳng
+nghĩa là lộ IP thật của router cho host đó.
+
+> Số byte tính theo kết nối **đang mở**; sing-box quên kết nối khi nó đóng. Đây
+> là ảnh chụp tức thời, không phải tổng tích luỹ từ lúc khởi động.
+
+**Về bảo mật.** API này *cấu hình lại được* sing-box chứ không chỉ đọc. Vì vậy nó
+bị ép nghe trên localhost — `apply.sh` từ chối `CLASH_API_LISTEN` bind ra ngoài —
+và luôn có secret, sinh tự động ở `/etc/sbproxy/clash-secret` quyền 0600, không
+nằm trong `settings.sh` (file này được commit). Mặc định tính năng tắt.
+
 ## Bước 8 — Áp dụng
 > **Script tương ứng (router):** `DRYRUN=1 sh scripts/apply.sh` để xem trước, `sh scripts/apply.sh` để áp thật và tự backup, `sh scripts/uninstall.sh` để gỡ phần cấu hình do project quản lý.
 

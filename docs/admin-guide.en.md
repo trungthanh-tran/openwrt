@@ -260,6 +260,33 @@ jq '.outbounds[]|select(.tag=="out-w1")|.network' /etc/sing-box/config.json
 # null = UDP relayed; "tcp" = TCP-only
 ```
 
+## Traffic accounting
+
+`clients.sh` reports how much a device pulled; it cannot say **what** it pulled,
+which is the half you need before sending a destination direct. sing-box knows
+the host behind every open connection, but only through its stats API.
+
+Set `TRAFFIC_STATS=1` and reapply:
+
+```sh
+sh scripts/traffic.sh              # hosts by bytes, largest first
+sh scripts/traffic.sh --idx 3      # one SSID only (0 = the main LAN)
+sh scripts/traffic.sh --json
+sh scripts/traffic.sh --suggest    # routing-rules.conf lines
+```
+
+A connection with no sniffed host is reported by destination IP — exactly the
+case `ip_cidr` exists for. `--suggest` prints candidates to review, not a config
+to paste: sending a host direct exposes the router's real address to it.
+
+Counts cover **open** connections only; sing-box forgets a connection when it
+closes, so this is a live picture, not a total since boot.
+
+The API reconfigures sing-box rather than merely reporting on it, so `apply.sh`
+refuses a `CLASH_API_LISTEN` bound anywhere but localhost, and the secret is
+generated at `/etc/sbproxy/clash-secret` with mode 0600 instead of living in the
+committed `settings.sh`. Off by default.
+
 ## Operations and recovery
 
 - Use full apply for SSID topology changes.
