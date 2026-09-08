@@ -6,6 +6,15 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Changed
+- **Web console định tuyến bằng anchor, chỉ còn một file HTML.** Mỗi workspace
+  từng là một file riêng (`config.html`, `devices.html`, …) vì `app.js` chọn màn
+  hình theo tên file — nghĩa là router phải phục vụ 8 bản sao của cùng một
+  console. Nay địa chỉ là mảnh URL: `index.html#devices`. Bookmark, F5 và nút
+  Back đều về đúng chỗ, và mọi thay đổi màn hình đi qua `hashchange` nên URL
+  không bao giờ lệch với những gì đang hiển thị. Link cũ dạng `<page>.html` vẫn
+  được nhận (dự phòng theo pathname); `install-agent.sh`/`self-update.sh` xoá
+  các file workspace do bản cài cũ để lại, vì chúng mang JS nội tuyến riêng và
+  sẽ mãi phục vụ bản console lúc chúng được cài.
 - **Web console tách thành một khung + `app.css` + `app.js`.** Trước đây toàn bộ
   CSS và JS nằm nội tuyến trong `control-panel.html`, và 8 trang còn lại
   (`config.html`, `devices.html`, …) là bản sao nguyên khối của file đó. Chúng

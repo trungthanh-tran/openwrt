@@ -2800,15 +2800,21 @@
     $("f_vendor").value = keep;
   }
 
-  // The router serves the same tested application shell as three focused
-  // entry points.  Each entry point keeps the shared API and dialogs, but
-  // opens one primary workspace so operators do not confuse configuration,
-  // devices, and router maintenance.
+  // One page, one workspace at a time. The workspace is the URL fragment, so a
+  // bookmark, a reload and the back button all land where the operator was,
+  // without the router having to serve a file per entry point -- those were
+  // eight copies of this same shell, and they drifted four releases apart.
+  const SPA_PAGES = ["config", "devices", "analytics", "settings", "status", "egress", "diagnose", "maintenance"];
+  function spaPageFromLocation() {
+    const hash = decodeURIComponent((location.hash || "").replace(/^#/, "")).toLowerCase();
+    if (SPA_PAGES.includes(hash)) return hash;
+    // Bookmarks and router deployments from before the fragment router still
+    // point at <page>.html; honour them so an old link is not a dead end.
+    const file = (location.pathname.split("/").pop() || "").toLowerCase().replace(/\.html$/, "");
+    return SPA_PAGES.includes(file) ? file : "config";
+  }
   function setupSinglePage() {
-    const file = (location.pathname.split("/").pop() || "index.html").toLowerCase();
-    let page = file === "devices.html" ? "devices" : file === "analytics.html" ? "analytics" :
-      ["status.html", "egress.html", "diagnose.html", "maintenance.html"].includes(file) ? file.slice(0, -5) :
-      file === "settings.html" ? "settings" : "config";
+    let page = spaPageFromLocation();
     document.body.dataset.page = page;
     const settingsPages = ["settings", "status", "egress", "diagnose", "maintenance"];
     function setWorkspace(next) {
@@ -2838,11 +2844,19 @@
         });
       }
     }
-    $("configBtn").onclick = () => setWorkspace("config");
-    $("devicesBtn").onclick = () => setWorkspace("devices");
-    $("settingsBtn").onclick = () => setWorkspace("settings");
+    // Navigation goes through the fragment rather than calling setWorkspace
+    // directly, so every route change -- button, link, typed URL, back button
+    // -- arrives the same way and the URL never disagrees with the screen.
+    const go = next => {
+      if (spaPageFromLocation() === next) setWorkspace(next);
+      else location.hash = next;
+    };
+    addEventListener("hashchange", () => setWorkspace(spaPageFromLocation()));
+    $("configBtn").onclick = () => go("config");
+    $("devicesBtn").onclick = () => go("devices");
+    $("settingsBtn").onclick = () => go("settings");
     document.querySelectorAll(".spa-link").forEach(link => {
-      link.onclick = event => { event.preventDefault(); setWorkspace(link.dataset.spaPage); };
+      link.onclick = event => { event.preventDefault(); go(link.dataset.spaPage); };
     });
     $("settingsPage").onclick = event => {
       const heading = event.target.closest(".settings-card h3");

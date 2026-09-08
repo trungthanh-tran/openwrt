@@ -441,6 +441,11 @@ match "Agent install deploys native CGI" "$agent_install" 'cp "\$AGENT/cgi/sbpro
 match "Agent install deploys self-hosted web console" "$agent_install" 'control-panel\.html" /www/sbproxy/index\.html'
 match "Agent install ships the offline UI assets" "$agent_install" 'cp "\$SB_ROOT/console/web/assets/"\* /www/sbproxy/assets/'
 match "Agent install ships shared WebUI locales" "$agent_install" 'i18n\.vi\.js.*i18n\.en\.js'
+match "Agent install ships the shared stylesheet and script" "$agent_install" 'app\.css.*app\.js'
+# The console routes on the fragment now. A pre-fragment install left a whole
+# copy of the console at each workspace name, and those copies keep serving the
+# release they were installed at, so an upgrade has to remove them.
+match "Agent install clears the pre-fragment workspace pages" "$agent_install" 'rm -f "/www/sbproxy/\$\{page\}\.html"'
 match "Agent install deploys the webauth helper" "$agent_install" 'cp "\$AGENT/sbproxy-webauth" /usr/sbin/sbproxy-webauth'
 match "Agent install leaves account creation to the first web visit" "$agent_install" 'FIRST visit to the UI asks you to create it'
 match "Agent install can still pre-create the account from env" "$agent_install" 'SBPROXY_WEB_USER'
@@ -1273,6 +1278,13 @@ match "web console can upload update package" "$(cat "$ROOT/console/web/app.js")
 # The console is a shell plus its stylesheet and script. The assertions below
 # look for a string anywhere in it rather than tracking which file it lives in.
 web_console="$(cat "$ROOT/console/web/control-panel.html" "$ROOT/console/web/app.css" "$ROOT/console/web/app.js" "$ROOT/console/web/i18n.en.js")"
+# The console is one page routed by the URL fragment; per-workspace .html files
+# are gone, so a nav link that still pointed at one would 404.
+match "the console routes on the URL fragment" "$web_console" 'addEventListener\("hashchange"'
+match "navigation sets the fragment, not the workspace directly" "$web_console" 'location\.hash = next'
+nomatch "no nav link points at a per-workspace page" "$(cat "$ROOT/console/web/control-panel.html")" 'href="[a-z]*\.html"'
+# A bookmark made before the fragment router still names <page>.html.
+match "an old per-page bookmark still resolves" "$web_console" 'location\.pathname\.split'
 match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'
 match "web console persists language preference" "$web_console" 'localStorage\.setItem\(LANGUAGE_KEY, language\)'
 match "web console switches language live" "$web_console" 'function setLanguage\(next\)'
@@ -1382,6 +1394,10 @@ match "web setup posts to setup_account"            "$web_console" 'postUnauthed
 match "web opens setup when no account exists"      "$web_console" 'account_configured === false\) openSetup\(\)'
 match "web console can change the password"         "$web_console" 'api\("change_password", "POST"'
 match "self-update redeploys the UI assets"         "$selfupdate" 'console/web/assets'
+# Shipping the shell without app.js would leave the console running whichever
+# script the last install happened to put there.
+match "self-update redeploys the shared script"     "$selfupdate" 'app\.css app\.js'
+match "self-update clears the pre-fragment pages"    "$selfupdate" 'rm -f .*_ui_page\.html'
 match "self-update redeploys the webauth helper"    "$selfupdate" 'agent/sbproxy-webauth'
 
 echo "== regression guards: masking, switch-gateway, reset source of truth =="

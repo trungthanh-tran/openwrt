@@ -226,10 +226,10 @@ if [ -d "$(dirname "$UI_DEST")" ]; then
     [ -f "$SB_ROOT/console/web/$_ui_js" ] || continue
     cp "$SB_ROOT/console/web/$_ui_js" "$(dirname "$UI_DEST")/$_ui_js"       && log "deploy $(dirname "$UI_DEST")/$_ui_js"
   done
-  # app.js picks its workspace from the filename it was loaded as, so each entry
-  # point has to exist as a URL. They are all the same shell.
+  # Routing moved into the URL fragment, so the per-workspace pages an older
+  # install left behind are stale shells that app.js would still route from.
   for _ui_page in config devices analytics settings status egress diagnose maintenance; do
-    cp "$SB_ROOT/console/web/control-panel.html" "$(dirname "$UI_DEST")/$_ui_page.html"
+    rm -f "$(dirname "$UI_DEST")/$_ui_page.html"
   done
   # Offline Bootstrap and any other static files the UI references.
   if [ -d "$SB_ROOT/console/web/assets" ]; then
