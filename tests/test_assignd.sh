@@ -103,14 +103,16 @@ fi
 
 # od and hexdump are what broke self-update in 0.4.10: many OpenWrt images do
 # not build them in, so the pool's randomness must not depend on either. This
-# reads pool_random's own body rather than the whole library: rand_mac_bytes
+# reads the seed helper's own body rather than the whole library: rand_mac_bytes
 # still uses hexdump with an od fallback and a die() if neither exists, which
 # is a separate pre-existing weakness and not this feature's to change.
 pool_random_src="$(awk '/^pool_random\(\) \{/, /^\}/' "$ROOT/scripts/lib.sh")"
-not_contains "the pool RNG does not call hexdump" "$pool_random_src" "hexdump"
-not_contains "the pool RNG does not call od"      "$pool_random_src" "od -"
-contains     "it seeds from /dev/urandom"         "$pool_random_src" "/dev/urandom"
-contains     "through cksum, which busybox always has" "$pool_random_src" "cksum"
+pool_seed_src="$(awk '/^pool_shuffle_seed\(\) \{/, /^\}/' "$ROOT/scripts/lib.sh")"
+not_contains "the pool seed helper does not call hexdump" "$pool_seed_src" "hexdump"
+not_contains "the pool seed helper does not call od"      "$pool_seed_src" "od -"
+contains     "it seeds from /dev/urandom when available"  "$pool_seed_src" "/dev/urandom"
+contains     "it uses cksum when available"               "$pool_seed_src" "cksum"
+contains     "it has a fallback seed source"              "$pool_seed_src" "date +%s"
 
 echo "== pinning a device that has just appeared =="
 reset_state
