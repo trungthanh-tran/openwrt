@@ -70,7 +70,7 @@ CLEAN="${CLEAN# }"
 
 # The seed is chosen here, not inside assign_spread, so a --dry-run preview and
 # the run that commits it can be given the same one.
-POOL_SHUFFLE_SEED="${POOL_SHUFFLE_SEED:-$(head -c 8 /dev/urandom | cksum | cut -d' ' -f1)}"
+POOL_SHUFFLE_SEED="${POOL_SHUFFLE_SEED:-$(pool_shuffle_seed)}"
 export POOL_SHUFFLE_SEED
 
 if [ "$DRYRUN_ONLY" = "1" ]; then

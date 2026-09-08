@@ -185,3 +185,22 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 ## Ghi chú
 - Nếu **B1 fail** (không ra net): xem [ROLLBACK.md](ROLLBACK.md) Mức 5 (debug sing-box/tproxy). Thường do: SOCKS sai/chết, `ZONE_INPUT=REJECT` chặn tproxy (đổi về `ACCEPT`), hoặc thiếu `kmod-nft-tproxy`.
 - Ghi lại kết quả mỗi test vào 1 file để so sánh giữa các lần thay đổi.
+
+### B11. Rebalance trên thiết bị thật
+
+Chạy router-side khi có client thật đang online trên SSID có proxy pool:
+
+```sh
+sh tests/test_rebalance_live.sh 4
+```
+
+Test kiểm tra client online, pool không rỗng, seed fallback khi thiếu `cksum`,
+preview lặp lại được, commit thật và trạng thái pin sau commit. Trên máy
+Windows đang có thêm route LAN quản trị, ép đúng interface Wi-Fi:
+
+```powershell
+.\pc\test-rebalance-client.ps1 -ClientIp 192.168.14.150 -ExpectedProxyIp 178.93.44.10
+```
+
+Đạt khi client reconnect, vẫn nhận DHCP, trạng thái `pinned`, và IP public
+bằng IP proxy. Không dùng route Ethernet/management để đánh giá egress.

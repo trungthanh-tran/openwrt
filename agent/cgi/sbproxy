@@ -112,9 +112,9 @@ available_log_dates() {
 settings_numbers() {
   (
     [ -f "$SB_ROOT/config/settings.sh" ] && . "$SB_ROOT/config/settings.sh" 2>/dev/null
-    printf '%s %s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
+    printf '%s %s %s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
       "${BSSID_LIMIT:-16}" "${POOL_PORT_BASE:-13000}" "${POOL_PORT_STRIDE:-256}" \
-      "${SOCKS_UDP:-1}"
+      "${SOCKS_UDP:-1}" "${POOL_UNASSIGNED:-default}"
   ) 2>/dev/null
 }
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
@@ -441,6 +441,8 @@ case "$ACTION" in
     set -- $(settings_numbers)
     net_base="${1:-10}"; tproxy_base="${2:-12000}"; bssid_limit="${3:-16}"
     pool_base="${4:-13000}"; pool_stride="${5:-256}"
+    pool_unassigned="${7:-default}"
+    case "$pool_unassigned" in default|block) : ;; *) pool_unassigned=default ;; esac
     # A console preview of sing-box has to know whether socks outbounds relay UDP.
     case "${6:-1}" in 0) socks_udp=false;; *) socks_udp=true;; esac
     case "$net_base$tproxy_base$bssid_limit$pool_base$pool_stride" in
@@ -456,14 +458,14 @@ case "$ACTION" in
                      --argjson bssid_limit "$bssid_limit" \
                      --argjson pool_port_base "$pool_base" \
                      --argjson pool_port_stride "$pool_stride" \
-                     --argjson socks_udp "$socks_udp" \
+                     --argjson socks_udp "$socks_udp" --arg pool_unassigned "$pool_unassigned" \
       '{ok:true, ssids:$ssids, health:$health,
         meta:{singbox_running:$running, singbox_uptime_s:$singbox_uptime_s,
               applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
               bssid_limit:$bssid_limit,
               pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride,
-              socks_udp:$socks_udp}}' 2>/dev/null)" \
+              socks_udp:$socks_udp, pool_unassigned:$pool_unassigned}}' 2>/dev/null)" \
       || json_err "500 Internal Server Error" "không dựng được JSON trạng thái"
     printf '%s' "$STATUS_JSON" | jq -e 'type == "object"' >/dev/null 2>&1 \
       || json_err "500 Internal Server Error" "JSON trạng thái không hợp lệ"
@@ -472,6 +474,29 @@ case "$ACTION" in
 
   get_conf)
     hdr "200 OK" "text/plain"; cat "$CONF" 2>/dev/null; exit 0
+    ;;
+
+  set_pool_unassigned)
+    [ "$REQUEST_METHOD" = "POST" ] || json_err "405 Method Not Allowed" "cần POST"
+    require_json_object
+    policy="$(jq_r '.policy // ""' "$BODY_FILE")"
+    case "$policy" in default|block) : ;; *) json_err "400 Bad Request" "policy phải là default hoặc block" ;; esac
+    require_root
+    TMP_SETTINGS="$(mktemp "${SB_ROOT}/config/settings.sh.candidate.XXXXXX")" \
+      || json_err "500 Internal Server Error" "không tạo được settings tạm"
+    awk -v policy="$policy" '
+      BEGIN { found=0 }
+      /^POOL_UNASSIGNED=/ { if (!found) { print "POOL_UNASSIGNED=" policy; found=1 }; next }
+      { print }
+      END { if (!found) print "POOL_UNASSIGNED=" policy }
+    ' "$SB_ROOT/config/settings.sh" > "$TMP_SETTINGS" \
+      || json_err "500 Internal Server Error" "không ghi được settings tạm"
+    mv "$TMP_SETTINGS" "$SB_ROOT/config/settings.sh" \
+      || json_err "500 Internal Server Error" "không lưu được settings"
+    CHECK="$(cd "$SB_ROOT" && DRYRUN=1 DRYRUN_QUIET=1 sh scripts/apply.sh --no-backup 2>&1)"; CHECK_RC=$?
+    [ "$CHECK_RC" -eq 0 ] || json_ok "$(jq -n --arg log "$CHECK" --argjson rc "$CHECK_RC" '{ok:false,rc:$rc,phase:"dryrun",log:$log}')"
+    OUT="$(cd "$SB_ROOT" && sh scripts/apply.sh --no-backup 2>&1)"; RC=$?
+    json_ok "$(jq -n --arg policy "$policy" --arg log "$OUT" --argjson rc "$RC" '{ok:($rc==0),rc:$rc,policy:$policy,phase:"apply",log:$log}')"
     ;;
 
   save_conf)

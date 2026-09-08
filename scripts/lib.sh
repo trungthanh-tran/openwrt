@@ -714,12 +714,25 @@ assign_prune() {
 # the counts differ by at most one and the order is not predictable from the
 # MAC list. The seed is reported so a preview and the write that follows it
 # cannot disagree.
+pool_shuffle_seed() {
+  _ps_seed=""
+  if command -v cksum >/dev/null 2>&1; then
+    _ps_seed="$(head -c 8 /dev/urandom 2>/dev/null | cksum 2>/dev/null \
+      | awk 'NR == 1 && $1 ~ /^[0-9]+$/ { print $1; exit }')"
+  fi
+  [ -n "$_ps_seed" ] || _ps_seed="$(date +%s 2>/dev/null || printf '0')"
+  _ps_rand="$(awk 'BEGIN { srand(); print int(rand() * 2147483647) }' </dev/null 2>/dev/null || printf '0')"
+  case "$_ps_rand" in *[!0-9]*|'') _ps_rand=0 ;; esac
+  printf '%u\n' "$(( _ps_seed ^ $$ ^ _ps_rand ))" 2>/dev/null \
+    || printf '%s\n' "$_ps_seed"
+}
+
 assign_spread() { # idx "mac mac ..."
   _sp_idx="$1"; _sp_macs="${2:-}"
   _sp_n="$(pool_count "$_sp_idx")"
   [ "$_sp_n" -gt 0 ] || die "Wi-Fi idx=$_sp_idx has no proxy pool"
   [ -n "$_sp_macs" ] || return 0
-  _sp_seed="${POOL_SHUFFLE_SEED:-$(head -c 8 /dev/urandom | cksum | cut -d' ' -f1)}"
+  _sp_seed="${POOL_SHUFFLE_SEED:-$(pool_shuffle_seed)}"
   _sp_tmp="${TMPDIR:-/tmp}/sbproxy-spread.$$"
   # shellcheck disable=SC2086  # the MAC list is intentionally word-split
   printf '%s\n' $_sp_macs \
@@ -897,7 +910,7 @@ restore_snapshot_files() { # snapshot directory
 # applets that broke self-update in 0.4.10 because many OpenWrt images do not
 # build them in, so nothing here may depend on either.
 pool_random() { # n
-  awk -v n="$1" -v seed="$(head -c 8 /dev/urandom | cksum | cut -d' ' -f1)" \
+  awk -v n="$1" -v seed="$(pool_shuffle_seed)" \
     'BEGIN { srand(seed); print int(rand() * n) % n }'
 }
 
@@ -905,7 +918,17 @@ pool_random() { # n
 # state file has been thrown away -- which is the only reason to prefer this
 # over `random`.
 assign_hash_slot() { # mac n
-  printf '%s' "$1" | cksum | awk -v n="$2" '{ print $1 % n }'
+  if command -v cksum >/dev/null 2>&1; then
+    printf '%s' "$1" | cksum | awk -v n="$2" '{ print $1 % n }'
+  else
+    awk -v s="$1" -v n="$2" 'BEGIN {
+      h=2166136261
+      for (i=1; i<=length(s); i++) {
+        h = (h * 16777619 + index("0123456789abcdef:", substr(s,i,1))) % 2147483647
+      }
+      print h % n
+    }'
+  fi
 }
 
 # The next slot in rotation, derived from how many devices this SSID already

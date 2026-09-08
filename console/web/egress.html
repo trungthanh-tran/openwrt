@@ -1543,8 +1543,6 @@
           <option value="socks5">SOCKS5</option>
           <option value="http">HTTP</option>
         </select>
-        <input id="poolSlots" type="text" placeholder="Slot cần xoá: 0,2,5" style="flex:1 1 160px">
-        <button class="btn ghost danger" id="poolDelete">Xoá slot đã nhập</button>
       </div>
       <div class="pool-input-stack">
         <textarea id="poolInput" rows="5" placeholder="176.116.132.71:43137:user:pass"></textarea>
@@ -3114,10 +3112,8 @@
   // Remove named slots instead of the whole pool. Slot numbers are positions in
   // proxy-pools.conf, and devices are pinned by position, so the ones still in
   // use are refused rather than quietly repointing someone's device.
-  function deletePoolSlots() {
-    const raw = $("poolSlots").value.trim();
-    if (!raw) return toast(pick("Enter the slots to remove, e.g. 0,2,5", "Nhập slot cần xoá, ví dụ 0,2,5"));
-    const slots = [...new Set(raw.split(/[\s,]+/).filter(Boolean).map(Number))];
+  function deletePoolSlots(selectedSlots) {
+    const slots = [...new Set(selectedSlots || [])].map(Number);
     if (slots.some(n => !Number.isInteger(n) || n < 0 || n >= activePool.length)) {
       return toast(pick("Invalid slot number.", "Số slot không hợp lệ."));
     }
@@ -3129,7 +3125,7 @@
       if (!confirm(pick(`Remove ${slots.length} proxy slot(s) from this pool?`,
                         `Xoá ${slots.length} slot proxy khỏi pool này?`))) return null;
       return savePoolRows(activePool.filter((_p, i) => !slots.includes(i)));
-    }).then(r => { if (r !== null) $("poolSlots").value = ""; })
+    }).then(r => { if (r !== null) { poolSelected.clear(); renderPoolRows(); } })
       .catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
   }
   function runPoolBulk() {
@@ -3137,7 +3133,7 @@
     if (!poolSelected.size) return toast(pick("Select at least one proxy.", "Chọn ít nhất một proxy."));
     if (action === "test") return testPoolSlots(poolSelected);
     if (action === "delete") {
-      $("poolSlots").value = [...poolSelected].sort((a, b) => a - b).join(",");
+      deletePoolSlots([...poolSelected]);
       deletePoolSlots();
     }
   }
@@ -4006,7 +4002,7 @@
     openContextMenu(x, y, [
       { label: pick("Test selected", "Test mục đã chọn"), run: () => testPoolSlots(poolSelected) },
       { label: pick("Delete selected", "Xóa mục đã chọn"), danger: true, run: () => {
-        $("poolSlots").value = [...poolSelected].sort((a, b) => a - b).join(","); deletePoolSlots();
+      deletePoolSlots([...poolSelected]);
       } }
     ]);
   }
@@ -4285,7 +4281,6 @@
   $("poolClose").onclick = closePool;
   $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
   $("poolSave").onclick = addPoolLines;
-  $("poolDelete").onclick = deletePoolSlots;
   $("poolClear").onclick = clearPool;
   $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;
