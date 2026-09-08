@@ -64,7 +64,7 @@ trị viên trước khi Apply thêm thay đổi.
 | **Băng** | 2.4G xa hơn/chậm hơn · 5G nhanh hơn/gần hơn. |
 | **SOCKS5** | Proxy đang gán: `host:cổng`. |
 | **Isolate** | on = các thiết bị trong WiFi này không thấy nhau (an toàn hơn). |
-| **WebRTC** | on = chặn rò rỉ IP qua WebRTC (đánh đổi: hỏng gọi video P2P). |
+| **WebRTC** | *Giữ nguyên* = không áp rule riêng · *Chặn WebRTC* = chặn STUN/TURN, không lộ IP nhưng hỏng gọi video P2P · *Bypass WebRTC* = đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy (cần proxy hỗ trợ UDP). |
 | **Sức khỏe** | Độ trễ proxy realtime + biểu đồ xu hướng — xem mục kế. |
 
 ---
@@ -85,7 +85,7 @@ trị viên trước khi Apply thêm thay đổi.
 
 ## 05 · Thao tác WiFi
 
-**Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* & *Chặn WebRTC*. Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
+**Thêm WiFi:** bấm **＋ Thêm WiFi**, điền tên, chọn băng tần, mật khẩu (≥ 8 ký tự), nhập SOCKS (host/cổng, user/pass nếu có), bật/tắt *Cách ly* và chọn chế độ *WebRTC* (Giữ nguyên / Chặn WebRTC / Bypass WebRTC). Theo dõi đồng hồ **BSSID** ở đầu trang — đừng để chuyển đỏ (vượt giới hạn phần cứng).
 
 **Giả MAC theo hãng WiFi:** nhấp chuột phải lên SSID trong bảng, chọn **Random MAC** rồi chọn hãng (TP-Link, Netgear, ASUS, Xiaomi…). Ba byte đầu theo OUI của hãng, ba byte sau ngẫu nhiên. Thao tác lưu provider và reload radio ngay sau khi bạn xác nhận cảnh báo.
 
@@ -146,7 +146,7 @@ Router **tự sao lưu** trước mỗi lần "Áp" hay "đổi sock". Ngoài ra
 | Router treo / không vào được sau update firmware | Việc của quản trị viên (recovery). Cung cấp **file backup đã tải về máy** để họ khôi phục nhanh. |
 | Console báo "Mất kết nối" | Mở lại đúng `http://<router>/sbproxy/`; kiểm tra token; hỏi quản trị viên. |
 | Latency toàn bộ tăng cao | Có thể do đường mạng/nhà cung cấp SOCKS. Theo dõi biểu đồ; báo admin nếu kéo dài. |
-| Client vẫn thấy nhau / gọi video hỏng | Kiểm tra cột *Isolate*/*WebRTC* của WiFi đó và chỉnh cho đúng nhu cầu. |
+| Client vẫn thấy nhau / gọi video hỏng | Kiểm tra cột *Isolate*/*WebRTC* của WiFi đó. Muốn vừa gọi được vừa không lộ IP thật thì chọn *Bypass WebRTC*. |
 
 ---
 

@@ -168,7 +168,9 @@ validate_conf() {
       if (idx ~ /^[1-9][0-9]*$/ && (net_base + idx_num > 254 || port_base + idx_num > 65535)) { printf "line %d: idx makes the subnet/port exceed its valid range\n", NR; bad=1 }
       if (port !~ /^[0-9]+$/ || port_num < 1 || port_num > 65535) { printf "line %d: invalid port\n", NR; bad=1 }
       if (band != "2g" && band != "5g") { printf "line %d: band must be 2g or 5g\n", NR; bad=1 }
-      if (iso !~ /^[01]$/ || web !~ /^[01]$/) { printf "line %d: isolate/webrtc must be 0 or 1\n", NR; bad=1 }
+      if (iso !~ /^[01]$/) { printf "line %d: isolate must be 0 or 1\n", NR; bad=1 }
+      # webrtc: 0 keeps it, 1 blocks STUN/TURN, 2 forces it through the proxy.
+      if (web !~ /^[012]$/) { printf "line %d: webrtc must be 0, 1 or 2\n", NR; bad=1 }
       if (length($1) < 1 || length($1) > 32) { printf "line %d: SSID must be 1..32 UTF-8 bytes long\n", NR; bad=1 }
       if (length($4) < 8 || length($4) > 63) { printf "line %d: Wi-Fi password must be 8..63 UTF-8 bytes long\n", NR; bad=1 }
       if (host == "") { printf "line %d: sock_host is empty\n", NR; bad=1 }
@@ -1486,6 +1488,24 @@ build_nft() {
     _nft_chains="$_nft_chains  chain w$_r_idx {\n"
     _nft_chains="$_nft_chains    # Hijack DNS into sing-box (fake-IP), ahead of the local-net bypass.\n"
     _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    # webrtc=2 ("bypass"): the STUN/TURN exchange is forced into sing-box ahead
+    # of every return rule below, so the STUN server answers with the proxy's
+    # address and the browser publishes that as its server-reflexive candidate
+    # instead of the router's real IP. Needs a proxy that relays UDP
+    # (SOCKS5 UDP ASSOCIATE); on one that does not, WebRTC finds no candidate
+    # and falls back to no media, which is the same visible result as webrtc=1.
+    if [ "$_r_webrtc" = "2" ]; then
+      _nft_chains="$_nft_chains    # Bypass WebRTC: STUN/TURN answers with the proxy IP, never the real one.\n"
+      # A pinned device has to reach its OWN pool proxy here too, or its calls
+      # would advertise the SSID default proxy's address while the rest of its
+      # traffic left through another one.
+      if pool_enabled "$_r_idx"; then
+        _nft_chains="$_nft_chains    tcp dport { $STUN_TCP_PORTS } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
+        _nft_chains="$_nft_chains    udp dport { $STUN_UDP_PORTS } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
+      fi
+      _nft_chains="$_nft_chains    tcp dport { $STUN_TCP_PORTS } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+      _nft_chains="$_nft_chains    udp dport { $STUN_UDP_PORTS } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    fi
     _nft_chains="$_nft_chains    # Do not proxy local or multicast traffic.\n"
     _nft_chains="$_nft_chains    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return\n"
     _nft_chains="$_nft_chains    # Bypass the proxy servers themselves through the WAN.\n"

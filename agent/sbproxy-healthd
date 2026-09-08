@@ -109,7 +109,9 @@ run_once() {
     band="$(trim_field "$band")"
     isolate="$(trim_field "$isolate")"; webrtc="$(trim_field "$webrtc")"
     case "$band" in 2g|5g) :;; *) continue;; esac
-    case "$isolate$webrtc" in 00|01|10|11) :;; *) continue;; esac
+    case "$isolate" in 0|1) :;; *) continue;; esac
+    # webrtc: 0 keep, 1 block STUN/TURN, 2 bypass through the proxy IP.
+    case "$webrtc" in 0|1|2) :;; *) continue;; esac
     [ "${#name}" -ge 1 ] && [ "${#name}" -le 32 ] || continue
     [ "${#wifi_key}" -ge 8 ] && [ "${#wifi_key}" -le 63 ] || continue
     idx="$(trim_field "$idx")"

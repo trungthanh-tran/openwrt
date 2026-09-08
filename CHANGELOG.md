@@ -5,6 +5,16 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Changed
+- **WebRTC nay là 3 chế độ thay vì bật/tắt.** Cột `webrtc` của
+  `config/wifi-socks.conf` nhận `0` (giữ nguyên), `1` (chặn STUN/TURN như cũ) và
+  `2` (bypass). Ở chế độ bypass, STUN/TURN bị đẩy vào sing-box **trước** mọi rule
+  `return`, nên STUN server nhìn thấy proxy và trả về IP của proxy — WebRTC vẫn
+  chạy nhưng báo IP proxy thay vì IP thật của router. Chế độ này cần proxy relay
+  được UDP (SOCKS5 UDP ASSOCIATE). Config cũ chỉ có `0`/`1` giữ nguyên ý nghĩa.
+  Ô chọn WebRTC trong web console và Console Native đổi từ checkbox sang select
+  box với ba lựa chọn tương ứng.
+
 ### Fixed
 - **Apply không còn restart dnsmasq trùng.** `network reload` và `wifi reload` đã
   phát interface event mà init script dnsmasq theo dõi. Lệnh restart riêng trước

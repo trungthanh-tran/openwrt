@@ -306,6 +306,8 @@ ssids_json() {
       case "$idx" in ''|*[!0-9]*|0*) continue;; esac
       [ "$idx" -ge 1 ] 2>/dev/null && [ "$idx" -le 200 ] 2>/dev/null || continue
       iso="$(trim_field "$iso")"; web="$(trim_field "$web")"
+      # webrtc is a mode, not a flag: 0 keep, 1 block, 2 bypass via the proxy IP.
+      case "$web" in 0|1|2) :;; *) web=0;; esac
       oui="$(trim_field "$oui")"
       proxy_type="$(trim_field "${proxy_type:-socks5}")"
       case "$proxy_type" in socks5|http) :;; *) proxy_type="socks5";; esac
@@ -314,7 +316,7 @@ ssids_json() {
             --arg host "$host" --arg port "$(trim_field "$port")" --arg user "$user" \
             --arg oui "$oui" --arg mac "$mac" --arg proxy_type "$proxy_type" \
             --argjson iso "$([ "$iso" = 1 ] && echo true || echo false)" \
-            --argjson web "$([ "$web" = 1 ] && echo true || echo false)" \
+            --argjson web "$web" \
         '{name:$name,band:$band,idx:$idx,host:$host,port:$port,proxy_type:$proxy_type,hasAuth:($user!=""),isolate:$iso,webrtc:$web,mac_oui:$oui,macaddr:$mac}'
     done; } | jq -s 'sort_by(.idx)'
 }

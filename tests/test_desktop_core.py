@@ -435,10 +435,21 @@ class WifiRecordTests(unittest.TestCase):
             with self.subTest(row=row), self.assertRaises(ValueError):
                 app.WifiRecord.from_row(row)
 
-    def test_boolean_columns_must_be_zero_or_one(self):
-        for isolate, webrtc in (("2", "1"), ("1", "yes"), ("", "0")):
-            row = f"A|2g|1|password12|proxy|1080|||{isolate}|{webrtc}"
+    def test_isolate_column_must_be_zero_or_one(self):
+        for isolate in ("2", "", "yes"):
+            row = f"A|2g|1|password12|proxy|1080|||{isolate}|1"
             with self.subTest(row=row), self.assertRaisesRegex(ValueError, "0 hoặc 1"):
+                app.WifiRecord.from_row(row)
+
+    def test_webrtc_column_carries_a_mode(self):
+        # 0 keep, 1 block, 2 bypass — anything else is not a mode.
+        for webrtc, mode in (("0", 0), ("1", 1), ("2", 2)):
+            row = f"A|2g|1|password12|proxy|1080|||1|{webrtc}"
+            with self.subTest(row=row):
+                self.assertEqual(app.WifiRecord.from_row(row).webrtc, mode)
+        for webrtc in ("3", "yes", "", "-1"):
+            row = f"A|2g|1|password12|proxy|1080|||1|{webrtc}"
+            with self.subTest(row=row), self.assertRaisesRegex(ValueError, "bypass"):
                 app.WifiRecord.from_row(row)
 
     def test_valid_boundaries(self):
@@ -458,7 +469,7 @@ class WifiRecordTests(unittest.TestCase):
             {"wifi_password": "p" * 7}, {"wifi_password": "p" * 64},
             {"host": ""}, {"host": "   "},
             {"port": 0}, {"port": 65536}, {"port": True}, {"port": "1080"},
-            {"isolate": 1}, {"webrtc": 0},
+            {"isolate": 1}, {"webrtc": 3}, {"webrtc": "yes"}, {"webrtc": None},
             {"mac_oui": "AA:BB"}, {"mac_oui": "GG:00:11"}, {"mac_oui": None},
         )
         for changes in cases:

@@ -1312,9 +1312,17 @@
           <input type="text" id="f_pass" class="mono">
         </div>
       </div>
+      <div class="field">
+        <label>WebRTC</label>
+        <select id="f_webrtc">
+          <option value="0">Giữ nguyên</option>
+          <option value="1">Chặn WebRTC</option>
+          <option value="2">Bypass WebRTC</option>
+        </select>
+        <div class="derived" id="f_webrtc_hint"></div>
+      </div>
       <div class="toggles">
         <label class="tg"><input type="checkbox" id="f_isolate" checked> Cách ly client</label>
-        <label class="tg"><input type="checkbox" id="f_webrtc" checked> Chặn WebRTC</label>
       </div>
       <div class="derived" id="f_derived"></div>
       <div class="err" id="f_err"></div>
@@ -1727,6 +1735,7 @@
     "Hãng WiFi giả lập (MAC)": "Emulated Wi-Fi vendor (MAC)", "(3 byte đầu của MAC theo hãng; 3 byte sau random)": "(first 3 MAC bytes identify the vendor; last 3 are random)",
     "Mật khẩu WiFi": "Wi-Fi password", "(≥ 8 ký tự)": "(≥ 8 characters)", "Cổng": "Port",
     "(trống nếu không auth)": "(empty when authentication is disabled)", "Cách ly client": "Isolate clients", "Chặn WebRTC": "Block WebRTC",
+    "Giữ nguyên": "Keep as-is", "Bypass WebRTC": "Bypass WebRTC",
     "Huỷ": "Cancel", "Lưu": "Save", "Kết nối agent trên router": "Connect to the router agent",
     "Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.": "Not connected. Log in with the sbproxy account.",
     "Tên đăng nhập": "Username", "Mật khẩu": "Password", "Đăng xuất": "Log out",
@@ -1878,6 +1887,44 @@
   const MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
+
+  // WebRTC handling per Wi-Fi, column 10 of wifi-socks.conf. It used to be a
+  // 0/1 flag, so a stored boolean still reads back as the mode it meant.
+  const WEBRTC_KEEP = 0, WEBRTC_BLOCK = 1, WEBRTC_BYPASS = 2;
+  function webrtcMode(value) {
+    if (value === true) return WEBRTC_BLOCK;
+    const n = parseInt(value, 10);
+    return (n === WEBRTC_BLOCK || n === WEBRTC_BYPASS) ? n : WEBRTC_KEEP;
+  }
+  function webrtcText(value) {
+    switch (webrtcMode(value)) {
+      case WEBRTC_BLOCK: return pick("Block WebRTC", "Chặn WebRTC");
+      case WEBRTC_BYPASS: return pick("Bypass WebRTC", "Bypass WebRTC");
+      default: return pick("Keep as-is", "Giữ nguyên");
+    }
+  }
+  function webrtcCell(value) {
+    const mode = webrtcMode(value);
+    if (mode === WEBRTC_BLOCK) return '<span class="chip on warnhue"><span class="dot"></span>' + pick("block", "chặn") + '</span>';
+    if (mode === WEBRTC_BYPASS) return '<span class="chip on"><span class="dot"></span>' + pick("bypass", "bypass") + '</span>';
+    return '<span class="chip">' + pick("keep", "giữ nguyên") + '</span>';
+  }
+  function updateWebrtcHint() {
+    const hint = $("f_webrtc_hint");
+    if (!hint) return;
+    switch (webrtcMode($("f_webrtc").value)) {
+      case WEBRTC_BLOCK:
+        hint.textContent = pick("Drops STUN/TURN, so WebRTC cannot leak an address — and calls stop working.",
+                                "Chặn STUN/TURN nên WebRTC không lộ IP — đồng thời cuộc gọi cũng không chạy.");
+        break;
+      case WEBRTC_BYPASS:
+        hint.textContent = pick("Forces STUN/TURN through the proxy, so WebRTC reports the proxy IP. Needs a proxy that relays UDP.",
+                                "Đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy. Cần proxy hỗ trợ UDP.");
+        break;
+      default:
+        hint.textContent = pick("No WebRTC-specific rule.", "Không áp rule riêng cho WebRTC.");
+    }
+  }
 
   // Common Wi-Fi vendor OUIs (first 3 MAC bytes). Keep in sync with the list in
   // config/wifi-socks.conf.example. Empty oui = random locally-administered 02:.
@@ -3680,7 +3727,7 @@
     const c5 = ssids.filter(s => s.band === "5g").length;
     const proxies = new Set(ssids.map(s => s.host + ":" + s.port)).size;
     const iso = ssids.filter(s => s.isolate).length;
-    const web = ssids.filter(s => s.webrtc).length;
+    const web = ssids.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).length;
     const meter = (n, cls) => {
       const over = n > BSSID_LIMIT;
       const w = Math.min(100, (n / BSSID_LIMIT) * 100);
@@ -3709,7 +3756,7 @@
     count("analytics5").textContent = c5;
     count("analyticsProxyCount").textContent = proxies;
     count("analyticsIsolation").textContent = ssids.filter(s => s.isolate).length;
-    count("analyticsWebrtc").textContent = ssids.filter(s => s.webrtc).length;
+    count("analyticsWebrtc").textContent = ssids.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).length;
     const sb = agent.singbox;
     const dot = count("analyticsSingboxDot");
     const status = count("analyticsSingboxStatus");
@@ -3751,7 +3798,7 @@
         <td class="mono sub">${subnet(s.idx)}</td>
         <td>${auth}</td>
         <td>${s.isolate ? '<span class="chip on"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
-        <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
+        <td>${webrtcCell(s.webrtc)}</td>
         <td data-health="${s.idx}">${healthCell(s.idx)}</td>
         <td><button class="iconbtn" data-pool="${s.idx}">${pick("Pool", "Pool")}</button></td>
         <td><div class="rowbtns">
@@ -3779,7 +3826,7 @@
 # name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type
 `;
     const lines = [...ssids].sort((a, b) => a.idx - b.idx).map(s =>
-      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, s.webrtc ? 1 : 0, s.mac_oui || "", s.proxy_type || "socks5"].join("|")
+      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, webrtcMode(s.webrtc), s.mac_oui || "", s.proxy_type || "socks5"].join("|")
     );
     return head + lines.join("\n") + (lines.length ? "\n" : "");
   }
@@ -3806,9 +3853,15 @@
 
   function genNft() {
     const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
-    const webrtc = sorted.filter(s => s.webrtc).flatMap(s => [
+    const webrtc = sorted.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).flatMap(s => [
       `    iifname "br-w${s.idx}" tcp dport { ${STUN_TCP} } drop`,
       `    iifname "br-w${s.idx}" udp dport { ${STUN_UDP} } drop`
+    ]);
+    // Bypass hijacks STUN/TURN ahead of every return rule, so the STUN server
+    // sees the proxy and hands back the proxy's IP as the reflexive candidate.
+    const webrtcBypass = sorted.filter(s => webrtcMode(s.webrtc) === WEBRTC_BYPASS).flatMap(s => [
+      `    iifname "br-w${s.idx}" tcp dport { ${STUN_TCP} } tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`,
+      `    iifname "br-w${s.idx}" udp dport { ${STUN_UDP} } tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`
     ]);
     const bypass = [...new Set(sorted.map(s => s.host).filter(isIP))].map(h => `    ip daddr ${h} return`);
     const tproxy = sorted.flatMap(s => [
@@ -3824,6 +3877,7 @@
       "  }",
       "  chain prerouting {",
       "    type filter hook prerouting priority mangle; policy accept;",
+      ...webrtcBypass,
       "    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return",
       ...bypass,
       ...tproxy,
@@ -4030,7 +4084,8 @@
     $("f_user").value = s ? (s.user || "") : "";
     $("f_pass").value = s ? (s.pass || "") : "";
     $("f_isolate").checked = s ? !!s.isolate : true;
-    $("f_webrtc").checked = s ? !!s.webrtc : true;
+    $("f_webrtc").value = String(s ? webrtcMode(s.webrtc) : WEBRTC_BLOCK);
+    updateWebrtcHint();
     $("f_vendor").value = s ? (s.mac_oui || "") : "";
     $("f_err").textContent = "";
     $("probeBtn").hidden = !agent.connected;
@@ -4075,7 +4130,7 @@
     const mac_oui = $("f_vendor").value;
     if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err(pick("mac_oui must look like AA:BB:CC.", "mac_oui phải dạng AA:BB:CC."));
 
-    const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked, mac_oui };
+    const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: webrtcMode($("f_webrtc").value), mac_oui };
     if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     configDirty = true;
@@ -4123,7 +4178,7 @@
         name: p[0].trim(), band: (p[1] || "2g").trim(), idx,
         key: (p[3] || "").trim(), host: (p[4] || "").trim(), port: (p[5] || "1080").trim(),
         user: (p[6] || "").trim(), pass: (p[7] || "").trim(),
-        isolate: (p[8] || "1").trim() === "1", webrtc: (p[9] || "0").trim() === "1",
+        isolate: (p[8] || "1").trim() === "1", webrtc: webrtcMode((p[9] || "0").trim()),
         mac_oui: (p[10] || "").trim(), proxy_type: (p[11] || "socks5").trim().toLowerCase()
       });
     });
@@ -4193,6 +4248,7 @@
   $("backdrop").onclick = e => { if (e.target.id === "backdrop") closeModal(); };
   $("f_idx").oninput = updateDerived;
   $("f_vendor").onchange = updateDerived;
+  $("f_webrtc").onchange = updateWebrtcHint;
   $("parseProxyBtn").onclick = fillCompactProxy;
   $("f_proxy_compact").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fillCompactProxy(); } };
   $("languageSelect").onchange = e => setLanguage(e.target.value);

@@ -184,7 +184,10 @@ more slowly.
 
 - IPv6: disabled on managed SSIDs because the project proxies IPv4 only.
 - DNS: port-53 traffic on proxied SSIDs is hijacked into sing-box fake-IP, so SOCKS receives hostnames; DoH/DoT clients bypass the hijack and rely on TLS SNI sniffing.
-- WebRTC: port-based STUN/TURN blocking is optional and not a universal guarantee.
+- WebRTC: `webrtc=1` blocks the listed STUN/TURN ports and `webrtc=2` forces them
+  through the proxy so the reflexive candidate is the proxy's address. Both are
+  port-based and neither is a universal guarantee; `webrtc=2` also needs a proxy
+  that relays UDP.
 - Fail-closed: guest zones must never receive a direct guest-to-WAN forwarding rule.
 - Logs: never print tokens, Wi-Fi passwords, or SOCKS credentials.
 

@@ -13,7 +13,13 @@
 #   proxy_user: Proxy username; leave empty when authentication is disabled.
 #   proxy_pass: Proxy password; leave empty when authentication is disabled.
 #   isolate  : 1 blocks clients on the same Wi-Fi from reaching one another.
-#   webrtc   : 1 blocks configured STUN/TURN ports to reduce WebRTC leaks.
+#   webrtc   : WebRTC handling mode.
+#              0 = keep: no WebRTC-specific rule at all.
+#              1 = block: drop the configured STUN/TURN ports to stop leaks.
+#              2 = bypass: force STUN/TURN through the proxy ahead of every
+#                  bypass rule, so the STUN server answers with the proxy's
+#                  address and WebRTC reports that IP instead of the real one.
+#                  Requires a proxy that relays UDP (SOCKS5 UDP ASSOCIATE).
 #   mac_oui  : OPTIONAL 11th column. 3-byte vendor prefix (AA:BB:CC) used as the
 #              first half of the AP MAC; the last 3 bytes are randomized. Leave
 #              empty (or omit the column) for a random locally-administered 02:

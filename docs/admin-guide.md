@@ -151,6 +151,8 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 ```
 `idx` duy nhất & ổn định (quyết định subnet `192.168.(10+idx).0/24`, cổng tproxy `12000+idx`). Có thể soạn bằng UI rồi copy/tải.
 
+`webrtc`: `0` giữ nguyên · `1` chặn STUN/TURN · `2` bypass — đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy (cần proxy relay được UDP).
+
 **Tunables `config/settings.sh`:**
 
 | Biến | Ý nghĩa |
@@ -159,7 +161,7 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `BSSID_LIMIT` | Số SSID tối đa mỗi băng (theo `iw list`). |
 | `ZONE_INPUT` | `ACCEPT` mặc định (đã chặn cổng admin từ zone khách). |
 | `WIFI_ENCRYPTION` | `psk2` (WPA2) · `sae`/`sae-mixed` (WPA3). |
-| `STUN_*_PORTS` | Cổng STUN/TURN bị chặn khi WebRTC bật. |
+| `STUN_*_PORTS` | Cổng STUN/TURN áp dụng cho `webrtc=1` (chặn) và `webrtc=2` (bypass qua proxy). |
 
 ### 7.1 Pool proxy — một SSID, nhiều proxy
 
@@ -395,7 +397,7 @@ nft list table inet sbproxy ; ip rule | grep 0x1 ; ip route show table 100
 | Client không có IP | `/etc/init.d/dnsmasq restart`; đảm bảo `ZONE_INPUT=ACCEPT`. |
 | Ra net nhưng sai IP | `iifname` không khớp `br-w<idx>`; kiểm tra route sing-box `in-w→out-w`. |
 | DNS leak | DNS SSID proxy được hijack vào sing-box fake-IP. `nslookup` phải trả `198.18.x.x`; nếu không, kiểm tra rule `dport 53` trong `nft list chain inet sbproxy prerouting` rồi chạy lại `apply.sh`. |
-| WebRTC lộ | Bật `webrtc=1` → `apply`; kiểm tra `nft list chain inet sbproxy webrtc`. |
+| WebRTC lộ | Đặt `webrtc=1` (chặn hẳn) hoặc `webrtc=2` (bypass: WebRTC báo IP của proxy) → `apply`; kiểm tra `nft list chain inet sbproxy webrtc` và `nft list chain inet sbproxy w<idx>`. |
 | Client thấy nhau | `isolate=1`; zone `forward=REJECT`; mỗi SSID một `br-w<idx>`. |
 | Agent không kết nối | `curl -H "Authorization: Bearer $(cat /etc/sbproxy/token)" http://IP/cgi-bin/sbproxy?action=status`; kiểm tra `+x` của CGI; với bản Web kiểm tra thêm mixed-content. |
 
@@ -445,7 +447,7 @@ Ba nhóm "lộ" cần chặn: **(A) lộ danh tính/IP thật**, **(B) lộ quy�
 |---|---|---|
 | **IPv6 bypass** | ✅ Đã chặn | tproxy hiện chỉ bắt IPv4; `apply.sh` tắt DHCPv6/RA/NDP trên từng SSID sbproxy. Chưa hỗ trợ proxy IPv6. |
 | **DNS leak** | ✅ Chặn (fake-IP) | DNS cổng 53 của SSID proxy hijack vào sing-box; client nhận fake-IP `198.18.0.0/15`, SOCKS nhận **hostname** (remote resolve). Client dùng DoH/DoT né được hijack → fallback sniff SNI; muốn chặt hơn, chặn cổng 853/resolver DoH trên zone khách. |
-| **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh (Bước 7). |
+| **WebRTC leak** | ✅ Có (nếu bật) | Đặt `webrtc=1` cho SSID cần ẩn danh, hoặc `webrtc=2` nếu vẫn cần gọi video (Bước 7). |
 | **Rò khi proxy chết** | ✅ Fail-closed | Zone khách `forward=REJECT` → sing-box/tproxy chết thì client **mất mạng** chứ không ra thẳng. Đừng thêm rule forward guest→wan. |
 | **MAC thật** | ✅ Random / giả hãng | Mặc định MAC `02:xx` (locally-administered) tự sinh mỗi SSID. Có thể chọn giả 3 byte đầu theo hãng WiFi phổ biến (cột 11 `mac_oui` trong `wifi-socks.conf`, hoặc dropdown "Hãng WiFi" trong Console) — 3 byte sau vẫn random. Đổi hãng rồi `apply.sh` sẽ sinh lại MAC. |
 

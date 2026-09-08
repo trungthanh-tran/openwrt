@@ -417,6 +417,7 @@ EN_TRANSLATIONS = {
     "Hãng router / MAC": "Router vendor / MAC",
     "Cách ly client": "Client isolation",
     "Chặn WebRTC": "Block WebRTC",
+    "Giữ nguyên": "Keep as-is", "Bypass WebRTC": "Bypass WebRTC",
     "Huỷ": "Cancel",
     "Lưu": "Save",
     "Dữ liệu không hợp lệ": "Invalid data",
@@ -515,8 +516,10 @@ EN_TRANSLATIONS = {
     "Đang rollback…": "Rolling back…",
     "Dry-run thất bại": "Dry-run failed",
     "Apply thất bại": "Apply failed",
-    "isolate và webrtc phải là 0 hoặc 1": "isolate and webrtc must be 0 or 1",
-    "isolate và webrtc phải là boolean": "isolate and webrtc must be boolean values",
+    "isolate phải là 0 hoặc 1": "isolate must be 0 or 1",
+    "isolate phải là boolean": "isolate must be a boolean value",
+    "webrtc phải là 0 (giữ nguyên), 1 (chặn) hoặc 2 (bypass)":
+        "webrtc must be 0 (keep), 1 (block) or 2 (bypass)",
     "Các trường văn bản phải là chuỗi": "Text fields must be strings",
     "Đã đạt giới hạn 200 SSID": "The 200-SSID limit has been reached",
     "Bỏ qua": "Skipped",
@@ -2732,6 +2735,44 @@ def parse_proxy_compact(value: str) -> tuple[str, int, str, str]:
     return host, port, user, password
 
 
+# WebRTC handling for one Wi-Fi, stored in column 10 of wifi-socks.conf.
+# 0 leaves STUN/TURN on the proxy path, 1 drops it, 2 sends it around the proxy
+# straight out the WAN. Older configs and console builds wrote 0/1 as a flag,
+# so a bool still reads back as the mode it used to mean.
+WEBRTC_KEEP, WEBRTC_BLOCK, WEBRTC_BYPASS = 0, 1, 2
+WEBRTC_LABELS = {
+    WEBRTC_KEEP: "Giữ nguyên",
+    WEBRTC_BLOCK: "Chặn WebRTC",
+    WEBRTC_BYPASS: "Bypass WebRTC",
+}
+
+
+def webrtc_mode(value) -> int:
+    """Normalize a stored webrtc value (bool, int or text) to 0, 1 or 2."""
+    if isinstance(value, bool):
+        return WEBRTC_BLOCK if value else WEBRTC_KEEP
+    try:
+        mode = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise ValueError("webrtc phải là 0 (giữ nguyên), 1 (chặn) hoặc 2 (bypass)")
+    if mode not in WEBRTC_LABELS:
+        raise ValueError("webrtc phải là 0 (giữ nguyên), 1 (chặn) hoặc 2 (bypass)")
+    return mode
+
+
+def webrtc_label(value) -> str:
+    return WEBRTC_LABELS[webrtc_mode(value)]
+
+
+def webrtc_mode_from_label(text: str) -> int:
+    """Map a picker entry back to its mode, in either console language."""
+    wanted = str(text).strip().casefold()
+    for mode, label in WEBRTC_LABELS.items():
+        if wanted in (label.casefold(), translate(label, "en").casefold()):
+            return mode
+    raise ValueError("webrtc phải là 0 (giữ nguyên), 1 (chặn) hoặc 2 (bypass)")
+
+
 @dataclass
 class WifiRecord:
     name: str
@@ -2743,7 +2784,7 @@ class WifiRecord:
     user: str = ""
     socks_password: str = ""
     isolate: bool = True
-    webrtc: bool = True
+    webrtc: int = WEBRTC_BLOCK
     mac_oui: str = ""
     proxy_type: str = "socks5"
 
@@ -2756,13 +2797,15 @@ class WifiRecord:
             columns.append("")
         if len(columns) == 11:
             columns.append("socks5")
-        if columns[8].strip() not in ("0", "1") or columns[9].strip() not in ("0", "1"):
-            raise ValueError("isolate và webrtc phải là 0 hoặc 1")
+        if columns[8].strip() not in ("0", "1"):
+            raise ValueError("isolate phải là 0 hoặc 1")
+        if columns[9].strip() not in ("0", "1", "2"):
+            raise ValueError("webrtc phải là 0 (giữ nguyên), 1 (chặn) hoặc 2 (bypass)")
         record = cls(
             name=columns[0], band=columns[1].strip(), idx=int(columns[2].strip()),
             wifi_password=columns[3], host=columns[4].strip(),
             port=int(columns[5].strip()), user=columns[6], socks_password=columns[7],
-            isolate=columns[8].strip() == "1", webrtc=columns[9].strip() == "1",
+            isolate=columns[8].strip() == "1", webrtc=int(columns[9].strip()),
             mac_oui=columns[10].strip(),
             proxy_type=columns[11].strip().lower() or "socks5",
         )
@@ -2800,8 +2843,10 @@ class WifiRecord:
             raise ValueError("Port SOCKS5 không hợp lệ")
         if self.proxy_type not in ("socks5", "http"):
             raise ValueError("Loại proxy phải là SOCKS5 hoặc HTTP")
-        if not isinstance(self.isolate, bool) or not isinstance(self.webrtc, bool):
-            raise ValueError("isolate và webrtc phải là boolean")
+        if not isinstance(self.isolate, bool):
+            raise ValueError("isolate phải là boolean")
+        # A bool here is a pre-3-mode caller; webrtc_mode maps it to keep/block.
+        self.webrtc = webrtc_mode(self.webrtc)
         if not isinstance(self.mac_oui, str):
             raise ValueError("MAC OUI phải có dạng AA:BB:CC")
         if self.mac_oui and not re.fullmatch(r"[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){2}", self.mac_oui):
@@ -2812,7 +2857,7 @@ class WifiRecord:
         return "|".join([
             self.name, self.band, str(self.idx), self.wifi_password, self.host,
             str(self.port), self.user, self.socks_password,
-            "1" if self.isolate else "0", "1" if self.webrtc else "0",
+            "1" if self.isolate else "0", str(webrtc_mode(self.webrtc)),
             self.mac_oui.upper(),
             self.proxy_type,
         ])
@@ -3140,7 +3185,10 @@ def wifi_sort_key(record, column, health=None, runtime=None, proxy_count=None, d
     if column == "isolate":
         return int(bool(getattr(record, "isolate", False)))
     if column == "webrtc":
-        return int(bool(getattr(record, "webrtc", False)))
+        try:
+            return webrtc_mode(getattr(record, "webrtc", WEBRTC_KEEP))
+        except ValueError:
+            return WEBRTC_KEEP
     if column == "health":
         state = str(health.get("state") or "").casefold()
         if any(word in state for word in ("ok", "up", "healthy")):
@@ -3190,7 +3238,7 @@ class WifiDialog(tk.Toplevel):
             "host": tk.StringVar(value=record.host), "port": tk.StringVar(value=str(record.port)),
             "user": tk.StringVar(value=record.user), "socks_password": tk.StringVar(value=record.socks_password),
             "vendor": tk.StringVar(value=vendor_label(record.mac_oui)), "isolate": tk.BooleanVar(value=record.isolate),
-            "webrtc": tk.BooleanVar(value=record.webrtc),
+            "webrtc": tk.StringVar(value=webrtc_label(record.webrtc)),
             "proxy_type": tk.StringVar(value=record.proxy_type.upper()),
         }
         fields = [
@@ -3199,6 +3247,7 @@ class WifiDialog(tk.Toplevel):
             ("Mật khẩu Wi‑Fi", "wifi_password", "secret"), ("SOCKS host", "host", None),
             ("SOCKS port", "port", None), ("SOCKS user", "user", None),
             ("SOCKS password", "socks_password", "secret"), ("Hãng router / MAC", "vendor", "vendor"),
+            ("WebRTC", "webrtc", "webrtc"),
         ]
         if not self.show_proxy_fields:
             fields = [field for field in fields
@@ -3212,6 +3261,9 @@ class WifiDialog(tk.Toplevel):
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=("2g", "5g"), state="readonly", width=33)
             elif kind == "proxy_type":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=("SOCKS5", "HTTP"), state="readonly", width=33)
+            elif kind == "webrtc":
+                widget = ttk.Combobox(body, textvariable=self.values[key], state="readonly", width=33,
+                                      values=tuple(WEBRTC_LABELS.values()))
             elif kind == "vendor":
                 widget = ttk.Combobox(body, textvariable=self.values[key], values=vendor_choices(record.mac_oui), state="readonly", width=33)
             else:
@@ -3221,7 +3273,6 @@ class WifiDialog(tk.Toplevel):
         checks = ttk.Frame(body)
         checks.grid(row=len(fields) + 1, column=0, columnspan=2, sticky="w", pady=(8, 4))
         ttk.Checkbutton(checks, text="Cách ly client", variable=self.values["isolate"]).pack(side="left", padx=(0, 18))
-        ttk.Checkbutton(checks, text="Chặn WebRTC", variable=self.values["webrtc"]).pack(side="left")
         actions = ttk.Frame(body)
         actions.grid(row=len(fields) + 2, column=0, columnspan=2, sticky="e", pady=(14, 0))
         if self.pool_command:
@@ -3249,7 +3300,8 @@ class WifiDialog(tk.Toplevel):
                 user=(self.values["user"].get() if self.show_proxy_fields else record.user),
                 socks_password=(self.values["socks_password"].get()
                                 if self.show_proxy_fields else record.socks_password),
-                isolate=self.values["isolate"].get(), webrtc=self.values["webrtc"].get(),
+                isolate=self.values["isolate"].get(),
+                webrtc=webrtc_mode_from_label(self.values["webrtc"].get()),
                 mac_oui=vendor_oui(self.values["vendor"].get()),
                 proxy_type=(self.values["proxy_type"].get().lower()
                             if self.show_proxy_fields else record.proxy_type),
@@ -6485,7 +6537,7 @@ class NativeApp:
             row_tag = "row_even" if pos % 2 == 0 else "row_odd"
             count = proxy_count(record.idx)
             proxy_display = str(count) if count is not None else "—"
-            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=(row_tag,), values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, connected_count(record.idx), self.t("Có") if record.isolate else self.t("Không"), self.t("Chặn") if record.webrtc else self.t("Cho phép")))
+            self.wifi_tree.insert("", "end", iid=str(record.idx), tags=(row_tag,), values=(record.idx, record.name, record.band, self.subnet_of(record.idx), mac_display, proxy_display, connected_count(record.idx), self.t("Có") if record.isolate else self.t("Không"), self.t(webrtc_label(record.webrtc))))
         self.update_client_filter_options()
         self.update_wifi_editor()
 
