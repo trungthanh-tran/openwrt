@@ -110,6 +110,33 @@ jq '.outbounds[]|select(.tag=="out-w<IDX>")|.network' /etc/sing-box/config.json
 UDP ASSOCIATE. Đặt `SOCKS_UDP=0` rồi `apply` để trình duyệt rơi về TCP ngay,
 thay vì phải chờ timeout.
 
+#### Test tự động: check → probe → quarantine → recover
+
+| ID | Tình huống | Đạt khi |
+|---|---|---|
+| UDP-CHECK-01 | Chạy preflight trên firmware mới | `ucode-mod-socket` và `ucode-mod-struct` đều `[OK]` |
+| UDP-PROBE-01 | TCP và UDP ASSOCIATE/STUN cùng pass | `state=ok/slow`, `udp_state=ok`, có relay |
+| UDP-PROBE-02 | TCP pass nhưng STUN timeout | Kết quả tổng là `fail`, `udp_state=fail`, verdict `udp-fail` |
+| UDP-QUAR-01 | sing-box ghi lỗi cho `out-wX-sY` | Chỉ slot `Y` của SSID `X` thành `UDP FAIL`; slot khác giữ nguyên |
+| UDP-QUAR-02 | Dòng log cũ vẫn còn trong `logread` | Không quarantine hoặc probe lại lần nữa |
+| UDP-RECOVER-01 | Probe retry vẫn fail | Slot tiếp tục bị quarantine và giữ lý do STUN |
+| UDP-RECOVER-02 | Probe retry pass | Slot đổi lại `udp_state=ok` và được phép tham gia random |
+
+Chạy bộ deterministic không dùng proxy thật:
+
+```sh
+sh tests/test_healthd.sh
+sh tests/test_assignd.sh
+sh tests/test_agent.sh
+```
+
+Probe một proxy thật trực tiếp trên router:
+
+```sh
+ucode scripts/probe-socks5-udp.uc HOST PORT USER PASS
+sh scripts/probe-proxy.sh HOST PORT USER PASS socks5 1 | jq '{state,udp_state,checks}'
+```
+
 > SSID dùng proxy HTTP luôn giữ rule drop UDP 443, kể cả khi `SOCKS_UDP=1`:
 > proxy HTTP không có kênh UDP nào để đi.
 

@@ -47,6 +47,22 @@ Confirm that all configured SSIDs exist, MAC addresses begin with `02:`, each br
 8. Verify that clients cannot reach router administration ports.
 9. Verify that no public IPv6 route is available.
 
+## Automated UDP health lifecycle cases
+
+| ID | Scenario | Pass condition |
+|---|---|---|
+| UDP-CHECK-01 | Preflight on a new firmware | Both `ucode-mod-socket` and `ucode-mod-struct` are `[OK]` |
+| UDP-PROBE-01 | TCP and UDP ASSOCIATE/STUN pass | `state=ok/slow`, `udp_state=ok`, relay is present |
+| UDP-PROBE-02 | TCP passes but STUN times out | Overall `fail`, `udp_state=fail`, verdict `udp-fail` |
+| UDP-QUAR-01 | sing-box reports `out-wX-sY` UDP failure | Only slot `Y` on SSID `X` is quarantined |
+| UDP-QUAR-02 | The same old log line remains visible | It causes no second quarantine or probe |
+| UDP-RECOVER-01 | Retry still fails UDP | Slot remains quarantined with the STUN reason |
+| UDP-RECOVER-02 | Retry passes UDP | Slot returns to `udp_state=ok` and random eligibility |
+
+Run `sh tests/test_healthd.sh`, `sh tests/test_assignd.sh`, and
+`sh tests/test_agent.sh` for deterministic coverage. On a router, probe a real
+endpoint with `ucode scripts/probe-socks5-udp.uc HOST PORT USER PASS`.
+
 ## SOCKS change check
 
 Run `set-sock.sh`, verify Wi-Fi and DHCP remain associated, and confirm the public IP changes. Existing sessions may be interrupted because sing-box restarts.

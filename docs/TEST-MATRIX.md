@@ -137,6 +137,10 @@ Suite: `tests/test_healthd.sh`
 - Verifies missing config and missing `jq` fail without publishing output.
 - Skips malformed config rows and normalizes malformed/`NaN` probe output to a
   safe failure object without calling curl for rejected rows.
+- Covers the complete WebRTC mode-2 UDP lifecycle: dependency check, successful
+  UDP ASSOCIATE/STUN probe, TCP-pass/UDP-fail classification, exact-slot
+  runtime quarantine, failed recovery remaining quarantined, successful
+  recovery, and an old retained log line not triggering quarantine again.
 
 ## Internet gateway
 
