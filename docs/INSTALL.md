@@ -55,6 +55,8 @@ sh scripts/preflight.sh
 ```sh
 sh scripts/install-deps.sh
 ```
+Setup cũng cài `coreutils-cksum` để random proxy pool lấy seed trực tiếp từ
+`/dev/urandom`. Code vẫn có fallback cho firmware tối giản không có package này.
 Cài: `nftables kmod-nft-tproxy kmod-nft-core ip-full iw-full sing-box`, cài `/etc/init.d/sbproxy` và bật autostart.
 
 > Nếu opkg không có `sing-box`: tải binary aarch64 (MT7986) từ release chính thức sing-box, đặt vào `/usr/bin/sing-box`, và tạo `/etc/init.d/sing-box` (procd) trỏ tới `config.json`. Xem docs sing-box.

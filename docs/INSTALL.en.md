@@ -25,6 +25,10 @@ Set `RADIO_2G` and `RADIO_5G`. `WIFI_COUNTRY` is optional: a valid two-letter co
 
 ## 2. Preflight and dependencies
 
+The dependency setup also installs `coreutils-cksum`. It lets proxy-pool random
+assignment seed directly from `/dev/urandom`; a built-in fallback remains for
+minimal images whose package feed does not provide it.
+
 ```sh
 sh scripts/preflight.sh
 sh scripts/install-deps.sh

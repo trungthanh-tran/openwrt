@@ -38,12 +38,17 @@ free 2>/dev/null | grep -i mem || true
 df -h / /tmp /overlay 2>/dev/null || true
 
 echo; echo "==== 5. Required packages ===="
-for p in sing-box nftables kmod-nft-tproxy kmod-nft-socket ip-full iw-full jq; do
+for p in sing-box nftables kmod-nft-tproxy kmod-nft-socket ip-full iw-full jq coreutils-cksum; do
   if command -v apk >/dev/null 2>&1; then installed="$(apk list -I "$p" 2>/dev/null || true)"
   else installed="$(opkg list-installed "$p" 2>/dev/null || true)"; fi
   # OpenWrt 25.x ships the nft binary as nftables-json on apk-based images.
   if [ "$p" = "nftables" ] && [ -z "$installed" ] && command -v nft >/dev/null 2>&1; then
     installed="nft binary"
+  fi
+  # Some custom BusyBox builds provide cksum without the split coreutils
+  # package. The command is what the random seed helper actually needs.
+  if [ "$p" = "coreutils-cksum" ] && [ -z "$installed" ] && command -v cksum >/dev/null 2>&1; then
+    installed="cksum binary"
   fi
   if [ -n "$installed" ]; then echo "  [OK] $p"; else echo "  [MISSING] $p"; fi
 done

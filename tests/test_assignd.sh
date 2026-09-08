@@ -604,6 +604,10 @@ contains "install-deps installs kmod-nft-socket" \
    "$(cat "$ROOT/scripts/install-deps.sh")" "kmod-nft-socket"
 contains "and preflight reports whether the kernel took it" \
    "$(cat "$ROOT/scripts/preflight.sh")" "kmod-nft-socket"
+contains "install-deps installs cksum for high-quality random seeds" \
+   "$(cat "$ROOT/scripts/install-deps.sh")" "coreutils-cksum"
+contains "and preflight reports cksum availability" \
+   "$(cat "$ROOT/scripts/preflight.sh")" "coreutils-cksum"
 
 printf '\nASSIGND TOTAL: pass=%s fail=%s\n' "$n_ok" "$n_bad"
 [ "$n_bad" -eq 0 ]
