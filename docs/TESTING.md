@@ -113,6 +113,23 @@ thay vì phải chờ timeout.
 > SSID dùng proxy HTTP luôn giữ rule drop UDP 443, kể cả khi `SOCKS_UDP=1`:
 > proxy HTTP không có kênh UDP nào để đi.
 
+### B8. Luật direct/block theo domain/IP (routing-rules.conf)
+Thêm vào `config/routing-rules.conf` rồi `apply`:
+```
+direct|domain_suffix|ipinfo.io
+block|domain_suffix|example.com
+```
+Trên client: mở `https://ipinfo.io/ip` → **đạt khi** hiện IP thật của router (đi
+thẳng, không qua proxy). Mở `https://example.com` → **đạt khi** không tải được.
+Mở một trang bất kỳ khác → vẫn ra IP của proxy.
+
+Kiểm tra ngược trên router:
+```sh
+jq '.route.rules' /etc/sing-box/config.json   # luật direct/block đứng TRÊN các rule inbound
+```
+**Thứ tự:** nếu một luật hẹp không có tác dụng, kiểm tra nó có đứng TRÊN luật
+rộng hơn không — khớp đầu tiên thắng.
+
 ## C. Kịch bản đổi SOCKS không gián đoạn
 ```sh
 # Trên router:
@@ -129,6 +146,7 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
 | 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
+| 5c | Direct/block theo domain/IP | B8 | đích `direct` ra IP thật, đích `block` không tải được, còn lại vẫn qua proxy |
 | 5b | UDP qua proxy | B7 | `SOCKS_UDP=1`: QUIC/media chạy được qua proxy socks5 |
 | 5 | WebRTC theo chế độ | B3 | `webrtc=1` không lộ IP · `webrtc=2` lộ IP của proxy, cuộc gọi vẫn chạy |
 | 6 | Cách ly client | B4 + B5 | không ping được nhau |

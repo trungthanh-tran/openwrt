@@ -168,6 +168,45 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `POOL_UNASSIGNED` | `default` = máy chưa ghim dùng proxy trong `wifi-socks.conf`. `block` = máy chưa ghim không có mạng (kể cả DNS) tới khi được gán proxy. |
 | `SOCKS_UDP` | `1` = socks5 relay UDP (UDP ASSOCIATE): QUIC/WebRTC/game đi qua proxy. `0` = chỉ TCP và drop UDP 443. Đặt `0` nếu proxy không hỗ trợ UDP. Proxy HTTP luôn chỉ TCP. |
 
+### 7.0 Luật định tuyến — cho một đích đi thẳng, chặn, hay ép qua proxy
+
+Mặc định mọi đích đều đi qua proxy. `config/routing-rules.conf` (copy từ
+`.example`) mở ba ngoại lệ:
+
+```
+action|type|value
+direct|domain_suffix|vietcombank.com.vn
+block|domain_keyword|doubleclick
+direct|ip_cidr|103.0.0.0/8
+```
+
+| action | Nghĩa |
+|---|---|
+| `direct` | Ra thẳng WAN, không qua proxy. Cho ngân hàng nội địa, dịch vụ chặn IP nước ngoài, hoặc thứ tốn băng thông proxy vô ích. |
+| `block` | Chặn hẳn tại router — quảng cáo, tracker. Mọi thiết bị đều được lợi, không cần cài gì trên máy. |
+| `proxy` | Ép qua proxy của SSID. Chỉ cần khi muốn khoét một lỗ hẹp bên trong luật `direct` rộng hơn. |
+
+`type` là `domain` (khớp chính xác), `domain_suffix` (kèm tên miền con),
+`domain_keyword` (chứa chuỗi), hoặc `ip_cidr`.
+
+**Thứ tự trong file có ý nghĩa.** Luật khớp đầu tiên thắng, và mọi luật ở đây
+được xét TRƯỚC khi traffic được gán vào proxy của SSID — nếu không thì không đích
+nào lấy ra khỏi proxy được. Vì vậy ngoại lệ hẹp phải đặt TRÊN luật rộng:
+
+```
+proxy|domain|api.example.com      # riêng host này vẫn qua proxy
+direct|domain_suffix|example.com  # còn lại đi thẳng
+```
+
+Luật `domain*` dựa vào sniff tên miền (TLS SNI, HTTP Host), nên với thứ chỉ có IP
+thì phải dùng `ip_cidr`. `apply.sh` và `preflight.sh` validate file này; bản thật
+nằm trong `.gitignore` vì nó lộ tên miền và dải IP mà triển khai này quan tâm.
+
+> Không có file = hành vi y như trước: mọi thứ qua proxy.
+
+Chưa biết nên cho đích nào đi thẳng? `scripts/traffic.sh --suggest` in ra ứng
+viên theo lượng byte thật đang chạy — xem mục 7.3.
+
 ### 7.1 Pool proxy — một SSID, nhiều proxy
 
 Mặc định mỗi Wi-Fi dùng đúng một proxy, khai trong `wifi-socks.conf`. Muốn một

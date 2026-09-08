@@ -12,6 +12,7 @@ Create multiple isolated SSIDs on a GL-MT6000 and route each SSID's IPv4 TCP/UDP
 - Only IPv4 is proxied. IPv6 services are disabled on managed SSIDs to prevent bypass.
 - SOCKS5 upstreams relay UDP through UDP ASSOCIATE by default (`SOCKS_UDP`), so QUIC, WebRTC media and game traffic leave through the proxy. HTTP upstreams are TCP-only and keep their QUIC block.
 - Port-53 DNS on managed SSIDs is hijacked into sing-box fake-IP; reverse mapping sends hostnames to the matching SOCKS upstream for remote resolution.
+- Per-destination routing (`config/routing-rules.conf`) can send a domain or IP range direct, block it at the router, or force it back through the proxy. Without the file every destination goes through the proxy, as before.
 - Changing SOCKS keeps Wi-Fi associated, but active sessions may be interrupted when sing-box restarts.
 
 ## Architecture

@@ -39,8 +39,13 @@ Confirm that all configured SSIDs exist, MAC addresses begin with `02:`, each br
    An SSID on an HTTP proxy always keeps the UDP 443 drop — HTTP proxies have
    no UDP transport.
 6. Verify that two clients on the same isolated SSID cannot reach each other.
-7. Verify that clients cannot reach router administration ports.
-8. Verify that no public IPv6 route is available.
+7. If `config/routing-rules.conf` is in use, confirm each action: a `direct`
+   destination must show the router's real address, a `block` destination must
+   fail to load, and anything else must still show the proxy. A narrow rule
+   that seems to do nothing is usually below the broad rule it meant to
+   override — first match wins.
+8. Verify that clients cannot reach router administration ports.
+9. Verify that no public IPv6 route is available.
 
 ## SOCKS change check
 

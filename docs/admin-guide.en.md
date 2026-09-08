@@ -120,6 +120,42 @@ sh agent/install-agent.sh
 
 Or rotate only the token with `sh scripts/rotate-token.sh`.
 
+## Routing rules
+
+Every destination goes through the proxy unless `config/routing-rules.conf`
+says otherwise (copy it from `.example`):
+
+```
+action|type|value
+direct|domain_suffix|vietcombank.com.vn
+block|domain_keyword|doubleclick
+direct|ip_cidr|103.0.0.0/8
+```
+
+`direct` leaves through the WAN — for a domestic bank, a service that rejects
+foreign addresses, or a download that would only waste proxy bandwidth. `block`
+rejects it at the router, so every device benefits without installing anything.
+`proxy` forces the SSID's proxy, and exists only to carve a narrow exception out
+of a broader `direct` rule.
+
+Match by `domain`, `domain_suffix`, `domain_keyword` or `ip_cidr`.
+
+File order is the semantic: first match wins, and every rule here is evaluated
+before any inbound is mapped to its outbound — otherwise nothing could be taken
+away from the proxy. So the narrow rule goes above the broad one:
+
+```
+proxy|domain|api.example.com      # this host keeps the proxy
+direct|domain_suffix|example.com  # the rest goes direct
+```
+
+`domain*` rules depend on sniffing a name from TLS SNI or an HTTP Host header;
+use `ip_cidr` for anything that only ever presents an IP. `apply.sh` and
+`preflight.sh` validate the file, and the real one is gitignored because it
+reveals which domains and ranges a deployment cares about.
+
+`scripts/traffic.sh --suggest` proposes candidates from live byte counts.
+
 ## Proxy pools
 
 By default each Wi-Fi uses one proxy, declared in `wifi-socks.conf`. To give one
