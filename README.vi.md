@@ -2,7 +2,7 @@
 
 **Ngôn ngữ:** Tiếng Việt | [English](README.md)
 
-Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua một SOCKS5 riêng**, MAC ngẫu nhiên, cách ly client, chặn WebRTC — điều khiển bằng **một file config duy nhất** + vài script.
+Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua một SOCKS5 riêng**, MAC ngẫu nhiên, cách ly client, chặn hoặc ngụy trang WebRTC — điều khiển bằng **một file config duy nhất** + vài script.
 
 ## ⚠️ Trạng thái & cảnh báo
 - **0.4.x — pre-production** (version hiện tại nằm ở [VERSION](VERSION) và trên header console). Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.

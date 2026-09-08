@@ -46,6 +46,14 @@ it reports degraded/down or says the route does not use `wwan`.
 - Add or edit an SSID, band, Wi-Fi password, SOCKS endpoint, isolation, WebRTC,
   and the **spoofed MAC vendor** (dropdown of common Wi-Fi brands; the first 3
   MAC bytes match the vendor, the rest are randomized).
+- **WebRTC** is a three-way picker, not a checkbox:
+  - *Keep as-is* — no WebRTC-specific rule.
+  - *Block WebRTC* — drops STUN/TURN, so nothing can leak an address. P2P video
+    calls stop working; that is the trade.
+  - *Bypass WebRTC* — forces STUN/TURN through the proxy, so the STUN server
+    answers with the proxy's address and the browser publishes that instead of
+    the router's real IP. Calls keep working. Needs an upstream proxy that
+    relays UDP (SOCKS5 UDP ASSOCIATE) and `SOCKS_UDP=1` on the router.
 - Right-click an SSID row for Edit, Change SOCKS, Random MAC, or Delete. A
   right-click first selects that row, so the action always targets the item
   under the pointer. The fixed edit panel keeps only Edit and Delete.

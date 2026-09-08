@@ -59,13 +59,23 @@ Mở https://dnsleaktest.com (Extended test).
 **Đạt khi:** DNS server hiện ra **không phải** ISP thật của bạn.
 > DNS của SSID proxy được hijack vào sing-box (fake-IP, remote resolve qua SOCKS). Kiểm tra nhanh trên client: `nslookup example.com` phải trả IP trong dải `198.18.0.0/15`. Nếu trả IP thật → rule hijack chưa nạp, chạy lại `sh scripts/apply.sh` và `sh scripts/verify.sh`.
 
-### B3. Không leak WebRTC (các WiFi bật webrtc=1)
-Mở https://browserleaks.com/webrtc
-**Đạt khi:** không lộ IP public thật qua WebRTC (mục "Public IP" trống hoặc = IP sock).
+### B3. WebRTC — kết quả tuỳ chế độ
+Mở https://browserleaks.com/webrtc. Đạt hay không phụ thuộc cột `webrtc` của SSID đó:
+
+| Chế độ | Đạt khi |
+|---|---|
+| `0` giữ nguyên | Không kiểm tra — không có rule nào được áp. |
+| `1` chặn | Không lộ IP public thật ("Public IP" trống). Gọi video P2P hỏng là đúng thiết kế. |
+| `2` bypass | "Public IP" hiện **IP của proxy**, không phải IP thật của router, và cuộc gọi vẫn chạy. |
+
 Kiểm tra ngược trên router:
 ```sh
-nft list chain inet sbproxy webrtc            # thấy rule drop STUN cho br-wIDX
+nft list chain inet sbproxy webrtc            # webrtc=1: thấy rule drop STUN cho br-wIDX
+nft list chain inet sbproxy w<IDX>            # webrtc=2: thấy rule tproxy STUN đứng TRÊN mọi rule return
 ```
+> `webrtc=2` cần proxy relay được UDP và `SOCKS_UDP=1`. Nếu proxy từ chối UDP
+> ASSOCIATE thì WebRTC không tìm được candidate — nhìn ra ngoài giống hệt
+> `webrtc=1`. Xem B7 để kiểm tra UDP trước.
 
 ### B4. Cách ly client trong cùng WiFi (isolate=1)
 Nối **2 thiết bị** vào cùng 1 WiFi (isolate=1). Từ máy 1 ping máy 2:
@@ -98,7 +108,7 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
 | 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
-| 5 | Chặn WebRTC | B3 | không lộ IP qua WebRTC |
+| 5 | WebRTC theo chế độ | B3 | `webrtc=1` không lộ IP · `webrtc=2` lộ IP của proxy, cuộc gọi vẫn chạy |
 | 6 | Cách ly client | B4 + B5 | không ping được nhau |
 
 ## Ghi chú

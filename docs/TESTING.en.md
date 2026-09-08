@@ -26,7 +26,12 @@ Confirm that all configured SSIDs exist, MAC addresses begin with `02:`, each br
 1. Confirm DHCP assigns the expected `192.168.X.0/24` address.
 2. Open `https://ipinfo.io/ip`; it must show the assigned SOCKS egress.
 3. Run a DNS leak test. `nslookup example.com` must return a fake-IP in `198.18.0.0/15`; a real IP means the DNS hijack rules are not loaded — rerun `sh scripts/apply.sh` and `sh scripts/verify.sh`.
-4. Run a WebRTC leak test when `webrtc=1`.
+4. Run a WebRTC leak test. What counts as a pass depends on the SSID's `webrtc`
+   mode: `1` must show no public IP at all (and P2P calls stop, by design), `2`
+   must show the **proxy's** address rather than the router's and calls must
+   still work, and `0` applies no rule so there is nothing to check. `webrtc=2`
+   needs `SOCKS_UDP=1` and a proxy that relays UDP ASSOCIATE; without one it
+   looks identical to `1` from the outside.
 5. Verify that two clients on the same isolated SSID cannot reach each other.
 6. Verify that clients cannot reach router administration ports.
 7. Verify that no public IPv6 route is available.
