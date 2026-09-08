@@ -65,8 +65,11 @@ param(
 . "$PSScriptRoot\_lib.ps1"
 Initialize-SbPc $PSBoundParameters
 
-# 1) Package router-side files; pc/ may contain local secrets and is excluded.
-$tmpTar = Join-Path $env:TEMP "sbproxy-update-$PID.tar.gz"
+# 1) Package router-side files; keep the transient archive in the ignored
+# .deploy directory so deploy artefacts never appear in git status/commits.
+$deployDir = Join-Path $RepoDir '.deploy'
+New-Item -ItemType Directory -Force $deployDir | Out-Null
+$tmpTar = Join-Path $deployDir "sbproxy-update-$PID.tar.gz"
 Log 'Dong goi repo...'
 tar -czf $tmpTar -C $RepoDir --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ `
   README.md VERSION agent config console docs etc scripts

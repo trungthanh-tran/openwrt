@@ -16,6 +16,7 @@ sbproxy-debug.log*
 
 # ==== Build output ====
 dist/
+.deploy/
 
 # ==== Node ====
 node_modules/

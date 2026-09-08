@@ -37,7 +37,9 @@ done
 sbpc_init
 
 # 1) Package router-side files; pc/ may contain local secrets and is excluded.
-TMP_TAR="${TMPDIR:-/tmp}/sbproxy-update-$$.tar.gz"
+DEPLOY_DIR="$REPO_DIR/.deploy"
+mkdir -p "$DEPLOY_DIR"
+TMP_TAR="$DEPLOY_DIR/sbproxy-update-$$.tar.gz"
 trap 'rm -f "$TMP_TAR"' EXIT
 log "Packaging repository..."
 tar czf "$TMP_TAR" -C "$REPO_DIR" --exclude=node_modules --exclude=dist --exclude=build --exclude=__pycache__ \
