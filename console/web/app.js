@@ -1,1711 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>sbproxy Console</title>
-<!-- Bootstrap is served offline by the router (/sbproxy/assets/); no CDN, no
-     Internet needed. The page's own stylesheet below loads after it on
-     purpose: it wins every property both of them set. -->
-<link rel="stylesheet" href="assets/bootstrap.min.css">
-<style>
-  :root {
-    --bg: #f5f5f7;
-    --bg-grad: none;
-    --panel: #ffffff;
-    --panel-2: #f5f5f7;
-    --glass: rgba(255,255,255,.78);
-    --border: #e5e5ea;
-    --border-strong: #d1d1d6;
-    --text: #1d1d1f;
-    --text-dim: #6e6e73;
-    --text-faint: #86868b;
-    --accent: #007aff;
-    --accent-2: #0a84ff;
-    --accent-soft: #e5f1ff;
-    --accent-ink: #0066cc;
-    --good: #248a3d;
-    --good-soft: #e4f6e8;
-    --warn: #b86e00;
-    --warn-soft: #fff1d6;
-    --crit: #d70015;
-    --crit-soft: #ffe5e7;
-    --ring: rgba(0,122,255,.28);
-    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --radius: 14px;
-    --radius-sm: 9px;
-    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
-    --shadow-pop: 0 24px 70px rgba(0,0,0,.22);
-  }
-  :root:not([data-theme="light"]) {}
-  @media (prefers-color-scheme: dark) {
-    :root[data-theme="dark"] {
-      --bg: #0a0f14;
-      --bg-grad: radial-gradient(1200px 500px at 50% -10%, rgba(45,212,191,.07), transparent 60%);
-      --panel: #131b23;
-      --panel-2: #19222c;
-      --glass: rgba(15,21,28,.72);
-      --border: #243039;
-      --border-strong: #35434f;
-      --text: #e7eef4;
-      --text-dim: #96a5b2;
-      --text-faint: #697886;
-      --accent: #2dd4bf;
-      --accent-2: #5eead4;
-      --accent-soft: #10352f;
-      --accent-ink: #7ff0e2;
-      --good: #38d178;
-      --good-soft: #0f311e;
-      --warn: #e0a53a;
-      --warn-soft: #32270e;
-      --crit: #f26c81;
-      --crit-soft: #36141b;
-      --ring: rgba(45,212,191,.4);
-      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.35);
-      --shadow-pop: 0 28px 80px rgba(0,0,0,.6);
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0a0f14;
-    --bg-grad: radial-gradient(1200px 500px at 50% -10%, rgba(45,212,191,.07), transparent 60%);
-    --panel: #131b23; --panel-2: #19222c; --glass: rgba(15,21,28,.72);
-    --border: #243039; --border-strong: #35434f;
-    --text: #e7eef4; --text-dim: #96a5b2; --text-faint: #697886;
-    --accent: #2dd4bf; --accent-2: #5eead4; --accent-soft: #10352f; --accent-ink: #7ff0e2;
-    --good: #38d178; --good-soft: #0f311e; --warn: #e0a53a; --warn-soft: #32270e;
-    --crit: #f26c81; --crit-soft: #36141b;
-    --ring: rgba(45,212,191,.4);
-    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.35);
-    --shadow-pop: 0 28px 80px rgba(0,0,0,.6);
-  }
+// app.js — the sbproxy web console. Every page under /sbproxy/ loads this one
+// file; it used to be pasted into each of them, which is how config.html and
+// its siblings drifted four releases behind control-panel.html.
 
-  * { box-sizing: border-box; }
-  /* .btn/.chip set their own display, which beats the UA's [hidden] rule. */
-  [hidden] { display: none !important; }
-  body {
-    margin: 0; background: var(--bg); background-image: var(--bg-grad); background-repeat: no-repeat;
-    color: var(--text);
-    font-family: var(--sans); font-size: 14px; line-height: 1.5;
-    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-  }
-  ::selection { background: var(--accent); color: #fff; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 20px 80px; }
-
-  /* Header */
-  header.top {
-    position: sticky; top: 0; z-index: 40;
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    margin: 0; padding: 12px 20px;
-    background: var(--glass); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
-    border-bottom: 1px solid var(--border);
-  }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo {
-    width: 40px; height: 40px; border-radius: 12px; flex: none;
-    background: linear-gradient(150deg, var(--accent-2), var(--accent));
-    display: grid; place-items: center; color: #fff; font-family: var(--mono); font-weight: 700; font-size: 18px;
-    box-shadow: 0 4px 14px var(--ring);
-  }
-  .brand h1 { margin: 0; font-size: 18px; letter-spacing: -.3px; font-weight: 700; }
-  .brand p { margin: 1px 0 0; font-size: 12.5px; color: var(--text-dim); }
-  .theme-btn {
-    border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
-    border-radius: 10px; padding: 7px 12px; cursor: pointer; font-size: 13px; font-family: var(--sans);
-    transition: border-color .15s, color .15s, box-shadow .15s, transform .1s;
-  }
-  .theme-btn:hover { border-color: var(--border-strong); color: var(--text); box-shadow: var(--shadow); }
-  .theme-btn:active { transform: translateY(1px); }
-  .language-select {
-    width: auto; min-width: 112px; padding: 7px 30px 7px 10px;
-    border: 1px solid var(--border); background: var(--panel); color: var(--text);
-  }
-
-  /* Stat bar */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
-  .stat {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px 15px; box-shadow: var(--shadow); position: relative; overflow: hidden;
-    transition: transform .15s ease, box-shadow .15s ease, border-color .15s;
-  }
-  .stat::before {
-    content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
-    background: linear-gradient(90deg, var(--accent), transparent 70%); opacity: .55;
-  }
-  .stat:hover { transform: translateY(-2px); border-color: var(--border-strong); }
-  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); margin-bottom: 6px; font-weight: 600; }
-  .stat .val { font-family: var(--mono); font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
-  .stat .val small { font-size: 13px; color: var(--text-dim); font-weight: 500; }
-  .meter { height: 6px; border-radius: 4px; background: var(--panel-2); margin-top: 9px; overflow: hidden; border: 1px solid var(--border); }
-  .meter > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .35s cubic-bezier(.4,0,.2,1); }
-  .meter.over > i { background: var(--crit); }
-  .stat.warnstate { border-color: var(--crit); }
-  .stat.warnstate::before { background: linear-gradient(90deg, var(--crit), transparent 70%); }
-
-  /* Toolbar */
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
-  .btn {
-    border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    border-radius: 10px; padding: 8px 14px; cursor: pointer; font-size: 13px; font-family: var(--sans);
-    display: inline-flex; align-items: center; gap: 7px;
-    transition: border-color .15s, background .15s, color .15s, box-shadow .15s, transform .1s;
-  }
-  .btn:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
-  .btn:active { transform: translateY(1px); }
-  .btn:focus-visible, .theme-btn:focus-visible, .iconbtn:focus-visible, .tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-  .btn.primary {
-    background: var(--accent); border-color: transparent;
-    color: #fff; font-weight: 600; box-shadow: 0 2px 10px var(--ring);
-  }
-  .btn.primary:hover { background: var(--accent-ink); box-shadow: 0 4px 16px var(--ring); }
-  .btn.ghost { background: transparent; }
-  .btn.danger:hover { border-color: var(--crit); color: var(--crit); }
-  .spacer { flex: 1; }
-
-  /* Table */
-  .tablecard { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-  .tablescroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 760px; }
-  thead th {
-    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
-    color: var(--text-faint); font-weight: 600; padding: 12px; border-bottom: 1px solid var(--border);
-    background: var(--panel-2); white-space: nowrap; position: sticky; top: 0; z-index: 1;
-  }
-  tbody td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr { transition: background .12s; }
-  tbody tr:hover { background: var(--panel-2); }
-  tbody tr.selected, .pool-select-row.selected { background: var(--accent-soft); }
-  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .ssid-name { font-weight: 600; }
-  .proxy-count { color: var(--app-muted, var(--text-dim)); font-size: 13px; }
-  .sub { color: var(--text-dim); font-size: 12px; }
-  .settings-page[hidden] { display: none !important; }
-  .settings-page { display: grid; gap: 14px; }
-  .settings-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
-  .settings-head h2 { margin: 0; font-size: 24px; letter-spacing: -.4px; }
-  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  .settings-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
-  .settings-card h3 { margin: 0 0 4px; font-size: 15px; }
-  .settings-card p { margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; }
-  .settings-value { min-height: 38px; padding: 9px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  #featurePage { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; }
-  #featurePage[hidden] { display: none !important; }
-  #featurePage > .modal.inline-feature {
-    position: static !important; inset: auto !important; z-index: auto !important;
-    width: 100% !important; max-width: none; height: auto; max-height: none;
-    overflow: visible; border-radius: var(--radius); box-shadow: var(--shadow);
-    transform: none !important; animation: none !important;
-  }
-  #featurePage > .modal.inline-feature.show { display: flex !important; }
-  #featurePage > .modal.inline-feature .form { max-height: none; overflow: visible; }
-  .section-toggle { display: flex; justify-content: flex-end; margin-top: 14px; }
-  #liveTools { display: none; }
-  #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
-  #topRouterTools { display: none; align-items: center; gap: 5px; }
-  #topRouterTools.on { display: inline-flex; }
-  #topRouterTools .theme-btn { padding: 6px 9px; font-size: 12px; }
-  @media (max-width: 720px) { .settings-grid { grid-template-columns: 1fr; } .settings-head { align-items: start; flex-direction: column; } }
-  .idxpill { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 2px 8px; }
-  .band { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 7px; border: 1px solid var(--border); }
-  .band.b2 { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
-  .band.b5 { color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
-  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
-  .chip.on { color: var(--good); background: var(--good-soft); border-color: transparent; }
-  .chip.on.warnhue { color: var(--warn); background: var(--warn-soft); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
-  .rowbtns { display: flex; gap: 5px; justify-content: flex-end; }
-  .iconbtn {
-    border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
-    border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 12px;
-    transition: border-color .15s, color .15s, box-shadow .15s, transform .1s;
-  }
-  .iconbtn:hover { border-color: var(--border-strong); color: var(--text); box-shadow: var(--shadow); }
-  .iconbtn:active { transform: translateY(1px); }
-  .iconbtn.del:hover { border-color: var(--crit); color: var(--crit); }
-  .empty { padding: 44px 20px; text-align: center; color: var(--text-dim); }
-  .empty b { color: var(--text); display: block; margin-bottom: 4px; }
-
-  /* Config output */
-  .out { margin-top: 22px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-  .out .tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); background: var(--panel-2); flex-wrap: wrap; }
-  .tab {
-    border: 1px solid transparent; background: transparent; color: var(--text-dim);
-    padding: 7px 13px; cursor: pointer; font-size: 13px; border-radius: 9px; font-family: var(--sans);
-    transition: background .15s, color .15s, box-shadow .15s;
-  }
-  .tab:hover { color: var(--text); }
-  .tab.active { background: var(--panel); color: var(--text); border-color: var(--border); font-weight: 600; box-shadow: var(--shadow); }
-  .out .head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
-  .out .head .fname { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); }
-  pre.code { margin: 0; padding: 0 16px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--text); white-space: pre; }
-  .hint { padding: 12px 16px; background: var(--panel-2); border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-dim); }
-  .hint code { font-family: var(--mono); background: var(--panel); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); color: var(--text); }
-
-  /* Modal */
-  .backdrop {
-    position: fixed; inset: 0; background: rgba(8,14,20,.5);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
-  }
-  .backdrop.show { display: flex; }
-  .modal {
-    background: var(--panel); border: 1px solid var(--border-strong); border-radius: 16px;
-    width: 100%; max-width: 520px; box-shadow: var(--shadow-pop); max-height: 90vh; overflow: hidden;
-    display: flex !important; flex-direction: column;
-    animation: modal-in .18s cubic-bezier(.2,.9,.3,1.2);
-  }
-  @keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
-  .modal h2 {
-    order: 0; flex: none; margin: 0; padding: 14px 20px; min-height: 50px;
-    font-size: 16px; border-bottom: 1px solid var(--border); letter-spacing: -.2px;
-    background: var(--panel-2);
-  }
-  .form { order: 2; min-height: 0; overflow-y: auto; padding: 18px 20px; display: grid; gap: 14px; }
-  .field { display: grid; gap: 5px; }
-  .field.two { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field.two > div { display: grid; gap: 5px; }
-  label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
-  label .req { color: var(--crit); }
-  input[type=text], input[type=password], input[type=number], select {
-    font-family: var(--sans); font-size: 13.5px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
-    background: var(--panel-2); color: var(--text); width: 100%;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  input.mono { font-family: var(--mono); }
-  input[type=file] {
-    font-family: var(--sans); font-size: 13px; color: var(--text-dim); width: 100%;
-    padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 9px; background: var(--panel-2);
-  }
-  input[type=file]::file-selector-button {
-    border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    border-radius: 8px; padding: 6px 11px; margin-right: 10px; cursor: pointer; font-family: var(--sans); font-size: 12.5px;
-  }
-  input:hover, select:hover { border-color: var(--border-strong); }
-  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
-  .toggles { display: flex; gap: 18px; }
-  .tg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
-  .tg input { width: 16px; height: 16px; accent-color: var(--accent); }
-  .modal .foot {
-    order: 1; flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 9px 12px;
-    border-bottom: 1px solid var(--border); background: var(--panel); flex-wrap: nowrap; overflow: hidden;
-  }
-  .modal .foot .btn { flex: 0 0 auto; white-space: nowrap; }
-  .modal .foot .folded-action { display: none !important; }
-  .modal .foot .action-overflow { min-width: 38px; justify-content: center; padding-inline: 10px; font-size: 18px; line-height: 1; }
-  .err { color: var(--crit); font-size: 12px; min-height: 0; }
-  .derived { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); }
-
-  .toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-size: 13px;
-    box-shadow: var(--shadow-pop); opacity: 0; transition: all .22s cubic-bezier(.2,.9,.3,1.1);
-    pointer-events: none; z-index: 60;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-  @media (max-width: 560px) { .toggles { flex-direction: column; gap: 10px; } .field.two { grid-template-columns: 1fr; } }
-
-  /* Live mode */
-  .hdr-actions { display: flex; gap: 8px; align-items: center; }
-  .live-badge { display: none; align-items: center; gap: 6px; font-size: 12px; font-family: var(--mono); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
-  .live-badge.on { display: inline-flex; color: var(--good); background: var(--good-soft); border-color: transparent; }
-  .live-badge.on .dot { animation: pulse 1.6s infinite; }
-  /* sing-box state: green when the proxy engine runs, loud red when it does not
-     — a silent sing-box means every proxied SSID has no Internet. */
-  .sbchip { cursor: pointer; font-family: var(--mono); }
-  .sbchip.ok { color: var(--good); background: var(--good-soft); border-color: transparent; }
-  .sbchip.down { color: #fff; background: var(--crit); border-color: transparent; font-weight: 700; animation: pulse 1.2s infinite; }
-  .stat.sb { cursor: pointer; }
-  .stat.sb .val { font-size: 18px; }
-  .stat.sb .btn { margin-top: 8px; padding: 6px 10px; font-size: 12.5px; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
-  #liveTools { display: flex; gap: 8px; }
-  /* health pill */
-  .hp { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
-  .hp.okp { color: var(--good); background: var(--good-soft); border-color: transparent; }
-  .hp.warnp { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
-  .hp.bad { color: var(--crit); background: var(--crit-soft); border-color: transparent; }
-  .hp.wait { color: var(--text-faint); }
-  /* assistant severity pills, same vocabulary as the health pills above */
-  .sev { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 11.5px; font-weight: 700;
-         padding: 2px 8px; border-radius: 20px; border: 1px solid transparent; white-space: nowrap; }
-  .sev.crit { color: var(--crit); background: var(--crit-soft); }
-  .sev.warn { color: var(--warn); background: var(--warn-soft); }
-  .sev.info { color: var(--text-dim); background: var(--panel-2); border-color: var(--border); }
-  .findrow td { vertical-align: top; }
-  .findrow details { margin-top: 6px; }
-  .findrow summary { cursor: pointer; color: var(--text-dim); font-size: 12px; }
-  .iconbtn.zap { color: var(--accent-ink); }
-  .iconbtn.zap:hover { border-color: var(--accent); }
-  /* Applying takes seconds on the router; a toast that has already faded is
-     not an answer to "is it still working?" */
-  .busychip { display: none; align-items: center; gap: 7px; font-size: 12px; font-weight: 600;
-              padding: 4px 10px; border-radius: 20px; border: 1px solid var(--accent);
-              color: var(--accent-ink); background: var(--accent-soft, var(--panel-2)); }
-  body.busy .busychip { display: inline-flex; }
-  .busychip .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor;
-                    border-top-color: transparent; animation: spin .8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  /* While the router is mid-apply, a second write would race the first. */
-  body.busy .side-nav .btn, body.busy .btn.primary, body.busy .btn.danger { pointer-events: none; opacity: .55; }
-  body.busy { cursor: progress; }
-  .conn-status { font-size: 12.5px; padding: 8px 11px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); }
-  .conn-status.ok { color: var(--good); }
-  .conn-status.bad { color: var(--crit); }
-  .logbox { font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; max-height: 220px; overflow: auto; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: var(--text-dim); }
-  .healthwrap { display: inline-flex; align-items: center; gap: 8px; }
-  svg.spark { display: block; overflow: visible; }
-  .rblist { display: grid; gap: 8px; max-height: 300px; overflow: auto; }
-  .rbitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
-  .rbitem .nm { font-family: var(--mono); font-size: 12.5px; }
-  .rbitem .nm small { color: var(--text-faint); display: block; font-size: 11px; }
-  /* Device filters: one wrapping row of controls above the table. */
-  .device-page[hidden] { display: none !important; }
-  #devicesPage.device-page {
-    width: 100%; display: flex; flex-direction: column; animation: none;
-  }
-  #devicesPage > h2 {
-    order: 0; margin: 0 0 12px; padding: 0; border: 0; background: transparent;
-    font-size: 24px; line-height: 1.25; letter-spacing: -.4px;
-  }
-  #devicesPage > .foot {
-    order: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 0 0 12px;
-    border: 0; background: transparent; flex-wrap: nowrap; overflow: hidden;
-  }
-  #devicesPage > .foot .btn { flex: 0 0 auto; white-space: nowrap; }
-  #devicesPage > .foot .folded-action { display: none !important; }
-  #devicesPage > .foot .action-overflow { min-width: 38px; justify-content: center; padding-inline: 10px; font-size: 18px; line-height: 1; }
-  #devicesPage > .form { order: 2; overflow: visible; padding: 0; }
-  #devicesPage .tablescroll {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
-  }
-  .filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .filterbar input[type=search] { flex: 1 1 200px; min-width: 160px; }
-  .filterbar select { width: auto; min-width: 120px; }
-  .input-action-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
-  .input-action-row textarea { width: 100%; min-width: 0; }
-  .input-action-row > .btn { min-height: 44px; white-space: nowrap; }
-  .pool-input-stack { display: grid; gap: 10px; }
-  .pool-input-stack textarea { width: 100%; min-height: 150px; }
-  .pool-input-stack > .btn { justify-self: end; min-width: 156px; min-height: 44px; }
-  .pool-input-help { color: var(--app-muted, var(--text-dim)); font-size: 13px; line-height: 1.5; opacity: .72; }
-  .pool-input-help span { display: block; }
-  .btn.loading { cursor: wait; opacity: .78; }
-  .btn.loading::before { content: ""; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: button-spin .7s linear infinite; }
-  @keyframes button-spin { to { transform: rotate(360deg); } }
-  .select-cell { width: 38px; text-align: center; }
-  .select-cell input, .pool-select-row input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
-  .pool-list { padding: 0; white-space: normal; }
-  .pool-select-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; border-bottom: 1px solid var(--border); }
-  .pool-select-row:last-child { border-bottom: 0; }
-  .pool-select-row .mono { min-width: 0; overflow-wrap: anywhere; }
-  .context-menu {
-    position: fixed; z-index: 100; min-width: 190px; padding: 4px;
-    background: var(--panel); border: 1px solid var(--border-strong); border-radius: 8px;
-    box-shadow: 0 12px 34px rgba(0,0,0,.22);
-    transform-origin: top left; animation: context-in .1s ease-out;
-  }
-  .context-menu button {
-    display: block; width: 100%; border: 0; border-radius: 4px; padding: 7px 10px;
-    background: transparent; color: var(--text); text-align: left; font: 13px var(--sans); cursor: pointer;
-  }
-  .context-menu button:hover, .context-menu button:focus { background: var(--panel-2); outline: none; }
-  .context-menu button.danger { color: var(--crit); }
-  @keyframes context-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
-  /* A device that is not associated right now stays readable but recedes. */
-  tbody tr.dim td { opacity: .62; }
-  tbody tr.dim:hover td { opacity: 1; }
-  thead th[data-sort] { cursor: pointer; user-select: none; }
-  thead th[data-sort]:hover { color: var(--text); }
-
-  /* ---- AdminLTE-style shell: fixed left sidebar + top navbar + content.
-     The grid/utility base comes from the offline Bootstrap loaded above. ---- */
-  .layout { display: flex; min-height: 100vh; align-items: stretch; }
-  .sidebar {
-    width: 236px; flex: none; display: flex; flex-direction: column;
-    background: var(--panel); border-right: 1px solid var(--border);
-    padding: 14px 10px 10px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
-  }
-  .side-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 12px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
-  .side-brand b { font-size: 15px; letter-spacing: -.2px; display: block; }
-  .side-brand small { display: block; color: var(--text-dim); font-size: 11px; }
-  .side-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-faint); font-weight: 700; padding: 12px 10px 4px; }
-  .side-nav { display: flex; flex-direction: column; gap: 2px; }
-  .side-nav .btn {
-    width: 100%; justify-content: flex-start; text-align: left;
-    border-color: transparent; background: transparent; box-shadow: none; padding: 8px 10px;
-  }
-  .side-nav .btn:hover { background: var(--panel-2); border-color: transparent; box-shadow: none; }
-  .side-nav .btn.page-active, .side-nav .btn.action-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
-  .side-nav .btn.danger:hover { color: var(--crit); }
-  .side-nav .btn.primary { background: var(--accent); color: #fff; }
-  .nav-block { padding: 0 0 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
-  .nav-block:last-child { border-bottom: 0; }
-  .content-block { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; }
-  .content-block > .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
-  .block-head h2 { margin: 0; font-size: 16px; letter-spacing: -.2px; }
-  .block-head p { margin: 2px 0 0; color: var(--text-dim); font-size: 12px; }
-  .block-body { padding: 14px; }
-  .content-block .stats { margin: 0; }
-  .content-block .tablecard { border: 0; border-radius: 0; box-shadow: none; }
-  .content-block .toolbar { margin: 0 0 12px; }
-  .content-block .section-toggle { margin: 0; padding-top: 12px; border-top: 1px solid var(--border); }
-  .content-block .out { margin: 12px 0 0; box-shadow: none; }
-  .side-foot { margin-top: auto; padding: 12px 10px 4px; color: var(--text-faint); font-size: 11px; border-top: 1px solid var(--border); }
-  .main { flex: 1 1 auto; min-width: 0; }
-  #liveTools { display: none; flex-direction: column; gap: 2px; }
-  #liveTools.on { display: flex; flex-direction: column; gap: 2px; }
-  #menuBtn { display: none; font-size: 15px; }
-  @media (max-width: 920px) {
-    #menuBtn { display: inline-block; }
-    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; height: auto; z-index: 70;
-               transform: translateX(-110%); transition: transform .18s ease; box-shadow: var(--shadow-pop); }
-    .layout.side-open .sidebar { transform: none; }
-  }
-
-  /* Bootstrap defines .btn/.modal/.toast too; these keep its component rules
-     from bleeding into this page's widgets of the same name. */
-  .backdrop > .modal { display: block; position: relative; height: auto; z-index: auto; overflow-y: auto; }
-  #toast { width: auto; border: 0; }
-  .btn {
-    --bs-btn-hover-color: var(--text); --bs-btn-hover-bg: transparent; --bs-btn-hover-border-color: var(--border-strong);
-    --bs-btn-active-color: var(--text); --bs-btn-active-bg: transparent; --bs-btn-active-border-color: var(--border-strong);
-    --bs-btn-focus-box-shadow: 0 0 0 3px var(--ring);
-  }
-  .btn.primary { --bs-btn-hover-color: #04231f; --bs-btn-active-color: #04231f; }
-  /* Proxy endpoints are managed in the batch pool dialog, not one-by-one. */
-  #backdrop .field:has(#f_proxy_type), #backdrop .field:has(#f_host),
-  #backdrop .field:has(#f_user), #backdrop #probeBtn { display: none; }
-  button[data-zap] { display: none; }
-
-  /* Compact phone layout. Tables remain horizontally scrollable so proxy,
-     device and health fields stay readable instead of being squeezed. */
-  @media (max-width: 600px) {
-    body { font-size: 13px; overflow-x: hidden; }
-    header.top { padding: 8px 10px; gap: 8px; align-items: flex-start; }
-    .brand { min-width: 0; gap: 8px; }
-    .logo { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; }
-    .brand h1 { font-size: 16px; white-space: nowrap; }
-    .brand p { display: none; }
-    .hdr-actions { flex: 0 0 auto; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
-    #topRouterTools { flex-wrap: wrap; justify-content: flex-end; }
-    #topRouterTools .theme-btn { padding: 5px 7px; font-size: 11px; }
-    .hdr-actions .chip, .live-badge { display: none !important; }
-    .language-select, .theme-btn { min-width: 0; width: auto; padding: 6px 8px; font-size: 11px; }
-    #connBtn { max-width: 42px; overflow: hidden; white-space: nowrap; font-size: 0; }
-    #connBtn::before { content: "🔌"; display: inline-block; font-size: 15px; line-height: 1; }
-    .wrap { padding: 12px 8px 48px; }
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 10px; }
-    .stat { padding: 10px; border-radius: 10px; }
-    .stat .label { font-size: 9px; }
-    .stat .val { font-size: 18px; }
-    .tablecard, .out { border-radius: 10px; }
-    .tablescroll { -webkit-overflow-scrolling: touch; }
-    table { min-width: 720px; }
-    thead th { padding: 9px 8px; font-size: 10px; }
-    tbody td { padding: 9px 8px; }
-    .out .tabs { overflow-x: auto; flex-wrap: nowrap; }
-    .tab { flex: 0 0 auto; padding: 7px 10px; }
-    .out .head { padding: 8px 10px; gap: 8px; }
-    pre.code { max-height: 260px; padding: 0 10px 10px; font-size: 11px; }
-    .backdrop { padding: 8px; align-items: flex-end; }
-    .modal { max-height: 94vh; border-radius: 14px 14px 8px 8px; }
-    .modal h2 { padding: 12px 14px; min-height: 46px; font-size: 15px; }
-    .form { padding: 13px 14px; gap: 10px; }
-    .field.two { grid-template-columns: 1fr; gap: 10px; }
-    .modal .foot { padding: 8px 10px; }
-    .modal .foot .btn { min-height: 38px; }
-    .rowbtns { flex-wrap: wrap; }
-    #liveTools { width: 100%; }
-    .side-nav .btn { min-height: 38px; }
-    .logbox { max-height: 180px; overflow-wrap: anywhere; }
-    #devicesPage { max-width: 100%; }
-    #devicesPage .tablescroll { margin: 0 -2px; }
-    #devSearch { min-height: 40px; }
-    .context-menu { min-width: 200px; }
-  }
-
-  @media (min-width: 601px) and (max-width: 920px) {
-    .wrap { padding-left: 14px; padding-right: 14px; }
-    header.top { padding-left: 14px; padding-right: 14px; }
-  }
-  /* ---- Plain settings skin -------------------------------------------------
-     A router settings console, not a dashboard: one dark surface, a text-only
-     sidebar whose active row is filled, form rows that read label-left /
-     control-right, and a single green Save against a plain Cancel. Everything
-     here is presentation -- ids, structure and behaviour are untouched -- and
-     it sits last so it wins over the rules above without editing each of them.
-
-     Dark is the default now, which is why the light palette moves under an
-     explicit [data-theme="light"]: the toggle still works both ways. The
-     [data-theme="dark"] selector is repeated here so an explicit choice of
-     dark lands on this palette rather than on the older one above. */
-  :root, :root[data-theme="dark"] {
-    --bg: #10161f; --bg-grad: none;
-    --panel: #172130; --panel-2: #1d2937; --glass: rgba(16,22,31,.86);
-    --border: #26313f; --border-strong: #364354;
-    --text: #e8eef5; --text-dim: #9fb0c3; --text-faint: #7d8ea3;
-    --accent: #2c7be5; --accent-2: #4d95f0; --accent-soft: #17304f; --accent-ink: #8ec1ff;
-    --good: #46b26a; --good-soft: #16301f; --warn: #d99b32; --warn-soft: #33270f;
-    --crit: #e5636f; --crit-soft: #351a1e;
-    --ring: rgba(44,123,229,.45);
-    --radius: 6px; --radius-sm: 4px;
-    --shadow: none; --shadow-pop: 0 18px 50px rgba(0,0,0,.5);
-  }
-  :root[data-theme="light"] {
-    /* The same page in daylight: a white sheet to read, a grey frame around
-       it, and the one blue that means "this is where you are". */
-    --bg: #eef1f5; --bg-grad: none;
-    --panel: #ffffff; --panel-2: #f4f6f9; --glass: #ffffff;
-    --border: #dde2e9; --border-strong: #c2c9d4;
-    --text: #1f2733; --text-dim: #5b6672; --text-faint: #7c8794;
-    --accent: #2c7be5; --accent-2: #1c66c9; --accent-soft: #e6f0fd; --accent-ink: #1a5fb4;
-    --good: #2f9e56; --good-soft: #e6f5ea; --warn: #b5771a; --warn-soft: #fdf1dd;
-    --crit: #cf3040; --crit-soft: #fce9eb;
-    --ring: rgba(44,123,229,.28);
-    --shadow: none;
-  }
-  body { background: var(--bg); }
-
-  /* Nothing here is decoration: no glass, no gradient bars, no lift on hover.
-     A settings page should look the same whether or not the pointer is over
-     it, so what moves means something. */
-  header.top, .backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .stat { padding: 13px 14px; transition: border-color .15s; }
-  .stat::before { display: none; }
-  .stat:hover { transform: none; border-color: var(--border-strong); }
-  .stat .val { font-size: 21px; letter-spacing: -.2px; }
-  .meter > i { background: var(--accent); }
-  .modal { animation: none; }
-  .modal h2 { background: var(--panel); font-size: 15px; }
-  /* One pill shape for every state chip: border, no fill, colour says the rest. */
-  .chip, .live-badge, .hp, .sev, .busychip { border-radius: var(--radius-sm); font-weight: 500; }
-  .sbchip.down { animation: none; }
-  .tab { border-radius: var(--radius-sm); }
-  .tab.active { box-shadow: none; }
-
-  /* Sidebar: rows of text, one of them filled. */
-  .sidebar { width: 224px; background: var(--panel); border-right: 1px solid var(--border); padding: 0 0 10px; }
-  .side-brand { padding: 16px 18px 14px; margin: 0; }
-  .side-group { padding: 16px 18px 6px; font-size: 10px; }
-  .side-nav { gap: 0; }
-  .side-nav .btn {
-    border-radius: 0; padding: 10px 18px; font-size: 13.5px; font-weight: 500;
-    color: var(--text-dim); border-left: 3px solid transparent;
-  }
-  .side-nav .btn:hover { background: var(--panel-2); color: var(--text); }
-  .side-nav .btn.page-active, .side-nav .btn.action-active {
-    background: var(--accent); color: #fff; border-left-color: var(--accent-2); font-weight: 600;
-  }
-  .side-foot { padding: 12px 18px; }
-
-  /* One flat header, no glass. */
-  header.top { background: var(--panel); border-bottom: 1px solid var(--border); backdrop-filter: none; }
-
-  /* Panels and tables: borders instead of cards. */
-  .tablecard, .stat, .content-block, .modal { box-shadow: none; }
-  .tablecard { border-radius: var(--radius); }
-  thead th { background: transparent; font-size: 10.5px; }
-
-  /* Buttons: one green Save, everything else quiet. */
-  .btn { border-radius: var(--radius-sm); font-weight: 500; }
-  .btn.primary { background: var(--good); color: #fff; box-shadow: none; }
-  .btn.primary:hover { background: #3d9c5c; box-shadow: none; }
-  .btn.ghost { border-color: transparent; color: var(--text-dim); }
-  .btn.ghost:hover { border-color: var(--border-strong); color: var(--text); }
-
-  /* Forms: the label sits beside its control, the way a settings page reads. */
-  input[type=text], input[type=password], input[type=number], select, input[type=search] {
-    border-radius: var(--radius-sm); background: var(--panel-2);
-  }
-  @media (min-width: 760px) {
-    .form .field:not(.two) {
-      grid-template-columns: 180px minmax(0, 1fr);
-      align-items: center; gap: 6px 18px;
-    }
-    .form .field:not(.two) > label { grid-column: 1; margin: 0; font-size: 13px; color: var(--text-dim); }
-    .form .field:not(.two) > :not(label) { grid-column: 2; }
-    /* A hint under a control lines up with the control, not with the label. */
-    .form .field:not(.two) > .sub, .form .field:not(.two) > .derived, .form .field:not(.two) > .err { grid-column: 2; }
-  }
-
-  /* Before authentication show only a focused login card. */
-  body:not(.authenticated) { background: #eef2f7; min-height: 100dvh; overflow: hidden; }
-  body:not(.authenticated) .layout { display: none; }
-  /* The html-level gate is intentionally stricter than the body class. It is
-     active before the bundle runs and while a saved token is being verified. */
-  html:not([data-authenticated="true"]) .layout { display: none !important; }
-  html:not([data-authenticated="true"]) .backdrop:not(#connBackdrop) { display: none !important; }
-  html:not([data-authenticated="true"]) #connBackdrop { display: flex !important; }
-  body:not(.authenticated) .backdrop:not(#connBackdrop) { display: none !important; }
-  body:not(.authenticated) #connBackdrop { display: flex !important; background: linear-gradient(135deg, #eef3f8, #dfe8f2); }
-  body:not(.authenticated) #connBackdrop > .modal { width: min(440px, calc(100vw - 32px)); max-width: 440px; max-height: calc(100dvh - 32px); border: 0; border-radius: 22px; box-shadow: 0 24px 70px rgba(31, 52, 73, .18); }
-  body:not(.authenticated) #connBackdrop .form { padding: 22px 26px 18px; gap: 16px; }
-  body:not(.authenticated) #connBackdrop .foot { padding: 14px 26px 24px; border-top: 0; }
-  body:not(.authenticated) #connBackdrop .modal > h2 { padding: 0 26px 8px; border: 0; background: transparent; font-size: 21px; }
-  .login-intro { display: grid; gap: 4px; padding: 2px 0 4px; }
-  .login-logo { color: var(--accent-ink); font: 700 27px var(--mono); letter-spacing: -1px; }
-  .login-sub { color: var(--text-dim); font-size: 13px; }
-  /* Focused login surface: title, form, then one clear action. */
-  body:not(.authenticated) #connBackdrop .modal > .form { order: 1; }
-  body:not(.authenticated) #connBackdrop .modal > .foot { order: 2; justify-content: stretch; }
-  body:not(.authenticated) #connBackdrop .modal > .foot #connectBtn { width: 100%; min-height: 44px; font-size: 14px; }
-  body:not(.authenticated) #connBackdrop .modal > .foot .action-overflow { display: none !important; }
-  body:not(.authenticated) #connBackdrop .modal > .foot #logoutBtn,
-  body:not(.authenticated) #connBackdrop .modal > .foot #disconnectBtn,
-  body:not(.authenticated) #connBackdrop .modal > .foot #connCancel { display: none !important; }
-  body:not(.authenticated) #connBackdrop .modal > h2 { order: 0; }
-  body:not(.authenticated) #connBackdrop { padding: 28px; background: radial-gradient(circle at 50% 0%, #ffffff 0, #edf3f9 55%, #dce7f2 100%); }
-  body:not(.authenticated) #connBackdrop > .modal { overflow: hidden; }
-  body:not(.authenticated) #connBackdrop .modal > h2 { padding-top: 26px; font-weight: 700; color: #142238; }
-  body:not(.authenticated) #connBackdrop .login-logo { font-size: 32px; color: #1769d1; }
-  body:not(.authenticated) #connBackdrop .login-sub { letter-spacing: .01em; }
-  body:not(.authenticated) #connBackdrop .conn-status { background: #f4f7fb; border-color: #dce5ef; }
-  body:not(.authenticated) #connBackdrop .modal > .foot { background: #fff; border-top: 1px solid #edf1f5; }
-  body:not(.authenticated) #connBackdrop #connectBtn { background: #1d9a58; border-color: #1d9a58; box-shadow: 0 8px 18px rgba(29,154,88,.22); }
-  body:not(.authenticated) #connBackdrop #connectBtn:hover { background: #168149; border-color: #168149; transform: translateY(-1px); }
-  body:not(.authenticated) #connBackdrop #connectBtn:active { transform: translateY(0); }
-  /* Login is a dedicated surface, not a generic modal. */
-  body:not(.authenticated) #connBackdrop .modal > .foot { order: 3; justify-content: stretch; }
-  body:not(.authenticated) #connBackdrop .modal > .foot #connectBtn { width: 100%; min-height: 44px; font-size: 14px; }
-  body:not(.authenticated) #connBackdrop .modal > .foot #logoutBtn,
-  body:not(.authenticated) #connBackdrop .modal > .foot #disconnectBtn,
-  body:not(.authenticated) #connBackdrop .modal > .foot #connCancel { display: none !important; }
-  body:not(.authenticated) #connBackdrop .modal > .form { order: 1; }
-  body:not(.authenticated) #connBackdrop .modal > h2 { order: 0; }
-  body:not(.authenticated) #connBackdrop .login-intro { margin-top: -4px; }
-  body:not(.authenticated) #connBackdrop input { min-height: 42px; }
-  body:not(.authenticated) #connBackdrop details { border-top: 1px solid var(--border); padding-top: 12px; }
-  @media (max-width: 560px) {
-    body:not(.authenticated) #connBackdrop { padding: 16px; }
-    body:not(.authenticated) #connBackdrop > .modal { width: 100%; border-radius: 18px; }
-    body:not(.authenticated) #connBackdrop .modal > h2 { padding-inline: 20px; font-size: 19px; }
-    body:not(.authenticated) #connBackdrop .form { padding: 18px 20px 14px; }
-    body:not(.authenticated) #connBackdrop .foot { padding: 12px 20px 20px; }
-    body:not(.authenticated) #connBackdrop .field.two { grid-template-columns: 1fr; }
-    body:not(.authenticated) #connBackdrop .foot #connCancel,
-    body:not(.authenticated) #connBackdrop .foot #disconnectBtn,
-    body:not(.authenticated) #connBackdrop .foot #logoutBtn { display: none; }
-  }
-
-  /* Final application skin: calm workspace, strong navigation hierarchy and
-     one obvious action per surface. This applies to every split HTML page. */
-  :root, :root[data-theme="dark"] {
-    --app-bg: #0b1220; --app-sidebar: #111b2b; --app-sidebar-hover: #1b2a40;
-    --app-sidebar-active: #1e3854; --app-sidebar-line: #263651;
-    --app-surface: #121d2e; --app-surface-2: #18263a; --app-border: #26364b;
-    --app-heading: #f4f7fb; --app-muted: #9aabc0; --app-shadow: 0 12px 32px rgba(0,0,0,.22);
-  }
-  :root[data-theme="light"] {
-    --app-bg: #f4f7fb; --app-sidebar: #111b2b; --app-sidebar-hover: #1b2a40;
-    --app-sidebar-active: #1e3854; --app-sidebar-line: #263651;
-    --app-surface: #fff; --app-surface-2: #f8fafc; --app-border: #e1e8f0;
-    --app-heading: #172033; --app-muted: #718096; --app-shadow: 0 10px 30px rgba(27,48,75,.06);
-  }
-  body.authenticated { background: var(--app-bg); color: var(--app-heading); }
-  body.authenticated .layout { min-height: 100dvh; }
-  body.authenticated .sidebar {
-    width: 248px; background: var(--app-sidebar); border-right: 0; padding: 0 12px 14px;
-    color: #dbe6f4; box-shadow: 10px 0 28px rgba(15, 29, 49, .08);
-  }
-  body.authenticated .side-brand { padding: 22px 14px 20px; margin-bottom: 10px; border-color: var(--app-sidebar-line); }
-  body.authenticated .side-brand b { color: #fff; font-size: 17px; }
-  body.authenticated .side-brand small { color: #91a4be; }
-  body.authenticated .side-brand .logo { background: #2b8a68; color: #fff; border-radius: 10px; }
-  body.authenticated .side-group { color: #7186a4; padding: 17px 12px 7px; }
-  body.authenticated .nav-block { border-color: var(--app-sidebar-line); }
-  body.authenticated .side-nav .btn {
-    border: 0; border-left: 3px solid transparent; border-radius: 10px;
-    color: #aebed2; margin: 2px 0; padding: 11px 12px; font-weight: 500;
-  }
-  body.authenticated .side-nav .btn:hover { color: #fff; background: var(--app-sidebar-hover); }
-  body.authenticated .side-nav .btn.page-active,
-  body.authenticated .side-nav .btn.action-active {
-    color: #fff; background: var(--app-sidebar-active); border-left-color: #55c49a; font-weight: 700;
-  }
-  body.authenticated #configBtn.btn.primary:not(.page-active) {
-    background: transparent; color: #aebed2; box-shadow: none;
-  }
-  body.authenticated .side-nav .btn.primary { background: #2b8a68; color: #fff; }
-  body.authenticated .side-nav .btn.primary:hover { background: #339b78; }
-  body.authenticated .side-foot { color: #7186a4; border-color: var(--app-sidebar-line); }
-  body.authenticated .main { background: var(--app-bg); }
-  body.authenticated header.top { background: var(--app-surface); border-bottom: 1px solid var(--app-border); padding: 17px 30px; }
-  body.authenticated .brand h1 { color: var(--app-heading); font-size: 20px; }
-  body.authenticated .brand p { color: var(--app-muted); }
-  body.authenticated .wrap { max-width: 1480px; padding: 30px clamp(18px, 3vw, 44px) 64px; }
-  body.authenticated .content-block,
-  body.authenticated .tablecard,
-  body.authenticated .stat,
-  body.authenticated .settings-card,
-  body.authenticated .out {
-    background: var(--app-surface); border-color: var(--app-border); border-radius: 16px;
-    box-shadow: var(--app-shadow);
-  }
-  body.authenticated .content-block > .block-head { background: var(--app-surface); padding: 20px 22px; border-color: var(--app-border); }
-  body.authenticated .block-head h2 { color: var(--app-heading); font-size: 18px; }
-  body.authenticated .block-head p { color: var(--app-muted); }
-  body.authenticated .block-body { padding: 20px 22px; }
-  body.authenticated .stat { padding: 18px; }
-  body.authenticated .settings-page { max-width: 1480px; min-height: calc(100dvh - 150px); align-content: start; }
-  body.authenticated .settings-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 4px 0 22px; }
-  body.authenticated .settings-head h2 { margin: 0; color: var(--app-heading); font-size: clamp(25px, 3vw, 34px); letter-spacing: -.9px; }
-  body.authenticated .settings-head .sub { margin-top: 5px; color: var(--app-muted); font-size: 13px; }
-  body.authenticated .settings-head::before { display: none; }
-  body.authenticated .settings-head h2::before { content: "ROUTER WORKSPACE"; display: block; margin-bottom: 8px; color: #2b8a68; font: 700 10px var(--mono); letter-spacing: .14em; }
-  body.authenticated .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; align-content: start; }
-  body.authenticated .settings-card { min-height: 0; display: flex; flex-direction: column; padding: 22px; }
-  body.authenticated .settings-card h3 { color: var(--app-heading); font-size: 17px; }
-  body.authenticated .settings-card p { color: var(--app-muted); line-height: 1.55; }
-  body.authenticated .settings-card .settings-value { margin-top: 8px; padding: 13px 14px; background: var(--app-surface-2); border: 1px solid var(--app-border); border-radius: 10px; color: var(--app-heading); font-family: var(--mono); }
-  body.authenticated .settings-card .settings-actions { margin-top: 16px; padding-top: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-  body.authenticated .settings-card.page-focus { border-color: #2b8a68; box-shadow: 0 0 0 3px rgba(43,138,104,.12), var(--app-shadow); }
-  body.authenticated .settings-card.page-focus::before { content: "ACTIVE"; align-self: flex-end; margin-bottom: -4px; color: #2b8a68; font: 700 10px var(--mono); letter-spacing: .1em; }
-  body.authenticated .page-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin: 4px 0 24px; }
-  body.authenticated .page-eyebrow { display: block; margin-bottom: 8px; color: #2b8a68; font: 700 10px var(--mono); letter-spacing: .14em; }
-  body.authenticated .page-hero h2 { margin: 0; color: var(--app-heading); font-size: clamp(26px, 3vw, 36px); letter-spacing: -.9px; }
-  body.authenticated .page-hero p { margin: 5px 0 0; color: var(--app-muted); font-size: 13px; }
-  body.authenticated .page-hero-badge { padding: 8px 11px; color: #2b8a68; border: 1px solid rgba(43,138,104,.35); border-radius: 9px; background: rgba(43,138,104,.08); font: 700 11px var(--mono); white-space: nowrap; }
-  body.authenticated .devices-entry .block-head { align-items: center; }
-  body.authenticated .devices-entry-body { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 15px; padding: 20px 22px; }
-  body.authenticated .devices-entry-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: rgba(43,138,104,.12); color: #2b8a68; font-size: 27px; }
-  body.authenticated .devices-entry-body strong { color: var(--app-heading); font-size: 14px; }
-  body.authenticated .devices-entry-body p { margin: 3px 0 0; color: var(--app-muted); font-size: 12px; }
-  body.authenticated .devices-entry-body .btn { white-space: nowrap; }
-  body.authenticated .settings-card.is-collapsed { min-height: 112px; cursor: pointer; }
-  body.authenticated .settings-card.is-collapsed .settings-value,
-  body.authenticated .settings-card.is-collapsed .settings-actions,
-  body.authenticated .settings-card.is-collapsed select { display: none; }
-  body.authenticated .settings-card.is-collapsed h3::after { content: "＋"; float: right; color: var(--app-muted); font: 400 18px var(--sans); }
-  body.authenticated .settings-card:not(.is-collapsed) h3::after { content: "−"; float: right; color: #2b8a68; font: 400 18px var(--sans); }
-  body.authenticated .analytics-page { display: grid; gap: 22px; align-content: start; min-height: calc(100dvh - 150px); }
-  body.authenticated .analytics-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
-  body.authenticated .analytics-card { min-height: 220px; padding: 22px; border: 1px solid var(--app-border); border-radius: 16px; background: var(--app-surface); box-shadow: var(--app-shadow); }
-  body.authenticated .analytics-card-head { display: flex; justify-content: space-between; align-items: center; color: var(--app-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-  body.authenticated .analytics-card > strong { display: block; margin-top: 24px; color: var(--app-heading); font: 700 39px var(--mono); letter-spacing: -2px; }
-  body.authenticated .analytics-card > p { margin: 4px 0 22px; color: var(--app-muted); font-size: 12px; }
-  body.authenticated .analytics-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: rgba(43,138,104,.13); color: #2b8a68; font-size: 19px; }
-  body.authenticated .state-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--app-muted); box-shadow: 0 0 0 5px rgba(154,171,192,.1); }
-  body.authenticated .state-dot.ok { background: #45c895; box-shadow: 0 0 0 5px rgba(69,200,149,.13); }
-  body.authenticated .state-dot.bad { background: #e56b78; box-shadow: 0 0 0 5px rgba(229,107,120,.13); }
-  body.authenticated .analytics-split { display: flex; gap: 20px; color: var(--app-muted); font: 11px var(--mono); }
-  body.authenticated .analytics-split b { color: var(--app-heading); font-size: 15px; }
-  body.authenticated .analytics-card .btn { margin-top: 8px; }
-  body.authenticated .analytics-note { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 22px; border: 1px solid var(--app-border); border-radius: 16px; background: var(--app-surface-2); }
-  body.authenticated .analytics-note b { color: var(--app-heading); font-size: 14px; }
-  body.authenticated .analytics-note p { margin: 4px 0 0; color: var(--app-muted); font-size: 12px; }
-  body.authenticated .side-nav { min-width: 0; overflow-x: hidden; }
-  body.authenticated .side-nav .btn { display: flex; align-items: center; min-width: 0; overflow: hidden; }
-  body.authenticated .side-nav .btn, body.authenticated .side-nav a { box-sizing: border-box; }
-  body.authenticated .btn { border-radius: 9px; }
-  body.authenticated .btn.primary { background: #1769d1; color: #fff; box-shadow: 0 5px 12px rgba(23,105,209,.16); }
-  body.authenticated .btn.primary:hover { background: #125bb8; }
-  body.authenticated #authLogoutBtn { color: #f08a8a; background: transparent; border-color: #814044; }
-  body.authenticated #authLogoutBtn:hover { background: #351d26; }
-  :root[data-theme="light"] body.authenticated #authLogoutBtn { color: #a62929; background: #fff7f7; border-color: #f0d5d5; }
-  :root[data-theme="light"] body.authenticated #authLogoutBtn:hover { background: #fff0f0; }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot { order: 3; display: block; padding: 16px 28px 28px; }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot #connectBtn { display: block; width: 100%; min-height: 46px; }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot .action-overflow,
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot #logoutBtn,
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot #disconnectBtn,
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot #connCancel { display: none !important; }
-  @media (max-width: 920px) {
-    body.authenticated .sidebar { width: 248px; }
-    body.authenticated header.top { padding: 14px 18px; }
-  }
-  @media (max-width: 600px) {
-    body.authenticated .wrap { padding: 18px 12px 44px; }
-    body.authenticated .content-block > .block-head { padding: 17px 16px; }
-    body.authenticated .block-body { padding: 16px; }
-    body.authenticated header.top { padding: 12px; }
-    body.authenticated .settings-head { align-items: flex-start; flex-direction: column; gap: 12px; }
-    body.authenticated .settings-head h2::before { margin-bottom: 7px; }
-    body.authenticated .settings-grid { grid-template-columns: 1fr; }
-    body.authenticated .settings-card { min-height: 210px; }
-    body.authenticated .page-hero { align-items: flex-start; flex-direction: column; }
-    body.authenticated .analytics-grid { grid-template-columns: 1fr; }
-    body.authenticated .analytics-card { min-height: 190px; }
-    body.authenticated .analytics-note { align-items: flex-start; flex-direction: column; }
-    body.authenticated .analytics-note .btn { width: 100%; }
-    body.authenticated .devices-entry-body { grid-template-columns: auto 1fr; }
-    body.authenticated .devices-entry-body .btn { grid-column: 1 / -1; width: 100%; }
-    body.authenticated .hdr-actions { min-width: 0; max-width: 48%; overflow: hidden; gap: 5px; }
-    body.authenticated #topRouterTools { display: none !important; }
-    body.authenticated .hdr-actions .language-select { max-width: 84px; min-width: 0; }
-    body.authenticated #authLogoutBtn { max-width: 38px; overflow: hidden; padding-inline: 8px; font-size: 0; }
-    body.authenticated #authLogoutBtn::before { content: "↪"; font-size: 15px; }
-    body.authenticated #themeBtn { max-width: 38px; overflow: hidden; padding-inline: 8px; font-size: 0; }
-    body.authenticated #themeBtn::before { content: "☼"; font-size: 15px; }
-  }
-
-  /* Compact SaaS workspace: use the available canvas and keep primary actions
-     visible when a feature is opened inline (for example Proxy pool). */
-  body.authenticated .wrap {
-    width: 100%; max-width: none; padding: 26px clamp(24px, 3vw, 52px) 52px;
-  }
-  body.authenticated .settings-page,
-  body.authenticated .analytics-page,
-  body.authenticated #dashboardPage,
-  body.authenticated #featurePage { width: 100%; max-width: none; }
-  body.authenticated { font-size: 17px; line-height: 1.6; }
-  :root { --sans: "Inter", "Segoe UI", Roboto, Arial, sans-serif; }
-  body.authenticated .side-nav .btn,
-  body.authenticated .side-nav a { font-size: 16px; line-height: 1.35; }
-  body.authenticated .side-group { font-size: 11px; }
-  body.authenticated .side-foot { font-size: 14px; }
-  body.authenticated .brand h1 { font-size: 23px; }
-  body.authenticated .brand p { font-size: 15px; }
-  body.authenticated .btn,
-  body.authenticated .theme-btn { font-size: 16px; }
-  body.authenticated #topRouterTools .theme-btn { font-size: 13px; }
-  body.authenticated input,
-  body.authenticated select,
-  body.authenticated textarea { font-size: 16px; }
-  body.authenticated label,
-  body.authenticated .tg { font-size: 15px; }
-  body.authenticated .sub,
-  body.authenticated .block-head p,
-  body.authenticated .settings-card p { font-size: 15px; }
-  body.authenticated tbody td { font-size: 15px; }
-  body:not(.authenticated) #connBackdrop .modal > h2 { font-size: 28px; line-height: 1.2; }
-  body:not(.authenticated) #connBackdrop .login-logo { font-size: 36px; }
-  body:not(.authenticated) #connBackdrop .login-sub,
-  body:not(.authenticated) #connBackdrop .conn-status { font-size: 15px; line-height: 1.55; }
-  body:not(.authenticated) #connBackdrop label { font-size: 15px; }
-  body:not(.authenticated) #connBackdrop input,
-  body:not(.authenticated) #connBackdrop select { font-size: 16px; min-height: 46px; }
-  body:not(.authenticated) #connBackdrop .modal > .foot #connectBtn { min-height: 50px; font-size: 16px; }
-  body.authenticated thead th { font-size: 14px; }
-  body.authenticated .conn-status,
-  body.authenticated .hint,
-  body.authenticated .derived { font-size: 15px; line-height: 1.55; }
-  body.authenticated .stat .label { font-size: 14px; }
-  body.authenticated .stat .val { font-size: 30px; }
-  body.authenticated .page-hero h2,
-  body.authenticated .settings-head h2 { font-size: clamp(34px, 3.2vw, 44px); }
-  body.authenticated .page-hero p,
-  body.authenticated .settings-head .sub { font-size: 15px; }
-  body.authenticated .block-head h2 { font-size: 21px; }
-  body.authenticated .block-head p { font-size: 15px; }
-  body.authenticated .ssid-name { font-size: 16px; }
-  body.authenticated .proxy-count,
-  body.authenticated .sub { font-size: 14px; }
-  body.authenticated thead th { font-size: 14px; }
-  body.authenticated tbody td { font-size: 15px; }
-  body.authenticated header.top {
-    min-height: 76px; padding: 12px clamp(16px, 2vw, 30px); gap: 8px;
-  }
-  body.authenticated .brand { min-width: 0; flex: 1 1 auto; }
-  body.authenticated .brand > div { min-width: 0; }
-  body.authenticated .brand h1,
-  body.authenticated .brand p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.authenticated .hdr-actions { flex: 0 0 auto; gap: 5px; flex-wrap: nowrap; justify-content: flex-end; }
-  body.authenticated .hdr-actions .theme-btn,
-  body.authenticated .hdr-actions .btn {
-    min-height: 36px; border-radius: 10px; padding: 6px 7px; font-size: 12px; font-weight: 600;
-  }
-  body.authenticated #topRouterTools { gap: 3px; }
-  body.authenticated #topRouterTools .theme-btn { padding: 6px 7px; font-size: 12px; }
-  body.authenticated .hdr-actions .language-select { min-width: 96px; }
-  body.authenticated .page-hero { margin-bottom: 18px; }
-  body.authenticated .content-block,
-  body.authenticated .tablecard,
-  body.authenticated .analytics-card,
-  body.authenticated .settings-card { box-shadow: 0 8px 24px rgba(31,55,86,.07); }
-  body.authenticated .content-block { margin-bottom: 16px; }
-  body.authenticated .content-block > .block-head { padding: 17px 20px; }
-  body.authenticated .block-body { padding: 17px 20px; }
-  body.authenticated #featurePage { gap: 16px; }
-  body.authenticated #featurePage > .modal.inline-feature {
-    margin: 0; width: 100% !important; max-width: none !important;
-    border-radius: 16px; background: var(--app-surface);
-    border: 1px solid var(--app-border); box-shadow: 0 10px 30px rgba(31,55,86,.09);
-  }
-  body.authenticated #featurePage > .modal.inline-feature > h2 {
-    padding: 20px 24px; margin: 0; color: var(--app-heading); font-size: 20px;
-    border-bottom: 1px solid var(--app-border); background: var(--app-surface);
-  }
-  body.authenticated #featurePage > .modal.inline-feature > .form {
-    padding: 20px 24px; gap: 16px; background: var(--app-surface);
-  }
-  body.authenticated #featurePage > .modal.inline-feature > .foot {
-    padding: 14px 24px 18px; border-top: 1px solid var(--app-border);
-    border-bottom: 0; flex-wrap: wrap; overflow: visible; justify-content: flex-end;
-  }
-  body.authenticated #featurePage > .modal.inline-feature > .foot .folded-action {
-    display: inline-flex !important; visibility: visible !important;
-  }
-  body.authenticated #featurePage > .modal.inline-feature > .foot .action-overflow {
-    display: none !important;
-  }
-  body.authenticated #featurePage > .modal.inline-feature > .foot #poolSave,
-  body.authenticated #featurePage > .modal.inline-feature > .foot #devProxySave {
-    order: 10; min-width: 156px; min-height: 44px; font-size: 14px;
-  }
-  body.authenticated #featurePage > .modal.inline-feature textarea {
-    min-height: 150px; font-size: 13px; line-height: 1.55;
-  }
-  /* Proxy pool: keep the dense controls readable at normal desktop zoom. */
-  body.authenticated #featurePage > .modal.inline-feature .conn-status,
-  body.authenticated #featurePage > .modal.inline-feature .filterbar,
-  body.authenticated #featurePage > .modal.inline-feature .tg,
-  body.authenticated #featurePage > .modal.inline-feature .filterbar .btn,
-  body.authenticated #featurePage > .modal.inline-feature .filterbar select,
-  body.authenticated #featurePage > .modal.inline-feature .filterbar input,
-  body.authenticated #featurePage > .modal.inline-feature .pool-input-stack > .btn {
-    font-size: 16px;
-  }
-  body.authenticated #featurePage > .modal.inline-feature .pool-list {
-    font-size: 16px;
-    line-height: 1.5;
-  }
-  body.authenticated #featurePage > .modal.inline-feature .pool-select-row {
-    padding: 11px 12px;
-    gap: 11px;
-  }
-  body.authenticated #featurePage > .modal.inline-feature .pool-input-help,
-  body.authenticated #featurePage > .modal.inline-feature .sub {
-    font-size: 15px;
-    line-height: 1.5;
-  }
-  body.authenticated #featurePage > .modal.inline-feature textarea {
-    font-size: 16px;
-    line-height: 1.55;
-  }
-  body.authenticated #featurePage > .modal.inline-feature > h2 { font-size: 24px; }
-  body.authenticated #featurePage > .modal.inline-feature > .foot .btn { font-size: 16px; }
-  @media (max-width: 600px) {
-    body.authenticated .wrap { padding: 18px 12px 40px; }
-    body.authenticated header.top { min-height: 64px; padding: 10px 12px; }
-    .input-action-row { grid-template-columns: 1fr; gap: 10px; }
-    .input-action-row > .btn { width: 100%; }
-    body.authenticated #featurePage > .modal.inline-feature > h2 { padding: 17px 16px; font-size: 18px; }
-    body.authenticated #featurePage > .modal.inline-feature > .form { padding: 16px; }
-    body.authenticated #featurePage > .modal.inline-feature > .foot { padding: 12px 16px 16px; justify-content: stretch; }
-    body.authenticated #featurePage > .modal.inline-feature > .foot .btn { flex: 1 1 auto; }
-    body.authenticated #featurePage > .modal.inline-feature > .foot #poolSave,
-    body.authenticated #featurePage > .modal.inline-feature > .foot #devProxySave { flex-basis: 100%; }
-  }
-
-  /* SaaS authentication surface: branded product panel plus focused sign-in
-     form. Existing auth behaviour and session restoration remain untouched. */
-  html:not([data-authenticated="true"]) #connBackdrop {
-    padding: 24px; background: #0b1220;
-    background-image: radial-gradient(circle at 12% 12%, rgba(61,133,255,.22), transparent 34%),
-                      radial-gradient(circle at 92% 88%, rgba(57,205,155,.16), transparent 32%);
-  }
-  html:not([data-authenticated="true"]) #connBackdrop > .modal {
-    display: grid !important; grid-template-columns: minmax(260px, .82fr) minmax(360px, 1.18fr);
-    grid-template-rows: auto 1fr auto; width: min(900px, 100%); max-width: 900px;
-    max-height: min(720px, calc(100dvh - 48px)); overflow: hidden; border: 1px solid #2a3c58;
-    border-radius: 24px; background: #111c2f; box-shadow: 0 28px 90px rgba(0,0,0,.4);
-  }
-  html:not([data-authenticated="true"]) #connBackdrop .login-brand-panel {
-    grid-column: 1; grid-row: 1 / 4; position: relative; overflow: hidden; padding: 42px 34px;
-    display: flex; flex-direction: column; align-items: flex-start; color: #fff;
-    background: linear-gradient(155deg, #173968 0%, #10243f 54%, #0c192d 100%);
-  }
-  .login-brand-mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px;
-    background: #45c895; color: #08251d; font: 800 19px var(--mono); box-shadow: 0 12px 24px rgba(69,200,149,.2); }
-  .login-brand-name { margin-top: 30px; font: 800 34px var(--mono); letter-spacing: -1.5px; }
-  .login-brand-panel p { margin: 8px 0 0; color: #a8c0db; font-size: 14px; }
-  .login-brand-foot { margin-top: auto; color: #7e9abb; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
-  .login-brand-orb { position: absolute; width: 240px; height: 240px; right: -92px; bottom: 72px;
-    border: 1px solid rgba(112,181,255,.22); border-radius: 50%; }
-  .login-brand-orb::after { content: ""; position: absolute; inset: 28px; border: 1px solid rgba(112,181,255,.14); border-radius: 50%; }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > h2 {
-    grid-column: 2; grid-row: 1; padding: 42px 48px 4px; min-height: 0; border: 0;
-    background: transparent; color: #f5f8fc; font-size: 25px; letter-spacing: -.6px;
-  }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .form {
-    grid-column: 2; grid-row: 2; padding: 16px 48px 22px; gap: 17px; overflow-y: auto;
-    color: #f5f8fc; background: transparent;
-  }
-  html:not([data-authenticated="true"]) #connBackdrop .login-intro { display: none; }
-  html:not([data-authenticated="true"]) #connBackdrop .conn-status { background: #182943; border-color: #2a4364; color: #a9c1dc; border-radius: 10px; }
-  html:not([data-authenticated="true"]) #connBackdrop label { color: #a9b9cd; }
-  html:not([data-authenticated="true"]) #connBackdrop input,
-  html:not([data-authenticated="true"]) #connBackdrop select { min-height: 46px; background: #0d182a; border-color: #2a405f; color: #f5f8fc; border-radius: 10px; }
-  html:not([data-authenticated="true"]) #connBackdrop input::placeholder { color: #6f829b; }
-  html:not([data-authenticated="true"]) #connBackdrop input:focus { border-color: #58c99d; box-shadow: 0 0 0 3px rgba(88,201,157,.17); }
-  html:not([data-authenticated="true"]) #connBackdrop .derived { color: #7f95af; line-height: 1.6; }
-  html:not([data-authenticated="true"]) #connBackdrop details { border-color: #2a3c58; }
-  html:not([data-authenticated="true"]) #connBackdrop .modal > .foot {
-    grid-column: 2; grid-row: 3; padding: 16px 48px 34px; border: 0; background: transparent;
-  }
-  html:not([data-authenticated="true"]) #connBackdrop #connectBtn {
-    min-height: 48px; border: 0; border-radius: 10px; background: #45b985; color: #06271b;
-    font-weight: 750; box-shadow: 0 10px 20px rgba(69,185,133,.2);
-  }
-  html:not([data-authenticated="true"]) #connBackdrop #connectBtn:hover { background: #5bd39e; transform: translateY(-1px); }
-  @media (max-width: 680px) {
-    html:not([data-authenticated="true"]) #connBackdrop { padding: 12px; }
-    html:not([data-authenticated="true"]) #connBackdrop > .modal { display: flex !important; width: 100%; max-height: calc(100dvh - 24px); border-radius: 20px; }
-    html:not([data-authenticated="true"]) #connBackdrop .login-brand-panel { flex: none; min-height: 128px; padding: 20px 22px; }
-    .login-brand-mark { width: 38px; height: 38px; border-radius: 11px; font-size: 16px; }
-    .login-brand-name { margin-top: 14px; font-size: 25px; }
-    .login-brand-panel p { margin-top: 2px; font-size: 12px; }
-    .login-brand-foot, .login-brand-orb { display: none; }
-    html:not([data-authenticated="true"]) #connBackdrop .modal > h2 { padding: 24px 22px 4px; font-size: 21px; }
-    html:not([data-authenticated="true"]) #connBackdrop .modal > .form { padding: 12px 22px 16px; }
-    html:not([data-authenticated="true"]) #connBackdrop .modal > .foot { padding: 12px 22px 22px; }
-  }
-  .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px;
-    background: var(--app-surface-2); border: 1px solid var(--app-border); border-radius: 11px; }
-  .login-method { border: 0; border-radius: 8px; padding: 9px 10px; background: transparent;
-    color: var(--app-muted); font: 600 12px var(--sans); cursor: pointer; }
-  .login-method.active { background: #2b8a68; color: #fff; box-shadow: 0 4px 10px rgba(43,138,104,.18); }
-  .login-method:not(.active):hover { color: var(--app-heading); background: var(--app-border); }
-  .login-panel { display: grid; gap: 13px; }
-  .login-short-hint, .login-help { position: relative; cursor: help; width: fit-content; border-bottom: 1px dotted currentColor; outline: none; }
-  .login-short-hint::after, .login-help::after { content: attr(title); position: absolute; z-index: 90; left: 0; bottom: calc(100% + 9px);
-    width: min(310px, calc(100vw - 48px)); padding: 10px 12px; border: 1px solid #334866; border-radius: 9px;
-    background: #07111f; color: #dce8f6; font: 11.5px/1.5 var(--sans); box-shadow: 0 10px 24px rgba(0,0,0,.3);
-    opacity: 0; visibility: hidden; transform: translateY(4px); pointer-events: none; transition: opacity .15s, transform .15s, visibility .15s; }
-  .login-short-hint::before, .login-help::before { content: ""; position: absolute; z-index: 91; left: 14px; bottom: calc(100% + 4px);
-    border: 5px solid transparent; border-top-color: #334866; opacity: 0; visibility: hidden; transition: opacity .15s, visibility .15s; }
-  .login-short-hint:hover::after, .login-short-hint:hover::before, .login-short-hint:focus-visible::after, .login-short-hint:focus-visible::before,
-  .login-help:hover::after, .login-help:hover::before, .login-help:focus-visible::after, .login-help:focus-visible::before { opacity: 1; visibility: visible; transform: none; }
-  @media (max-width: 680px) {
-    .login-short-hint::after, .login-help::after { left: auto; right: 0; width: min(290px, calc(100vw - 56px)); }
-    .login-short-hint::before, .login-help::before { left: auto; right: 14px; }
-  }
-  html:not([data-authenticated="true"]) #connBackdrop .login-methods { background: #0d182a; border-color: #2a405f; }
-  html:not([data-authenticated="true"]) #connBackdrop .login-method { color: #8fa4bf; }
-  html:not([data-authenticated="true"]) #connBackdrop .login-method.active { background: #25496a; color: #fff; }
-  html:not([data-authenticated="true"]) #connBackdrop .login-panel[hidden] { display: none !important; }
-</style>
-</head>
-<body>
-
-<div class="layout" id="layout">
-  <aside class="sidebar" id="sidebar">
-    <div class="side-brand">
-      <div class="logo">sb</div>
-      <div><b>sbproxy</b><small>Multi-WiFi → SOCKS5</small></div>
-    </div>
-    <nav class="side-nav">
-      <div class="nav-block">
-      <div class="side-group">Cấu hình</div>
-      <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
-      <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
-      <button class="btn ghost" id="exportConf">⭳ Tải wifi-socks.conf</button>
-      <button class="btn ghost" id="exportJson">⭳ Tải JSON</button>
-      <button class="btn ghost danger" id="clearBtn">✕ Xoá hết</button>
-      <button class="btn primary page-active" id="configBtn" title="Quản lý cấu hình WiFi và proxy">▦ WiFi</button>
-      </div>
-      <div class="nav-block">
-      <span id="liveTools">
-        <div class="side-group">Router</div>
-        <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
-        <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
-        <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
-        <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
-        <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
-        <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>
-        <button class="btn ghost" id="dailyLogBtn" title="Xem và tải nhật ký debug 7 ngày">▤ Nhật ký</button>
-        <button class="btn ghost" id="debugBtn" title="Quét lỗi trên router và đề xuất cách sửa">🤖 Trợ lý gỡ lỗi</button>
-        <button class="btn ghost danger" id="resetAllBtn" title="Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply">⟲ Reset toàn bộ</button>
-      </span>
-      </div>
-      <div class="nav-block">
-      <button class="btn ghost" id="settingsBtn" title="Kiểm tra và vận hành router">⚙ Cài đặt</button>
-      </div>
-      <div class="nav-block">
-      <a class="btn ghost spa-link" href="devices.html" data-spa-page="devices">📱 Thiết bị</a>
-      <a class="btn ghost spa-link" href="analytics.html" data-spa-page="analytics">◈ Analytics</a>
-      </div>
-    </nav>
-    <div class="side-foot">sbproxy Console</div>
-  </aside>
-
-  <div class="main">
-  <header class="top">
-    <div class="brand">
-      <button class="iconbtn" id="menuBtn" title="Mở / đóng menu">☰</button>
-      <div>
-        <h1>sbproxy Console</h1>
-        <p>GL-MT6000 / OpenWrt · <span id="verLine" class="mono"></span></p>
-      </div>
-    </div>
-    <div class="hdr-actions">
-      <span class="chip" id="whoami" hidden></span>
-      <span class="busychip" id="busyChip"><span class="spin"></span><span id="busyText"></span></span>
-      <span class="live-badge" id="liveBadge"><span class="dot"></span>Live</span>
-      <button class="chip sbchip" id="sbChip" hidden></button>
-      <select class="language-select" id="languageSelect" aria-label="Language">
-        <option value="en">English</option>
-        <option value="vi">Tiếng Việt</option>
-      </select>
-      <button class="theme-btn" id="connBtn" title="Kết nối agent trên router">🔌 Kết nối router</button>
-      <button class="theme-btn" id="authLogoutBtn" hidden title="Đăng xuất">↪ Đăng xuất</button>
-      <span id="topRouterTools">
-        <button class="theme-btn" id="topRbBtn" title="Backup và rollback trên router">🗂 Backup</button>
-        <button class="theme-btn" id="topGwBtn" title="Xem đường ra Internet của router">🌐 Egress</button>
-        <button class="theme-btn" id="topUpBtn" title="Cập nhật sbproxy trên router">⬆ Update</button>
-      </span>
-      <button class="theme-btn" id="themeBtn" title="Đổi giao diện sáng/tối">◐ Theme</button>
-    </div>
-  </header>
-
-  <div class="wrap">
-  <div id="dashboardPage">
-  <section class="page-hero" aria-labelledby="wifiPageTitle">
-    <div><span class="page-eyebrow">WIFI WORKSPACE</span><h2 id="wifiPageTitle">WiFi</h2><p>Cấu hình SSID, proxy pool và chính sách kết nối.</p></div>
-  </section>
-  <section id="stats" hidden></section>
-  <section class="content-block" aria-labelledby="actionsBlockTitle">
-    <div class="block-head"><div><h2 id="actionsBlockTitle">Configuration actions</h2><p>Thêm, nhập, xuất và áp dụng cấu hình lên router.</p></div></div>
-    <div class="block-body">
-  <div class="toolbar config-toolbar" id="configToolbar"></div>
-    </div>
-  </section>
-  <section class="content-block" aria-labelledby="ssidBlockTitle">
-    <div class="block-head"><div><h2 id="ssidBlockTitle">WiFi networks</h2><p>Danh sách SSID và thao tác riêng cho từng WiFi.</p></div></div>
-
-  <div class="tablecard">
-    <div class="tablescroll">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th><th>WiFi (SSID)</th><th>Băng</th><th>Subnet</th>
-            <th>Auth</th><th>Isolate</th><th>WebRTC</th><th>Sức khỏe</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="empty" style="display:none">
-      <b>Chưa có WiFi nào</b>
-      Bấm “＋ Thêm WiFi” để tạo, hoặc “⤓ Nhập .conf” để dán file có sẵn.
-    </div>
-  </div>
-
-  </section>
-  <section class="content-block" aria-labelledby="previewBlockTitle">
-    <div class="block-head"><div><h2 id="previewBlockTitle">Configuration preview</h2><p>Xem nội dung cấu hình trước khi sao chép hoặc debug.</p></div><button class="btn ghost" id="outputToggle">⌄ Show</button></div>
-  <div class="out" id="configOutput" hidden>
-    <div class="tabs" id="outTabs">
-      <button class="tab active" data-t="conf">wifi-socks.conf</button>
-      <button class="tab" data-t="singbox">sing-box config.json</button>
-      <button class="tab" data-t="nft">sbproxy.nft</button>
-    </div>
-    <div class="head">
-      <span class="fname" id="outName">config/wifi-socks.conf</span>
-      <button class="btn ghost" id="copyBtn">⧉ Copy</button>
-    </div>
-    <pre class="code" id="outCode"></pre>
-    <div class="hint" id="applyHint"></div>
-  </div>
-  </section>
-  </div><!-- /#dashboardPage -->
-  <section class="analytics-page" id="analyticsPage" hidden>
-    <div class="page-hero">
-      <div><span class="page-eyebrow">ROUTER ANALYTICS</span><h2>Analytics</h2><p>The operational view of your WiFi proxy workspace.</p></div>
-      <a class="btn ghost spa-link" href="config.html" data-spa-page="config">Cài đặt proxy →</a>
-    </div>
-    <section class="analytics-grid" aria-label="Router analytics">
-      <article class="analytics-card analytics-primary"><div class="analytics-card-head"><span>SSID coverage</span><span class="analytics-icon">⌁</span></div><strong id="analyticsSsidCount">0</strong><p>Configured WiFi networks</p><div class="analytics-split"><span><b id="analytics24">0</b> 2.4 GHz</span><span><b id="analytics5">0</b> 5 GHz</span></div></article>
-      <article class="analytics-card"><div class="analytics-card-head"><span>sing-box</span><span class="state-dot" id="analyticsSingboxDot"></span></div><strong id="analyticsSingboxStatus">—</strong><p id="analyticsSingboxMeta">Waiting for agent status</p><button class="btn primary" id="analyticsRestartBtn">↻ Restart sing-box</button></article>
-      <article class="analytics-card"><div class="analytics-card-head"><span>Proxy policy</span><span class="analytics-icon">◌</span></div><strong id="analyticsProxyCount">0</strong><p>Distinct SOCKS endpoints</p><div class="analytics-split"><span><b id="analyticsIsolation">0</b> isolated</span><span><b id="analyticsWebrtc">0</b> WebRTC</span></div></article>
-    </section>
-    <section class="analytics-note"><div><b>Need to change the setup?</b><p>Manage WiFi, proxy pools and routing policy from Proxy settings.</p></div><a class="btn primary spa-link" href="config.html" data-spa-page="config">Open proxy settings →</a></section>
-  </section>
-  <section class="settings-page" id="settingsPage" hidden>
-    <div class="settings-head">
-      <div><h2>Router settings</h2><div class="sub">Chỉ các mục kiểm tra và vận hành cần thiết trên router.</div></div>
-      <button class="btn ghost" id="settingsRefresh">↻ Làm mới</button>
-    </div>
-    <div class="settings-grid">
-      <section class="settings-card" id="statusCard">
-        <h3>Trạng thái</h3>
-        <p>Kết nối agent, phiên bản và dịch vụ proxy.</p>
-        <div class="settings-value" id="settingsStatus">Chưa kết nối</div>
-        <div class="settings-actions"><button class="btn ghost" id="settingsHealth">Kiểm tra health</button><button class="btn ghost" id="settingsRestart">Restart sing-box</button></div>
-      </section>
-      <section class="settings-card" id="egressCard">
-        <h3>Egress</h3>
-        <p>Đường ra Internet thực tế của router.</p>
-        <div class="settings-value" id="settingsGateway">Chưa kiểm tra</div>
-        <div class="settings-actions"><button class="btn ghost" id="settingsGatewayOpen">Chi tiết egress</button></div>
-      </section>
-      <section class="settings-card" id="diagnoseCard">
-        <h3>Chẩn đoán SSID</h3>
-        <p>Kiểm tra Wi-Fi, bridge, DHCP, nftables, route, sing-box và proxy.</p>
-        <select id="settingsDiagSsid" aria-label="SSID cần chẩn đoán"></select>
-        <div class="settings-actions"><button class="btn ghost" id="settingsDiagRun">Chạy chẩn đoán</button><button class="btn ghost" id="settingsLogs">Nhật ký 7 ngày</button></div>
-      </section>
-      <section class="settings-card" id="maintenanceCard">
-        <h3>Bảo trì router</h3>
-        <p>Các thao tác có thể làm thay đổi hoặc khôi phục hệ thống.</p>
-        <div class="settings-actions"><button class="btn ghost" id="settingsBackup">Backup / Rollback</button><button class="btn ghost" id="settingsUpdate">Cập nhật agent</button><button class="btn ghost" id="settingsConnect">Kết nối</button></div>
-      </section>
-    </div>
-  </section>
-  <section id="featurePage" hidden></section>
-  <section class="device-page" id="devicesPage" hidden></section>
-  </div><!-- /.wrap -->
-  </div><!-- /.main -->
-</div><!-- /.layout -->
-
-<!-- Modal -->
-<div class="backdrop" id="backdrop">
-  <div class="modal">
-    <h2 id="modalTitle">Thêm WiFi</h2>
-    <div class="form">
-      <div class="field">
-        <label>Tên WiFi (SSID) <span class="req">*</span></label>
-        <input type="text" id="f_name" placeholder="Alpha" maxlength="32">
-      </div>
-      <div class="field two">
-        <div>
-          <label>Băng tần</label>
-          <select id="f_band"><option value="2g">2.4 GHz</option><option value="5g">5 GHz</option></select>
-        </div>
-        <div>
-          <label>idx (số duy nhất) <span class="req">*</span></label>
-          <input type="number" id="f_idx" class="mono" min="1" max="240">
-        </div>
-      </div>
-      <div class="field">
-        <label>Hãng WiFi giả lập (MAC) <span class="derived">(3 byte đầu của MAC theo hãng; 3 byte sau random)</span></label>
-        <select id="f_vendor"></select>
-      </div>
-      <div class="field">
-        <label>Mật khẩu WiFi <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
-        <input type="text" id="f_key" class="mono" placeholder="Alpha_pass_123">
-      </div>
-      <div class="field two">
-        <div>
-          <label>Loại proxy</label>
-          <select id="f_proxy_type"><option value="socks5">SOCKS5</option><option value="http">HTTP</option></select>
-        </div>
-        <div>
-          <label>Nhập nhanh proxy</label>
-          <div style="display:flex;gap:8px"><input type="text" id="f_proxy_compact" class="mono" placeholder="host:port:user:password"><button type="button" class="btn ghost" id="parseProxyBtn">Tách</button></div>
-        </div>
-      </div>
-      <div class="field two">
-        <div>
-          <label>Proxy host <span class="req">*</span></label>
-          <input type="text" id="f_host" class="mono" placeholder="1.2.3.4">
-        </div>
-        <div>
-          <label>Cổng <span class="req">*</span></label>
-          <input type="number" id="f_port" class="mono" placeholder="1080" value="1080">
-        </div>
-      </div>
-      <div class="field two">
-        <div>
-          <label>Proxy user <span class="derived">(trống nếu không auth)</span></label>
-          <input type="text" id="f_user" class="mono">
-        </div>
-        <div>
-          <label>Proxy pass</label>
-          <input type="text" id="f_pass" class="mono">
-        </div>
-      </div>
-      <div class="toggles">
-        <label class="tg"><input type="checkbox" id="f_isolate" checked> Cách ly client</label>
-        <label class="tg"><input type="checkbox" id="f_webrtc" checked> Chặn WebRTC</label>
-      </div>
-      <div class="derived" id="f_derived"></div>
-      <div class="err" id="f_err"></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="probeBtn" style="margin-right:auto" title="Test proxy đang nhập từ router (không cần lưu trước)">🧪 Test proxy</button>
-      <button class="btn ghost" id="cancelBtn">Huỷ</button>
-      <button class="btn primary" id="saveBtn">Lưu</button>
-    </div>
-  </div>
-</div>
-
-<!-- Connect modal -->
-<div class="backdrop" id="connBackdrop">
-  <div class="modal">
-    <div class="login-brand-panel" data-i18n-skip aria-hidden="true">
-      <div class="login-brand-mark">sb</div>
-      <div class="login-brand-name">sbproxy</div>
-      <p>Secure router workspace</p>
-      <div class="login-brand-orb"></div>
-      <div class="login-brand-foot">Private infrastructure control</div>
-    </div>
-    <h2>Kết nối agent trên router</h2>
-    <div class="form">
-      <div class="login-intro">
-        <div class="login-logo">sbproxy</div>
-        <div class="login-sub">Secure control panel for your router</div>
-      </div>
-      <div class="conn-status" id="connStatus">Chưa kết nối. Đăng nhập bằng tài khoản sbproxy.</div>
-      <div class="login-methods" role="tablist" aria-label="Login method">
-        <button type="button" class="login-method active" id="loginAccountTab" data-login-method="account">Tài khoản</button>
-        <button type="button" class="login-method" id="loginTokenTab" data-login-method="token">Token agent</button>
-      </div>
-      <div class="login-panel" id="accountLoginPanel">
-        <div class="field two">
-          <div>
-            <label>Tên đăng nhập <span class="req">*</span></label>
-            <input type="text" id="c_user" class="mono" placeholder="admin" autocomplete="username">
-          </div>
-          <div>
-            <label>Mật khẩu <span class="req">*</span></label>
-            <input type="password" id="c_pass" class="mono" autocomplete="current-password">
-          </div>
-        </div>
-        <div class="derived login-short-hint" tabindex="0" title="Tài khoản riêng của sbproxy, tạo ở lần mở web đầu tiên; có thể đổi trong UI hoặc bằng lệnh sbproxy-webauth trên router.">Tài khoản sbproxy ⓘ</div>
-      </div>
-      <div class="login-panel" id="tokenLoginPanel" hidden>
-        <div class="field">
-          <label>Agent URL <span class="optional">(tuỳ chọn)</span></label>
-          <input type="text" id="c_base" class="mono" placeholder="http://192.168.8.1">
-        </div>
-        <div class="field">
-          <label>Token agent <span class="req">*</span></label>
-          <input type="text" id="c_token" class="mono" placeholder="3f9a1c…" autocomplete="off">
-        </div>
-        <div class="derived login-short-hint" tabindex="0" title="Token được in ra bởi install-agent.sh. Chỉ dùng phương thức này trên mạng quản trị tin cậy.">Token trực tiếp ⓘ</div>
-      </div>
-      <button class="btn ghost" id="cpBtn" hidden style="justify-self:start">🔑 Đổi mật khẩu</button>
-      <div class="login-help" id="mixedNote" data-i18n-skip tabindex="0" title="Nếu mở UI qua HTTPS, trình duyệt có thể chặn gọi HTTP tới router. Hãy mở UI bằng HTTP từ mạng quản trị hoặc dùng bản Desktop.">ⓘ Hướng dẫn kết nối</div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost danger" id="logoutBtn">Đăng xuất</button>
-      <button class="btn ghost" id="disconnectBtn">Ngắt</button>
-      <button class="btn ghost" id="connCancel">Đóng</button>
-      <button class="btn primary" id="connectBtn">Kết nối</button>
-    </div>
-  </div>
-</div>
-
-<!-- Egress modal -->
-<div class="backdrop" id="gwBackdrop">
-  <div class="modal">
-    <h2>Đường ra Internet</h2>
-    <div class="form">
-      <div class="conn-status" id="gwHint" data-i18n-html="gwHint">Chọn interface rồi bấm <b>Đổi đường ra</b>. Wi-Fi và proxy không đổi.</div>
-      <div class="conn-status" id="gwState">…</div>
-      <div class="rblist" id="gwList"><div class="sub">Đang tải…</div></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="gwRefresh">Kiểm tra lại</button>
-      <button class="btn ghost" id="gwPin" title="Ghi nhớ interface đang chọn là đường ra mong đợi">📌 Ghim</button>
-      <button class="btn ghost" id="gwAuto" title="Bỏ ghim: chấp nhận đường ra mà default route đang dùng">Tự động</button>
-      <button class="btn ghost" id="gwClose">Đóng</button>
-      <button class="btn primary" id="gwSwitch">Đổi đường ra</button>
-    </div>
-  </div>
-</div>
-
-<!-- Backup / Rollback modal -->
-<div class="backdrop" id="rbBackdrop">
-  <div class="modal">
-    <h2>Backup &amp; Rollback</h2>
-    <div class="form">
-      <div class="conn-status" id="rbHint" data-i18n-html="rbHint">Router tự backup khi Áp / đổi SOCKS. Trước khi cập nhật firmware, hãy bấm <b>⭳ Về máy</b>.</div>
-      <div class="rblist" id="rbList"><div class="sub">Đang tải danh sách…</div></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="rbClose">Đóng</button>
-      <button class="btn primary" id="rbBackupNow">💾 Tạo backup ngay</button>
-    </div>
-  </div>
-</div>
-
-<!-- Devices modal -->
-<div class="backdrop" id="devBackdrop">
-  <div class="modal device-modal">
-    <h2>Thiết bị</h2>
-    <div class="form">
-      <div class="conn-status" id="devHint" data-i18n-html="devHint">Thiết bị theo từng Wi-Fi. <b>Ngắt</b> là tạm thời; <b>Cấm</b> là vĩnh viễn.</div>
-      <div class="filterbar">
-        <input id="devSearch" type="search" placeholder="Tìm MAC, IP, tên máy hoặc SSID…">
-        <select id="devSsidFilter"><option value="">WiFi: tất cả</option></select>
-        <select id="devStateFilter">
-          <option value="">Trạng thái: tất cả</option>
-          <option value="online">Đang kết nối</option>
-          <option value="offline">Đã ngắt</option>
-          <option value="blocked">Bị cấm</option>
-        </select>
-        <label class="tg"><input type="checkbox" id="devAuto" checked> Tự làm mới</label>
-        <select id="devInterval">
-          <option value="5">5s</option>
-          <option value="10" selected>10s</option>
-          <option value="30">30s</option>
-          <option value="60">60s</option>
-        </select>
-      </div>
-      <div class="sub" id="devSummary">—</div>
-      <div class="filterbar">
-        <select id="devBulkAction" aria-label="Thao tác với thiết bị đã chọn">
-          <option value="">Thao tác đã chọn…</option>
-          <option value="replace_proxy" id="devProxyAction" hidden>Thêm proxy &amp; phân phối</option>
-          <option value="kick">Ngắt kết nối</option>
-          <option value="ban">Cấm</option>
-          <option value="unban">Bỏ cấm</option>
-        </select>
-        <button class="btn ghost" id="devBulkRun" disabled>Thực hiện</button>
-        <span class="sub" id="devSelectedCount">0 đã chọn</span>
-      </div>
-      <div class="tablescroll">
-        <table style="min-width: 1040px;">
-          <thead><tr>
-            <th class="select-cell"><input id="devSelectAll" type="checkbox" aria-label="Chọn tất cả thiết bị hiển thị"></th>
-            <th data-sort="idx">WiFi</th><th data-sort="mac">MAC</th><th data-sort="ip">IP / Tên máy</th>
-            <th data-sort="status">Trạng thái</th><th data-sort="rx_bytes">Vào (in)</th>
-            <th data-sort="tx_bytes">Ra (out)</th><th data-sort="signal_dbm">Sóng</th>
-            <th data-sort="slot">Proxy</th><th></th>
-          </tr></thead>
-          <tbody id="devRows"><tr><td colspan="10" class="sub">Đang tải…</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="devBan">⛔ Chặn MAC…</button>
-      <button class="btn ghost" id="devCsv">⭳ Xuất CSV</button>
-      <button class="btn ghost" id="devRefresh">↻ Làm mới</button>
-      <button class="btn primary" id="devClose">Đóng</button>
-    </div>
-  </div>
-</div>
-
-<!-- Add proxies and spread selected devices within one SSID -->
-<div class="backdrop" id="devProxyBackdrop">
-  <div class="modal" style="max-width: 680px;">
-    <h2>Thêm proxy · <span id="devProxyTitle"></span></h2>
-    <div class="form">
-      <div class="conn-status" id="devProxyHint">Proxy mới được thêm vào SSID. Chỉ thiết bị đã chọn được phân phối lại.</div>
-      <div class="sub" id="devProxyCurrent">Đang tải pool…</div>
-      <div class="filterbar">
-        <select id="devProxyFormat" title="Định dạng của nhà cung cấp proxy">
-          <option value="auto">Tự động nhận dạng</option>
-          <option value="hpup">host:port:user:pass</option>
-          <option value="uphp">user:pass@host:port</option>
-          <option value="hp">host:port</option>
-          <option value="csv">host,port,user,pass</option>
-          <option value="semi">host;port;user;pass</option>
-          <option value="url">socks5://user:pass@host:port</option>
-        </select>
-        <select id="devProxyType" title="Loại proxy cho các dòng vừa dán">
-          <option value="socks5">SOCKS5</option>
-          <option value="http">HTTP</option>
-        </select>
-      </div>
-      <div class="input-action-row">
-      <textarea id="devProxyInput" rows="7" placeholder="176.116.132.71:43137:user:pass"></textarea>
-        <button class="btn primary" id="devProxySave">Thêm &amp; phân phối</button>
-      </div>
-      <div class="err" id="devProxyError"></div>
-      <div class="sub" id="devProxyStatus" role="status" aria-live="polite"></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="devProxyCancel">Đóng</button>
-    </div>
-  </div>
-</div>
-
-<!-- Proxy pool modal -->
-<div class="backdrop" id="poolBackdrop">
-  <div class="modal" style="max-width: 760px;">
-    <h2>Proxy pool · <span id="poolTitle"></span></h2>
-    <div class="form">
-      <div class="conn-status">Mỗi dòng một proxy. Thay đổi pool không reload Wi‑Fi.</div>
-      <div class="logbox pool-list" id="poolRows">Đang tải…</div>
-      <div class="filterbar">
-        <button class="btn ghost" id="poolRefresh">↻ Thử lại</button>
-        <button class="btn ghost" id="poolMore" hidden>Xem thêm</button>
-        <label class="tg"><input id="poolSelectAll" type="checkbox"> Chọn tất cả</label>
-        <select id="poolBulkAction" aria-label="Thao tác với proxy đã chọn">
-          <option value="">Thao tác đã chọn…</option>
-          <option value="test">Test proxy</option>
-          <option value="delete">Xóa proxy</option>
-        </select>
-        <button class="btn ghost" id="poolBulkRun" disabled>Thực hiện</button>
-        <span class="sub" id="poolSelectedCount">0 đã chọn</span>
-      </div>
-      <div class="filterbar">
-        <select id="poolFormat" title="Định dạng của nhà cung cấp proxy">
-          <option value="auto">Tự động nhận dạng</option>
-          <option value="hpup">host:port:user:pass</option>
-          <option value="uphp">user:pass@host:port</option>
-          <option value="hp">host:port</option>
-          <option value="csv">host,port,user,pass</option>
-          <option value="semi">host;port;user;pass</option>
-          <option value="url">socks5://user:pass@host:port</option>
-        </select>
-        <select id="poolType" title="Loại proxy cho các dòng vừa dán">
-          <option value="socks5">SOCKS5</option>
-          <option value="http">HTTP</option>
-        </select>
-      </div>
-      <div class="pool-input-stack">
-        <textarea id="poolInput" rows="5" placeholder="176.116.132.71:43137:user:pass"></textarea>
-        <div class="pool-input-help"><span>Mỗi dòng là một proxy.</span><span>Bạn có thể dán nhiều proxy cùng lúc vào ô này.</span></div>
-        <button class="btn primary" id="poolSave">Thêm vào pool</button>
-        <div class="sub" id="poolAddStatus" role="status" aria-live="polite"></div>
-      </div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost danger" id="poolClear">Xóa pool</button>
-      <button class="btn ghost" id="poolTest">Test proxy</button>
-      <button class="btn ghost" id="poolRebalance">Rebalance client</button>
-      <button class="btn ghost" id="poolClose">Đóng</button>
-      <span class="sub" id="poolActionStatus" role="status" aria-live="polite"></span>
-    </div>
-  </div>
-</div>
-
-<!-- Update modal -->
-<div class="backdrop" id="upBackdrop">
-  <div class="modal">
-    <h2>Cập nhật agent trên router</h2>
-    <div class="form">
-      <div class="conn-status" id="upStatus" data-i18n-html="upStatus">Chọn package cập nhật sbproxy. Router sẽ backup trước và giữ cấu hình Wi-Fi/SOCKS hiện tại.</div>
-      <div class="field">
-        <label>Bản đang chạy trên router</label>
-        <div class="mono" id="upCurVer">—</div>
-      </div>
-      <div class="field">
-        <label>File package <span class="req">*</span></label>
-        <input type="file" id="upFile" accept=".tar.gz,.tgz,.zip,application/gzip,application/zip">
-      </div>
-      <div class="toggles">
-        <label class="tg"><input type="checkbox" id="upForce"> Cho phép hạ version (force)</label>
-      </div>
-      <div class="derived">Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy &amp; Áp” sau đó.</div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="upCancel">Đóng</button>
-      <button class="btn primary" id="upGo">⬆ Cập nhật</button>
-    </div>
-  </div>
-</div>
-
-<!-- First-run account setup modal -->
-<div class="backdrop" id="setupBackdrop">
-  <div class="modal">
-    <h2>Tạo tài khoản quản trị đầu tiên</h2>
-    <div class="form">
-      <div class="conn-status" id="setupStatus">Router chưa có tài khoản web. Tạo tài khoản đầu tiên để đăng nhập.</div>
-      <div class="field">
-        <label>Tên đăng nhập <span class="req">*</span> <span class="derived">(1-32 ký tự chữ, số, . _ -)</span></label>
-        <input type="text" id="su_user" class="mono" value="admin" autocomplete="username">
-      </div>
-      <div class="field two">
-        <div>
-          <label>Mật khẩu <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
-          <input type="password" id="su_pass" class="mono" autocomplete="new-password">
-        </div>
-        <div>
-          <label>Nhập lại mật khẩu <span class="req">*</span></label>
-          <input type="password" id="su_pass2" class="mono" autocomplete="new-password">
-        </div>
-      </div>
-      <div class="err" id="su_err"></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="setupCancel">Đóng</button>
-      <button class="btn primary" id="setupGo">Tạo tài khoản</button>
-    </div>
-  </div>
-</div>
-
-<!-- Change-password modal -->
-<div class="backdrop" id="cpBackdrop">
-  <div class="modal">
-    <h2>Đổi mật khẩu</h2>
-    <div class="form">
-      <div class="conn-status" id="cpStatus">Đổi mật khẩu tài khoản web của sbproxy. Cần mật khẩu hiện tại.</div>
-      <div class="field">
-        <label>Mật khẩu hiện tại <span class="req">*</span></label>
-        <input type="password" id="cp_old" class="mono" autocomplete="current-password">
-      </div>
-      <div class="field two">
-        <div>
-          <label>Mật khẩu mới <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
-          <input type="password" id="cp_new" class="mono" autocomplete="new-password">
-        </div>
-        <div>
-          <label>Nhập lại mật khẩu mới <span class="req">*</span></label>
-          <input type="password" id="cp_new2" class="mono" autocomplete="new-password">
-        </div>
-      </div>
-      <div class="err" id="cp_err"></div>
-    </div>
-    <div class="foot">
-      <button class="btn ghost" id="cpCancel">Đóng</button>
-      <button class="btn primary" id="cpGo">Đổi mật khẩu</button>
-    </div>
-  </div>
-</div>
-
-<!-- Daily diagnostic logs -->
-<div class="backdrop" id="dailyLogBackdrop">
-  <div class="modal" style="max-width:760px">
-    <h2>Nhật ký debug</h2>
-    <div class="form">
-      <div class="conn-status">Log theo ngày, tự xoá sau 7 ngày. File tải về không chứa mật khẩu hoặc token.</div>
-      <div class="filterbar">
-        <select id="dailyLogDate" aria-label="Ngày log"></select>
-        <button class="btn ghost" id="dailyLogRefresh">↻ Làm mới</button>
-        <button class="btn ghost" id="dailyLogCopy">⧉ Copy</button>
-        <button class="btn primary" id="dailyLogDownload">↓ Tải gói debug</button>
-      </div>
-      <div class="sub" id="dailyLogMeta">—</div>
-      <div class="logbox" id="dailyLogBox" style="max-height:52vh">Đang tải…</div>
-    </div>
-    <div class="foot"><button class="btn primary" id="dailyLogClose">Đóng</button></div>
-  </div>
-</div>
-
-<div class="backdrop" id="debugBackdrop">
-  <div class="modal" style="max-width:900px">
-    <h2>🤖 Trợ lý gỡ lỗi</h2>
-    <div class="form">
-      <div class="conn-status">Chạy hoàn toàn trên router: không cần Internet, không có dữ liệu nào rời khỏi máy. Mỗi kết luận kèm cách sửa, và chỉ chạy khi bạn bấm xác nhận.</div>
-      <div class="filterbar">
-        <button class="btn primary" id="debugRun">↻ Quét lại</button>
-        <span class="sub" id="debugMeta">—</span>
-      </div>
-      <div class="conn-status" id="debugVerdict">—</div>
-      <div class="tablecard">
-        <div class="tablescroll">
-          <table>
-            <thead><tr><th style="width:96px">Mức độ</th><th>Phát hiện</th><th style="width:210px">Cách sửa</th></tr></thead>
-            <tbody id="debugRows"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <div class="foot"><button class="btn primary" id="debugClose">Đóng</button></div>
-  </div>
-</div>
-
-<!-- Log modal -->
-<div class="backdrop" id="logBackdrop">
-  <div class="modal">
-    <h2 id="logTitle">Kết quả</h2>
-    <div class="form"><div class="logbox" id="logBox"></div></div>
-    <div class="foot"><button class="btn danger" id="logRetry" hidden>↻ Thử lại</button><button class="btn primary" id="logClose">Đóng</button></div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-<div class="context-menu" id="contextMenu" role="menu" hidden></div>
-
-<script src="i18n.vi.js"></script>
-<script src="i18n.en.js"></script>
-<script>
 (function () {
   "use strict";
   // Kept in sync with the repo VERSION file; tests/run.sh enforces the match.
-  const UI_VERSION = "0.5.30-SNAPSHOT";
+  const UI_VERSION = "0.5.34-SNAPSHOT";
   const LS_KEY = "sbproxy.ssids.v1";
   const LANGUAGE_KEY = "sbproxy.language";
   let language = localStorage.getItem(LANGUAGE_KEY) === "vi" ? "vi" : "en";
@@ -1751,10 +51,48 @@
   }
   // Defaults only: a connected agent reports the router's effective
   // config/settings.sh values through status meta (see applyRouterSettings).
-  let NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16;
+  let NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, SOCKS_UDP = true, POOL_UNASSIGNED = "default";
   const MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
+
+  // WebRTC handling per Wi-Fi, column 10 of wifi-socks.conf. It used to be a
+  // 0/1 flag, so a stored boolean still reads back as the mode it meant.
+  const WEBRTC_KEEP = 0, WEBRTC_BLOCK = 1, WEBRTC_BYPASS = 2;
+  function webrtcMode(value) {
+    if (value === true) return WEBRTC_BLOCK;
+    const n = parseInt(value, 10);
+    return (n === WEBRTC_BLOCK || n === WEBRTC_BYPASS) ? n : WEBRTC_KEEP;
+  }
+  function webrtcText(value) {
+    switch (webrtcMode(value)) {
+      case WEBRTC_BLOCK: return pick("Block WebRTC", "Chặn WebRTC");
+      case WEBRTC_BYPASS: return pick("Bypass WebRTC", "Bypass WebRTC");
+      default: return pick("Keep as-is", "Giữ nguyên");
+    }
+  }
+  function webrtcCell(value) {
+    const mode = webrtcMode(value);
+    if (mode === WEBRTC_BLOCK) return '<span class="chip on warnhue"><span class="dot"></span>' + pick("block", "chặn") + '</span>';
+    if (mode === WEBRTC_BYPASS) return '<span class="chip on"><span class="dot"></span>' + pick("bypass", "bypass") + '</span>';
+    return '<span class="chip">' + pick("keep", "giữ nguyên") + '</span>';
+  }
+  function updateWebrtcHint() {
+    const hint = $("f_webrtc_hint");
+    if (!hint) return;
+    switch (webrtcMode($("f_webrtc").value)) {
+      case WEBRTC_BLOCK:
+        hint.textContent = pick("Drops STUN/TURN, so WebRTC cannot leak an address — and calls stop working.",
+                                "Chặn STUN/TURN nên WebRTC không lộ IP — đồng thời cuộc gọi cũng không chạy.");
+        break;
+      case WEBRTC_BYPASS:
+        hint.textContent = pick("Forces STUN/TURN through the proxy, so WebRTC reports the proxy IP. Needs a proxy that relays UDP.",
+                                "Đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy. Cần proxy hỗ trợ UDP.");
+        break;
+      default:
+        hint.textContent = pick("No WebRTC-specific rule.", "Không áp rule riêng cho WebRTC.");
+    }
+  }
 
   // Common Wi-Fi vendor OUIs (first 3 MAC bytes). Keep in sync with the list in
   // config/wifi-socks.conf.example. Empty oui = random locally-administered 02:.
@@ -1803,6 +141,8 @@
     NET_BASE = take(meta.net_base, NET_BASE);
     TPROXY_BASE = take(meta.tproxy_port_base, TPROXY_BASE);
     BSSID_LIMIT = take(meta.bssid_limit, BSSID_LIMIT);
+    if (typeof meta.socks_udp === "boolean") SOCKS_UDP = meta.socks_udp;
+    if (meta.pool_unassigned === "block" || meta.pool_unassigned === "default") POOL_UNASSIGNED = meta.pool_unassigned;
   }
 
   const octet = i => NET_BASE + i;
@@ -3063,7 +1403,6 @@
     if (action === "test") return testPoolSlots(poolSelected);
     if (action === "delete") {
       deletePoolSlots([...poolSelected]);
-      deletePoolSlots();
     }
   }
   function clearPool() {
@@ -3202,6 +1541,26 @@
       ? ssids.map(s => `<option value="${s.idx}">${esc(s.name)} · idx ${s.idx}</option>`).join("")
       : `<option value="">${pick("No Wi-Fi", "Chưa có WiFi")}</option>`;
     if ([...select.options].some(o => o.value === keep)) select.value = keep;
+    const policy = $("poolUnassignedSelect");
+    const status = $("poolUnassignedStatus");
+    if (policy) policy.value = POOL_UNASSIGNED;
+    if (status) status.textContent = POOL_UNASSIGNED === "block"
+      ? pick("Enabled: unassigned devices are blocked", "Đang bật: thiết bị chưa gán bị chặn")
+      : pick("Disabled: unassigned devices use the default proxy", "Đang tắt: thiết bị chưa gán dùng proxy mặc định");
+  }
+  function savePoolUnassigned() {
+    if (!agent.connected) return toast(pick("Connect to the router first.", "Hãy kết nối router trước."));
+    const policy = $("poolUnassignedSelect").value;
+    const label = policy === "block" ? pick("Block Internet", "Chặn Internet") : pick("Use the default proxy", "Dùng proxy mặc định");
+    if (!confirm(pick(`Set unassigned devices to: ${label}? The router will dry-run and apply now.`, `Đặt thiết bị chưa gán thành: ${label}? Router sẽ dry-run và apply ngay.`))) return;
+    const button = $("poolUnassignedSave");
+    button.disabled = true; button.textContent = pick("Applying…", "Đang apply…");
+    api("set_pool_unassigned", "POST", { policy }).then(d => {
+      if (!d || !d.ok) throw new Error(routerReason(d, pick("Apply failed", "Apply thất bại")));
+      POOL_UNASSIGNED = policy; renderSettings(); poll();
+      toast(pick("Unassigned-device policy applied", "Đã apply chính sách thiết bị chưa gán"));
+    }).catch(e => toast(`${pick("Error: ", "Lỗi: ")}${e.message || e}`))
+      .finally(() => { button.disabled = false; button.textContent = pick("Save & Apply", "Lưu & Apply"); });
   }
   function loadSettingsGateway() {
     const box = $("settingsGateway");
@@ -3605,7 +1964,7 @@
     const c5 = ssids.filter(s => s.band === "5g").length;
     const proxies = new Set(ssids.map(s => s.host + ":" + s.port)).size;
     const iso = ssids.filter(s => s.isolate).length;
-    const web = ssids.filter(s => s.webrtc).length;
+    const web = ssids.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).length;
     const meter = (n, cls) => {
       const over = n > BSSID_LIMIT;
       const w = Math.min(100, (n / BSSID_LIMIT) * 100);
@@ -3634,7 +1993,7 @@
     count("analytics5").textContent = c5;
     count("analyticsProxyCount").textContent = proxies;
     count("analyticsIsolation").textContent = ssids.filter(s => s.isolate).length;
-    count("analyticsWebrtc").textContent = ssids.filter(s => s.webrtc).length;
+    count("analyticsWebrtc").textContent = ssids.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).length;
     const sb = agent.singbox;
     const dot = count("analyticsSingboxDot");
     const status = count("analyticsSingboxStatus");
@@ -3676,7 +2035,7 @@
         <td class="mono sub">${subnet(s.idx)}</td>
         <td>${auth}</td>
         <td>${s.isolate ? '<span class="chip on"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
-        <td>${s.webrtc ? '<span class="chip on warnhue"><span class="dot"></span>on</span>' : '<span class="chip">off</span>'}</td>
+        <td>${webrtcCell(s.webrtc)}</td>
         <td data-health="${s.idx}">${healthCell(s.idx)}</td>
         <td><button class="iconbtn" data-pool="${s.idx}">${pick("Pool", "Pool")}</button></td>
         <td><div class="rowbtns">
@@ -3704,7 +2063,7 @@
 # name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type
 `;
     const lines = [...ssids].sort((a, b) => a.idx - b.idx).map(s =>
-      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, s.webrtc ? 1 : 0, s.mac_oui || "", s.proxy_type || "socks5"].join("|")
+      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, webrtcMode(s.webrtc), s.mac_oui || "", s.proxy_type || "socks5"].join("|")
     );
     return head + lines.join("\n") + (lines.length ? "\n" : "");
   }
@@ -3717,7 +2076,10 @@
     const outbounds = sorted.map(s => {
       const isHttp = (s.proxy_type || "socks5") === "http";
       const o = { type: isHttp ? "http" : "socks", tag: `out-w${s.idx}`, server: s.host, server_port: Number(s.port) };
-      if (!isHttp) { o.version = "5"; o.network = "tcp"; }
+      // SOCKS_UDP on the router decides whether a socks outbound is pinned to
+      // TCP; unpinned means sing-box also relays UDP ASSOCIATE. An HTTP proxy
+      // has no UDP transport, so it is never pinned either way.
+      if (!isHttp) { o.version = "5"; if (!SOCKS_UDP) o.network = "tcp"; }
       if (s.user) { o.username = s.user; o.password = s.pass || ""; }
       return o;
     });
@@ -3731,9 +2093,15 @@
 
   function genNft() {
     const sorted = [...ssids].sort((a, b) => a.idx - b.idx);
-    const webrtc = sorted.filter(s => s.webrtc).flatMap(s => [
+    const webrtc = sorted.filter(s => webrtcMode(s.webrtc) === WEBRTC_BLOCK).flatMap(s => [
       `    iifname "br-w${s.idx}" tcp dport { ${STUN_TCP} } drop`,
       `    iifname "br-w${s.idx}" udp dport { ${STUN_UDP} } drop`
+    ]);
+    // Bypass hijacks STUN/TURN ahead of every return rule, so the STUN server
+    // sees the proxy and hands back the proxy's IP as the reflexive candidate.
+    const webrtcBypass = sorted.filter(s => webrtcMode(s.webrtc) === WEBRTC_BYPASS).flatMap(s => [
+      `    iifname "br-w${s.idx}" tcp dport { ${STUN_TCP} } tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`,
+      `    iifname "br-w${s.idx}" udp dport { ${STUN_UDP} } tproxy ip to :${tport(s.idx)} meta mark set ${MARK} accept`
     ]);
     const bypass = [...new Set(sorted.map(s => s.host).filter(isIP))].map(h => `    ip daddr ${h} return`);
     const tproxy = sorted.flatMap(s => [
@@ -3749,6 +2117,7 @@
       "  }",
       "  chain prerouting {",
       "    type filter hook prerouting priority mangle; policy accept;",
+      ...webrtcBypass,
       "    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return",
       ...bypass,
       ...tproxy,
@@ -3931,7 +2300,7 @@
     openContextMenu(x, y, [
       { label: pick("Test selected", "Test mục đã chọn"), run: () => testPoolSlots(poolSelected) },
       { label: pick("Delete selected", "Xóa mục đã chọn"), danger: true, run: () => {
-      deletePoolSlots([...poolSelected]);
+        deletePoolSlots([...poolSelected]);
       } }
     ]);
   }
@@ -3955,7 +2324,8 @@
     $("f_user").value = s ? (s.user || "") : "";
     $("f_pass").value = s ? (s.pass || "") : "";
     $("f_isolate").checked = s ? !!s.isolate : true;
-    $("f_webrtc").checked = s ? !!s.webrtc : true;
+    $("f_webrtc").value = String(s ? webrtcMode(s.webrtc) : WEBRTC_BLOCK);
+    updateWebrtcHint();
     $("f_vendor").value = s ? (s.mac_oui || "") : "";
     $("f_err").textContent = "";
     $("probeBtn").hidden = !agent.connected;
@@ -4000,7 +2370,7 @@
     const mac_oui = $("f_vendor").value;
     if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err(pick("mac_oui must look like AA:BB:CC.", "mac_oui phải dạng AA:BB:CC."));
 
-    const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: $("f_webrtc").checked, mac_oui };
+    const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: webrtcMode($("f_webrtc").value), mac_oui };
     if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     configDirty = true;
@@ -4048,7 +2418,7 @@
         name: p[0].trim(), band: (p[1] || "2g").trim(), idx,
         key: (p[3] || "").trim(), host: (p[4] || "").trim(), port: (p[5] || "1080").trim(),
         user: (p[6] || "").trim(), pass: (p[7] || "").trim(),
-        isolate: (p[8] || "1").trim() === "1", webrtc: (p[9] || "0").trim() === "1",
+        isolate: (p[8] || "1").trim() === "1", webrtc: webrtcMode((p[9] || "0").trim()),
         mac_oui: (p[10] || "").trim(), proxy_type: (p[11] || "socks5").trim().toLowerCase()
       });
     });
@@ -4118,6 +2488,7 @@
   $("backdrop").onclick = e => { if (e.target.id === "backdrop") closeModal(); };
   $("f_idx").oninput = updateDerived;
   $("f_vendor").onchange = updateDerived;
+  $("f_webrtc").onchange = updateWebrtcHint;
   $("parseProxyBtn").onclick = fillCompactProxy;
   $("f_proxy_compact").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); fillCompactProxy(); } };
   $("languageSelect").onchange = e => setLanguage(e.target.value);
@@ -4291,6 +2662,7 @@
   $("resetAllBtn").onclick = resetEverything;
   $("settingsBtn").onclick = openSettings;
   $("settingsRefresh").onclick = refreshSettings;
+  $("poolUnassignedSave").onclick = savePoolUnassigned;
   $("settingsHealth").onclick = runSettingsHealth;
   $("settingsRestart").onclick = restartSingbox;
   $("settingsGatewayOpen").onclick = openGateway;
@@ -4491,6 +2863,3 @@
   initAgent();
   updateConnHint();
 })();
-</script>
-</body>
-</html>

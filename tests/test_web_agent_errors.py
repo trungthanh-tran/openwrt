@@ -22,10 +22,19 @@ ROOT = Path(__file__).resolve().parents[1]
 PANEL = ROOT / "console" / "web" / "control-panel.html"
 NODE = shutil.which("node")
 
+# The console used to be one HTML file with its CSS and JS inline. Both are now
+# separate files shared by every page, so a test that only searches for a string
+# looks at all three rather than guessing which one it landed in.
+def console_source() -> str:
+    return "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in (PANEL, PANEL.with_name("app.css"), PANEL.with_name("app.js"))
+    )
+
 
 def reader_source() -> str:
     """agentBodyError + readJson, from the comment block to readJson's brace."""
-    text = PANEL.read_text(encoding="utf-8")
+    text = PANEL.with_name("app.js").read_text(encoding="utf-8")
     start = text.index("  // Every answer from the agent is JSON")
     end = text.index("\n  }\n", text.index("function readJson", start)) + len("\n  }\n")
     return text[start:end]
@@ -111,7 +120,7 @@ class AgentAnswerTests(unittest.TestCase):
 
 def reason_source() -> str:
     """routerReason, from its comment block to its closing brace."""
-    text = PANEL.read_text(encoding="utf-8")
+    text = PANEL.with_name("app.js").read_text(encoding="utf-8")
     start = text.index("  // What the router said, trimmed")
     end = text.index("\n  }\n", text.index("function routerReason", start)) + len("\n  }\n")
     return text[start:end]
@@ -180,7 +189,7 @@ class PanelParsesEveryAnswerSafelyTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = PANEL.read_text(encoding="utf-8")
+        cls.text = console_source()
 
     def test_no_raw_json_parsing_is_left(self):
         self.assertNotIn("r.json()", self.text)

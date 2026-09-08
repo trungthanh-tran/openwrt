@@ -36,7 +36,7 @@ failures.
 | Read-only status report | `scripts/doctor.sh` |
 | Read-only evidence collection | `scripts/diagnose.sh` |
 | LAN API | `agent/cgi/sbproxy`, `agent/sbproxy-healthd` |
-| Web console (self-hosted at `/www/sbproxy/index.html`) | `console/web/control-panel.html` |
+| Web console (self-hosted at `/www/sbproxy/index.html`) | `console/web/control-panel.html` (shell) · `app.js` (code) · `app.css` (styling) |
 | Native desktop console (Tkinter, no WebView) | `console/desktop/main.py` |
 | Tests | `tests/` — see [TEST-MATRIX.md](TEST-MATRIX.md) |
 

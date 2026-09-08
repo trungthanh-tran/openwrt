@@ -1131,7 +1131,7 @@ fi
 echo "== versioning and self-update =="
 project_version="$(tr -d ' \r\n' < "$ROOT/VERSION")"
 match "VERSION is semver or snapshot" "$project_version" '^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$'
-ui_version="$(sed -n 's/.*const UI_VERSION = "\([0-9.]*\(-SNAPSHOT\)\{0,1\}\)".*/\1/p' "$ROOT/console/web/control-panel.html")"
+ui_version="$(sed -n 's/.*const UI_VERSION = "\([0-9.]*\(-SNAPSHOT\)\{0,1\}\)".*/\1/p' "$ROOT/console/web/app.js")"
 eq "web console version matches VERSION file" "$ui_version" "$project_version"
 desktop_version="$(sed -n 's/^APP_VERSION = "\([0-9.]*\(-SNAPSHOT\)\{0,1\}\)"$/\1/p' "$ROOT/console/desktop/main.py")"
 eq "desktop console version matches VERSION file" "$desktop_version" "$project_version"
@@ -1173,7 +1173,7 @@ match "Linux deploy release tests its GUI executable" "$linux_bundle" 'xvfb-run.
 match "release workflow builds Windows and Linux" "$release_workflow" 'needs: \[windows, linux\]'
 match "release workflow uploads standalone Windows executable" "$release_workflow" 'sbproxy-web-deployer-\*-windows-x64\.exe'
 match "release workflow uploads full Windows console" "$release_workflow" 'sbproxy-console-\*-windows-x64\.exe'
-match "web applies Wi-Fi mutations immediately" "$(cat "$ROOT/console/web/control-panel.html")" 'function autoApplyConfig\('
+match "web applies Wi-Fi mutations immediately" "$(cat "$ROOT/console/web/app.js")" 'function autoApplyConfig\('
 match "release workflow publishes only after platform builds" "$release_workflow" 'gh release create'
 if [ -s "$ROOT/docs/images/web-deployer-windows.png" ] &&
    [ -s "$ROOT/docs/images/web-dashboard.png" ] &&
@@ -1269,8 +1269,10 @@ eq "the merged file still sources cleanly" \
   "$(sh -c '. "$1" && echo sourced' _ "$STUB/cur.sh" 2>&1)" "sourced"
 
 eq "a missing packaged file is not an error" "$(sh "$SU" --merge-settings "$STUB/nope.sh" "$STUB/cur.sh"; echo $?)" "0"
-match "web console can upload update package" "$(cat "$ROOT/console/web/control-panel.html")" 'apiUrl\("update"\)'
-web_console="$(cat "$ROOT/console/web/control-panel.html"; cat "$ROOT/console/web/i18n.en.js")"
+match "web console can upload update package" "$(cat "$ROOT/console/web/app.js")" 'apiUrl\("update"\)'
+# The console is a shell plus its stylesheet and script. The assertions below
+# look for a string anywhere in it rather than tracking which file it lives in.
+web_console="$(cat "$ROOT/console/web/control-panel.html" "$ROOT/console/web/app.css" "$ROOT/console/web/app.js" "$ROOT/console/web/i18n.en.js")"
 match "web console offers English and Vietnamese" "$web_console" 'id="languageSelect"'
 match "web console persists language preference" "$web_console" 'localStorage\.setItem\(LANGUAGE_KEY, language\)'
 match "web console switches language live" "$web_console" 'function setLanguage\(next\)'

@@ -29,11 +29,21 @@ NEVER_TRANSLATED = {"Tiếng Việt"}
 
 
 def source() -> str:
+    """The panel as one document again: markup, then the locale and app scripts.
+
+    The console is split across control-panel.html, app.js and the locale
+    bundles, but the audit reads it as a whole — a phrase in the markup and its
+    translation in a bundle only make sense together. Splicing them back in
+    place of the app.js tag also keeps `<body>`..`<script>` meaning markup and
+    everything from `<script>` meaning code, as the checks below assume.
+    """
     panel = PANEL.read_text(encoding="utf-8")
     locale = EN_LOCALE.read_text(encoding="utf-8")
-    marker = "<script>"
+    app = PANEL.with_name("app.js").read_text(encoding="utf-8")
+    marker = '<script src="app.js"></script>'
     at = panel.index(marker)
-    return panel[:at] + marker + "\n" + locale + "\n</script>\n" + panel[at + len(marker):]
+    return (panel[:at] + "<script>\n" + locale + "\n" + app + "\n</script>\n"
+            + panel[at + len(marker):])
 
 
 def map_keys(text: str, start: str, end: str) -> list[str]:

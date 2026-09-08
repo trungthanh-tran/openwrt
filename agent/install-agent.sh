@@ -94,10 +94,14 @@ chmod 755 /www/cgi-bin/sbproxy
 log "5) UI self-host -> /www/sbproxy/ (index.html + offline Bootstrap assets)"
 mkdir -p /www/sbproxy/assets
 cp "$SB_ROOT/console/web/control-panel.html" /www/sbproxy/index.html
+# app.js picks its workspace from the filename it was loaded as, so each entry
+# point needs to exist as a URL. They are the same shell, so the repo keeps one
+# copy and the fan-out happens here -- eight checked-in duplicates were how the
+# console drifted four releases apart from itself.
 for page in config devices analytics settings status egress diagnose maintenance; do
-  cp "$SB_ROOT/console/web/${page}.html" "/www/sbproxy/${page}.html"
+  cp "$SB_ROOT/console/web/control-panel.html" "/www/sbproxy/${page}.html"
 done
-cp "$SB_ROOT/console/web/i18n.vi.js" "$SB_ROOT/console/web/i18n.en.js" /www/sbproxy/
+cp "$SB_ROOT/console/web/app.css" "$SB_ROOT/console/web/app.js" "$SB_ROOT/console/web/i18n.vi.js" "$SB_ROOT/console/web/i18n.en.js" /www/sbproxy/
 cp "$SB_ROOT/console/web/assets/"* /www/sbproxy/assets/ 2>/dev/null \
   || echo "  warning: console/web/assets/ was not found — the UI falls back to its built-in styling"
 

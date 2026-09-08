@@ -51,12 +51,12 @@ if [ "$RUN_TESTS" = 1 ]; then
 else
   echo "WARNING: skipping tests at the operator's request" >&2
 fi
-for file in VERSION console/desktop/main.py console/web/control-panel.html; do sed -i "s/$SOURCE/$RELEASE/g" "$file"; done
-git add VERSION console/desktop/main.py console/web/control-panel.html
+for file in VERSION console/desktop/main.py console/web/app.js; do sed -i "s/$SOURCE/$RELEASE/g" "$file"; done
+git add VERSION console/desktop/main.py console/web/app.js
 git commit -m "release: $RELEASE"
 git tag -a "$RELEASE" -m "Release $RELEASE"
-for file in VERSION console/desktop/main.py console/web/control-panel.html; do sed -i "s/$RELEASE/$NEXT/g" "$file"; done
-git add VERSION console/desktop/main.py console/web/control-panel.html
+for file in VERSION console/desktop/main.py console/web/app.js; do sed -i "s/$RELEASE/$NEXT/g" "$file"; done
+git add VERSION console/desktop/main.py console/web/app.js
 git commit -m "chore: start $NEXT development"
 if [ "$PUSH" = 1 ]; then
   git push origin main

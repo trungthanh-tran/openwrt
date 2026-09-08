@@ -22,10 +22,19 @@ ROOT = Path(__file__).resolve().parents[1]
 PANEL = ROOT / "console" / "web" / "control-panel.html"
 NODE = shutil.which("node")
 
+# The console used to be one HTML file with its CSS and JS inline. Both are now
+# separate files shared by every page, so a test that only searches for a string
+# looks at all three rather than guessing which one it landed in.
+def console_source() -> str:
+    return "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in (PANEL, PANEL.with_name("app.css"), PANEL.with_name("app.js"))
+    )
+
 
 def patch_table_source() -> str:
     """The real function, from its comment block to its closing brace."""
-    text = PANEL.read_text(encoding="utf-8")
+    text = PANEL.with_name("app.js").read_text(encoding="utf-8")
     start = text.index("  // Patch a <tbody> from a keyed list")
     end = text.index("\n  }\n", text.index("function patchTable", start)) + len("\n  }\n")
     return text[start:end]
@@ -172,7 +181,7 @@ class PanelUsesThePatcherTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = PANEL.read_text(encoding="utf-8")
+        cls.text = console_source()
 
     def test_the_wifi_table_is_patched(self):
         self.assertIn("patchTable(tb, sorted, s => s.id, wifiRowCells)", self.text)
@@ -198,7 +207,7 @@ class RouterBusyStateTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = PANEL.read_text(encoding="utf-8")
+        cls.text = console_source()
 
     def test_the_page_has_a_busy_chip(self):
         self.assertIn('id="busyChip"', self.text)
@@ -238,7 +247,7 @@ class EveryWriteReachesTheRouterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = PANEL.read_text(encoding="utf-8")
+        cls.text = console_source()
 
     def test_every_router_write_announces_itself(self):
         for action in self.WRITES:
@@ -266,7 +275,7 @@ class PlainSkinTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.text = PANEL.read_text(encoding="utf-8")
+        cls.text = console_source()
 
     def test_dark_is_the_default_and_an_explicit_dark_lands_on_it(self):
         self.assertIn(':root, :root[data-theme="dark"] {', self.text)

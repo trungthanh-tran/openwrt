@@ -58,7 +58,8 @@ scripts/
   lib.sh                    # helpers + generator sing-box/nftables
 etc/init.d/sbproxy          # nạp nftables TPROXY + policy routing khi boot
 console/                    # Hai frontend độc lập dùng chung Agent API
-  web/control-panel.html    #   UI Web self-host trên router
+  web/control-panel.html    #   UI Web self-host trên router (khung)
+  web/app.js, web/app.css  #   Mã và giao diện dùng chung cho mọi trang
   deployer/                 #   EXE chỉ kiểm tra, cài/cập nhật và mở Web Console
   desktop/                  #   App Windows Tkinter native, không dùng HTML/WebView
     main.py / build.ps1 / build.sh  # code native + build 1 lệnh -> dist/sbproxy-console(.exe)

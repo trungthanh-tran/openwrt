@@ -35,7 +35,7 @@ trong WSL; console desktop chạy riêng bằng `cd console\desktop; .\run.ps1`.
 | Báo cáo trạng thái chỉ đọc | `scripts/doctor.sh` |
 | Gom bằng chứng chỉ đọc | `scripts/diagnose.sh` |
 | API LAN | `agent/cgi/sbproxy`, `agent/sbproxy-healthd` |
-| Console web (self-host tại `/www/sbproxy/index.html`) | `console/web/control-panel.html` |
+| Console web (self-host tại `/www/sbproxy/index.html`) | `console/web/control-panel.html` (khung) · `app.js` (mã) · `app.css` (giao diện) |
 | Console desktop native (Tkinter, không WebView) | `console/desktop/main.py` |
 | Test | `tests/` — xem [TEST-MATRIX.md](TEST-MATRIX.md) |
 

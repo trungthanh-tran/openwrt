@@ -6,7 +6,7 @@ config/     wifi-socks.conf(.example), settings.sh   # nguồn cấu hình + tun
 scripts/    lib.sh + entrypoints (apply, verify, doctor, clients, kick/ban…)
 etc/init.d/ sbproxy                                    # init nạp nft + policy routing
 agent/      CGI uhttpd + health daemon (agent LAN)
-console/    web/control-panel.html (UI nguồn) + desktop/ (app Tkinter native)
+console/    web/ (UI nguồn: control-panel.html + app.css + app.js) + desktop/ (app Tkinter native)
 pc/         script quản trị router từ máy Windows/Linux qua SSH
 docs/       *.md — tài liệu (Markdown là định dạng duy nhất)
 tests/      run-all.sh gọi mọi suite — xem docs/TEST-MATRIX.md

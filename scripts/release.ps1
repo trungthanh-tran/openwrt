@@ -51,18 +51,18 @@ function Set-Version([string]$value) {
   $mainText = [System.IO.File]::ReadAllText($main, [System.Text.Encoding]::UTF8)
   $mainText = $mainText -replace 'APP_VERSION = "[^"]+"', ('APP_VERSION = "' + $value + '"')
   [System.IO.File]::WriteAllText($main, $mainText, $utf8NoBom)
-  $web = Join-Path $repo 'console/web/control-panel.html'
+  $web = Join-Path $repo 'console/web/app.js'
   $webText = [System.IO.File]::ReadAllText($web, [System.Text.Encoding]::UTF8)
   $webText = $webText -replace 'const UI_VERSION = "[^"]+";', ('const UI_VERSION = "' + $value + '";')
   [System.IO.File]::WriteAllText($web, $webText, $utf8NoBom)
 }
 
 Set-Version $Version
-git add VERSION console/desktop/main.py console/web/control-panel.html
+git add VERSION console/desktop/main.py console/web/app.js
 git commit -m "release: $Version"
 git tag -a $Version -m "Release $Version"
 Set-Version $next
-git add VERSION console/desktop/main.py console/web/control-panel.html
+git add VERSION console/desktop/main.py console/web/app.js
 git commit -m "chore: start $next development"
 if ($Push) {
   git push origin main

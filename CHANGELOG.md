@@ -5,6 +5,19 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Changed
+- **Web console tách thành một khung + `app.css` + `app.js`.** Trước đây toàn bộ
+  CSS và JS nằm nội tuyến trong `control-panel.html`, và 8 trang còn lại
+  (`config.html`, `devices.html`, …) là bản sao nguyên khối của file đó. Chúng
+  trôi lệch: 8 trang đứng ở `0.5.30-SNAPSHOT` trong khi `control-panel.html` đã
+  `0.5.34-SNAPSHOT` — router phục vụ `/sbproxy/config.html` với UI cũ 4 bản,
+  không có select WebRTC 3 chế độ, và JS mới chạy trên markup cũ sẽ đọc sai
+  `#f_webrtc`. Nay mã và giao diện nằm một chỗ; repo chỉ giữ một file HTML, còn
+  `install-agent.sh`/`self-update.sh` nhân ra 8 URL lúc cài, vì `app.js` chọn
+  workspace theo tên file. `self-update.sh` cũng deploy `app.css`/`app.js`/
+  locale — trước đây nó chỉ chép HTML nên console sẽ chạy JS cũ sau mỗi lần cập
+  nhật.
+
 ### Added
 - **Theo dõi traffic theo host (`TRAFFIC_STATS=1` + `scripts/traffic.sh`).**
   `clients.sh` cho biết mỗi thiết bị tải bao nhiêu, nhưng không cho biết nó tải

@@ -64,7 +64,8 @@ def conf_shape(text: str) -> str:
 # --- web ---------------------------------------------------------------------
 
 def web_reset_source() -> str:
-    html = WEB.read_text(encoding="utf-8")
+    # The console's JS lives in app.js now; control-panel.html is only its shell.
+    html = WEB.with_name("app.js").read_text(encoding="utf-8")
     start = html.index('const RESET_WORD = "RESET";')
     end = html.index("function pullFromRouter() {", start)
     return html[start:end]
@@ -203,7 +204,8 @@ class ResetParityTests(unittest.TestCase):
 
     def test_both_fronts_carry_the_same_warning_facts(self):
         """Counts of SSIDs, pools and devices, the backup note, and 'cannot be undone'."""
-        html = WEB.read_text(encoding="utf-8")
+        # The warning text is in app.js; the shell only carries the markup.
+        html = WEB.read_text(encoding="utf-8") + WEB.with_name("app.js").read_text(encoding="utf-8")
         py = (ROOT / "console" / "desktop" / "main.py").read_text(encoding="utf-8")
         for needle in ("Xoá TẤT CẢ", "pre-apply", "Không hoàn tác được", "Gõ RESET"):
             self.assertTrue(re.search(needle.replace("RESET", r"(RESET|\$\{RESET_WORD\}|\{word\})"), html), needle)

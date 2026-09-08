@@ -219,6 +219,18 @@ deploy "$SB_ROOT/agent/cgi/sbproxy" "$CGI_DEST"
 if [ -d "$(dirname "$UI_DEST")" ]; then
   cp "$SB_ROOT/console/web/control-panel.html" "$UI_DEST"
   log "deploy $UI_DEST"
+  # The page is a shell around app.js and the locale bundles. Shipping the HTML
+  # without them would leave the console running whichever JS the last install
+  # happened to put there, which is the drift this split exists to end.
+  for _ui_js in app.css app.js i18n.vi.js i18n.en.js; do
+    [ -f "$SB_ROOT/console/web/$_ui_js" ] || continue
+    cp "$SB_ROOT/console/web/$_ui_js" "$(dirname "$UI_DEST")/$_ui_js"       && log "deploy $(dirname "$UI_DEST")/$_ui_js"
+  done
+  # app.js picks its workspace from the filename it was loaded as, so each entry
+  # point has to exist as a URL. They are all the same shell.
+  for _ui_page in config devices analytics settings status egress diagnose maintenance; do
+    cp "$SB_ROOT/console/web/control-panel.html" "$(dirname "$UI_DEST")/$_ui_page.html"
+  done
   # Offline Bootstrap and any other static files the UI references.
   if [ -d "$SB_ROOT/console/web/assets" ]; then
     mkdir -p "$(dirname "$UI_DEST")/assets"
