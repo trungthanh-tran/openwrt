@@ -860,8 +860,10 @@ case "$ACTION" in
       ' "$ASSIGN" 2>/dev/null \
       | jq -R -s 'split("\n") | map(select(length > 0) | split("\t"))
                   | map({mac:.[0], slot:(.[1]|tonumber), source:.[2]})')"
-    json_ok "$(jq -n --argjson idx "$idx" --argjson p "${proxies:-[]}" --argjson a "${assignments:-[]}" \
-      '{ok:true, idx:$idx, proxies:$p, assignments:$a}')"
+    pool_health_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+    pool_health="$(jq -c --arg i "$idx" '.pool_probes[$i] // {}' "$pool_health_file" 2>/dev/null || printf '{}')"
+    json_ok "$(jq -n --argjson idx "$idx" --argjson p "${proxies:-[]}" --argjson a "${assignments:-[]}" --argjson h "${pool_health:-{}}" \
+      '{ok:true, idx:$idx, proxies:$p, assignments:$a, pool_health:$h}')"
     ;;
 
   save_pool)

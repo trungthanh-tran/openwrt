@@ -2835,6 +2835,7 @@
   let activePool = [];
   const poolSelected = new Set();
   const poolStatus = {};
+  let activePoolHealth = {};
   // The pool list is plain text, so its words go through pick() like every
   // other runtime string, and one formatter keeps the four places that draw a
   // slot from drifting apart.
@@ -2848,6 +2849,10 @@
     `${i}: [${String(p.type || "socks5").toUpperCase()}] ${p.host}:${p.port}` +
     `${p.user ? " · auth" : ""}${p.label ? " · " + p.label : ""} · ${status}`;
   const poolStatusKey = (p, i) => p.slot == null ? i : p.slot;
+  function poolHealthState(i) {
+    const h = activePoolHealth[String(i)] || activePoolHealth[i];
+    return h && (h.state === "ok" || h.state === "slow" || h.state === "fail") ? h.state : "";
+  }
   let poolExpanded = false;
   let poolLoadSeq = 0;
   let poolLoadController = null;
@@ -2864,7 +2869,7 @@
     $("poolRows").innerHTML = shown.length
       ? shown.map((p, i) => `<div class="pool-select-row${poolSelected.has(i) ? " selected" : ""}" data-pool-row="${i}">
           <input type="checkbox" data-pool-select="${i}" ${poolSelected.has(i) ? "checked" : ""} aria-label="${pick("Select proxy slot", "Chọn proxy slot")} ${i}">
-          <span class="mono">${esc(poolLine(p, i, poolStatus[poolStatusKey(p, i)] || poolWord.untested()))}</span>
+          <span class="mono">${esc(poolLine(p, i, poolStatus[poolStatusKey(p, i)] || (poolHealthState(i) === "fail" ? "FAIL ⚠" : poolHealthState(i) === "slow" ? "SLOW ⚠" : poolHealthState(i) === "ok" ? "OK" : poolWord.untested())))}</span>
         </div>`).join("")
       : `<div class="sub" style="padding:10px">${pick("Pool is empty.", "Pool đang trống.")}</div>`;
     $("poolMore").hidden = activePool.length <= 2;
@@ -2898,6 +2903,7 @@
         if (seq !== poolLoadSeq || idx !== activePoolIdx) return;
         if (!d || d.ok === false) throw new Error((d && d.error) || "pool error");
         activePool = d.proxies || [];
+        activePoolHealth = d.pool_health || {};
         if (!activePool.length) {
           const current = ssids.find(s => s.idx === activePoolIdx);
           if (current && current.host && current.port) activePool = [{
@@ -2931,8 +2937,8 @@
     renderPoolList();
     Promise.all(rows.map(({ p, i }) =>
       api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
-        .then(d => { poolStatus[poolStatusKey(p, i)] = d && (d.state === "ok" || d.state === "slow") ? "OK" : "FAIL"; })
-        .catch(() => { poolStatus[poolStatusKey(p, i)] = "FAIL"; })
+        .then(d => { const state = d && (d.state === "ok" || d.state === "slow") ? d.state : "fail"; poolStatus[poolStatusKey(p, i)] = state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠"; activePoolHealth[String(i)] = { state }; })
+        .catch(() => { poolStatus[poolStatusKey(p, i)] = "FAIL ⚠"; activePoolHealth[String(i)] = { state: "fail" }; })
     )).then(() => {
       renderPoolList();
     });
