@@ -2795,6 +2795,16 @@
     const h = activePoolHealth[String(i)] || activePoolHealth[i];
     return h && (h.state === "ok" || h.state === "slow" || h.state === "fail") ? h.state : "";
   }
+  function poolHealthLabel(i) {
+    const h = activePoolHealth[String(i)] || activePoolHealth[i];
+    if (h && h.udp_state === "fail") return "UDP FAIL ⚠";
+    return poolHealthState(i) === "fail" ? "FAIL ⚠" : poolHealthState(i) === "slow" ? "SLOW ⚠" :
+      poolHealthState(i) === "ok" ? "OK" : poolWord.untested();
+  }
+  const activePoolNeedsUdp = () => {
+    const current = ssids.find(s => s.idx === activePoolIdx);
+    return !!current && Number(current.webrtc) === 2;
+  };
   let poolExpanded = false;
   let poolLoadSeq = 0;
   let poolLoadController = null;
@@ -2811,7 +2821,7 @@
     $("poolRows").innerHTML = shown.length
       ? shown.map((p, i) => `<div class="pool-select-row${poolSelected.has(i) ? " selected" : ""}" data-pool-row="${i}">
           <input type="checkbox" data-pool-select="${i}" ${poolSelected.has(i) ? "checked" : ""} aria-label="${pick("Select proxy slot", "Chọn proxy slot")} ${i}">
-          <span class="mono">${esc(poolLine(p, i, poolStatus[poolStatusKey(p, i)] || (poolHealthState(i) === "fail" ? "FAIL ⚠" : poolHealthState(i) === "slow" ? "SLOW ⚠" : poolHealthState(i) === "ok" ? "OK" : poolWord.untested())))}</span>
+          <span class="mono">${esc(poolLine(p, i, poolStatus[poolStatusKey(p, i)] || poolHealthLabel(i)))}</span>
         </div>`).join("")
       : `<div class="sub" style="padding:10px">${pick("Pool is empty.", "Pool đang trống.")}</div>`;
     $("poolMore").hidden = activePool.length <= 2;
@@ -2877,9 +2887,10 @@
     if (!rows.length) return toast(pick("Select at least one proxy.", "Chọn ít nhất một proxy."));
     rows.forEach(({ p, i }) => { poolStatus[poolStatusKey(p, i)] = poolWord.testing(); });
     renderPoolList();
+    const checkUdp = activePoolNeedsUdp();
     Promise.all(rows.map(({ p, i }) =>
-      api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
-        .then(d => { const state = d && (d.state === "ok" || d.state === "slow") ? d.state : "fail"; poolStatus[poolStatusKey(p, i)] = state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠"; activePoolHealth[String(i)] = { state }; })
+      api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5", check_udp: checkUdp })
+        .then(d => { const state = d && (d.state === "ok" || d.state === "slow") ? d.state : "fail"; const udpState = d && d.udp_state; poolStatus[poolStatusKey(p, i)] = udpState === "fail" ? "UDP FAIL ⚠" : state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠"; activePoolHealth[String(i)] = { state, udp_state: udpState }; })
         .catch(() => { poolStatus[poolStatusKey(p, i)] = "FAIL ⚠"; activePoolHealth[String(i)] = { state: "fail" }; })
     )).then(() => {
       renderPoolList();
@@ -2894,15 +2905,16 @@
     if (!targets.length) return Promise.resolve();
     let cursor = 0;
     const failed = [];
+    const checkUdp = activePoolNeedsUdp();
     const worker = () => {
       const item = targets[cursor++];
       if (!item) return Promise.resolve();
       const p = item.p;
-      return api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5" })
+      return api("probe_proxy", "POST", { host: p.host, port: p.port, user: p.user || "", pass: p.pass || "", type: p.type || "socks5", check_udp: checkUdp })
         .then(d => {
           const state = d && (d.state === "ok" || d.state === "slow") ? d.state : "fail";
           if (state === "fail") failed.push(`${p.host}:${p.port}`);
-          poolStatus[poolStatusKey(p, item.i)] = state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠";
+          poolStatus[poolStatusKey(p, item.i)] = d && d.udp_state === "fail" ? "UDP FAIL ⚠" : state === "ok" ? "OK" : state === "slow" ? "SLOW ⚠" : "FAIL ⚠";
         }).catch(() => {
           failed.push(`${p.host}:${p.port}`);
           poolStatus[poolStatusKey(p, item.i)] = "FAIL ⚠";

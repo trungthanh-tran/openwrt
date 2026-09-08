@@ -529,7 +529,7 @@ tương đương trừ vài mục ghi chú dưới đây.
 | Đổi MAC/BSSID ngẫu nhiên, chọn hãng (🎲) | ✅ | ✅ | `rotate_mac` |
 | Health + độ trễ từng SSID, sparkline | ✅ | ✅ | `status` |
 | Chẩn đoán đường dữ liệu 1 SSID (🩺) | ✅ | ✅ | `diagnose_ssid` |
-| Test 1 proxy từ router, kèm lý do fail (🧪) | ✅ | ✅ (form WiFi + Test cả pool) | `probe_proxy` |
+| Test 1 proxy từ router, kèm lý do fail (🧪); mode 2 kiểm tra thêm UDP ASSOCIATE/STUN và hiện `UDP FAIL` | ✅ | ✅ (form WiFi + Test cả pool) | `probe_proxy` |
 | **Pool proxy**: xem, thêm nhiều định dạng, xoá slot chọn lọc, xoá cả pool | ✅ | ✅ | `get_pool`, `save_pool` |
 | Pool: gán proxy cho 1 thiết bị / bỏ ghim | ✅ | ✅ (nút **Đổi proxy** ở màn Thiết bị) | `assign_proxy` |
 | Pool: chia đều thiết bị lên các slot | ✅ (chỉ trong code) | ✅ (**Rebalance client**) | `rebalance` |

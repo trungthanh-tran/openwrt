@@ -1295,6 +1295,8 @@ match "web console can diagnose one SSID"           "$web_console" 'api\("diagno
 match "web console can probe a proxy from the form" "$web_console" 'api\("probe_proxy", "POST"'
 match "web console probes new pool proxies before saving" "$web_console" 'function probeNewPoolRows\(rows\)'
 match "web console limits immediate pool probes" "$web_console" 'Math\.min\(4, targets\.length\)'
+match "mode 2 requests a UDP proxy probe" "$web_console" 'check_udp: checkUdp'
+match "web console warns about UDP-specific failures" "$web_console" 'UDP FAIL ⚠'
 match "pool loading has a timeout"                   "$web_console" 'setTimeout\(\(\) => controller\.abort\(\), 8000\)'
 match "pool loading retries once"                    "$web_console" 'loadPool\(1\)'
 match "pool dialog has a manual retry"               "$web_console" 'id="poolRefresh"'

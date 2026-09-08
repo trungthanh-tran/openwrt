@@ -516,7 +516,7 @@ equivalent except where noted.
 | Rotate MAC/BSSID with a vendor choice (🎲) | ✅ | ✅ | `rotate_mac` |
 | Per-SSID health + latency sparkline | ✅ | ✅ | `status` |
 | Diagnose one SSID's data path (🩺) | ✅ | ✅ | `diagnose_ssid` |
-| Probe one proxy from the router, with the failure reason (🧪) | ✅ | ✅ (Wi-Fi form + whole-pool test) | `probe_proxy` |
+| Probe one proxy from the router, with the failure reason (🧪); mode 2 also checks UDP ASSOCIATE/STUN and shows `UDP FAIL` | ✅ | ✅ (Wi-Fi form + whole-pool test) | `probe_proxy` |
 | **Proxy pool**: view, add in several provider formats, delete chosen slots, empty it | ✅ | ✅ | `get_pool`, `save_pool` |
 | Pool: pin/unpin one device's proxy | ✅ | ✅ (**Proxy** button on the Devices screen) | `assign_proxy` |
 | Pool: spread devices evenly over the slots | ✅ (code only) | ✅ (**Rebalance clients**) | `rebalance` |

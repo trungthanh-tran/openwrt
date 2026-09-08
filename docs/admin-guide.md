@@ -151,7 +151,7 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 ```
 `idx` duy nhất & ổn định (quyết định subnet `192.168.(10+idx).0/24`, cổng tproxy `12000+idx`). Có thể soạn bằng UI rồi copy/tải.
 
-`webrtc`: `0` giữ nguyên · `1` chặn STUN/TURN · `2` bypass — đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy (cần proxy relay được UDP).
+`webrtc`: `0` giữ nguyên · `1` chặn STUN/TURN · `2` bypass — đẩy STUN/TURN qua proxy để WebRTC báo IP của proxy. Ở mode `2`, WebUI và healthd kiểm tra SOCKS5 UDP ASSOCIATE bằng STUN thật: slot `UDP FAIL` bị quarantine, không được random chọn, và chỉ phục hồi sau khi probe UDP pass. HTTP proxy không hợp lệ cho mode này.
 
 **Tunables `config/settings.sh`:**
 
