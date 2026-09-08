@@ -1792,6 +1792,14 @@
     "Ngày log": "Log date", "Tải gói debug": "Download debug report",
     "Cập nhật KHÔNG reload WiFi — cấu hình chỉ đổi khi bạn bấm “Đẩy & Áp” sau đó.": "Update does not reload Wi-Fi. Click “Push & Apply” to activate changes."
   };
+  Object.assign(EN_TEXT, {
+    "Thiết bị chưa gán proxy": "Unassigned devices",
+    "Chặn": "Block",
+    "sẽ giữ DHCP/gateway nhưng chặn DNS và Internet tới khi thiết bị được gán proxy.": "DHCP/gateway remain available, but DNS and Internet are blocked until a proxy is assigned.",
+    "Chặn Internet": "Block Internet",
+    "Dùng proxy mặc định": "Use the default proxy",
+    "Lưu & Apply": "Save & Apply"
+  });
   // Blocks that contain inline markup are swapped whole rather than per text node.
   Object.assign(EN_TEXT, {
     "Mỗi dòng là một proxy.": "One proxy per line.", "Bạn có thể dán nhiều proxy cùng lúc vào ô này.": "You can paste multiple proxies into this field at once.",
@@ -3334,12 +3342,14 @@
     const policy = $("poolUnassignedSelect");
     const status = $("poolUnassignedStatus");
     if (policy) policy.value = POOL_UNASSIGNED;
-    if (status) status.textContent = POOL_UNASSIGNED === "block" ? "Đang bật: thiết bị chưa gán bị chặn" : "Đang tắt: thiết bị chưa gán dùng proxy mặc định";
+    if (status) status.textContent = POOL_UNASSIGNED === "block"
+      ? pick("Enabled: unassigned devices are blocked", "Đang bật: thiết bị chưa gán bị chặn")
+      : pick("Disabled: unassigned devices use the default proxy", "Đang tắt: thiết bị chưa gán dùng proxy mặc định");
   }
   function savePoolUnassigned() {
     if (!agent.connected) return toast(pick("Connect to the router first.", "Hãy kết nối router trước."));
     const policy = $("poolUnassignedSelect").value;
-    const label = policy === "block" ? "Chặn Internet" : "Dùng proxy mặc định";
+    const label = policy === "block" ? pick("Block Internet", "Chặn Internet") : pick("Use the default proxy", "Dùng proxy mặc định");
     if (!confirm(pick(`Set unassigned devices to: ${label}? The router will dry-run and apply now.`, `Đặt thiết bị chưa gán thành: ${label}? Router sẽ dry-run và apply ngay.`))) return;
     const button = $("poolUnassignedSave");
     button.disabled = true; button.textContent = pick("Applying…", "Đang apply…");
