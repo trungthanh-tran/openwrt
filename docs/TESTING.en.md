@@ -32,9 +32,15 @@ Confirm that all configured SSIDs exist, MAC addresses begin with `02:`, each br
    still work, and `0` applies no rule so there is nothing to check. `webrtc=2`
    needs `SOCKS_UDP=1` and a proxy that relays UDP ASSOCIATE; without one it
    looks identical to `1` from the outside.
-5. Verify that two clients on the same isolated SSID cannot reach each other.
-6. Verify that clients cannot reach router administration ports.
-7. Verify that no public IPv6 route is available.
+5. On an SSID whose proxy is SOCKS5, check that UDP reaches the Internet:
+   open an HTTP/3 page or place a video call. `SOCKS_UDP=1` (the default)
+   should carry it; QUIC that hangs before falling back to TCP usually means
+   the upstream proxy refuses UDP ASSOCIATE, so set `SOCKS_UDP=0` and reapply.
+   An SSID on an HTTP proxy always keeps the UDP 443 drop — HTTP proxies have
+   no UDP transport.
+6. Verify that two clients on the same isolated SSID cannot reach each other.
+7. Verify that clients cannot reach router administration ports.
+8. Verify that no public IPv6 route is available.
 
 ## SOCKS change check
 

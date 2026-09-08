@@ -92,6 +92,27 @@ Máy 1 ở WiFi Alpha (192.168.11.x), máy 2 ở WiFi Bravo (192.168.12.x). Ping
 Từ client khách mở `http://192.168.(10+idx).1` (LuCI) và thử `ssh`.
 **Đạt khi:** bị từ chối (rule chặn admin `22/80/443`).
 
+### B7. UDP đi qua proxy (SOCKS_UDP=1)
+Chỉ áp dụng cho SSID dùng proxy socks5. Trên client:
+```sh
+nslookup example.com            # phải ra fake-IP 198.18.0.0/15 như B2
+```
+Mở một trang chạy QUIC/HTTP3 (ví dụ https://cloudflare-quic.com) hoặc gọi video.
+**Đạt khi:** trang báo dùng HTTP/3, hoặc cuộc gọi có media hai chiều.
+
+Kiểm tra ngược trên router:
+```sh
+nft list chain inet sbproxy w<IDX> | grep 'udp dport 443 drop'   # phải KHÔNG có
+jq '.outbounds[]|select(.tag=="out-w<IDX>")|.network' /etc/sing-box/config.json
+# null = có relay UDP · "tcp" = chỉ TCP
+```
+**Không đạt** (QUIC treo rồi mới rơi về TCP) thường là proxy upstream từ chối
+UDP ASSOCIATE. Đặt `SOCKS_UDP=0` rồi `apply` để trình duyệt rơi về TCP ngay,
+thay vì phải chờ timeout.
+
+> SSID dùng proxy HTTP luôn giữ rule drop UDP 443, kể cả khi `SOCKS_UDP=1`:
+> proxy HTTP không có kênh UDP nào để đi.
+
 ## C. Kịch bản đổi SOCKS không gián đoạn
 ```sh
 # Trên router:
@@ -108,6 +129,7 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
 | 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
+| 5b | UDP qua proxy | B7 | `SOCKS_UDP=1`: QUIC/media chạy được qua proxy socks5 |
 | 5 | WebRTC theo chế độ | B3 | `webrtc=1` không lộ IP · `webrtc=2` lộ IP của proxy, cuộc gọi vẫn chạy |
 | 6 | Cách ly client | B4 + B5 | không ping được nhau |
 

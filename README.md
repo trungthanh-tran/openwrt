@@ -10,6 +10,7 @@ Create multiple isolated SSIDs on a GL-MT6000 and route each SSID's IPv4 TCP/UDP
   current version is in [VERSION](VERSION) and in the console header.
 - OpenWrt 24.10 (`opkg`) and 25.12 (`apk`) are supported; GL.iNet OEM firmware is experimental.
 - Only IPv4 is proxied. IPv6 services are disabled on managed SSIDs to prevent bypass.
+- SOCKS5 upstreams relay UDP through UDP ASSOCIATE by default (`SOCKS_UDP`), so QUIC, WebRTC media and game traffic leave through the proxy. HTTP upstreams are TCP-only and keep their QUIC block.
 - Port-53 DNS on managed SSIDs is hijacked into sing-box fake-IP; reverse mapping sends hostnames to the matching SOCKS upstream for remote resolution.
 - Changing SOCKS keeps Wi-Fi associated, but active sessions may be interrupted when sing-box restarts.
 

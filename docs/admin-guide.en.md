@@ -168,6 +168,28 @@ turns a per-packet map lookup into a per-connection one. Without it
 `POOL_DIVERT="auto"` simply switches divert off and everything still works,
 more slowly.
 
+## UDP through the proxy
+
+`SOCKS_UDP=1` (the default) lets a SOCKS5 outbound relay UDP with UDP
+ASSOCIATE, so QUIC, WebRTC media and game traffic reach the Internet carrying
+the proxy's address. It is also what makes `webrtc=2` work at all.
+
+Set `SOCKS_UDP=0` when the upstream proxies refuse UDP ASSOCIATE. sing-box
+would otherwise accept each UDP flow and blackhole it, so a QUIC attempt has to
+time out before the browser falls back to TCP. With it off, nftables drops UDP
+443 instead and the fallback is immediate.
+
+QUIC stays blocked wherever UDP cannot be delivered anyway: with `SOCKS_UDP=0`,
+and on any SSID that can route a device to an HTTP proxy — including one whose
+pool merely contains an HTTP slot — because HTTP proxies have no UDP transport.
+
+```sh
+# What the generator decided for one SSID:
+nft list chain inet sbproxy w1 | grep -c 'udp dport 443 drop'   # 1 = QUIC blocked here
+jq '.outbounds[]|select(.tag=="out-w1")|.network' /etc/sing-box/config.json
+# null = UDP relayed; "tcp" = TCP-only
+```
+
 ## Operations and recovery
 
 - Use full apply for SSID topology changes.
