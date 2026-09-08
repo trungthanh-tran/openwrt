@@ -579,6 +579,54 @@ else
   sk "build_singbox" "no jq"
 fi
 
+echo "== routing-rules.conf =="
+if command -v jq >/dev/null 2>&1; then
+  mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0||socks5'
+  ROUTES_OK="$STUB/routes.conf"
+  printf '%s\n' '# a comment' 'proxy|domain|api.example.com' 'direct|domain_suffix|example.com' \
+    'block|domain_keyword|doubleclick' 'direct|ip_cidr|103.0.0.0/8' > "$ROUTES_OK"
+  ( CONF="$STUB/c.conf" ROUTES="$ROUTES_OK" SINGBOX_CONF="$STUB/routes.json" build_singbox ) >/dev/null 2>&1
+  rcfg="$STUB/routes.json"
+  eq "a routed config is still valid JSON" "$(jq -e . "$rcfg" >/dev/null 2>&1 && echo yes)" "yes"
+  # File order is the whole semantic: first match wins, so a narrow exception
+  # placed above a broad rule has to stay above it after generation.
+  eq "rules keep their file order, after sniff and DNS" \
+    "$(jq -c '[.route.rules[]|(.domain//.domain_suffix//.domain_keyword//.ip_cidr//["-"])[0]]' "$rcfg")" \
+    '["-","-","api.example.com","example.com","doubleclick","103.0.0.0/8","-","-"]'
+  eq "direct leaves the proxy"  "$(jq -r '.route.rules[]|select(.domain_suffix)|.outbound' "$rcfg")" "direct"
+  eq "block rejects"            "$(jq -r '.route.rules[]|select(.domain_keyword)|.action' "$rcfg")" "reject"
+  eq "ip_cidr routes direct"    "$(jq -r '.route.rules[]|select(.ip_cidr)|.outbound' "$rcfg")" "direct"
+  # `proxy` cannot name one outbound, so it becomes an inbound-scoped rule per
+  # inbound; without it the broad `direct` line below would swallow the host.
+  eq "proxy is scoped to an inbound and its own outbound" \
+    "$(jq -c '.route.rules[]|select(.domain)|[.inbound[0],.outbound]' "$rcfg")" '["in-w1","out-w1"]'
+  # Routing rules must precede the inbound-to-outbound mapping, or nothing
+  # could ever be taken away from the proxy.
+  eq "routing rules come before the inbound mapping" \
+    "$(jq '([.route.rules[]|has("domain_suffix")]|index(true)) < ([.route.rules[]|(has("inbound") and has("outbound") and (has("domain")|not))]|index(true))' "$rcfg")" "true"
+
+  ( CONF="$STUB/c.conf" ROUTES="$STUB/no-such-routes.conf" SINGBOX_CONF="$STUB/noroutes.json" build_singbox ) >/dev/null 2>&1
+  eq "no routing file adds no rules" \
+    "$(jq '[.route.rules[]|select(has("domain") or has("domain_suffix") or has("domain_keyword") or has("ip_cidr"))]|length' "$STUB/noroutes.json")" "0"
+
+  for bad in 'direct|domain' 'sideways|domain|x.com' 'direct|regex|x.com' 'direct|domain|' \
+             'direct|ip_cidr|not-a-cidr' 'direct|domain|a/b' 'direct|domain|has space'; do
+    printf '%s\n' "$bad" > "$STUB/bad-routes.conf"
+    if ( ROUTES="$STUB/bad-routes.conf" validate_routes ) >/dev/null 2>&1; then
+      no "routing rule rejected: $bad"
+    else
+      ok "routing rule rejected: $bad"
+    fi
+  done
+  if ( ROUTES="$ROUTES_OK" validate_routes ) >/dev/null 2>&1; then
+    ok "a well-formed routing file validates"
+  else
+    no "a well-formed routing file validates"
+  fi
+else
+  sk "routing-rules.conf" "no jq"
+fi
+
 echo "== clients.sh (integration) =="
 if command -v jq >/dev/null 2>&1; then
   printf '{"radio0":{"interfaces":[{"section":"w1","ifname":"phy0-ap0"}]}}\n' > "$STUB/wifi.json"

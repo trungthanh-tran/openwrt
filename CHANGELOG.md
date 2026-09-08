@@ -6,6 +6,16 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Bypass direct/block theo domain/IP (`config/routing-rules.conf`).** Trước đây
+  mọi đích đều đi qua proxy, không có cách nào cho ngân hàng nội địa đi thẳng hay
+  chặn tracker ngay tại router. File mới nhận từng luật `action|type|value` với
+  `direct` (ra thẳng WAN), `block` (chặn) và `proxy` (ép qua proxy), khớp theo
+  `domain`, `domain_suffix`, `domain_keyword` hoặc `ip_cidr`. Luật giữ đúng thứ
+  tự trong file — khớp đầu tiên thắng — và được xét trước khi traffic được gán
+  vào proxy của SSID, nên một luật hẹp đặt trên có thể khoét lỗ trong luật rộng
+  đặt dưới. Không có file thì hành vi y như cũ. `apply.sh`/`preflight.sh`
+  validate file này; bản thật nằm trong `.gitignore`.
+
 - **Chặn thiết bị chưa được gán proxy (`POOL_UNASSIGNED=block`).** Trước đây một
   máy trong SSID có pool nhưng chưa được ghim sẽ âm thầm dùng proxy trong
   `wifi-socks.conf` — nghĩa là mọi máy chưa ghim của SSID đó cùng ra một IP,

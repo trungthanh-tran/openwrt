@@ -1,0 +1,44 @@
+# routing-rules.conf — cho một đích đi thẳng, bị chặn, hay bắt buộc qua proxy.
+# Copy sang config/routing-rules.conf để dùng; không có file thì mọi traffic đi
+# qua proxy như trước.
+#
+# Một luật mỗi dòng, ngăn bằng `|`, không thêm khoảng trắng quanh dấu ngăn.
+# Dòng trống và dòng bắt đầu bằng `#` bị bỏ qua.
+#
+#   action|type|value
+#
+# action:
+#   direct  đi thẳng ra WAN, KHÔNG qua proxy. Dùng cho ngân hàng nội địa, dịch
+#           vụ chặn IP nước ngoài, hay thứ gì phải thấy IP thật của router.
+#   block   chặn hẳn. Dùng cho quảng cáo, tracker, tên miền không muốn máy chạm.
+#   proxy   ép qua proxy của SSID đó. Chỉ cần khi muốn khoét một lỗ nhỏ bên
+#           trong một luật `direct` rộng hơn đứng trước nó.
+#
+# type:
+#   domain          khớp CHÍNH XÁC tên miền:            example.com
+#   domain_suffix   khớp tên miền và mọi tên miền con:   .example.com
+#   domain_keyword  khớp mọi tên miền chứa chuỗi này:    doubleclick
+#   ip_cidr         khớp IP đích hoặc dải:               1.2.3.0/24
+#
+# THỨ TỰ CÓ Ý NGHĨA: luật khớp đầu tiên thắng, và mọi luật ở đây đều được xét
+# TRƯỚC khi traffic được gán vào proxy của SSID. Đặt ngoại lệ hẹp lên trên luật
+# rộng.
+#
+# Luật `domain*` dựa vào sniff tên miền, nên chỉ áp dụng cho traffic có tên
+# miền để đọc (TLS SNI, HTTP Host). Với thứ chỉ có IP, dùng `ip_cidr`.
+
+# Ngân hàng nội địa thường chặn IP nước ngoài — cho đi thẳng.
+direct|domain_suffix|vietcombank.com.vn
+direct|domain_suffix|techcombank.com.vn
+
+# Dải IP trong nước đi thẳng, không tốn băng thông proxy.
+direct|ip_cidr|103.0.0.0/8
+
+# Quảng cáo và tracker: chặn ở router, mọi thiết bị đều được lợi.
+block|domain_keyword|doubleclick
+block|domain_suffix|googlesyndication.com
+
+# Ví dụ khoét lỗ: mọi thứ .example.com đi thẳng, RIÊNG api. thì qua proxy.
+# Luật hẹp phải đứng TRƯỚC luật rộng.
+proxy|domain|api.example.com
+direct|domain_suffix|example.com

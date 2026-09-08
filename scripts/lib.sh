@@ -5,6 +5,7 @@
 SB_ROOT="${SB_ROOT:-$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 POOLS="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
+ROUTES="${ROUTES:-$SB_ROOT/config/routing-rules.conf}"
 SETTINGS="${SETTINGS:-$SB_ROOT/config/settings.sh}"
 
 # A settings.sh edited on Windows -- or copied there and back by a Windows
@@ -1000,6 +1001,78 @@ validate_pools() {
   ' "$POOLS" || die "proxy-pools.conf is invalid."
 }
 
+# --- Routing rules ----------------------------------------------------------
+# config/routing-rules.conf sends one destination straight out the WAN, blocks
+# it, or forces it back through the proxy. Absent file = every destination goes
+# through the proxy, which is what happened before this existed.
+validate_routes() {
+  [ -f "${ROUTES:-}" ] || return 0
+  awk -F'|' '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF != 3 { printf "line %d: expected 3 columns, found %d\n", NR, NF; bad=1; next }
+    {
+      action=tolower(trim($1)); type=tolower(trim($2)); value=trim($3)
+      if (action != "direct" && action != "block" && action != "proxy") {
+        printf "line %d: action must be direct, block or proxy\n", NR; bad=1
+      }
+      if (type != "domain" && type != "domain_suffix" && type != "domain_keyword" && type != "ip_cidr") {
+        printf "line %d: type must be domain, domain_suffix, domain_keyword or ip_cidr\n", NR; bad=1
+      }
+      if (value == "") { printf "line %d: value is empty\n", NR; bad=1 }
+      else if (length(value) > 253) { printf "line %d: value may be at most 253 bytes\n", NR; bad=1 }
+      # The generator writes these straight into JSON, so the charset is the
+      # quoting: nothing here can close a string or inject a field.
+      else if (value !~ /^[A-Za-z0-9._:\/-]+$/) {
+        printf "line %d: value may only contain letters, digits and . _ - : /\n", NR; bad=1
+      }
+      else if (type == "ip_cidr" && value !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/) {
+        printf "line %d: ip_cidr must look like 1.2.3.0/24\n", NR; bad=1
+      }
+      else if (type != "ip_cidr" && value ~ /\//) {
+        printf "line %d: a domain value must not contain /\n", NR; bad=1
+      }
+    }
+    END { exit bad ? 1 : 0 }
+  ' "$ROUTES" || die "routing-rules.conf is invalid."
+}
+
+# Sing-box route rules for config/routing-rules.conf, in file order, so the
+# first match wins exactly as the file reads top to bottom. Emitted with a
+# leading comma: they are spliced after rules that are always present.
+#
+# `direct` and `block` are one rule each. `proxy` cannot be, because the
+# outbound it means is whichever one this packet's inbound would have chosen,
+# and no single rule can say that. It becomes one inbound-scoped rule per
+# inbound instead, which is also why the pairs are passed in: dropping the line
+# and relying on fall-through would let a broader `direct` line BELOW it match,
+# and shadowing exactly that is the only reason the action exists.
+routes_json() { # "in-tag:out-tag in-tag:out-tag ..."
+  [ -f "${ROUTES:-}" ] || return 0
+  awk -F'|' -v pairs="${1:-}" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    BEGIN { npairs = split(pairs, pair, " ") }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+    NF != 3 { next }
+    {
+      action=tolower(trim($1)); type=tolower(trim($2)); value=trim($3)
+      if (value == "") next
+      if (action == "proxy") {
+        for (i = 1; i <= npairs; i++) {
+          split(pair[i], t, ":")
+          printf ",{\"inbound\":[\"%s\"],\"%s\":[\"%s\"],\"outbound\":\"%s\"}", t[1], type, value, t[2]
+        }
+        next
+      }
+      if (action == "block") verdict = "\"action\":\"reject\""
+      else verdict = "\"outbound\":\"direct\""
+      printf ",{\"%s\":[\"%s\"],%s}", type, value, verdict
+    }
+  ' "$ROUTES"
+}
+
 # --- Duplicate index validation --------------------------------------------
 check_unique_idx() {
   dup=$(awk -F'|' '!/^#/ && NF>=3 {gsub(/ /,"",$3); if($3!="") print $3}' "$CONF" \
@@ -1371,6 +1444,8 @@ build_singbox() {
   # Quoted through jq so a hostname or an unusual resolver cannot break the JSON.
   dns_upstream_json="$(jq -Rn --arg v "${DNS_UPSTREAM:-1.1.1.1}" '$v')"
   inbounds=""; outbounds=""; rules=""; sep=""
+  # Every inbound with the outbound it routes to, for the `proxy` routing rules.
+  _sb_pairs=""
   # One outbound object. Shared by the wifi-socks.conf row and by pool slots so
   # the two can never drift in how they quote a credential or pick a type.
   _sb_outbound() { # tag type host port user pass
@@ -1398,6 +1473,7 @@ build_singbox() {
     # The per-SSID inbound stays even in pool mode: it carries DNS and every
     # device that is not pinned to a slot yet.
     inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp}"
+    _sb_pairs="$_sb_pairs in-w$idx:out-w$idx"
     outbounds="$outbounds$sep$(_sb_outbound "out-w$idx" "$proxy_type" "$host" "$port" "$user" "$pass")"
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
     sep=","
@@ -1408,6 +1484,7 @@ build_singbox() {
     _sb_slot() { # slot type host port user pass label
       _s_tag="w$idx-s$1"
       inbounds="$inbounds,{\"type\":\"tproxy\",\"tag\":\"in-$_s_tag\",\"listen\":\"0.0.0.0\",\"listen_port\":$(pool_port "$idx" "$1")}"
+      _sb_pairs="$_sb_pairs in-$_s_tag:out-$_s_tag"
       outbounds="$outbounds,$(_sb_outbound "out-$_s_tag" "$2" "$3" "$4" "$5" "$6")"
       rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
       rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"outbound\":\"out-$_s_tag\"}"
@@ -1415,6 +1492,9 @@ build_singbox() {
     for_each_pool "$idx" _sb_slot
   }
   for_each_ssid _sb_row
+  # Routing rules are evaluated before any inbound is mapped to its outbound,
+  # or a destination could never be taken away from the proxy.
+  _sb_routes="$(routes_json "${_sb_pairs# }")"
 
   mkdir -p "$(dirname "$SINGBOX_CONF")"
   # Fake-IP DNS: return fake IPs to clients and map them back to hostnames on connect,
@@ -1444,7 +1524,7 @@ build_singbox() {
     { "type": "direct", "tag": "direct" }
   ],
   "route": {
-    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }${rules:+,} $rules ],
+    "rules": [ { "action": "sniff", "timeout": "1s" }, { "protocol": "dns", "action": "hijack-dns" }$_sb_routes${rules:+,} $rules ],
     "default_domain_resolver": "upstream",
     "final": "direct"
   },

@@ -3,6 +3,8 @@
 config/wifi-socks.conf
 # Pool proxy thật chứa user/pass của từng proxy.
 config/proxy-pools.conf
+# Luật định tuyến thật lộ tên miền/dải IP mà triển khai này quan tâm.
+config/routing-rules.conf
 # Token agent ở mọi thư mục.
 **/token
 # Bí mật cục bộ khác.
