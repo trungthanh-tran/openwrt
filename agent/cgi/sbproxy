@@ -29,7 +29,7 @@
 # POST ?action=uninstall     -> remove project-managed configuration
 # GET  ?action=health_now    -> run an immediate health probe
 # GET  ?action=diagnose_ssid&idx=N -> walk the data path of one SSID (wifi, bridge, dhcp, nft, routing, sing-box, proxy) and name the broken link
-# POST ?action=probe_proxy   body json {host,port,user?,pass?,type?} -> curl through that proxy now, with the reason it fails
+# POST ?action=probe_proxy   body json {host,port,user?,pass?,type?,check_udp?} -> TCP/HTTPS and optional SOCKS5 UDP/STUN probe
 # GET  ?action=gateway       -> default Internet gateway route/link/DNS/HTTP status + interface list
 # POST ?action=set_gateway   body json {interface} -> pin the expected uplink ("" = automatic)
 # POST ?action=switch_gateway body json {interface} -> make that interface the uplink (route metrics) and pin it
@@ -46,7 +46,9 @@
 # POST ?action=update[&force=1]  body=binary package (.tar.gz/.zip) -> self-update code
 
 # ---- env / config ----
-[ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
+if [ "${SBPROXY_SKIP_ENV:-0}" != "1" ] && [ -f /etc/sbproxy/env ]; then
+  . /etc/sbproxy/env
+fi
 SB_ROOT="${SB_ROOT:-/root/sbproxy}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
 TOKEN_FILE="${TOKEN_FILE:-/etc/sbproxy/token}"
@@ -677,7 +679,7 @@ case "$ACTION" in
     ;;
 
   health_now)
-    [ -x /usr/sbin/sbproxy-healthd ] && /usr/sbin/sbproxy-healthd --once >/dev/null 2>&1
+    [ "${SBPROXY_SKIP_ENV:-0}" = "1" ] || { [ -x /usr/sbin/sbproxy-healthd ] && /usr/sbin/sbproxy-healthd --once >/dev/null 2>&1; }
     H="$(cat "$HEALTH_FILE" 2>/dev/null)"; [ -n "$H" ] || H='{}'
     printf '%s' "$H" | jq -e '
       type == "object" and
@@ -786,19 +788,21 @@ case "$ACTION" in
       (.host | clean) and (.port | integer) and
       ((has("user") | not) or (.user | clean)) and
       ((has("pass") | not) or (.pass | clean)) and
-      ((has("type") | not) or (.type == "socks5" or .type == "http"))
-    ' "host/port/user/pass/type sai kiểu hoặc chứa ký tự điều khiển"
+      ((has("type") | not) or (.type == "socks5" or .type == "http")) and
+      ((has("check_udp") | not) or (.check_udp | type == "boolean"))
+    ' "host/port/user/pass/type/check_udp sai kiểu hoặc chứa ký tự điều khiển"
     host="$(jq -r '.host' "$BODY_FILE")"
     port="$(jq -r '.port' "$BODY_FILE")"
     user="$(jq -r '.user // ""' "$BODY_FILE")"
     pass="$(jq -r '.pass // ""' "$BODY_FILE")"
     proxy_type="$(jq -r '.type // "socks5"' "$BODY_FILE")"
+    check_udp="$(jq -r 'if .check_udp == true then 1 else 0 end' "$BODY_FILE")"
     case "$host" in ''|*[!A-Za-z0-9._:-]*) json_err "400 Bad Request" "host không hợp lệ" ;; esac
     [ "${#host}" -le 253 ] || json_err "400 Bad Request" "host dài quá"
     [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null \
       || json_err "400 Bad Request" "port không hợp lệ"
     [ "${#user}" -le 255 ] && [ "${#pass}" -le 255 ] || json_err "400 Bad Request" "user/pass dài quá 255 byte"
-    OUT="$(cd "$SB_ROOT" && sh scripts/probe-proxy.sh "$host" "$port" "$user" "$pass" "$proxy_type" 2>/dev/null)"
+    OUT="$(cd "$SB_ROOT" && sh scripts/probe-proxy.sh "$host" "$port" "$user" "$pass" "$proxy_type" "$check_udp" 2>/dev/null)"
     printf '%s' "$OUT" | jq -e 'type == "object"' >/dev/null 2>&1 \
       || json_err "500 Internal Server Error" "probe-proxy trả dữ liệu không hợp lệ"
     json_ok "$OUT"

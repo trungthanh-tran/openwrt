@@ -14,6 +14,7 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 SB_ROOT="$TMP/router"
+SBPROXY_SKIP_ENV=1
 CONF="$SB_ROOT/config/wifi-socks.conf"
 TOKEN_FILE="$TMP/token"
 HEALTH_FILE="$TMP/health.json"
@@ -21,6 +22,7 @@ LOG_DIR="$TMP/daily-logs"
 BACKUP_DIR="$TMP/backups"
 BIN="$TMP/bin"
 CALLS="$TMP/calls.log"
+export SBPROXY_SKIP_ENV
 mkdir -p "$SB_ROOT/config" "$SB_ROOT/scripts" "$BACKUP_DIR" "$BIN" "$LOG_DIR"
 printf '%s\n' 'agent-test-token' > "$TOKEN_FILE"
 : > "$CALLS"
@@ -92,7 +94,7 @@ SH
 
 cat > "$SB_ROOT/scripts/probe-proxy.sh" <<'SH'
 #!/bin/sh
-printf 'probe-proxy:%s:%s:%s:%s:%s:%s\n' "$#" "$1" "$2" "${3:-}" "${4:-}" "${5:-}" >> "$CALLS"
+printf 'probe-proxy:%s:%s:%s:%s:%s:%s:%s\n' "$#" "$1" "$2" "${3:-}" "${4:-}" "${5:-}" "${6:-}" >> "$CALLS"
 printf '{"ok":true,"state":"fail","curl_exit":7,"latency_ms":0,"code":0,"error":"curl: (7) refused","hint":"cannot connect","transcript":"","host":"%s","port":"%s","type":"%s"}\n' "$1" "$2" "${5:-socks5}"
 exit 0
 SH
@@ -516,7 +518,11 @@ reset_calls
 out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":1080,"user":"u","pass":"p","type":"http"}')"
 eq "probe_proxy relays the state"     "$(json_value "$out" '.state')" 'fail'
 eq "probe_proxy relays the hint"      "$(json_value "$out" '.hint')" 'cannot connect'
-eq "probe_proxy passes every field"   "$(grep -c '^probe-proxy:5:1.2.3.4:1080:u:p:http$' "$CALLS")" '1'
+eq "probe_proxy passes every field"   "$(grep -c '^probe-proxy:6:1.2.3.4:1080:u:p:http:0$' "$CALLS")" '1'
+out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":1080,"type":"socks5","check_udp":true}')"
+eq "probe_proxy forwards a requested UDP check" "$(grep -c '^probe-proxy:6:1.2.3.4:1080:::socks5:1$' "$CALLS")" '1'
+out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":1080,"check_udp":1}')"
+contains "probe_proxy rejects non-boolean check_udp" "$out" 'Status: 400 Bad Request'
 out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4;reboot","port":1080}')"
 contains "probe_proxy rejects a dirty host" "$out" 'Status: 400 Bad Request'
 out="$(auth_run POST 'action=probe_proxy' '{"host":"1.2.3.4","port":70000}')"
@@ -599,7 +605,7 @@ out="$(auth_run POST 'action=save_conf' 'Saved|2g|3|password12|proxy3|1080|||1|1
 eq "save accepts the 12-column proxy_type row" "$(json_value "$out" '.saved')" 'true'
 export APPLY_DRYRUN_RC=7
 out="$(auth_run POST 'action=dryrun_conf' "$valid")"
-eq "dryrun failure is structured" "$(json_value "$out" '.ok,.rc,.phase' | paste -sd ':')" 'false:7:dryrun'
+eq "dryrun failure is structured" "$(json_value "$out" '[.ok,.rc,.phase] | map(tostring) | join(":")')" 'false:7:dryrun'
 export APPLY_DRYRUN_RC=0
 
 echo "== agent apply safety gate =="
@@ -613,11 +619,11 @@ not_contains "failed gate never invokes real apply" "$(cat "$CALLS")" 'apply:app
 reset_calls
 export APPLY_DRYRUN_RC=0 APPLY_REAL_RC=0
 out="$(auth_run POST 'action=apply' '{}')"
-eq "apply succeeds after gate" "$(json_value "$out" '.ok,.phase' | paste -sd ':')" 'true:apply'
+eq "apply succeeds after gate" "$(json_value "$out" '[.ok,.phase] | map(tostring) | join(":")')" 'true:apply'
 eq "successful apply invokes dryrun and real apply" "$(wc -l < "$CALLS" | tr -d ' ')" '2'
 export APPLY_REAL_RC=5
 out="$(auth_run POST 'action=apply' '{}')"
-eq "real apply failure is structured" "$(json_value "$out" '.ok,.rc,.phase' | paste -sd ':')" 'false:5:apply'
+eq "real apply failure is structured" "$(json_value "$out" '[.ok,.rc,.phase] | map(tostring) | join(":")')" 'false:5:apply'
 export APPLY_REAL_RC=0
 
 echo "== agent SOCKS and MAC mutation validation =="
@@ -653,7 +659,7 @@ eq "set_sock accepts HTTP proxy type" "$(json_value "$out" '.ok')" 'true'
 contains "set_sock forwards HTTP proxy type" "$(cat "$CALLS")" 'set-sock:6:1:http.example:8080:::http'
 export SET_SOCK_RC=4
 out="$(auth_run POST 'action=set_sock' '{"idx":1,"host":"proxy","port":1080}')"
-eq "set_sock script failure propagates" "$(json_value "$out" '.ok,.rc' | paste -sd ':')" 'false:4'
+eq "set_sock script failure propagates" "$(json_value "$out" '[.ok,.rc] | map(tostring) | join(":")')" 'false:4'
 export SET_SOCK_RC=0
 
 reset_calls

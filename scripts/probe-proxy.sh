@@ -1,7 +1,7 @@
 #!/bin/sh
 # Probe one proxy from the router, right now, and say why it fails.
 #
-#   probe-proxy.sh <host> <port> [user] [pass] [socks5|http]
+#   probe-proxy.sh <host> <port> [user] [pass] [socks5|http] [check_udp:0|1]
 #
 # Same request the health daemon makes (curl through the proxy to a 204
 # endpoint), but verbose: the JSON carries curl's exit code, its error line,
@@ -34,11 +34,12 @@ mask_secret() { # text secret -> masked text
       print masked line }'
 }
 
-host="${1:-}"; port="${2:-}"; user="${3:-}"; pass="${4:-}"; proxy_type="${5:-socks5}"
+host="${1:-}"; port="${2:-}"; user="${3:-}"; pass="${4:-}"; proxy_type="${5:-socks5}"; check_udp="${6:-0}"
 [ -n "$host" ] && [ -n "$port" ] || { out '{ok:false,error:"host and port are required"}'; exit 1; }
 case "$host" in *[!A-Za-z0-9._:-]*) out '{ok:false,error:"invalid host"}'; exit 1;; esac
 case "$port" in ''|*[!0-9]*) out '{ok:false,error:"invalid port"}'; exit 1;; esac
 case "$proxy_type" in socks5|http) :;; *) out '{ok:false,error:"type must be socks5 or http"}'; exit 1;; esac
+case "$check_udp" in 0|1) :;; *) out '{ok:false,error:"check_udp must be 0 or 1"}'; exit 1;; esac
 command -v curl >/dev/null 2>&1 || { out '{ok:false,state:"fail",error:"curl is not installed on the router"}'; exit 1; }
 
 [ "$proxy_type" = "http" ] && scheme="http" || scheme="socks5h"
@@ -129,15 +130,40 @@ else
   esac
 fi
 
+# WebRTC mode 2 depends on SOCKS5 UDP ASSOCIATE. A successful HTTPS request
+# only proves TCP, so run a real STUN exchange before a new mode-2 slot is
+# accepted. HTTP proxies can never satisfy this requirement.
+udp_state="not_checked"; udp_error=""; udp_relay=""
+if [ "$check_udp" = "1" ]; then
+  if [ "$proxy_type" != "socks5" ]; then
+    udp_state="fail"; udp_error="HTTP proxies do not support SOCKS5 UDP ASSOCIATE"
+  elif ! command -v ucode >/dev/null 2>&1 || [ ! -r "$SB_ROOT/scripts/probe-socks5-udp.uc" ]; then
+    udp_state="fail"; udp_error="UDP checker is unavailable; install ucode-mod-socket and ucode-mod-struct"
+  else
+    udp_json="$(ucode "$SB_ROOT/scripts/probe-socks5-udp.uc" "$host" "$port" "$user" "$pass" 2>/dev/null)"
+    udp_state="$(printf '%s' "$udp_json" | jq -r '.udp_state // "fail"' 2>/dev/null)"
+    udp_error="$(printf '%s' "$udp_json" | jq -r '.error // "UDP checker returned invalid output"' 2>/dev/null)"
+    udp_relay="$(printf '%s' "$udp_json" | jq -r '.relay // ""' 2>/dev/null)"
+    [ "$udp_state" = "ok" ] || udp_state="fail"
+  fi
+  if [ "$udp_state" != "ok" ]; then
+    state="fail"
+    hint="UDP ASSOCIATE/STUN failed: $udp_error"
+    verdict="udp-fail: this proxy cannot safely be used by WebRTC mode 2"
+  fi
+fi
+
 out --arg state "$state" --argjson rc "$rc" --argjson ms "$ms" --argjson code "${code:-0}" \
     --arg error "$err" --arg hint "$hint" --arg transcript "$transcript" \
     --arg host "$host" --arg port "$port" --arg type "$proxy_type" \
     --argjson curl_socks "$curl_socks" --argjson tcp_open "$tcp_open" --argjson tcp_rc "$tcp_rc" \
     --argjson direct_ok "$direct_ok" --arg public_ip "$public_ip" \
     --arg singbox_log "$singbox_log" --arg verdict "$verdict" \
+    --arg udp_state "$udp_state" --arg udp_error "$udp_error" --arg udp_relay "$udp_relay" \
     '{ok:true, state:$state, curl_exit:$rc, latency_ms:$ms, code:$code,
-      error:$error, hint:$hint, verdict:$verdict,
+      error:$error, hint:$hint, verdict:$verdict, udp_state:$udp_state,
       checks:{curl_socks:$curl_socks, tcp_open:$tcp_open, tcp_curl_exit:$tcp_rc,
-              direct_internet:$direct_ok, public_ip:$public_ip},
+              direct_internet:$direct_ok, public_ip:$public_ip,
+              udp_associate:($udp_state == "ok"), udp_error:$udp_error, udp_relay:$udp_relay},
       singbox_log:$singbox_log, transcript:$transcript,
       host:$host, port:$port, type:$type}'
