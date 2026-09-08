@@ -5,6 +5,16 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **SOCKS5 relay UDP (UDP ASSOCIATE).** Outbound socks trước đây bị ghim
+  `"network":"tcp"` nên mọi UDP — QUIC, media WebRTC, game — không bao giờ ra
+  được qua proxy; nft phải drop UDP 443 để trình duyệt rơi về TCP. Nay
+  `SOCKS_UDP=1` (mặc định) bỏ ghim đó, UDP đi qua proxy và mang IP của proxy,
+  nhờ vậy `webrtc=2` mới chạy thật. QUIC chỉ còn bị drop ở SSID mà UDP không
+  thể tới đích được: khi `SOCKS_UDP=0`, hoặc SSID dùng proxy HTTP (kể cả khi
+  chỉ một slot trong pool là HTTP) vì HTTP proxy không có kênh UDP. Đặt
+  `SOCKS_UDP=0` nếu proxy upstream từ chối UDP ASSOCIATE.
+
 ### Changed
 - **WebRTC nay là 3 chế độ thay vì bật/tắt.** Cột `webrtc` của
   `config/wifi-socks.conf` nhận `0` (giữ nguyên), `1` (chặn STUN/TURN như cũ) và

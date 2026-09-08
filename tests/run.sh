@@ -522,7 +522,17 @@ match   "every SSID is dispatched by verdict map" "$nft" 'iifname vmap [{] "br-w
 match   "DNS hijack covers tcp and udp"  "$nft" 'meta l4proto [{] tcp, udp [}] th dport 53 tproxy ip to :12001'
 match   "tproxy rule for the first SSID" "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12001'
 match   "second SSID tproxy port"        "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12002'
-match   "block QUIC"                     "$nft" 'udp dport 443 drop'
+# With SOCKS_UDP on, QUIC only stays blocked where UDP could not be delivered:
+# an HTTP-proxy SSID. A socks5 SSID lets it through to the proxy instead.
+nomatch "socks5 SSID no longer blocks QUIC" "$(echo "$nft" | awk '/^  chain w1 \{/,/^  \}/')" 'udp dport 443 drop'
+nft_noudp_conf="$STUB/c-noudp.conf"
+printf '%s
+' 'A|2g|1|password12|1.2.3.4|1080|||1|1|' 'H|5g|4|password12|1.2.3.4|8080|||1|0||http' > "$nft_noudp_conf"
+( CONF="$nft_noudp_conf" NFT_FILE="$STUB/x-noudp.nft" SOCKS_UDP=0 build_nft ) >/dev/null 2>&1
+nft_noudp="$(cat "$STUB/x-noudp.nft" 2>/dev/null)"
+match "SOCKS_UDP=0 blocks QUIC again" "$(echo "$nft_noudp" | awk '/^  chain w1 \{/,/^  \}/')" 'udp dport 443 drop'
+( CONF="$nft_noudp_conf" NFT_FILE="$STUB/x-http.nft" build_nft ) >/dev/null 2>&1
+match "an http-proxy SSID keeps the QUIC block" "$(awk '/^  chain w4 \{/,/^  \}/' "$STUB/x-http.nft")" 'udp dport 443 drop'
 match   "bypass proxy hosts by set"      "$nft" 'ip daddr @proxy_hosts return'
 match   "literal sock IP is a set element" "$nft" 'elements = [{] 1[.]2[.]3[.]4 [}]'
 nomatch "no hostname bypass"          "$nft" 'dns\.example\.com'
@@ -555,9 +565,16 @@ B|5g|2|password12|5.6.7.8|8080|||1|0||http'
   match   "hijack-dns route rule"        "$cfg" 'hijack-dns'
   eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "1"
   eq      "http outbound count"   "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="http")]|length')" "1"
-  eq      "socks outbound network" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network')" "tcp"
+  # SOCKS_UDP on: no "network" pin, so sing-box also relays UDP ASSOCIATE.
+  eq      "socks outbound relays udp" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network // "any"')" "any"
   eq      "auth on user row"      "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.username')" "user1"
   eq      "no auth on empty row"  "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w2")|.username // "none"')" "none"
+  # SOCKS_UDP off restores the TCP-only pin. An HTTP proxy has no UDP transport
+  # either way, so it never carries a "network" key to begin with.
+  ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/config-noudp.json" SOCKS_UDP=0 build_singbox ) >/dev/null 2>&1
+  cfg_noudp="$(cat "$STUB/config-noudp.json" 2>/dev/null)"
+  eq "SOCKS_UDP=0 pins socks to tcp" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network')" "tcp"
+  eq "http outbound never pins network" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w2")|.network // "any"')" "any"
 else
   sk "build_singbox" "no jq"
 fi

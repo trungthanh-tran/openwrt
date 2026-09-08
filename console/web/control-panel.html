@@ -1883,7 +1883,7 @@
   }
   // Defaults only: a connected agent reports the router's effective
   // config/settings.sh values through status meta (see applyRouterSettings).
-  let NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16;
+  let NET_BASE = 10, TPROXY_BASE = 12000, BSSID_LIMIT = 16, SOCKS_UDP = true;
   const MARK = 1;
   const STUN_TCP = "3478, 3479, 5349, 5350";
   const STUN_UDP = "3478, 3479, 5349, 5350, 19302-19309";
@@ -1973,6 +1973,7 @@
     NET_BASE = take(meta.net_base, NET_BASE);
     TPROXY_BASE = take(meta.tproxy_port_base, TPROXY_BASE);
     BSSID_LIMIT = take(meta.bssid_limit, BSSID_LIMIT);
+    if (typeof meta.socks_udp === "boolean") SOCKS_UDP = meta.socks_udp;
   }
 
   const octet = i => NET_BASE + i;
@@ -3839,7 +3840,10 @@
     const outbounds = sorted.map(s => {
       const isHttp = (s.proxy_type || "socks5") === "http";
       const o = { type: isHttp ? "http" : "socks", tag: `out-w${s.idx}`, server: s.host, server_port: Number(s.port) };
-      if (!isHttp) { o.version = "5"; o.network = "tcp"; }
+      // SOCKS_UDP on the router decides whether a socks outbound is pinned to
+      // TCP; unpinned means sing-box also relays UDP ASSOCIATE. An HTTP proxy
+      // has no UDP transport, so it is never pinned either way.
+      if (!isHttp) { o.version = "5"; if (!SOCKS_UDP) o.network = "tcp"; }
       if (s.user) { o.username = s.user; o.password = s.pass || ""; }
       return o;
     });

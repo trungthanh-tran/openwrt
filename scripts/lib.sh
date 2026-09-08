@@ -509,6 +509,19 @@ for_each_pool() {
   rm -f "$_pool_tmp"
 }
 
+# Whether a SOCKS5 outbound may relay UDP. Off means "network":"tcp" on every
+# socks outbound and a QUIC drop in nftables, which is the pre-UDP behaviour.
+socks_udp_enabled() { [ "${SOCKS_UDP:-1}" = "1" ]; }
+
+# Whether any slot of one idx is an HTTP proxy. An HTTP proxy cannot carry UDP,
+# so an SSID that can route a device to one keeps dropping QUIC even when
+# SOCKS_UDP is on — otherwise that device's QUIC would reach sing-box and be
+# blackholed instead of failing fast enough for the browser to use TCP.
+pool_has_http() {
+  [ -f "${POOLS:-}" ] || return 1
+  pool_rows "$1" | awk -F'|' '$2 == "http" { found = 1 } END { exit found ? 0 : 1 }'
+}
+
 # Every pool host, deduplicated — the nftables bypass needs all of them, not
 # just the hosts named in wifi-socks.conf.
 pool_hosts() {
@@ -1359,10 +1372,14 @@ build_singbox() {
     if [ -n "$5" ]; then
       _o_auth=",\"username\":$(jq -Rn --arg v "$5" '$v'),\"password\":$(jq -Rn --arg v "$6" '$v')"
     else _o_auth=""; fi
-    # Both supported upstream types are TCP-only. UDP/QUIC is blocked so web
-    # clients fall back to TCP HTTP/HTTPS through the selected proxy.
+    # An HTTP proxy has no UDP transport at all, so it stays TCP-only and its
+    # SSID keeps dropping QUIC. A SOCKS5 proxy carries UDP through UDP
+    # ASSOCIATE; pinning "network" to tcp is what refuses it.
     if [ "$2" = "http" ]; then
       printf '{"type":"http","tag":"%s","server":%s,"server_port":%s%s}' \
+        "$1" "$_o_host" "$4" "$_o_auth"
+    elif socks_udp_enabled; then
+      printf '{"type":"socks","tag":"%s","server":%s,"server_port":%s,"version":"5"%s}' \
         "$1" "$_o_host" "$4" "$_o_auth"
     else
       printf '{"type":"socks","tag":"%s","server":%s,"server_port":%s,"version":"5","network":"tcp"%s}' \
@@ -1473,7 +1490,7 @@ build_nft() {
   }
 
   _nft_row() {
-    _r_idx="$3"; _r_host="$5"; _r_webrtc="${10}"
+    _r_idx="$3"; _r_host="$5"; _r_webrtc="${10}"; _r_type="${12:-socks5}"
     _r_tp="$(tproxy_port "$_r_idx")"
     _nft_add_host "$_r_host"
     _nft_vmap="$_nft_vmap$_nft_sep\"br-w$_r_idx\" : jump w$_r_idx"
@@ -1510,8 +1527,14 @@ build_nft() {
     _nft_chains="$_nft_chains    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return\n"
     _nft_chains="$_nft_chains    # Bypass the proxy servers themselves through the WAN.\n"
     _nft_chains="$_nft_chains    ip daddr @proxy_hosts return\n"
-    _nft_chains="$_nft_chains    # Drop QUIC/HTTP3; force TCP/HTTPS through the proxy.\n"
-    _nft_chains="$_nft_chains    udp dport 443 drop\n"
+    # QUIC is only dropped where UDP cannot reach the Internet anyway: with
+    # SOCKS_UDP off, or on an SSID that can route a device to an HTTP proxy.
+    # Dropping it there is what makes a browser fall back to TCP HTTPS at once
+    # instead of waiting out a UDP flow that sing-box could never deliver.
+    if ! socks_udp_enabled || [ "$_r_type" = "http" ] || pool_has_http "$_r_idx"; then
+      _nft_chains="$_nft_chains    # Drop QUIC/HTTP3; force TCP/HTTPS through the proxy.\n"
+      _nft_chains="$_nft_chains    udp dport 443 drop\n"
+    fi
     # A pooled SSID looks up the source IP in its own map and is sent straight
     # to that proxy's port. One rule and one hash lookup, whatever the pool
     # size. A miss does not match, so the device falls through to the default

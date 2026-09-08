@@ -31,6 +31,19 @@ NET_BASE=10
 # sing-box TPROXY port = TPROXY_PORT_BASE + idx.
 TPROXY_PORT_BASE=12000
 
+# --- Proxy transport --------------------------------------------------------
+# Whether a SOCKS5 outbound also relays UDP through the proxy (UDP ASSOCIATE,
+# RFC 1928 §4/§7).
+#   1 = relay it. QUIC, WebRTC media and game traffic reach the Internet
+#       carrying the proxy's address, and webrtc=2 can work at all.
+#   0 = TCP only, and client UDP to 443 is dropped so browsers fall back to
+#       TCP HTTPS straight away.
+# Set this to 0 when the upstream proxies reject UDP ASSOCIATE: sing-box would
+# otherwise accept each UDP flow and blackhole it, so a QUIC attempt has to time
+# out before the browser retries over TCP. HTTP proxies cannot carry UDP at all
+# and stay TCP-only whatever this says.
+SOCKS_UDP=1
+
 # --- Proxy pool -------------------------------------------------------------
 # An SSID may carry several proxies (config/proxy-pools.conf). Each one is a
 # "slot" with its own TPROXY port, so a device can be pinned to a single proxy

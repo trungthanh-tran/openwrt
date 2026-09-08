@@ -191,7 +191,9 @@ else
   eq "the legacy inbound keeps its own port"     "$(jq -r '.inbounds[]|select(.tag=="in-w1")|.listen_port' "$SINGBOX_CONF")" "$(tproxy_port 1)"
   eq "every slot inbound is a tproxy listener"     "$(jq -c '[.inbounds[]|select(.tag|startswith("in-w1-s"))|.type]|unique' "$SINGBOX_CONF")"     '["tproxy"]'
 
-  eq "a socks5 slot becomes a socks outbound"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s0")|[.type,.server,.server_port,.version,.network,.username,.password]' "$SINGBOX_CONF")"     '["socks","9.9.9.9",1080,"5","tcp","pu","pw"]'
+  # SOCKS_UDP defaults on, so a socks5 slot carries no "network" pin and jq
+  # reports null in its place; the slot relays UDP ASSOCIATE like the row does.
+  eq "a socks5 slot becomes a socks outbound"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s0")|[.type,.server,.server_port,.version,.network,.username,.password]' "$SINGBOX_CONF")"     '["socks","9.9.9.9",1080,"5",null,"pu","pw"]'
   eq "an http slot becomes an http outbound"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s1")|[.type,.server,.server_port]' "$SINGBOX_CONF")"     '["http","10.0.0.7",8080]'
   eq "a slot without credentials carries no auth fields"     "$(jq -c '.outbounds[]|select(.tag=="out-w1-s1")|has("username")' "$SINGBOX_CONF")" "false"
   eq "a hostname slot is passed through unresolved"     "$(jq -r '.outbounds[]|select(.tag=="out-w1-s2")|.server' "$SINGBOX_CONF")" "proxy.example.com"
@@ -262,8 +264,10 @@ eq "prerouting no longer carries per-SSID rules" \
   "$(chain_body prerouting | grep -c 'br-w')" "1"
 
 # Rule order inside an SSID chain must match the old flat chain's order.
-eq "chain w1 keeps the original rule order" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
-eq "chain w3 has the identical shape"       "$(chain_shape w3)" "dns localnet hosts quic tproxy "
+# SOCKS_UDP is on by default, so a socks5 SSID no longer drops QUIC: UDP now
+# reaches the Internet through the proxy instead of being blackholed.
+eq "chain w1 keeps the original rule order" "$(chain_shape w1)" "dns localnet hosts tproxy "
+eq "chain w3 has the identical shape"       "$(chain_shape w3)" "dns localnet hosts tproxy "
 eq "an SSID chain is a constant number of rules" \
   "$(chain_body w1 | grep -vc '^ *#')" "$(chain_body w3 | grep -vc '^ *#')"
 
@@ -308,7 +312,7 @@ eq "divert is the first rule in prerouting" \
 eq "divert is tcp only" "$(chain_body prerouting | grep -c 'socket transparent 1')" "1"
 nftgen - off
 eq "divert can be turned off" "$(grep -c 'socket transparent' "$NFT_FILE")" "0"
-eq "the chains are otherwise unchanged without divert" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
+eq "the chains are otherwise unchanged without divert" "$(chain_shape w1)" "dns localnet hosts tproxy "
 
 echo "== nftables edge cases =="
 : > "$STUB/empty.conf"; CONF="$STUB/empty.conf"; nftgen -
@@ -337,7 +341,7 @@ printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' > "$POOL1"
 nftgen -
 eq "no pool means no map"      "$(grep -c 'map w[0-9]*map' "$NFT_FILE")" "0"
 eq "no pool means no pin rule" "$(grep -c 'ip saddr map' "$NFT_FILE")" "0"
-eq "no pool keeps the F3 chain shape" "$(chain_shape w1)" "dns localnet hosts quic tproxy "
+eq "no pool keeps the F3 chain shape" "$(chain_shape w1)" "dns localnet hosts tproxy "
 
 nftgen "$POOL1"
 eq "a pooled SSID declares one map"  "$(grep -c 'map w1map' "$NFT_FILE")" "1"
@@ -350,7 +354,9 @@ eq "the map declares a size, for the fixed-size hash backend" \
 eq "the map declares no timeout, which would force the resizable backend" \
   "$(grep -c 'map w1map {.*timeout' "$NFT_FILE")" "0"
 eq "the pin rule sits before the default tproxy rule" "$(chain_shape w1)" \
-  "dns localnet hosts quic pin tproxy "
+  "dns localnet hosts pin tproxy "
+# w2 of the example config is an HTTP proxy, which has no UDP transport at all,
+# so it keeps dropping QUIC however SOCKS_UDP is set.
 eq "an SSID without a pool keeps the plain shape" "$(chain_shape w2)" \
   "dns localnet hosts quic tproxy "
 eq "the pin rule covers tcp and udp" \

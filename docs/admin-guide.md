@@ -162,6 +162,7 @@ name|band|idx|wifi_key|sock_host|sock_port|sock_user|sock_pass|isolate|webrtc
 | `ZONE_INPUT` | `ACCEPT` mặc định (đã chặn cổng admin từ zone khách). |
 | `WIFI_ENCRYPTION` | `psk2` (WPA2) · `sae`/`sae-mixed` (WPA3). |
 | `STUN_*_PORTS` | Cổng STUN/TURN áp dụng cho `webrtc=1` (chặn) và `webrtc=2` (bypass qua proxy). |
+| `SOCKS_UDP` | `1` = socks5 relay UDP (UDP ASSOCIATE): QUIC/WebRTC/game đi qua proxy. `0` = chỉ TCP và drop UDP 443. Đặt `0` nếu proxy không hỗ trợ UDP. Proxy HTTP luôn chỉ TCP. |
 
 ### 7.1 Pool proxy — một SSID, nhiều proxy
 

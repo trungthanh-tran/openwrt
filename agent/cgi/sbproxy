@@ -112,8 +112,9 @@ available_log_dates() {
 settings_numbers() {
   (
     [ -f "$SB_ROOT/config/settings.sh" ] && . "$SB_ROOT/config/settings.sh" 2>/dev/null
-    printf '%s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
-      "${BSSID_LIMIT:-16}" "${POOL_PORT_BASE:-13000}" "${POOL_PORT_STRIDE:-256}"
+    printf '%s %s %s %s %s %s\n' "${NET_BASE:-10}" "${TPROXY_PORT_BASE:-12000}" \
+      "${BSSID_LIMIT:-16}" "${POOL_PORT_BASE:-13000}" "${POOL_PORT_STRIDE:-256}" \
+      "${SOCKS_UDP:-1}"
   ) 2>/dev/null
 }
 trim_field() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
@@ -440,6 +441,8 @@ case "$ACTION" in
     set -- $(settings_numbers)
     net_base="${1:-10}"; tproxy_base="${2:-12000}"; bssid_limit="${3:-16}"
     pool_base="${4:-13000}"; pool_stride="${5:-256}"
+    # A console preview of sing-box has to know whether socks outbounds relay UDP.
+    case "${6:-1}" in 0) socks_udp=false;; *) socks_udp=true;; esac
     case "$net_base$tproxy_base$bssid_limit$pool_base$pool_stride" in
       ''|*[!0-9]*)
         net_base=10; tproxy_base=12000; bssid_limit=16
@@ -453,12 +456,14 @@ case "$ACTION" in
                      --argjson bssid_limit "$bssid_limit" \
                      --argjson pool_port_base "$pool_base" \
                      --argjson pool_port_stride "$pool_stride" \
+                     --argjson socks_udp "$socks_udp" \
       '{ok:true, ssids:$ssids, health:$health,
         meta:{singbox_running:$running, singbox_uptime_s:$singbox_uptime_s,
               applied:$applied, version:$ver,
               net_base:$net_base, tproxy_port_base:$tproxy_port_base,
               bssid_limit:$bssid_limit,
-              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride}}' 2>/dev/null)" \
+              pool_port_base:$pool_port_base, pool_port_stride:$pool_port_stride,
+              socks_udp:$socks_udp}}' 2>/dev/null)" \
       || json_err "500 Internal Server Error" "không dựng được JSON trạng thái"
     printf '%s' "$STATUS_JSON" | jq -e 'type == "object"' >/dev/null 2>&1 \
       || json_err "500 Internal Server Error" "JSON trạng thái không hợp lệ"
