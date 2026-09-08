@@ -143,6 +143,22 @@ nft list chain inet sbproxy w<IDX> | tail -3   # rule cuối phải là `drop`
 > DNS bị chặn là **có chủ ý**. Nếu để DNS chạy, máy sẽ nhận fake-IP rồi không kết
 > nối được — trông như hỏng chứ không phải như bị chặn.
 
+### B10. Proxy cho máy trên dải LAN chính (LAN_PROXY=1)
+Thêm dòng `0|socks5|...` vào `proxy-pools.conf`, đặt `LAN_PROXY=1`, `apply`.
+Dùng một **máy cắm dây** trên dải LAN chính.
+
+1. **Trước khi ghim** — mở `https://ipinfo.io/ip`: **đạt khi** hiện IP thật của
+   router, và `nslookup example.com` trả IP thật (không phải fake-IP). Bật tính
+   năng này không được đổi gì với máy chưa ghim.
+2. `sh scripts/assign.sh 0 <mac> auto` rồi tải lại trang: **đạt khi** hiện IP của
+   proxy đã ghim.
+3. `sh scripts/assign.sh 0 <mac> none`: **đạt khi** quay lại IP thật của router.
+
+```sh
+nft list chain inet sbproxy w0        # chain của br-lan, map @w0map
+```
+> LAN không có proxy mặc định, nên bước 1 và 3 phải cho **cùng một kết quả**.
+
 ## C. Kịch bản đổi SOCKS không gián đoạn
 ```sh
 # Trên router:
@@ -159,6 +175,7 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
 | 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
+| 5e | Proxy cho máy LAN/dây | B10 | `LAN_PROXY=1`: ghim rồi ra IP proxy, chưa ghim thì y như trước |
 | 5d | Chặn máy chưa gán proxy | B9 | `POOL_UNASSIGNED=block`: chưa ghim thì không có mạng lẫn DNS; ghim xong chạy ngay |
 | 5c | Direct/block theo domain/IP | B8 | đích `direct` ra IP thật, đích `block` không tải được, còn lại vẫn qua proxy |
 | 5b | UDP qua proxy | B7 | `SOCKS_UDP=1`: QUIC/media chạy được qua proxy socks5 |
