@@ -130,6 +130,19 @@ jq '.route.rules' /etc/sing-box/config.json   # luật direct/block đứng TRÊ
 **Thứ tự:** nếu một luật hẹp không có tác dụng, kiểm tra nó có đứng TRÊN luật
 rộng hơn không — khớp đầu tiên thắng.
 
+### B9. Máy chưa ghim bị chặn (POOL_UNASSIGNED=block)
+Trên SSID **có pool**, đặt `POOL_UNASSIGNED=block` rồi `apply`. Cho một máy chưa
+ghim vào SSID đó.
+**Đạt khi:** máy vẫn nhận IP DHCP và ping được gateway của nó, nhưng
+`nslookup example.com` **không trả lời** và không mở được trang nào.
+Sau `sh scripts/assign.sh <IDX> <mac> auto` thì mạng chạy ngay, không cần apply.
+
+```sh
+nft list chain inet sbproxy w<IDX> | tail -3   # rule cuối phải là `drop`
+```
+> DNS bị chặn là **có chủ ý**. Nếu để DNS chạy, máy sẽ nhận fake-IP rồi không kết
+> nối được — trông như hỏng chứ không phải như bị chặn.
+
 ## C. Kịch bản đổi SOCKS không gián đoạn
 ```sh
 # Trên router:
@@ -146,6 +159,7 @@ Các phiên TCP/UDP đang mở có thể gián đoạn vì sing-box được res
 | 2 | 20–30 SSID | A1 + preflight `iw list` | đủ SSID, ≤ giới hạn BSSID |
 | 3 | Đổi sock không reload WiFi | C | WiFi/DHCP giữ nguyên, IP đổi; ghi nhận gián đoạn phiên |
 | 4 | Random MAC | A2 | MAC `02:` khác nhau, ổn định |
+| 5d | Chặn máy chưa gán proxy | B9 | `POOL_UNASSIGNED=block`: chưa ghim thì không có mạng lẫn DNS; ghim xong chạy ngay |
 | 5c | Direct/block theo domain/IP | B8 | đích `direct` ra IP thật, đích `block` không tải được, còn lại vẫn qua proxy |
 | 5b | UDP qua proxy | B7 | `SOCKS_UDP=1`: QUIC/media chạy được qua proxy socks5 |
 | 5 | WebRTC theo chế độ | B3 | `webrtc=1` không lộ IP · `webrtc=2` lộ IP của proxy, cuộc gọi vẫn chạy |
