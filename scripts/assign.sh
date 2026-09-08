@@ -29,7 +29,12 @@ if [ "$SLOT" = "none" ]; then
     ip="$(lease_ip_of "$MAC")"
     [ -n "$ip" ] && nft delete element inet sbproxy "w${IDX}map" "{ $ip }" >/dev/null 2>&1 || true
   fi
-  log "Unpinned $MAC on idx=$IDX; it now uses the Wi-Fi's default proxy."
+  # idx 0 is the main LAN, which has no wifi-socks.conf row to fall back to.
+  if [ "$IDX" = 0 ]; then
+    log "Unpinned $MAC on the main LAN; it is no longer proxied."
+  else
+    log "Unpinned $MAC on idx=$IDX; it now uses the Wi-Fi's default proxy."
+  fi
   exit 0
 fi
 

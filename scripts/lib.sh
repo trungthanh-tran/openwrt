@@ -520,6 +520,11 @@ for_each_pool() {
 # socks outbound and a QUIC drop in nftables, which is the pre-UDP behaviour.
 socks_udp_enabled() { [ "${SOCKS_UDP:-1}" = "1" ]; }
 
+# Whether the main LAN is a proxied source. It is pool-only: idx 0 of
+# proxy-pools.conf holds its proxies, and only a pinned device uses one, so
+# turning this on leaves every unpinned wired machine exactly as it was.
+lan_proxy_enabled() { [ "${LAN_PROXY:-0}" = "1" ] && pool_enabled 0; }
+
 # Whether any slot of one idx is an HTTP proxy. An HTTP proxy cannot carry UDP,
 # so an SSID that can route a device to one keeps dropping QUIC even when
 # SOCKS_UDP is on — otherwise that device's QUIC would reach sing-box and be
@@ -985,7 +990,8 @@ validate_pools() {
       # BusyBox awk compares trim() results as strings unless coerced, so "3"
       # would sort above "200"; force both numeric before any bounds check.
       idx_num=idx+0; port_num=port+0
-      if (idx !~ /^[1-9][0-9]*$/ || idx_num > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
+      # idx 0 is the main LAN pool (LAN_PROXY); 1..200 are the SSIDs.
+      if (idx !~ /^(0|[1-9][0-9]*)$/ || idx_num > 200) { printf "line %d: invalid idx\n", NR; bad=1 }
       if (type != "socks5" && type != "http") { printf "line %d: proxy_type must be socks5 or http\n", NR; bad=1 }
       if (host == "") { printf "line %d: host is empty\n", NR; bad=1 }
       else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "line %d: invalid host\n", NR; bad=1 }
@@ -1467,6 +1473,20 @@ build_singbox() {
         "$1" "$_o_host" "$4" "$_o_auth"
     fi
   }
+  # One tproxy port per pool proxy, so nftables can pin a device to a proxy by
+  # choosing a port — no sing-box reload when an assignment changes. Reads
+  # `idx` from its caller, which is either a wifi-socks.conf row or the LAN.
+  # It carries its own separator because the LAN pool can be the very first
+  # thing emitted, with no SSID row ahead of it.
+  _sb_slot() { # slot type host port user pass label
+    _s_tag="w$idx-s$1"
+    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-$_s_tag\",\"listen\":\"0.0.0.0\",\"listen_port\":$(pool_port "$idx" "$1")}"
+    _sb_pairs="$_sb_pairs in-$_s_tag:out-$_s_tag"
+    outbounds="$outbounds$sep$(_sb_outbound "out-$_s_tag" "$2" "$3" "$4" "$5" "$6")"
+    rules="$rules$sep{\"inbound\":[\"in-$_s_tag\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
+    rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"outbound\":\"out-$_s_tag\"}"
+    sep=","
+  }
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"; proxy_type="${12:-socks5}"
     tp="$(tproxy_port "$idx")"
@@ -1479,19 +1499,16 @@ build_singbox() {
     sep=","
     rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
     sep=","
-    # One tproxy port per pool proxy, so nftables can pin a device to a proxy
-    # by choosing a port — no sing-box reload when an assignment changes.
-    _sb_slot() { # slot type host port user pass label
-      _s_tag="w$idx-s$1"
-      inbounds="$inbounds,{\"type\":\"tproxy\",\"tag\":\"in-$_s_tag\",\"listen\":\"0.0.0.0\",\"listen_port\":$(pool_port "$idx" "$1")}"
-      _sb_pairs="$_sb_pairs in-$_s_tag:out-$_s_tag"
-      outbounds="$outbounds,$(_sb_outbound "out-$_s_tag" "$2" "$3" "$4" "$5" "$6")"
-      rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
-      rules="$rules,{\"inbound\":[\"in-$_s_tag\"],\"outbound\":\"out-$_s_tag\"}"
-    }
     for_each_pool "$idx" _sb_slot
   }
   for_each_ssid _sb_row
+  # The main LAN is pool-only: idx 0 has no wifi-socks.conf row, so it gets slot
+  # inbounds and nothing else. An unpinned wired device matches no slot and is
+  # never sent to sing-box at all.
+  if lan_proxy_enabled; then
+    idx=0
+    for_each_pool 0 _sb_slot
+  fi
   # Routing rules are evaluated before any inbound is mapped to its outbound,
   # or a destination could never be taken away from the proxy.
   _sb_routes="$(routes_json "${_sb_pairs# }")"
@@ -1651,6 +1668,38 @@ build_nft() {
     _nft_chains="$_nft_chains  }\n"
   }
   for_each_ssid _nft_row
+
+  # The main LAN. It has no wifi-socks.conf row and so no default proxy: only a
+  # device pinned to an idx-0 slot is proxied, and everything else falls off the
+  # end of the chain and routes exactly as it did before LAN_PROXY was set.
+  # That is also why DNS follows the pin map — hijacking it unconditionally
+  # would drag every unpinned wired machine off dnsmasq and into fake-IP.
+  if lan_proxy_enabled; then
+    _nft_lan_br="${LAN_BRIDGE:-br-lan}"
+    _nft_vmap="$_nft_vmap$_nft_sep\"$_nft_lan_br\" : jump w0"
+    _nft_sep=", "
+    _nft_elements_lan="$(assign_elements 0)"
+    _nft_maps="$_nft_maps  map w0map { type ipv4_addr : inet_service; size ${POOL_MAP_SIZE:-512}${_nft_elements_lan:+; elements = { $_nft_elements_lan \}}; }\n"
+    _nft_chains="$_nft_chains  chain w0 {\n"
+    _nft_chains="$_nft_chains    # DNS follows the pin, so an unpinned LAN device keeps using dnsmasq.\n"
+    _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :ip saddr map @w0map meta mark set $TPROXY_MARK accept\n"
+    _nft_chains="$_nft_chains    # Do not proxy local or multicast traffic.\n"
+    _nft_chains="$_nft_chains    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return\n"
+    _nft_chains="$_nft_chains    # Bypass the proxy servers themselves through the WAN.\n"
+    _nft_chains="$_nft_chains    ip daddr @proxy_hosts return\n"
+    if ! socks_udp_enabled || pool_has_http 0; then
+      _nft_chains="$_nft_chains    # Drop QUIC/HTTP3; force TCP/HTTPS through the proxy.\n"
+      _nft_chains="$_nft_chains    udp dport 443 drop\n"
+    fi
+    _nft_chains="$_nft_chains    # Devices pinned to a LAN pool proxy go to that proxy's port.\n"
+    _nft_chains="$_nft_chains    meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w0map meta mark set $TPROXY_MARK accept\n"
+    if [ "${POOL_UNASSIGNED:-default}" = "block" ]; then
+      _nft_chains="$_nft_chains    # POOL_UNASSIGNED=block: no proxy pinned, no Internet.\n"
+      _nft_chains="$_nft_chains    drop\n"
+    fi
+    _nft_chains="$_nft_chains  }\n"
+  fi
+
   # Pool proxies need the same WAN bypass as the wifi-socks.conf ones.
   for _nft_ph in $(pool_hosts); do _nft_add_host "$_nft_ph"; done
 

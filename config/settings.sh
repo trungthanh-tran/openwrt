@@ -31,6 +31,18 @@ NET_BASE=10
 # sing-box TPROXY port = TPROXY_PORT_BASE + idx.
 TPROXY_PORT_BASE=12000
 
+# --- Main LAN ---------------------------------------------------------------
+# 1 = thiết bị trên dải LAN chính (máy cắm dây, và SSID nào dùng chung dải đó)
+# cũng gán proxy được, không chỉ các SSID do dự án này tạo.
+# LAN không có proxy mặc định trong wifi-socks.conf, nên nó CHỈ chạy theo pool:
+# khai báo proxy cho nó bằng các dòng idx `0` trong config/proxy-pools.conf, rồi
+# ghim từng máy như với SSID. Máy chưa ghim đi thẳng như trước — hoặc bị chặn,
+# nếu POOL_UNASSIGNED=block. DNS cũng theo pin, nên máy chưa ghim vẫn dùng
+# dnsmasq bình thường.
+LAN_PROXY=0
+# Bridge của dải LAN chính. Đổi nếu board dùng tên khác.
+LAN_BRIDGE="br-lan"
+
 # --- Proxy transport --------------------------------------------------------
 # Whether a SOCKS5 outbound also relays UDP through the proxy (UDP ASSOCIATE,
 # RFC 1928 §4/§7).

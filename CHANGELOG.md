@@ -6,6 +6,17 @@ Ngày theo định dạng YYYY-MM-DD.
 ## [Unreleased]
 
 ### Added
+- **Gán proxy cho thiết bị trên dải LAN chính (`LAN_PROXY=1`).** Trước đây chỉ
+  các SSID do dự án tạo (`br-w<idx>`) mới đi qua proxy được; máy cắm dây và SSID
+  dùng chung dải LAN chính thì không. Nay `br-lan` có chain riêng, dùng pool
+  `idx 0` trong `proxy-pools.conf`, ghim máy bằng `scripts/assign.sh 0 <mac>
+  <slot>` như với SSID. LAN không có proxy mặc định nên chỉ máy đã ghim mới đi
+  qua proxy — máy chưa ghim rơi khỏi chain và định tuyến y như trước, kể cả DNS
+  (rule DNS cũng theo pin map nên dnsmasq vẫn phục vụ bình thường). Bật
+  `POOL_UNASSIGNED=block` thì máy LAN chưa ghim cũng bị chặn. Mặc định
+  `LAN_PROXY=0`: một triển khai đang chạy không tự dưng proxy cả LAN chỉ vì file
+  pool có dòng idx 0.
+
 - **Bypass direct/block theo domain/IP (`config/routing-rules.conf`).** Trước đây
   mọi đích đều đi qua proxy, không có cách nào cho ngân hàng nội địa đi thẳng hay
   chặn tracker ngay tại router. File mới nhận từng luật `action|type|value` với

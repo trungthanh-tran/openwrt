@@ -97,7 +97,10 @@ mkpool '1|socks5|2001:db8::1|1080|||';                   vrun "an IPv6 literal h
 echo "== validation rejects =="
 mkpool '1|socks5|1.2.3.4';                               vrun "too few columns" die
 mkpool '1|socks5|1.2.3.4|1080|u|p|label|extra';          vrun "too many columns" die
-mkpool '0|socks5|1.2.3.4|1080|||';                       vrun "idx zero" die
+# idx 0 used to be rejected; it is now the main LAN pool (LAN_PROXY), and the
+# rows are simply ignored while that setting is off.
+mkpool '0|socks5|1.2.3.4|1080|||';                       vrun "idx zero is the LAN pool" ok
+mkpool '-1|socks5|1.2.3.4|1080|||';                      vrun "a negative idx" die
 mkpool '201|socks5|1.2.3.4|1080|||';                     vrun "idx above 200" die
 mkpool 'x|socks5|1.2.3.4|1080|||';                       vrun "a non-numeric idx" die
 mkpool '1|socks4|1.2.3.4|1080|||';                       vrun "an unsupported proxy type" die
@@ -387,6 +390,37 @@ eq "local traffic still returns before the drop" "$(chain_shape w1)" \
 POOL_UNASSIGNED=default nftgen "$POOL1"
 eq "default policy still falls back to the SSID proxy" \
   "$(chain_body w1 | grep -c "tproxy ip to :$(tproxy_port 1) meta mark set 1 accept")" "2"
+
+echo "== LAN_PROXY (idx 0) =="
+# The main LAN carries wired machines and any SSID sharing its subnet. It has
+# no wifi-socks.conf row, so it is pool-only: idx 0 of proxy-pools.conf.
+LAN_POOL="$STUB/lan.conf"
+printf '%s\n' '0|socks5|9.9.9.9|1080|u|p|LAN-01' '0|socks5|8.8.8.8|1080|||LAN-02' > "$LAN_POOL"
+if ( POOLS="$LAN_POOL" validate_pools ) >/dev/null 2>&1; then
+  ok "idx 0 is accepted as the LAN pool"
+else
+  no "idx 0 is accepted as the LAN pool"
+fi
+LAN_PROXY=1 nftgen "$LAN_POOL"
+eq "br-lan is dispatched to its own chain" \
+  "$(grep -c '"br-lan" : jump w0' "$NFT_FILE")" "1"
+eq "the LAN gets a pin map" "$(grep -c 'map w0map' "$NFT_FILE")" "1"
+eq "a pinned LAN device reaches its slot" \
+  "$(chain_body w0 | grep -c 'meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w0map')" "1"
+# No default proxy exists for the LAN, so an unpinned device must fall off the
+# end of the chain and route as it did before LAN_PROXY was turned on.
+eq "an unpinned LAN device is not proxied at all" \
+  "$(chain_body w0 | grep -c 'tproxy ip to :[0-9]')" "0"
+eq "LAN DNS follows the pin, so dnsmasq still serves unpinned devices" \
+  "$(chain_body w0 | grep -c 'dport 53 tproxy ip to :ip saddr map @w0map')" "1"
+LAN_PROXY=1 POOL_UNASSIGNED=block nftgen "$LAN_POOL"
+eq "block policy also cuts off unpinned LAN devices" \
+  "$(chain_body w0 | grep -c '^    drop$')" "1"
+# Off by default: an existing deployment must not start proxying its LAN
+# because a pool file happens to carry an idx 0 row.
+LAN_PROXY=0 nftgen "$LAN_POOL"
+eq "LAN_PROXY off leaves br-lan alone" "$(grep -c 'br-lan' "$NFT_FILE")" "0"
+eq "LAN_PROXY off declares no idx-0 map" "$(grep -c 'map w0map' "$NFT_FILE")" "0"
 
 echo "== nftables map elements =="
 # The state file identifies a device by MAC; the map is keyed by the IP that
