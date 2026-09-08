@@ -140,6 +140,15 @@ exit IP that moves around breaks logged-in sessions. Pins live in
 `/etc/sbproxy.assign` and are baked into the generated nft file, so a restart
 does not lose them.
 
+`POOL_UNASSIGNED` decides what a device that is **not pinned yet** gets.
+`default` sends it to the `wifi-socks.conf` proxy, which means every unpinned
+device on that SSID shares one exit IP — silently. `block` ends the chain in a
+drop instead, and the DNS rule follows the pin map too, so an unpinned device
+cannot even resolve; letting it resolve would hand it fake IPs it can never
+connect to, which looks broken rather than blocked. The local-net return still
+precedes the drop, so DHCP and the device's own gateway keep working. An SSID
+with no pool is unaffected.
+
 Which slot a new device gets is `POOL_ASSIGN_POLICY`: `random` (default),
 `round-robin`, `least-loaded`, or `sticky-hash`. See the settings table in
 [admin-guide.md](admin-guide.md) for the full list of `POOL_*` tunables.

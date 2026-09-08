@@ -202,6 +202,27 @@ vào file nft sinh ra, nên restart không mất.
 | `POOL_SCAN_INTERVAL` | `3` | Nhịp quét của `sbproxy-assignd`, giây. |
 | `POOL_SYNC_EVERY` | `20` | Số vòng quét giữa hai lần kiểm map khi danh sách máy không đổi. |
 | `POOL_DIVERT` | `auto` | Luật *divert*. `auto` = dùng nếu nhân nhận. |
+| `POOL_UNASSIGNED` | `default` | Máy CHƯA được ghim thì làm gì. `default` = dùng proxy trong `wifi-socks.conf`. `block` = không có mạng. |
+
+**Máy chưa được ghim: `default` hay `block`.** Với `default`, một máy vừa vào
+SSID có pool nhưng chưa kịp ghim sẽ đi bằng proxy khai trong `wifi-socks.conf`.
+Nghĩa là **mọi máy chưa ghim của SSID đó cùng ra một IP** — đúng kiểu liên kết
+mà phone farm phải tránh, và nó xảy ra âm thầm.
+
+`POOL_UNASSIGNED=block` kết thúc chain bằng `drop` thay vì đẩy về proxy mặc
+định. Rule DNS cũng tra pin map, nên máy chưa ghim **không phân giải được tên
+miền** — nếu để DNS chạy, máy sẽ nhận fake-IP rồi không kết nối được, trông như
+hỏng chứ không phải như bị chặn. Rule trả về cho dải nội bộ vẫn đứng trước lệnh
+drop, nên máy vẫn xin được DHCP và vẫn tới được gateway của chính nó.
+
+SSID không có pool thì không bị ảnh hưởng: chúng không có gì để "chưa ghim".
+
+```sh
+# Ghim để mở mạng cho một máy đang bị chặn:
+sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 auto
+# Xem chain đang kết thúc bằng gì:
+nft list chain inet sbproxy w1 | tail -3
+```
 
 **Lệnh CLI:**
 
