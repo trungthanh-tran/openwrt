@@ -263,6 +263,31 @@ sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 auto
 nft list chain inet sbproxy w1 | tail -3
 ```
 
+**Dải LAN chính (`LAN_PROXY`).** Chỉ các SSID do dự án tạo (`br-w<idx>`) mới đi
+qua proxy; máy cắm dây và SSID dùng chung dải LAN chính thì không. Đặt
+`LAN_PROXY=1` để `br-lan` cũng có chain riêng, lấy proxy từ **các dòng `idx 0`**
+trong `proxy-pools.conf`:
+
+```
+idx|proxy_type|host|port|user|pass|label
+0|socks5|9.9.9.9|1080|u|p|LAN-01
+0|socks5|8.8.8.8|1080|||LAN-02
+```
+
+```sh
+sh scripts/assign.sh 0 aa:bb:cc:dd:ee:01 auto   # ghim một máy LAN vào proxy
+sh scripts/assign.sh 0 aa:bb:cc:dd:ee:01 none   # bỏ ghim: máy hết đi qua proxy
+```
+
+LAN **không có proxy mặc định** (không có dòng nào trong `wifi-socks.conf`), nên
+chỉ máy đã ghim mới qua proxy. Máy chưa ghim không khớp map, rơi khỏi chain và
+định tuyến **y như trước khi bật** — kể cả DNS, vì rule DNS cũng tra pin map nên
+dnsmasq vẫn phục vụ bình thường. Bật `POOL_UNASSIGNED=block` thì máy LAN chưa ghim
+cũng bị chặn.
+
+Mặc định `LAN_PROXY=0`: một triển khai đang chạy không tự dưng proxy cả LAN chỉ vì
+file pool có dòng `idx 0`. Đổi `LAN_BRIDGE` nếu board dùng tên bridge khác `br-lan`.
+
 **Lệnh CLI:**
 
 ```sh

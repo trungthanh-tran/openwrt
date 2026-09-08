@@ -203,6 +203,31 @@ sh scripts/assign.sh 1 aa:bb:cc:dd:ee:01 3
 sh scripts/rebalance.sh 1 --online --dry-run
 ```
 
+### The main LAN
+
+Only bridges this project creates (`br-w<idx>`) are proxied, so a wired machine
+— or an SSID sharing the main subnet — has no way to be given a proxy. Set
+`LAN_PROXY=1` and `br-lan` gets its own chain, fed by the **idx 0** rows of
+`proxy-pools.conf`:
+
+```
+0|socks5|9.9.9.9|1080|u|p|LAN-01
+```
+
+```sh
+sh scripts/assign.sh 0 aa:bb:cc:dd:ee:01 auto
+```
+
+The LAN has no `wifi-socks.conf` row and so no default proxy: only a pinned
+device is proxied. An unpinned one matches no map entry, falls off the end of
+the chain, and routes exactly as it did before — DNS included, because the DNS
+rule follows the pin map rather than dragging every wired machine off dnsmasq
+into fake-IP. `POOL_UNASSIGNED=block` applies here too.
+
+Off by default, so a deployment that already lists an idx 0 row does not
+suddenly start proxying its LAN. Set `LAN_BRIDGE` if the board names the bridge
+something other than `br-lan`.
+
 > `sock_bypass` is global, not per-SSID. The router must reach a proxy host
 > directly or TPROXY would loop it back, and that bypass list is shared, so a
 > proxy added to SSID 1's pool is also reachable directly by SSID 2's clients.

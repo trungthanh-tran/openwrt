@@ -8,6 +8,7 @@ Tạo nhiều WiFi (SSID), **mỗi WiFi định tuyến toàn bộ traffic qua m
 - **0.4.x — pre-production** (version hiện tại nằm ở [VERSION](VERSION) và trên header console). Hỗ trợ GL-MT6000 trên OpenWrt 24.10 (`opkg`) và 25.12 (`apk`); firmware GL.iNet OEM là experimental. **Phải kiểm thử trên router thật**, đặc biệt TPROXY, DNS và giới hạn BSSID.
 - SOCKS5 **relay được UDP** (UDP ASSOCIATE) theo mặc định (`SOCKS_UDP`), nên QUIC, media WebRTC và game đi qua proxy. Proxy HTTP chỉ TCP và vẫn drop QUIC.
 - Hiện chỉ proxy **IPv4**; IPv6 bị tắt trên các SSID sbproxy để tránh đi thẳng. DNS cổng 53 được hijack vào fake-IP và reverse-map hostname để SOCKS thực hiện remote resolve.
+- **Gán proxy cho máy trên dải LAN chính** (`LAN_PROXY=1`): máy cắm dây và SSID dùng chung dải LAN cũng ghim proxy được, qua pool `idx 0`.
 - **Luật định tuyến theo domain/IP** (`config/routing-rules.conf`): cho một đích đi thẳng, chặn hẳn, hoặc ép qua proxy. Không có file = mọi thứ qua proxy như trước.
 - Luôn có **backup tự động** trước mỗi thay đổi và **rollback 1 lệnh** — xem [docs/ROLLBACK.md](docs/ROLLBACK.md).
 - Chỉ dùng cho mục đích hợp pháp; đảm bảo tuân thủ điều khoản của nhà cung cấp SOCKS.
