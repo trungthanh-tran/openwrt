@@ -10,6 +10,7 @@
 [ -f /etc/sbproxy/env ] && . /etc/sbproxy/env
 SB_ROOT="${SB_ROOT:-/root/sbproxy}"
 CONF="${CONF:-$SB_ROOT/config/wifi-socks.conf}"
+POOLS="${POOLS:-$SB_ROOT/config/proxy-pools.conf}"
 HEALTH_FILE="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
 LOG_DIR="${LOG_DIR:-/etc/sbproxy/logs}"
 HEALTH_LOG_STATE="${HEALTH_LOG_STATE:-/tmp/sbproxy-health-log-state}"
@@ -98,6 +99,7 @@ run_once() {
   [ -r "$CONF" ] || { echo "healthd: cannot read config $CONF" >&2; return 1; }
   purge_daily_logs
   probes="{}"
+  pool_probes="{}"
   state_tmp="$HEALTH_LOG_STATE.tmp.$$"
   : > "$state_tmp" 2>/dev/null || state_tmp=""
   # Read the source configuration.
@@ -140,11 +142,37 @@ run_once() {
               '.[$i] = {state:$s, latency_ms:$ms, code:$c, endpoint:$ep} + (if $e == "" then {} else {error:$e} end)')"
   done < "$CONF"
 
+  # Probe every pool slot as well as each SSID's default proxy.  Pool slots are
+  # what the DHCP assigner actually chooses, so a healthy SSID-level probe is
+  # not enough to prevent a dead slot from being selected.
+  if [ -r "$POOLS" ]; then
+    pool_tmp="${TMPDIR:-/tmp}/sbproxy-health-pool.$$"
+    awk -F'|' '{ sub(/\r$/, ""); if ($0 ~ /^[[:space:]]*#/ || $0 ~ /^[[:space:]]*$/ || NF < 6 || NF > 7) next; i=$1; printf "%s|%d|%s|%s|%s|%s|%s|%s\n", i, seen[i]++, $2, $3, $4, $5, $6, (NF >= 7 ? $7 : "") }' "$POOLS" > "$pool_tmp" 2>/dev/null || :
+    while IFS='|' read -r pidx pslot ptype phost pport puser ppass plabel pextra; do
+      case "$pidx" in ''|\#*) continue;; esac
+      [ -z "$pextra" ] || continue
+      case "$ptype" in socks5|http) :;; *) continue;; esac
+      pidx="$(trim_field "$pidx")"; phost="$(trim_field "$phost")"; pport="$(trim_field "$pport")"
+      case "$pidx" in ''|*[!0-9]*) continue;; esac
+      case "$pport" in ''|*[!0-9]*) continue;; esac
+      [ "$pport" -ge 1 ] 2>/dev/null && [ "$pport" -le 65535 ] 2>/dev/null || continue
+      [ "${#puser}" -le 255 ] && [ "${#ppass}" -le 255 ] || continue
+      case "$pslot" in ''|*[!0-9]*) continue;; esac
+      probe_one "$phost" "$pport" "$puser" "$ppass" "$ptype"
+      pool_probes="$(echo "$pool_probes" | jq --arg i "$pidx" --arg s "$pslot" \
+        --arg st "$PROBE_STATE" --arg ep "$phost:$pport" --argjson ms "${PROBE_MS:-0}" \
+        --argjson c "${PROBE_CODE:-0}" --arg e "${PROBE_ERROR:-}" \
+        '.[$i] = (.[$i] // {}) | .[$i][$s] = ({state:$st,latency_ms:$ms,code:$c,endpoint:$ep} + (if $e == "" then {} else {error:$e} end))')"
+    done < "$pool_tmp"
+    rm -f "$pool_tmp"
+  fi
+
   [ -z "$state_tmp" ] || mv "$state_tmp" "$HEALTH_LOG_STATE" 2>/dev/null || true
 
   ts="$(date +%s)"
   tmp="$HEALTH_FILE.tmp.$$"
-  jq -n --argjson ts "$ts" --argjson p "$probes" '{ts:$ts, probes:$p}' > "$tmp" && mv "$tmp" "$HEALTH_FILE"
+  jq -n --argjson ts "$ts" --argjson p "$probes" --argjson pp "$pool_probes" \
+    '{ts:$ts, probes:$p, pool_probes:$pp}' > "$tmp" && mv "$tmp" "$HEALTH_FILE"
 }
 
 if [ "${1:-}" = "--once" ]; then run_once; exit $?; fi

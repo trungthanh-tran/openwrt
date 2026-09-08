@@ -90,6 +90,22 @@ done
 eq "random stays inside the pool" "$(printf '%s' "$seen" | grep -c 'out-of-range')" "0"
 eq "random does not always answer the same slot" \
    "$([ "${#seen}" -gt 1 ] && echo yes)" "yes"
+eq "random sequence changes inside one process" \
+   "$([ "$(cat "${POOL_RANDOM_COUNTER_FILE:-/tmp/sbproxy-pool-random-seq}" 2>/dev/null || echo 0)" -gt 0 ] && echo yes)" "yes"
+
+HEALTH_FILE="$STUB/health.json"
+cat > "$HEALTH_FILE" <<'EOF'
+{"pool_probes":{"1":{"0":{"state":"fail"},"1":{"state":"ok"},"2":{"state":"slow"},"3":{"state":"fail"}}}}
+EOF
+healthy_seen=""
+n=0
+while [ "$n" -lt 20 ]; do
+  s="$(POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01)"
+  case "$s" in 1|2) healthy_seen=yes ;; *) healthy_seen=no; break ;; esac
+  n=$(( n + 1 ))
+done
+eq "random excludes failed pool slots when health is available" "$healthy_seen" "yes"
+rm -f "$HEALTH_FILE"
 
 eq "the default policy is random" \
    "$(unset POOL_ASSIGN_POLICY 2>/dev/null; sed -n 's/^POOL_ASSIGN_POLICY=//p' "$ROOT/config/settings.sh" | tr -d '"')" \
@@ -584,7 +600,6 @@ contains "which runs under procd" \
 contains "and calls the daemon" \
    "$(cat "$ROOT/agent/init.d/sbproxy-assignd" 2>/dev/null)" "/usr/sbin/sbproxy-assignd"
 
-# kmod-nft-socket is the only new dependency the whole plan introduces (D9).
 contains "install-deps installs kmod-nft-socket" \
    "$(cat "$ROOT/scripts/install-deps.sh")" "kmod-nft-socket"
 contains "and preflight reports whether the kernel took it" \

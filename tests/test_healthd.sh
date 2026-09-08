@@ -15,9 +15,15 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 BIN="$TMP/bin"
 CONF="$TMP/wifi-socks.conf"
 HEALTH_FILE="$TMP/health.json"
+POOLS="$TMP/proxy-pools.conf"
 CURL_CALLS="$TMP/curl.log"
 mkdir -p "$BIN"
 : > "$CURL_CALLS"
+cat > "$POOLS" <<'EOF'
+1|socks5|fast.example|1080|||fast-slot
+1|socks5|offline.example|5080|carol|hunter2|bad-slot
+2|http|slow.example|2080|alice|secret|slow-slot
+EOF
 
 cat > "$BIN/curl" <<'SH'
 #!/bin/sh
@@ -76,7 +82,7 @@ eq() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1 — want[$3] got[$2]"; fi; 
 contains() { if printf '%s' "$2" | grep -Fq "$3"; then ok "$1"; else no "$1 — missing [$3]"; fi; }
 
 echo "== health daemon probe states =="
-export CONF HEALTH_FILE CURL_CALLS
+export CONF POOLS HEALTH_FILE CURL_CALLS
 export PATH="$BIN:$PATH"
 export PROBE_URL='https://probe.example/204' PROBE_TIMEOUT=3 SLOW_MS=800
 if sh "$HEALTHD" --once; then ok "--once succeeds"; else no "--once succeeds"; fi
@@ -98,6 +104,9 @@ eq "a bad HTTP code explains itself" "$(jq -r '.probes["4"].error' "$HEALTH_FILE
 eq "a regex-metachar password is still blanked" "$(jq -r '.probes["12"].error' "$HEALTH_FILE" | grep -cF 'se[cr*t.x')" '0'
 eq "and the reason survives with the mask in place" "$(jq -r '.probes["12"].error' "$HEALTH_FILE" | grep -cF 'denied for ***')" '1'
 eq "a healthy probe carries no error" "$(jq -r '.probes["1"] | has("error")' "$HEALTH_FILE")" 'false'
+eq "healthy pool slot is published" "$(jq -r '.pool_probes["1"]["0"].state' "$HEALTH_FILE")" 'ok'
+eq "failed pool slot is published" "$(jq -r '.pool_probes["1"]["1"].state' "$HEALTH_FILE")" 'fail'
+eq "pool slot carries its endpoint" "$(jq -r '.pool_probes["1"]["1"].endpoint' "$HEALTH_FILE")" 'offline.example:5080'
 
 echo "== probe-proxy.sh: one proxy, with the reason =="
 PROBE="$ROOT/scripts/probe-proxy.sh"
@@ -178,7 +187,7 @@ if sh "$HEALTHD" --once; then ok "dirty config run still succeeds"; else no "dir
 eq "only valid endpoint rows are published" "$(jq -r '.probes | keys | join(",")' "$HEALTH_FILE")" '6,7,8'
 eq "NaN latency is normalized to failure" "$(jq -r '.probes["7"] | [.state,.latency_ms,.code] | join(":")' "$HEALTH_FILE")" 'fail:0:204'
 eq "garbled curl output is normalized to failure" "$(jq -r '.probes["8"] | [.state,.latency_ms,.code] | join(":")' "$HEALTH_FILE")" 'fail:0:0'
-eq "dirty rows never invoke curl" "$(wc -l < "$CURL_CALLS" | tr -d ' ')" '3'
+eq "dirty rows never invoke curl" "$(wc -l < "$CURL_CALLS" | tr -d ' ')" '6'
 # "fail" without the endpoint hid the whole point of the line: WHICH proxy did
 # not answer. A console pill has no room for a second request to find out.
 eq "each probe carries the endpoint it hit" "$(jq -r '.probes["6"].endpoint' "$HEALTH_FILE")" 'fast.example:1080'

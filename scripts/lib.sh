@@ -910,8 +910,33 @@ restore_snapshot_files() { # snapshot directory
 # applets that broke self-update in 0.4.10 because many OpenWrt images do not
 # build them in, so nothing here may depend on either.
 pool_random() { # n
-  awk -v n="$1" -v seed="$(pool_shuffle_seed)" \
-    'BEGIN { srand(seed); print int(rand() * n) % n }'
+  _pr_counter_file="${POOL_RANDOM_COUNTER_FILE:-/tmp/sbproxy-pool-random-seq}"
+  _pr_counter="$(cat "$_pr_counter_file" 2>/dev/null || printf '0')"
+  case "$_pr_counter" in ''|*[!0-9]*) _pr_counter=0 ;; esac
+  _pr_counter=$(( _pr_counter + 1 ))
+  _pr_counter_tmp="$_pr_counter_file.$$"
+  printf '%s\n' "$_pr_counter" > "$_pr_counter_tmp" 2>/dev/null && mv "$_pr_counter_tmp" "$_pr_counter_file" 2>/dev/null || rm -f "$_pr_counter_tmp"
+  awk -v n="$1" -v seq="$_pr_counter" -v seed="$(pool_shuffle_seed)" \
+    'BEGIN { srand(seed + seq * 104729); print int(rand() * n) % n }'
+}
+
+# Return pool slots whose latest health probe can safely carry traffic.  A
+# missing or malformed health file deliberately returns no result: callers
+# fall back to the existing random behaviour while healthd is starting.
+pool_healthy_slots() { # idx
+  _ph_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+  [ -r "$_ph_file" ] || return 0
+  jq -r --arg i "$1" \
+    '.pool_probes[$i] // {} | to_entries[] | select(.value.state == "ok" or .value.state == "slow") | .key' \
+    "$_ph_file" 2>/dev/null
+}
+
+pool_random_healthy() { # idx count
+  _prh_slots="$(pool_healthy_slots "$1")"
+  [ -n "$_prh_slots" ] || return 1
+  _prh_count="$(printf '%s\n' $_prh_slots | awk 'NF { n++ } END { print n + 0 }')"
+  [ "$_prh_count" -gt 0 ] || return 1
+  printf '%s\n' $_prh_slots | sed -n "$(( $(pool_random "$_prh_count") + 1 ))p"
 }
 
 # The slot a MAC always hashes to. Same device, same proxy, even after the
@@ -949,7 +974,7 @@ assign_policy_slot() { # idx mac
   _ps_n="$(pool_count "$_ps_idx")"
   [ "$_ps_n" -gt 0 ] || die "Wi-Fi idx=$_ps_idx has no proxy pool"
   case "${POOL_ASSIGN_POLICY:-random}" in
-    random)       pool_random "$_ps_n" ;;
+    random)       pool_random_healthy "$_ps_idx" "$_ps_n" || pool_random "$_ps_n" ;;
     least-loaded) assign_pick_slot "$_ps_idx" ;;
     sticky-hash)  assign_hash_slot "$_ps_mac" "$_ps_n" ;;
     round-robin)  assign_next_slot "$_ps_idx" "$_ps_n" ;;
