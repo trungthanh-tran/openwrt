@@ -21,6 +21,7 @@ LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 case "$LOG_RETENTION_DAYS" in ''|*[!0-9]*|0) LOG_RETENTION_DAYS=7;; esac
 PROBE_URL="${PROBE_URL:-https://www.gstatic.com/generate_204}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-8}"
+UDP_PROBE="${UDP_PROBE:-$SB_ROOT/scripts/probe-socks5-udp.uc}"
 INTERVAL="${INTERVAL:-15}"
 SLOW_MS="${SLOW_MS:-800}"
 HEALTHY_INTERVAL="${HEALTHY_INTERVAL:-300}"
@@ -77,7 +78,7 @@ probe_one() {
   host="$1"; port="$2"; user="$3"; pass="$4"; proxy_type="${5:-socks5}"
   [ "$proxy_type" = "http" ] && scheme="http" || scheme="socks5h"
   if [ -n "$user" ]; then px="$scheme://$user:$pass@$host:$port"; else px="$scheme://$host:$port"; fi
-  PROBE_ERROR=""; PROBE_STATE=fail; PROBE_MS=0; PROBE_CODE=0
+  PROBE_ERROR=""; PROBE_STATE=fail; PROBE_MS=0; PROBE_CODE=0; PROBE_UDP_STATE=""
   # curl's stderr goes to a scratch file when one can be made; on a full or
   # read-only /tmp the probe still runs, only the error detail is lost.
   errf="${TMPDIR:-/tmp}/sbproxy-probe.$$"
@@ -107,6 +108,37 @@ probe_one() {
   esac
 }
 
+webrtc_mode_for_idx() { # idx
+  awk -F'|' -v wanted="$1" '
+    $0 !~ /^[[:space:]]*#/ && NF >= 10 {
+      i=$3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", i)
+      if (i == wanted) { w=$10; gsub(/^[[:space:]]+|[[:space:]]+$/, "", w); print w; exit }
+    }' "$CONF" 2>/dev/null
+}
+
+probe_udp_required() { # host port user pass type
+  PROBE_UDP_STATE="fail"
+  [ "$PROBE_STATE" = "ok" ] || [ "$PROBE_STATE" = "slow" ] || return 0
+  if [ "$5" != "socks5" ]; then
+    PROBE_ERROR="HTTP proxies do not support SOCKS5 UDP ASSOCIATE"
+    PROBE_STATE=fail
+    return 0
+  fi
+  if ! command -v ucode >/dev/null 2>&1 || [ ! -r "$UDP_PROBE" ]; then
+    PROBE_ERROR="UDP checker is unavailable; install ucode-mod-socket and ucode-mod-struct"
+    PROBE_STATE=fail
+    return 0
+  fi
+  _pu_json="$(ucode "$UDP_PROBE" "$1" "$2" "$3" "$4" 2>/dev/null)"
+  PROBE_UDP_STATE="$(printf '%s' "$_pu_json" | jq -r '.udp_state // "fail"' 2>/dev/null)"
+  if [ "$PROBE_UDP_STATE" != "ok" ]; then
+    PROBE_UDP_STATE=fail
+    _pu_error="$(printf '%s' "$_pu_json" | jq -r '.error // "UDP checker returned invalid output"' 2>/dev/null)"
+    PROBE_ERROR="UDP ASSOCIATE/STUN failed: $_pu_error"
+    PROBE_STATE=fail
+  fi
+}
+
 schedule_probe_result() { # endpoint previous-fail-count
   _spr_ep="$1"; _spr_fail="${2:-0}"
   case "$_spr_fail" in ''|*[!0-9]*) _spr_fail=0;; esac
@@ -122,10 +154,12 @@ schedule_probe_result() { # endpoint previous-fail-count
       ;;
   esac
   _spr_next=$(( now + _spr_delay ))
-  PROBE_JSON="$(jq -n --arg st "$PROBE_STATE" --arg ep "$_spr_ep" --arg e "${PROBE_ERROR:-}" \
+  PROBE_JSON="$(jq -n --arg st "$PROBE_STATE" --arg ep "$_spr_ep" --arg e "${PROBE_ERROR:-}" --arg udp "${PROBE_UDP_STATE:-}" \
     --argjson ms "${PROBE_MS:-0}" --argjson c "${PROBE_CODE:-0}" --argjson checked "$now" \
     --argjson next "$_spr_next" --argjson fails "$_spr_fail" \
-    '{state:$st,latency_ms:$ms,code:$c,endpoint:$ep,checked_at:$checked,next_check:$next,fail_count:$fails} + (if $e == "" then {} else {error:$e} end)')"
+    '{state:$st,latency_ms:$ms,code:$c,endpoint:$ep,checked_at:$checked,next_check:$next,fail_count:$fails}
+     + (if $e == "" then {} else {error:$e} end)
+     + (if $udp == "" then {} else {udp_state:$udp} end)')"
 }
 
 run_once() {
@@ -138,6 +172,7 @@ run_once() {
   old_probes="$(jq -c '.probes // {}' "$HEALTH_FILE" 2>/dev/null || printf '{}')"
   old_pool_probes="$(jq -c '.pool_probes // {}' "$HEALTH_FILE" 2>/dev/null || printf '{}')"
   runtime_bad=""
+  runtime_udp_bad=""
   if command -v logread >/dev/null 2>&1; then
     runtime_tmp="${TMPDIR:-/tmp}/sbproxy-health-errors.$$"
     logread 2>/dev/null | grep -E 'sing-box.*(ERROR|error).*out-w[0-9]+-s[0-9]+' > "$runtime_tmp" || true
@@ -147,7 +182,10 @@ run_once() {
     case "$runtime_count" in ''|*[!0-9]*) runtime_count=0;; esac
     [ "$runtime_count" -ge "$runtime_seen" ] || runtime_seen=0
     if [ "$runtime_count" -gt "$runtime_seen" ]; then
-      runtime_bad="$(sed -n "$(( runtime_seen + 1 )),${runtime_count}p" "$runtime_tmp" 2>/dev/null \
+      runtime_new="$(sed -n "$(( runtime_seen + 1 )),${runtime_count}p" "$runtime_tmp" 2>/dev/null)"
+      runtime_bad="$(printf '%s\n' "$runtime_new" \
+        | sed -n 's/.*out-w\([0-9][0-9]*\)-s\([0-9][0-9]*\).*/\1|\2/p' | sort -u)"
+      runtime_udp_bad="$(printf '%s\n' "$runtime_new" | grep -F 'UDP is not supported by outbound' \
         | sed -n 's/.*out-w\([0-9][0-9]*\)-s\([0-9][0-9]*\).*/\1|\2/p' | sort -u)"
     fi
     printf '%s\n' "$runtime_count" > "$RUNTIME_ERROR_CURSOR" 2>/dev/null || true
@@ -185,11 +223,14 @@ run_once() {
     previous_ep="$(printf '%s' "$previous_json" | jq -r '.endpoint // ""')"
     previous_next="$(printf '%s' "$previous_json" | jq -r '.next_check // 0')"
     case "$previous_next" in ''|*[!0-9]*) previous_next=0;; esac
-    if [ "$previous_ep" = "$ep" ] && [ "$previous_next" -gt "$now" ]; then
+    previous_udp="$(printf '%s' "$previous_json" | jq -r '.udp_state // ""')"
+    if [ "$previous_ep" = "$ep" ] && [ "$previous_next" -gt "$now" ] \
+       && { [ "$webrtc" != "2" ] || [ -n "$previous_udp" ]; }; then
       PROBE_JSON="$previous_json"
     else
       previous_fail="$(printf '%s' "$previous_json" | jq -r '.fail_count // 0')"
       probe_one "$host" "$port" "$user" "$pass" "$proxy_type"
+      [ "$webrtc" = "2" ] && probe_udp_required "$host" "$port" "$user" "$pass" "$proxy_type"
       schedule_probe_result "$ep" "$previous_fail"
     fi
     state="$(printf '%s' "$PROBE_JSON" | jq -r '.state // "pending"')"
@@ -226,12 +267,27 @@ run_once() {
       previous="$(printf '%s' "$old_pool_probes" | jq -c --arg i "$pidx" --arg s "$pslot" '.[$i][$s] // {}')"
       previous_ep="$(printf '%s' "$previous" | jq -r '.endpoint // ""')"
       previous_next="$(printf '%s' "$previous" | jq -r '.next_check // 0')"
+      previous_udp="$(printf '%s' "$previous" | jq -r '.udp_state // ""')"
       case "$previous_next" in ''|*[!0-9]*) previous_next=0;; esac
-      if printf '%s\n' "$runtime_bad" | grep -qx "$pidx|$pslot"; then
+      pwebrtc="$(webrtc_mode_for_idx "$pidx")"
+      pcheckudp=0
+      { [ "$pwebrtc" = "2" ] || [ "$previous_udp" = "fail" ]; } && pcheckudp=1
+      if printf '%s\n' "$runtime_udp_bad" | grep -qx "$pidx|$pslot"; then
+        previous_fail="$(printf '%s' "$previous" | jq -r '.fail_count // 0')"
+        case "$previous_fail" in ''|*[!0-9]*) previous_fail=0;; esac
+        previous_fail=$(( previous_fail + 1 ))
+        PROBE_JSON="$(jq -n --arg ep "$pep" --argjson checked "$now" --argjson next "$(( now + FAIL_RETRY_BASE ))" \
+          --argjson fails "$previous_fail" '{state:"fail",udp_state:"fail",latency_ms:0,code:0,endpoint:$ep,
+            checked_at:$checked,next_check:$next,fail_count:$fails,error:"sing-box reported UDP is not supported by this outbound"}')"
+        health_daily_log "idx=$pidx slot=$pslot endpoint=$pep udp=fail runtime-error=quarantine"
+      elif printf '%s\n' "$runtime_bad" | grep -qx "$pidx|$pslot"; then
         previous_next=0
         health_daily_log "idx=$pidx slot=$pslot endpoint=$pep runtime-error=reprobe"
       fi
-      if [ "$previous_ep" = "$pep" ] && [ "$previous_next" -gt "$now" ]; then
+      if printf '%s\n' "$runtime_udp_bad" | grep -qx "$pidx|$pslot"; then
+        : # Publish quarantine now; only a later real UDP probe may recover it.
+      elif [ "$previous_ep" = "$pep" ] && [ "$previous_next" -gt "$now" ] \
+           && { [ "$pcheckudp" != "1" ] || [ -n "$previous_udp" ]; }; then
         PROBE_JSON="$previous"
       elif [ "$pool_probe_count" -ge "$MAX_POOL_PROBES_PER_RUN" ]; then
         PROBE_JSON="$previous"
@@ -239,6 +295,7 @@ run_once() {
       else
         previous_fail="$(printf '%s' "$previous" | jq -r '.fail_count // 0')"
         probe_one "$phost" "$pport" "$puser" "$ppass" "$ptype"
+        [ "$pcheckudp" = "1" ] && probe_udp_required "$phost" "$pport" "$puser" "$ppass" "$ptype"
         schedule_probe_result "$pep" "$previous_fail"
         pool_probe_count=$(( pool_probe_count + 1 ))
       fi

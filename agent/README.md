@@ -91,10 +91,15 @@ Trình duyệt **chặn** trang https gọi tới router http. Vì vậy:
 `/etc/sbproxy/env` (do install-agent tạo): `SB_ROOT`, `CONF`, `PROBE_URL`, `INTERVAL` (giây giữa các lần probe), `SLOW_MS` (ngưỡng "chậm"), `PROBE_TIMEOUT`.
 Health proxy pool dùng lịch adaptive: proxy mới được WebUI kiểm tra trước khi
 lưu; `OK` kiểm tra lại sau 300 giây, `SLOW` sau 120 giây, còn `FAIL` retry theo
-15/30/60/120/300 giây. Mỗi vòng probe tối đa 4 slot; lỗi sing-box có tên
-`out-w<idx>-s<slot>` sẽ yêu cầu kiểm tra lại slot đó ngay. Có thể chỉnh bằng
+15/30/60/120/300 giây. Với SSID dùng WebRTC mode `2`, mỗi slot SOCKS5 phải qua
+thêm một phép thử UDP ASSOCIATE + STUN thật; slot TCP tốt nhưng UDP lỗi bị ghi
+`UDP FAIL`, loại khỏi random và chỉ được dùng lại sau khi phép thử UDP pass.
+Lỗi runtime `UDP is not supported by outbound: out-w<idx>-s<slot>` quarantine
+đúng slot ngay lập tức. Mỗi vòng probe tối đa 4 slot. Có thể chỉnh bằng
 `HEALTHY_INTERVAL`, `SLOW_INTERVAL`, `FAIL_RETRY_BASE`, `FAIL_RETRY_MAX` và
 `MAX_POOL_PROBES_PER_RUN` trong `/etc/sbproxy/env`.
+Phép thử UDP cần `ucode-mod-socket` và `ucode-mod-struct`; `install-deps.sh`
+tự cài và `preflight.sh` báo thiếu nếu firmware chưa có.
 `GATEWAY_EXPECTED_INTERFACE` để trống nghĩa là chấp nhận mọi uplink; đặt tên một
 interface (`wan`, `wwan`, …) nếu muốn ép đúng một đường ra. File này được agent
 nạp trước mọi script nên **giá trị trong đó thắng mặc định trong code**;

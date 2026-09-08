@@ -923,14 +923,29 @@ pool_random() { # n
 # Return pool slots whose latest health probe can safely carry traffic.  A
 # missing or malformed health file deliberately returns no result: callers
 # fall back to the existing random behaviour while healthd is starting.
+pool_requires_udp() { # idx
+  [ "$(awk -F'|' -v wanted="$1" '
+      $0 !~ /^[[:space:]]*#/ && NF >= 10 {
+        i=$3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", i)
+        if (i == wanted) { w=$10; gsub(/^[[:space:]]+|[[:space:]]+$/, "", w); print w; exit }
+      }' "$CONF" 2>/dev/null)" = "2" ]
+}
+
+pool_health_known() { # idx
+  _phk_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
+  [ -r "$_phk_file" ] || return 1
+  jq -e --arg i "$1" '(.pool_probes[$i] // {} | length) > 0' "$_phk_file" >/dev/null 2>&1
+}
+
 pool_healthy_slots() { # idx
   _ph_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
   [ -r "$_ph_file" ] || return 0
-  jq -r --arg i "$1" \
+  if pool_requires_udp "$1"; then _ph_udp=true; else _ph_udp=false; fi
+  jq -r --arg i "$1" --argjson require_udp "$_ph_udp" \
     '(.pool_probes[$i] // {} | to_entries) as $slots |
-     ([$slots[] | select(.value.state == "ok") | .key]) as $ok |
+     ([$slots[] | select(.value.state == "ok" and (($require_udp | not) or .value.udp_state == "ok")) | .key]) as $ok |
      if ($ok | length) > 0 then $ok[]
-     else $slots[] | select(.value.state == "slow") | .key end' \
+     else $slots[] | select(.value.state == "slow" and (($require_udp | not) or .value.udp_state == "ok")) | .key end' \
     "$_ph_file" 2>/dev/null
 }
 
@@ -977,7 +992,15 @@ assign_policy_slot() { # idx mac
   _ps_n="$(pool_count "$_ps_idx")"
   [ "$_ps_n" -gt 0 ] || die "Wi-Fi idx=$_ps_idx has no proxy pool"
   case "${POOL_ASSIGN_POLICY:-random}" in
-    random)       pool_random_healthy "$_ps_idx" "$_ps_n" || pool_random "$_ps_n" ;;
+    random)
+      if _ps_slot="$(pool_random_healthy "$_ps_idx" "$_ps_n")"; then
+        printf '%s' "$_ps_slot"
+      elif pool_requires_udp "$_ps_idx" && pool_health_known "$_ps_idx"; then
+        die "Wi-Fi idx=$_ps_idx has no TCP+UDP healthy proxy slot"
+      else
+        pool_random "$_ps_n"
+      fi
+      ;;
     least-loaded) assign_pick_slot "$_ps_idx" ;;
     sticky-hash)  assign_hash_slot "$_ps_mac" "$_ps_n" ;;
     round-robin)  assign_next_slot "$_ps_idx" "$_ps_n" ;;
@@ -1002,8 +1025,13 @@ assign_ensure() { # idx mac [reconnect]
   if [ -n "$_ae3_have" ]; then
     _ae3_src="$(awk -F'|' -v i="$_ae3_idx" -v m="$_ae3_mac" \
                   '$1 == i && tolower($2) == m { print $4; exit }' "$ASSIGN_FILE")"
-    if [ "${3:-0}" != "1" ] || [ "${POOL_ROTATE_ON_RECONNECT:-0}" != "1" ] \
-       || [ "$_ae3_src" = "manual" ]; then
+    _ae3_unhealthy=0
+    if [ "$_ae3_src" != "manual" ] && pool_requires_udp "$_ae3_idx" && pool_health_known "$_ae3_idx" \
+       && ! pool_healthy_slots "$_ae3_idx" | grep -qx "$_ae3_have"; then
+      _ae3_unhealthy=1
+    fi
+    if [ "$_ae3_unhealthy" = "0" ] && { [ "${3:-0}" != "1" ] || [ "${POOL_ROTATE_ON_RECONNECT:-0}" != "1" ] \
+       || [ "$_ae3_src" = "manual" ]; }; then
       printf '%s' "$_ae3_have"
       return 0
     fi

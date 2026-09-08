@@ -62,9 +62,24 @@ esac
 SH
 chmod +x "$BIN/curl"
 
+cat > "$BIN/ucode" <<'SH'
+#!/bin/sh
+# argv: checker-script host port user pass. Keep the fake deterministic while
+# exercising healthd's mode-2 decision and JSON parsing.
+case "$2" in
+  udp-fail.example) printf '%s\n' '{"ok":false,"udp_state":"fail","error":"STUN timed out","relay":""}'; exit 1 ;;
+  *) printf '%s\n' '{"ok":true,"udp_state":"ok","error":"","relay":"198.51.100.1:40000"}' ;;
+esac
+SH
+cat > "$BIN/logread" <<'SH'
+#!/bin/sh
+printf '%s\n' "${LOGREAD_OUTPUT:-}"
+SH
+chmod +x "$BIN/ucode" "$BIN/logread"
+
 cat > "$CONF" <<'EOF'
 # name|band|idx|key|host|port|user|pass|isolate|webrtc
-Fast|2g|1|password12|fast.example|1080|||1|1
+Fast|2g|1|password12|fast.example|1080|||1|2
 Slow|5g|2|password12|slow.example|2080|alice|secret|1|1
 Edge|2g|3|password12|edge.example|3080|||1|1
 BadCode|2g|4|password12|badcode.example|4080|||1|1
@@ -106,6 +121,7 @@ eq "a regex-metachar password is still blanked" "$(jq -r '.probes["12"].error' "
 eq "and the reason survives with the mask in place" "$(jq -r '.probes["12"].error' "$HEALTH_FILE" | grep -cF 'denied for ***')" '1'
 eq "a healthy probe carries no error" "$(jq -r '.probes["1"] | has("error")' "$HEALTH_FILE")" 'false'
 eq "healthy pool slot is published" "$(jq -r '.pool_probes["1"]["0"].state' "$HEALTH_FILE")" 'ok'
+eq "mode 2 records a successful UDP relay probe" "$(jq -r '.pool_probes["1"]["0"].udp_state' "$HEALTH_FILE")" 'ok'
 eq "failed pool slot is published" "$(jq -r '.pool_probes["1"]["1"].state' "$HEALTH_FILE")" 'fail'
 eq "pool slot carries its endpoint" "$(jq -r '.pool_probes["1"]["1"].endpoint' "$HEALTH_FILE")" 'offline.example:5080'
 eq "healthy slots wait five minutes" "$(jq -r '.pool_probes["1"]["0"] | .next_check - .checked_at' "$HEALTH_FILE")" '300'
@@ -115,6 +131,17 @@ calls_before="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
 sh "$HEALTHD" --once
 calls_after="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
 eq "a second immediate pass reuses every fresh result" "$(( calls_after - calls_before ))" '0'
+
+echo "== runtime UDP quarantine and recovery =="
+export RUNTIME_ERROR_CURSOR="$TMP/runtime-error-cursor"
+rm -f "$RUNTIME_ERROR_CURSOR"
+LOGREAD_OUTPUT='sing-box ERROR router: UDP is not supported by outbound: out-w1-s0' sh "$HEALTHD" --once
+eq "a new sing-box UDP error quarantines the exact slot" "$(jq -r '.pool_probes["1"]["0"].state' "$HEALTH_FILE")" 'fail'
+eq "runtime quarantine is labelled UDP fail" "$(jq -r '.pool_probes["1"]["0"].udp_state' "$HEALTH_FILE")" 'fail'
+eq "runtime quarantine retains an actionable reason" "$(jq -r '.pool_probes["1"]["0"].error' "$HEALTH_FILE" | grep -c 'sing-box reported UDP')" '1'
+jq '.pool_probes["1"]["0"].next_check = 0' "$HEALTH_FILE" > "$TMP/recover.json" && mv "$TMP/recover.json" "$HEALTH_FILE"
+LOGREAD_OUTPUT='' sh "$HEALTHD" --once
+eq "only a successful UDP probe releases quarantine" "$(jq -r '.pool_probes["1"]["0"] | [.state,.udp_state] | join(":")' "$HEALTH_FILE")" 'ok:ok'
 
 echo "== probe-proxy.sh: one proxy, with the reason =="
 PROBE="$ROOT/scripts/probe-proxy.sh"
@@ -147,6 +174,11 @@ out="$(DIRECT_DOWN=1 sh "$PROBE" offline.example 5080)"
 eq "probe: no WAN is wan-down"        "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'wan-down'
 out="$(sh "$PROBE" fast.example 1080)"
 eq "probe: a good proxy verdict is ok" "$(printf '%s' "$out" | jq -r .verdict | cut -d: -f1)" 'ok'
+out="$(SB_ROOT="$ROOT" sh "$PROBE" fast.example 1080 "" "" socks5 1)"
+eq "probe: mode 2 asks for UDP ASSOCIATE" "$(printf '%s' "$out" | jq -r .udp_state)" 'ok'
+eq "probe: mode 2 carries the UDP relay result" "$(printf '%s' "$out" | jq -r .checks.udp_associate)" 'true'
+out="$(SB_ROOT="$ROOT" sh "$PROBE" fast.example 1080 "" "" http 1)"
+eq "probe: HTTP cannot pass a mode-2 UDP check" "$(printf '%s' "$out" | jq -r '.state + ":" + .udp_state')" 'fail:fail'
 out="$(sh "$PROBE" 'bad host' 1080)"
 eq "probe: a dirty host is refused"   "$(printf '%s' "$out" | jq -r .ok)" 'false'
 out="$(sh "$PROBE" fast.example 1080 "" "" ftp)"

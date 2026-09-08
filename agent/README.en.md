@@ -58,8 +58,13 @@ headers.
 New pool proxies are checked by the Web UI before they are saved. The daemon
 then caches each slot result: `ok` is checked again after 300 seconds, `slow`
 after 120 seconds, and failures retry with 15/30/60/120/300-second backoff.
-At most four pool slots are probed per daemon pass. A sing-box error naming an
-`out-w<idx>-s<slot>` outbound schedules that slot for an immediate recheck.
+At most four pool slots are probed per daemon pass. For WebRTC mode `2`, each
+SOCKS5 slot must also pass a real UDP ASSOCIATE + STUN exchange. A TCP-good but
+UDP-bad slot is shown as `UDP FAIL`, excluded from random assignment, and only
+released after a successful UDP probe. A runtime `UDP is not supported by
+outbound: out-w<idx>-s<slot>` error quarantines that exact slot immediately.
+The checker uses `ucode-mod-socket` and `ucode-mod-struct`, installed by
+`install-deps.sh` and reported by `preflight.sh` when missing.
 These intervals and `MAX_POOL_PROBES_PER_RUN` can be overridden in
 `/etc/sbproxy/env`.
 

@@ -110,6 +110,35 @@ cat > "$HEALTH_FILE" <<'EOF'
 EOF
 eq "random falls back to a SLOW slot when no OK slot exists" \
    "$(POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01)" "2"
+
+MODE2_CONF="$STUB/mode2.conf"
+printf '%s\n' 'Mode2|2g|1|password12|1.0.0.1|1080|||1|2||socks5' > "$MODE2_CONF"
+CONF="$MODE2_CONF"
+cat > "$HEALTH_FILE" <<'EOF'
+{"pool_probes":{"1":{"0":{"state":"ok","udp_state":"fail"},"1":{"state":"ok","udp_state":"ok"},"2":{"state":"slow","udp_state":"ok"},"3":{"state":"fail","udp_state":"fail"}}}}
+EOF
+eq "mode 2 random excludes a TCP-good slot whose UDP failed" \
+   "$(POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01)" "1"
+cat > "$HEALTH_FILE" <<'EOF'
+{"pool_probes":{"1":{"0":{"state":"ok","udp_state":"fail"},"1":{"state":"fail","udp_state":"fail"},"2":{"state":"slow","udp_state":"fail"},"3":{"state":"fail","udp_state":"fail"}}}}
+EOF
+if ( POOL_ASSIGN_POLICY=random assign_policy_slot 1 aa:bb:cc:dd:ee:01 ) >/dev/null 2>&1; then
+  no "mode 2 refuses to select a known UDP-bad slot"
+else
+  ok "mode 2 refuses to select a known UDP-bad slot"
+fi
+cat > "$HEALTH_FILE" <<'EOF'
+{"pool_probes":{"1":{"0":{"state":"ok","udp_state":"fail"},"1":{"state":"ok","udp_state":"ok"},"2":{"state":"fail","udp_state":"fail"},"3":{"state":"fail","udp_state":"fail"}}}}
+EOF
+reset_state
+assign_set 1 aa:bb:cc:dd:ee:09 0 auto
+POOL_ASSIGN_POLICY=random assign_ensure 1 aa:bb:cc:dd:ee:09 >/dev/null
+eq "an automatic mode-2 pin leaves a quarantined slot" "$(slot_of 1 aa:bb:cc:dd:ee:09)" "1"
+reset_state
+assign_set 1 aa:bb:cc:dd:ee:09 0 manual
+POOL_ASSIGN_POLICY=random assign_ensure 1 aa:bb:cc:dd:ee:09 >/dev/null
+eq "a manual pin is still an explicit operator override" "$(slot_of 1 aa:bb:cc:dd:ee:09)" "0"
+CONF="$ROOT/config/wifi-socks.conf.example"
 rm -f "$HEALTH_FILE"
 
 eq "the default policy is random" \
@@ -613,6 +642,10 @@ contains "install-deps installs cksum for high-quality random seeds" \
    "$(cat "$ROOT/scripts/install-deps.sh")" "coreutils-cksum"
 contains "and preflight reports cksum availability" \
    "$(cat "$ROOT/scripts/preflight.sh")" "coreutils-cksum"
+contains "install-deps installs the UDP checker modules" \
+   "$(cat "$ROOT/scripts/install-deps.sh")" "ucode-mod-socket ucode-mod-struct"
+contains "preflight reports the UDP checker modules" \
+   "$(cat "$ROOT/scripts/preflight.sh")" "ucode-mod-socket ucode-mod-struct"
 
 printf '\nASSIGND TOTAL: pass=%s fail=%s\n' "$n_ok" "$n_bad"
 [ "$n_bad" -eq 0 ]
