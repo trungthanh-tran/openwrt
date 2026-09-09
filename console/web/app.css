@@ -469,9 +469,11 @@
     --bs-btn-focus-box-shadow: 0 0 0 3px var(--ring);
   }
   .btn.primary { --bs-btn-hover-color: #04231f; --bs-btn-active-color: #04231f; }
-  /* Proxy endpoints are managed in the batch pool dialog, not one-by-one. */
-  #backdrop .field:has(#f_proxy_type), #backdrop .field:has(#f_host),
-  #backdrop .field:has(#f_user), #backdrop #probeBtn { display: none; }
+  /* The proxy fields used to be hidden here, on the grounds that endpoints are
+     managed in the pool dialog. That left Save writing a proxy nobody could
+     see or change, so an SSID's proxy could only be replaced by deleting its
+     pool and adding it again. They are visible again; saveForm keeps the pool
+     in step when the SSID has exactly one. */
   button[data-zap] { display: none; }
 
   /* Compact phone layout. Tables remain horizontally scrollable so proxy,

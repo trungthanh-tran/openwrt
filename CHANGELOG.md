@@ -5,6 +5,19 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Fixed
+- **Đổi proxy của một Wi-Fi trong console giờ có tác dụng thật.** Màn hình sửa
+  Wi-Fi ẩn hết các ô proxy (`show_proxy_fields=False` ở bản Desktop, một rule CSS
+  ở bản Web), nên nút Save ghi một proxy không ai nhìn thấy hay sửa được — mà
+  `wifi-socks.conf` lại chỉ là proxy mặc định cho thiết bị **chưa ghim**; máy đã
+  ghim vẫn theo slot trong pool. Kết quả: đổi proxy xong tưởng như không có gì
+  thay đổi, và cách duy nhất để đổi thật là xoá cả pool rồi thêm lại. Nay các ô
+  proxy hiện trở lại, và khi Save làm đổi endpoint thì: SSID không có pool —
+  như cũ; pool đúng **một** proxy — slot đó được ghi lại theo endpoint mới (giữ
+  nguyên label) rồi áp; pool **nhiều** proxy — không đoán và không ghi đè, chỉ
+  báo rõ số proxy và rằng thay đổi chỉ áp cho máy chưa ghim. Pool chỉ được đụng
+  tới sau khi apply cấu hình Wi-Fi đã thành công.
+
 ### Changed
 - **Web console định tuyến bằng anchor, chỉ còn một file HTML.** Mỗi workspace
   từng là một file riêng (`config.html`, `devices.html`, …) vì `app.js` chọn màn

@@ -1280,6 +1280,15 @@ match "web console can upload update package" "$(cat "$ROOT/console/web/app.js")
 web_console="$(cat "$ROOT/console/web/control-panel.html" "$ROOT/console/web/app.css" "$ROOT/console/web/app.js" "$ROOT/console/web/i18n.en.js")"
 # The console is one page routed by the URL fragment; per-workspace .html files
 # are gone, so a nav link that still pointed at one would 404.
+# An SSID's proxy lives in wifi-socks.conf, which only unpinned devices read.
+# Hiding the fields left Save writing a proxy nobody could see or change.
+nomatch "the Wi-Fi dialog no longer hides its proxy fields" "$web_console" 'has\(#f_proxy_type\)'
+match "editing the proxy syncs a single-proxy pool" "$web_console" 'function syncPoolToSsidProxy\('
+match "a pool of one is rewritten to the new endpoint" "$web_console" 'api\("save_pool", "POST", \{ idx, proxies: \[wanted\] \}\)'
+# Overwriting several slots would discard proxies and the pins that point at them.
+match "a pool of several is reported, never overwritten" "$web_console" 'rows\.length > 1'
+# autoApplyConfig swallows its error to roll back, so the caller needs the flag.
+match "the pool is only touched after the apply landed" "$web_console" 'applied && proxyChanged'
 match "the console routes on the URL fragment" "$web_console" 'addEventListener\("hashchange"'
 match "navigation sets the fragment, not the workspace directly" "$web_console" 'location\.hash = next'
 nomatch "no nav link points at a per-workspace page" "$(cat "$ROOT/console/web/control-panel.html")" 'href="[a-z]*\.html"'

@@ -1401,6 +1401,15 @@ def parse_proxy_list(text: str, limit: int | None = None, input_format="auto") -
     return rows, dropped
 
 
+def proxy_identity(record) -> tuple:
+    """What makes two proxies the same endpoint, ignoring the pool label."""
+    return (str(getattr(record, "proxy_type", "") or DEFAULT_PROXY_TYPE).lower(),
+            str(getattr(record, "host", "") or "").lower(),
+            int(getattr(record, "port", 0) or 0),
+            str(getattr(record, "user", "") or ""),
+            str(getattr(record, "socks_password", "") or ""))
+
+
 def proxy_object_tuple(row) -> tuple | None:
     """Convert a router pool object to the tuple used by save_pool."""
     if not isinstance(row, dict):
@@ -6104,8 +6113,17 @@ class NativeApp:
                 return idx
         raise AgentError("Đã đạt giới hạn 200 SSID")
 
-    def apply_wifi_change(self, previous, label):
-        """Persist one Wi-Fi edit immediately, with a dry-run and rollback."""
+    def apply_wifi_change(self, previous, label, sync_proxy=None):
+        """Persist one Wi-Fi edit immediately, with a dry-run and rollback.
+
+        `sync_proxy` is the edited record when its proxy changed. wifi-socks.conf
+        only holds the SSID default, which unpinned devices use, so on an SSID
+        with a pool the edit would otherwise appear to do nothing. With exactly
+        one proxy in the pool that slot means the same endpoint and is rewritten
+        too; with several there is no single slot to mean, and overwriting them
+        all would discard proxies and the pins that point at them, so the log
+        says where the change landed instead.
+        """
         try:
             client = self.require_client()
             current_content = render_conf(self.records)
@@ -6130,7 +6148,8 @@ class NativeApp:
                 result = client.apply()
                 if not result.get("ok", False):
                     raise AgentError(result.get("log") or "Apply thất bại")
-                return {"ok": True, "result": result}
+                note = self._sync_pool_to_ssid_proxy(client, sync_proxy) if sync_proxy else ""
+                return {"ok": True, "result": result, "note": note}
             except Exception as exc:
                 # save_conf may have completed before apply failed. Restore the
                 # known-good configuration so the local editor and router agree.
@@ -6150,10 +6169,39 @@ class NativeApp:
                 self._task_error(AgentError(payload.get("error") or "Apply thất bại"))
                 return
             self.append_log(payload["result"].get("log") or self.t(label))
+            if payload.get("note"):
+                self.append_log(payload["note"])
             self.status_var.set(self.t(label))
             self.root.after(1500, self.refresh_all)
 
         self.run_task(self.t(label), work, done, show_loading=True, timeout_hint=225)
+
+    @staticmethod
+    def _sync_pool_to_ssid_proxy(client, record) -> str:
+        """Keep a one-proxy pool on the SSID's new endpoint. Returns a log note."""
+        try:
+            pool = client.get_pool(record.idx) or {}
+            rows = [r for r in (pool.get("proxies") or []) if isinstance(r, dict)]
+        except Exception as exc:
+            return f"Đã lưu Wi-Fi, nhưng không đọc được pool: {exc}"
+        if not rows:
+            return ""
+        if len(rows) > 1:
+            return (f"WiFi này có {len(rows)} proxy trong pool; thay đổi chỉ áp cho "
+                    f"thiết bị chưa ghim. Sửa từng slot trong trình quản lý Pool.")
+        current = proxy_object_tuple(rows[0])
+        wanted = (record.proxy_type, record.host, record.port,
+                  record.user, record.socks_password,
+                  (current[5] if current else ""))
+        if current and current[:5] == wanted[:5]:
+            return ""
+        try:
+            answer = client.save_pool(record.idx, [wanted])
+        except Exception as exc:
+            return f"Đã lưu Wi-Fi, nhưng chưa cập nhật pool: {exc}"
+        if not answer.get("ok", False):
+            return f"Đã lưu Wi-Fi, nhưng chưa cập nhật pool: {answer.get('log') or 'save_pool thất bại'}"
+        return "Đã cập nhật luôn proxy duy nhất trong pool."
 
     def add_wifi(self):
         if self.block_if_incompatible():
@@ -6182,18 +6230,24 @@ class NativeApp:
         if not record:
             messagebox.showinfo(APP_NAME, self.t("Hãy chọn một Wi‑Fi"), parent=self.root)
             return
+        # The proxy fields used to be hidden here, so Save wrote a proxy nobody
+        # could see: the only way to change an SSID's proxy was to delete its
+        # pool and add it again. They are shown, and the pool is kept in step
+        # below when the SSID has exactly one.
         dialog = WifiDialog(self.root, record, record.idx, self.language, self.palette,
-                            pool_command=self.open_pool_editor, show_proxy_fields=False)
+                            pool_command=self.open_pool_editor, show_proxy_fields=True)
         self.root.wait_window(dialog)
         if dialog.result:
             previous = list(self.records)
             if any(item.idx == dialog.result.idx and item is not record for item in self.records):
                 messagebox.showerror(self.t("IDX bị trùng"), self.t("IDX này đã được sử dụng"), parent=self.root)
                 return
+            proxy_changed = proxy_identity(record) != proxy_identity(dialog.result)
             self.records[self.records.index(record)] = dialog.result
             self.records.sort(key=lambda item: item.idx)
             self.render_wifi()
-            self.apply_wifi_change(previous, "Đã cập nhật Wi-Fi và apply")
+            self.apply_wifi_change(previous, "Đã cập nhật Wi-Fi và apply",
+                                   sync_proxy=dialog.result if proxy_changed else None)
 
     def delete_wifi(self):
         if self.block_if_incompatible():

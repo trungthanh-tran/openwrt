@@ -884,6 +884,97 @@ class WifiMutationTests(unittest.TestCase):
         dialog.assert_not_called()
 
 
+class EditWifiPoolSyncTests(unittest.TestCase):
+    """Editing an SSID's proxy must change what its devices actually use.
+
+    wifi-socks.conf holds only the SSID default, which unpinned devices use, so
+    on an SSID with a pool the edit used to look like it did nothing at all.
+    """
+
+    @staticmethod
+    def pool(*rows):
+        return {"ok": True, "idx": 1, "proxies": list(rows), "assignments": []}
+
+    @staticmethod
+    def slot(host="1.1.1.1", port=1080, label="one", ptype="socks5"):
+        return {"slot": 0, "type": ptype, "host": host, "port": port,
+                "user": "", "pass": "", "label": label}
+
+    def sync(self, pool, target=None):
+        client = mock.Mock()
+        client.get_pool.return_value = pool
+        client.save_pool.return_value = {"ok": True, "log": "saved"}
+        edited = target or record(1)
+        edited.host = "9.9.9.9"
+        note = appmod.NativeApp._sync_pool_to_ssid_proxy(client, edited)
+        return client, note
+
+    def test_the_only_proxy_in_the_pool_follows_the_edit(self):
+        client, note = self.sync(self.pool(self.slot()))
+        client.save_pool.assert_called_once()
+        idx, rows = client.save_pool.call_args[0]
+        self.assertEqual(idx, 1)
+        self.assertEqual(rows[0][1], "9.9.9.9")
+        self.assertEqual(rows[0][5], "one", "the slot keeps its label")
+        self.assertIn("pool", note)
+
+    def test_an_ssid_with_no_pool_is_left_alone(self):
+        client, note = self.sync(self.pool())
+        client.save_pool.assert_not_called()
+        self.assertEqual(note, "")
+
+    def test_several_proxies_are_never_overwritten(self):
+        """Rewriting them all would discard proxies and the pins on them."""
+        client, note = self.sync(self.pool(self.slot(), self.slot(host="2.2.2.2")))
+        client.save_pool.assert_not_called()
+        self.assertIn("2", note, "the operator is told how many proxies there are")
+
+    def test_a_pool_already_on_that_endpoint_is_not_rewritten(self):
+        client, note = self.sync(self.pool(self.slot(host="9.9.9.9")))
+        client.save_pool.assert_not_called()
+        self.assertEqual(note, "")
+
+    def test_a_failed_pool_write_is_reported_not_swallowed(self):
+        client = mock.Mock()
+        client.get_pool.return_value = self.pool(self.slot())
+        client.save_pool.return_value = {"ok": False, "log": "pool.sh exploded"}
+        edited = record(1)
+        edited.host = "9.9.9.9"
+        note = appmod.NativeApp._sync_pool_to_ssid_proxy(client, edited)
+        self.assertIn("pool.sh exploded", note)
+
+    def test_an_unreadable_pool_does_not_break_the_apply(self):
+        client = mock.Mock()
+        client.get_pool.side_effect = RuntimeError("no route to router")
+        edited = record(1)
+        edited.host = "9.9.9.9"
+        note = appmod.NativeApp._sync_pool_to_ssid_proxy(client, edited)
+        self.assertIn("no route to router", note)
+
+    def test_the_edit_dialog_shows_the_proxy_fields(self):
+        """Hidden fields were how Save came to write a proxy nobody could see."""
+        instance = bare_app()
+        target = record(1)
+        instance.records = [target]
+        instance.selected_wifi = lambda: target
+        instance.block_if_incompatible = lambda: False
+        with mock.patch.object(appmod, "WifiDialog") as dialog:
+            dialog.return_value.result = None
+            instance.root.wait_window = mock.Mock()
+            instance.edit_wifi()
+        self.assertTrue(dialog.call_args.kwargs["show_proxy_fields"])
+
+
+class ProxyIdentityTests(unittest.TestCase):
+    def test_only_the_endpoint_counts(self):
+        a = record(1)
+        b = record(1)
+        b.name = "renamed"
+        self.assertEqual(appmod.proxy_identity(a), appmod.proxy_identity(b))
+        b.host = "9.9.9.9"
+        self.assertNotEqual(appmod.proxy_identity(a), appmod.proxy_identity(b))
+
+
 class AgentCompatibilityTests(unittest.TestCase):
     """The console and the agent it drives must be the same version."""
 

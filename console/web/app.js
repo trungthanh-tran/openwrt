@@ -765,10 +765,14 @@
       throw err;
     }).finally(() => { configApplying = false; busyDone(); });
   }
+  // Resolves to whether the change actually landed on the router: it swallows
+  // the error to roll the list back, so a caller with follow-up work of its own
+  // cannot tell from the promise alone.
   function autoApplyConfig(previous, successMessage) {
-    return applyConfigText(genConf(), false).then(() => toast(successMessage + " ✓")).catch(async err => {
+    return applyConfigText(genConf(), false).then(() => { toast(successMessage + " ✓"); return true; }).catch(async err => {
       ssids = previous; configDirty = true; render();
       toast(pick("Change was not applied: ", "Không apply được thay đổi: ") + err.message);
+      return false;
     });
   }
   function pushApply() {
@@ -2371,12 +2375,44 @@
     if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err(pick("mac_oui must look like AA:BB:CC.", "mac_oui phải dạng AA:BB:CC."));
 
     const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: webrtcMode($("f_webrtc").value), mac_oui };
-    if (editId) { const s = ssids.find(x => x.id === editId); Object.assign(s, rec); }
+    const before = editId ? ssids.find(x => x.id === editId) : null;
+    const proxyChanged = !!before && proxyIdentity(before) !== proxyIdentity(rec);
+    if (editId) { Object.assign(before, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     configDirty = true;
     const wasEditing = !!editId;
     closeModal(); render();
-    autoApplyConfig(previous, wasEditing ? pick("Updated and applied", "Đã cập nhật và apply") : pick("Wi-Fi added and applied", "Đã thêm WiFi và apply"));
+    autoApplyConfig(previous, wasEditing ? pick("Updated and applied", "Đã cập nhật và apply") : pick("Wi-Fi added and applied", "Đã thêm WiFi và apply"))
+      .then(applied => { if (applied && proxyChanged) return syncPoolToSsidProxy(idx, rec); });
+  }
+
+  // wifi-socks.conf holds the SSID's default proxy, which only unpinned devices
+  // use; a pinned device follows its pool slot. Editing the Wi-Fi therefore used
+  // to look like it changed nothing. When the SSID has exactly one proxy in its
+  // pool, "the SSID's proxy" and "that slot" are the same thing, so the slot is
+  // rewritten too. With several slots there is no single one to mean, and
+  // overwriting them all would throw away proxies and the pins that point at
+  // them, so the operator is told where the change did and did not land.
+  function syncPoolToSsidProxy(idx, rec) {
+    return fetchPoolForIdx(idx).then(rows => {
+      if (!rows.length) return;
+      if (rows.length > 1) {
+        toast(pick(
+          `This Wi-Fi has ${rows.length} proxies in its pool; the change applies to unpinned devices only. Use Pool to edit a slot.`,
+          `WiFi này có ${rows.length} proxy trong pool; thay đổi chỉ áp cho thiết bị chưa ghim. Sửa từng slot trong Pool.`));
+        return;
+      }
+      const only = rows[0];
+      const wanted = cleanProxy({ type: rec.proxy_type, host: rec.host, port: rec.port,
+        user: rec.user, pass: rec.pass, label: only.label || "" });
+      if (proxyIdentity(only) === proxyIdentity(wanted)) return;
+      return api("save_pool", "POST", { idx, proxies: [wanted] }).then(d => {
+        if (!d || d.ok === false) throw new Error(routerReason(d, pick("saving the pool failed", "lưu pool thất bại")));
+        poolCounts[idx] = 1;
+        toast(pick("The pool's only proxy was updated too ✓", "Đã cập nhật luôn proxy duy nhất trong pool ✓"));
+        poll();
+      });
+    }).catch(e => toast(pick("Wi-Fi saved, but the pool was not updated: ", "Đã lưu WiFi, nhưng chưa cập nhật pool: ") + (e.message || e)));
   }
 
   function fillCompactProxy() {
