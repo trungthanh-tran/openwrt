@@ -8,10 +8,11 @@
 #   idx      : Unique positive integer. Determines subnet and TPROXY port.
 #              subnet = 192.168.(NET_BASE+idx).0/24; keep deployed indexes stable.
 #   wifi_key : Wi-Fi password, 8–63 characters for WPA2.
-#   proxy_host: Upstream proxy IP address or hostname.
-#   proxy_port: Upstream proxy port.
-#   proxy_user: Proxy username; leave empty when authentication is disabled.
-#   proxy_pass: Proxy password; leave empty when authentication is disabled.
+#   proxy_host: Legacy field; leave empty. Upstream proxies belong in
+#               config/proxy-pools.conf.
+#   proxy_port: Legacy field; leave empty.
+#   proxy_user: Legacy field; leave empty.
+#   proxy_pass: Legacy field; leave empty.
 #   isolate  : 1 blocks clients on the same Wi-Fi from reaching one another.
 #   webrtc   : WebRTC handling mode.
 #              0 = keep: no WebRTC-specific rule at all.

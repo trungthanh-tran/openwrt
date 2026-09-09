@@ -180,8 +180,8 @@ validate_conf() {
       if (web !~ /^[012]$/) { printf "line %d: webrtc must be 0, 1 or 2\n", NR; bad=1 }
       if (length($1) < 1 || length($1) > 32) { printf "line %d: SSID must be 1..32 UTF-8 bytes long\n", NR; bad=1 }
       if (length($4) < 8 || length($4) > 63) { printf "line %d: Wi-Fi password must be 8..63 UTF-8 bytes long\n", NR; bad=1 }
-      if (host == "") { printf "line %d: sock_host is empty\n", NR; bad=1 }
-      else if (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/) { printf "line %d: invalid sock_host\n", NR; bad=1 }
+      if ((host == "") != (port == "")) { printf "line %d: sock_host and port must both be empty or both be set\n", NR; bad=1 }
+      if (host != "" && (length(host) > 253 || host !~ /^[A-Za-z0-9._:-]+$/)) { printf "line %d: invalid sock_host\n", NR; bad=1 }
       if (length($7) > 255 || length($8) > 255) { printf "line %d: SOCKS user/pass may be at most 255 bytes\n", NR; bad=1 }
       if ($1 ~ /[[:cntrl:]|]/ || $4 ~ /[[:cntrl:]|]/ || $5 ~ /[[:cntrl:]|]/ || $7 ~ /[[:cntrl:]|]/ || $8 ~ /[[:cntrl:]|]/) { printf "line %d: field contains a forbidden or control character\n", NR; bad=1 }
       seen[idx]++; if (seen[idx] > 1) { printf "line %d: duplicate idx %s\n", NR, idx; bad=1 }
@@ -463,8 +463,8 @@ for_each_ssid() {
 # The slot number is the row's position within its idx, counted from zero, so
 # rows must never be reordered without also remapping /etc/sbproxy.assign.
 #
-# An absent file, or an idx with no rows, means that SSID keeps using the single
-# proxy from its wifi-socks.conf row. Every generator branches on pool_enabled.
+# An absent file, or an idx with no rows, means that SSID has no proxy route.
+# SSIDs are pool-only; there is no wifi-socks.conf fallback.
 
 # Normalised rows of one idx: slot|type|host|port|user|pass|label
 pool_rows() {
@@ -1606,15 +1606,9 @@ build_singbox() {
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"; proxy_type="${12:-socks5}"
     tp="$(tproxy_port "$idx")"
-    # The per-SSID inbound stays even in pool mode: it carries DNS and every
-    # device that is not pinned to a slot yet.
-    inbounds="$inbounds$sep{\"type\":\"tproxy\",\"tag\":\"in-w$idx\",\"listen\":\"0.0.0.0\",\"listen_port\":$tp}"
-    _sb_pairs="$_sb_pairs in-w$idx:out-w$idx"
-    outbounds="$outbounds$sep$(_sb_outbound "out-w$idx" "$proxy_type" "$host" "$port" "$user" "$pass")"
-    rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"action\":\"sniff\",\"timeout\":\"1s\"}"
-    sep=","
-    rules="$rules$sep{\"inbound\":[\"in-w$idx\"],\"outbound\":\"out-w$idx\"}"
-    sep=","
+    if ! pool_enabled "$idx"; then
+      warn "SSID idx=$idx has no proxy pool; no default proxy will be generated."
+    fi
     for_each_pool "$idx" _sb_slot
   }
   for_each_ssid _sb_row
@@ -1736,16 +1730,17 @@ build_nft() {
     # rule order inside the chain matches the old flat chain exactly.
     # An SSID with a pool can refuse service to a device that has no proxy
     # pinned yet, instead of quietly falling back to the wifi-socks.conf one.
-    _r_gate=0
-    if pool_enabled "$_r_idx" && [ "${POOL_UNASSIGNED:-default}" = "block" ]; then _r_gate=1; fi
+    _r_gate=1
     _nft_chains="$_nft_chains  chain w$_r_idx {\n"
     _nft_chains="$_nft_chains    # Hijack DNS into sing-box (fake-IP), ahead of the local-net bypass.\n"
-    if [ "$_r_gate" = 1 ]; then
+    if [ "$_r_gate" = 1 ] && pool_enabled "$_r_idx"; then
       # DNS goes through the pinned device's own slot, so an unpinned device
       # does not even resolve — no name lookup, no fake IP, no connection.
       _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
-    else
+    elif pool_enabled "$_r_idx"; then
       _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
+    else
+      _nft_chains="$_nft_chains    meta l4proto { tcp, udp } th dport 53 drop\n"
     fi
     # webrtc=2 ("bypass"): the STUN/TURN exchange is forced into sing-box ahead
     # of every return rule below, so the STUN server answers with the proxy's
@@ -1762,8 +1757,6 @@ build_nft() {
         _nft_chains="$_nft_chains    tcp dport { $STUN_TCP_PORTS } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
         _nft_chains="$_nft_chains    udp dport { $STUN_UDP_PORTS } tproxy ip to :ip saddr map @w${_r_idx}map meta mark set $TPROXY_MARK accept\n"
       fi
-      _nft_chains="$_nft_chains    tcp dport { $STUN_TCP_PORTS } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
-      _nft_chains="$_nft_chains    udp dport { $STUN_UDP_PORTS } tproxy ip to :$_r_tp meta mark set $TPROXY_MARK accept\n"
     fi
     _nft_chains="$_nft_chains    # Do not proxy local or multicast traffic.\n"
     _nft_chains="$_nft_chains    ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4, 240.0.0.0/4 } return\n"

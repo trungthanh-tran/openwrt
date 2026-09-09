@@ -1299,15 +1299,13 @@ match "a delete cancels an open edit"         "$web_console" 'cancelPoolEdit\(\)
 match "the edit action is offered in the pool dialog" "$web_console" 'action === "edit"'
 nomatch "the pool is no longer described as uneditable" "$web_console" 'proxy hiện có không sửa trực tiếp'
 
-# An SSID's proxy lives in wifi-socks.conf, which only unpinned devices read.
-# Hiding the fields left Save writing a proxy nobody could see or change.
-nomatch "the Wi-Fi dialog no longer hides its proxy fields" "$web_console" 'has\(#f_proxy_type\)'
-match "editing the proxy syncs a single-proxy pool" "$web_console" 'function syncPoolToSsidProxy\('
-match "a pool of one is rewritten to the new endpoint" "$web_console" 'api\("save_pool", "POST", \{ idx, proxies: \[wanted\] \}\)'
-# Overwriting several slots would discard proxies and the pins that point at them.
-match "a pool of several is reported, never overwritten" "$web_console" 'rows\.length > 1'
-# autoApplyConfig swallows its error to roll back, so the caller needs the flag.
-match "the pool is only touched after the apply landed" "$web_console" 'applied && proxyChanged'
+# SSIDs are pool-only. The legacy default proxy fields remain hidden only as
+# inert compatibility inputs and are always serialized empty.
+match "the Wi-Fi dialog advertises pool-only routing" "$web_console" 'SSID này chỉ dùng proxy trong Pool'
+match "Wi-Fi save clears the legacy proxy host" "$web_console" 'const host = ""'
+match "Wi-Fi config serializes an empty default proxy" "$web_console" '\[s\.name, s\.band, s\.idx, s\.key, "", "", "", ""'
+nomatch "Wi-Fi edit no longer rewrites a pool" "$web_console" 'function syncPoolToSsidProxy\('
+nomatch "Wi-Fi edit no longer calls save_pool" "$web_console" 'applied && proxyChanged'
 match "the console routes on the URL fragment" "$web_console" 'addEventListener\("hashchange"'
 match "navigation sets the fragment, not the workspace directly" "$web_console" 'location\.hash = next'
 nomatch "no nav link points at a per-workspace page" "$(cat "$ROOT/console/web/control-panel.html")" 'href="[a-z]*\.html"'

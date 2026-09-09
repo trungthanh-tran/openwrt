@@ -1,6 +1,7 @@
 (function () {
   "use strict";
 const EN_TEXT = {
+  "SSID này chỉ dùng proxy trong Pool. Thiết bị chưa được gán slot sẽ bị chặn; không có proxy mặc định.": "This SSID uses proxy pool slots only. Unassigned devices are blocked; there is no default proxy.",
     "Tài khoản": "Account", "Token agent": "Agent token", "Agent URL": "Agent URL", "(tuỳ chọn)": "(optional)",
     "Cài đặt proxy": "Proxy settings", "Cài đặt proxy →": "Proxy settings →", "Cấu hình WiFi, SOCKS và chính sách kết nối trên router.": "Configure Wi-Fi, SOCKS and connection policies on the router.", "Cấu hình SSID, proxy pool và chính sách kết nối.": "Configure SSIDs, proxy pools and connection policies.",
     "Analytics": "Analytics", "Tổng quan nhanh về WiFi, proxy và health.": "A quick overview of Wi-Fi, proxy and health.",

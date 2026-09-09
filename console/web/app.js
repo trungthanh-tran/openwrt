@@ -2112,7 +2112,7 @@
     });
   }
   function wifiRowCells(s) {
-      const auth = s.user ? `<span class="chip"><span class="dot"></span>${esc(s.user)}</span>` : `<span class="sub">—</span>`;
+      const auth = `<span class="chip on"><span class="dot"></span>${pick("Pool-only", "Chỉ dùng pool")}</span>`;
       return `
         <td><span class="idxpill">${s.idx}</span></td>
         <td><div class="ssid-name">${esc(s.name)}</div><div class="sub mono">${gw(s.idx)} · tproxy :${tport(s.idx)} · MAC ${esc(s.mac_oui ? s.mac_oui + " " + vendorName(s.mac_oui) : pick("02: anonymous", "02: ẩn danh"))}</div><div class="proxy-count">${poolCounts[s.idx] == null ? pick("Proxy count…", "Đang tải số proxy…") : `${poolCounts[s.idx]} proxy`}</div></td>
@@ -2148,7 +2148,7 @@
 # name|band|idx|wifi_key|proxy_host|proxy_port|proxy_user|proxy_pass|isolate|webrtc|mac_oui|proxy_type
 `;
     const lines = [...ssids].sort((a, b) => a.idx - b.idx).map(s =>
-      [s.name, s.band, s.idx, s.key, s.host, s.port, s.user || "", s.pass || "", s.isolate ? 1 : 0, webrtcMode(s.webrtc), s.mac_oui || "", s.proxy_type || "socks5"].join("|")
+      [s.name, s.band, s.idx, s.key, "", "", "", "", s.isolate ? 1 : 0, webrtcMode(s.webrtc), s.mac_oui || "", "socks5"].join("|")
     );
     return head + lines.join("\n") + (lines.length ? "\n" : "");
   }
@@ -2398,17 +2398,14 @@
     $("f_band").value = s ? s.band : "2g";
     $("f_idx").value = s ? s.idx : nextIdx();
     $("f_key").value = s ? s.key : "";
-    // Never pre-fill an address: 127.0.0.1 looked like a sensible default and
-     // became the live outbound of every SSID whose operator used a pool
-     // instead -- red health on all of them, and no Internet for any device
-     // that was not pinned to a slot.
-    $("f_host").value = s ? s.host : "";
-    $("f_proxy_type").value = s ? (s.proxy_type || "socks5") : "socks5";
+    // Pool-only mode: the SSID form never pre-fills or persists an upstream
+    // address. Proxy credentials are edited in the Pool dialog.
+    $("f_host").value = "";
+    $("f_proxy_type").value = "socks5";
     $("f_proxy_compact").value = "";
-    $("f_port").value = s ? s.port : "1080";
-    $("f_host").placeholder = pick("proxy host or IP", "host hoặc IP của proxy");
-    $("f_user").value = s ? (s.user || "") : "";
-    $("f_pass").value = s ? (s.pass || "") : "";
+    $("f_port").value = "";
+    $("f_user").value = "";
+    $("f_pass").value = "";
     $("f_isolate").checked = s ? !!s.isolate : true;
     $("f_webrtc").value = String(s ? webrtcMode(s.webrtc) : WEBRTC_BLOCK);
     updateWebrtcHint();
@@ -2438,11 +2435,11 @@
     const band = $("f_band").value;
     const idx = parseInt($("f_idx").value, 10);
     const key = $("f_key").value.trim();
-    const host = $("f_host").value.trim();
-    const port = parseInt($("f_port").value, 10);
-    const user = $("f_user").value.trim();
-    const pass = $("f_pass").value;
-    const proxy_type = $("f_proxy_type").value;
+    const host = "";
+    const port = "";
+    const user = "";
+    const pass = "";
+    const proxy_type = "socks5";
     const err = m => { $("f_err").textContent = m; return false; };
 
     if (!name) return err(pick("Wi-Fi name is required.", "Thiếu tên WiFi."));
@@ -2450,51 +2447,17 @@
     if (!isFinite(idx) || idx < 1) return err(pick("idx must be a number ≥ 1.", "idx phải là số ≥ 1."));
     if (ssids.some(s => s.idx === idx && s.id !== editId)) return err(pick(`idx ${idx} is already used by another Wi-Fi.`, `idx ${idx} đã dùng cho WiFi khác.`));
     if (key.length < 8) return err(pick("Wi-Fi password must contain at least 8 characters (WPA2).", "Mật khẩu WiFi phải ≥ 8 ký tự (WPA2)."));
-    if (!host) return err(pick("SOCKS host is required.", "Thiếu SOCKS host."));
-    if (!isFinite(port) || port < 1 || port > 65535) return err(pick("Invalid SOCKS port.", "Cổng SOCKS không hợp lệ."));
-    if (user && !pass) return err(pick("A password is required when a username is set (or leave both empty).", "Có user thì cần pass (hoặc bỏ trống cả hai)."));
     const mac_oui = $("f_vendor").value;
     if (mac_oui && !/^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$/.test(mac_oui)) return err(pick("mac_oui must look like AA:BB:CC.", "mac_oui phải dạng AA:BB:CC."));
 
     const rec = { name, band, idx, key, host, port: String(port), user, pass, proxy_type, isolate: $("f_isolate").checked, webrtc: webrtcMode($("f_webrtc").value), mac_oui };
     const before = editId ? ssids.find(x => x.id === editId) : null;
-    const proxyChanged = !!before && proxyIdentity(before) !== proxyIdentity(rec);
     if (editId) { Object.assign(before, rec); }
     else { rec.id = "s" + idx + "_" + Math.floor(performance.now()); ssids.push(rec); }
     configDirty = true;
     const wasEditing = !!editId;
     closeModal(); render();
-    autoApplyConfig(previous, wasEditing ? pick("Updated and applied", "Đã cập nhật và apply") : pick("Wi-Fi added and applied", "Đã thêm WiFi và apply"))
-      .then(applied => { if (applied && proxyChanged) return syncPoolToSsidProxy(idx, rec); });
-  }
-
-  // wifi-socks.conf holds the SSID's default proxy, which only unpinned devices
-  // use; a pinned device follows its pool slot. Editing the Wi-Fi therefore used
-  // to look like it changed nothing. When the SSID has exactly one proxy in its
-  // pool, "the SSID's proxy" and "that slot" are the same thing, so the slot is
-  // rewritten too. With several slots there is no single one to mean, and
-  // overwriting them all would throw away proxies and the pins that point at
-  // them, so the operator is told where the change did and did not land.
-  function syncPoolToSsidProxy(idx, rec) {
-    return fetchPoolForIdx(idx).then(rows => {
-      if (!rows.length) return;
-      if (rows.length > 1) {
-        toast(pick(
-          `This Wi-Fi has ${rows.length} proxies in its pool; the change applies to unpinned devices only. Use Pool to edit a slot.`,
-          `WiFi này có ${rows.length} proxy trong pool; thay đổi chỉ áp cho thiết bị chưa ghim. Sửa từng slot trong Pool.`));
-        return;
-      }
-      const only = rows[0];
-      const wanted = cleanProxy({ type: rec.proxy_type, host: rec.host, port: rec.port,
-        user: rec.user, pass: rec.pass, label: only.label || "" });
-      if (proxyIdentity(only) === proxyIdentity(wanted)) return;
-      return api("save_pool", "POST", { idx, proxies: [wanted] }).then(d => {
-        if (!d || d.ok === false) throw new Error(routerReason(d, pick("saving the pool failed", "lưu pool thất bại")));
-        poolCounts[idx] = 1;
-        toast(pick("The pool's only proxy was updated too ✓", "Đã cập nhật luôn proxy duy nhất trong pool ✓"));
-        poll();
-      });
-    }).catch(e => toast(pick("Wi-Fi saved, but the pool was not updated: ", "Đã lưu WiFi, nhưng chưa cập nhật pool: ") + (e.message || e)));
+    autoApplyConfig(previous, wasEditing ? pick("Updated and applied", "Đã cập nhật và apply") : pick("Wi-Fi added and applied", "Đã thêm WiFi và apply"));
   }
 
   function fillCompactProxy() {

@@ -294,7 +294,9 @@ class PlainSkinTests(unittest.TestCase):
     def test_the_add_form_suggests_no_proxy_address(self):
         """127.0.0.1:1080 was a default, and became three routers' live outbound."""
         self.assertNotIn('$("f_host").value = s ? s.host : "127.0.0.1";', self.text)
-        self.assertIn('$("f_host").value = s ? s.host : "";', self.text)
+        self.assertIn('$("f_host").value = "";', self.text)
+        self.assertIn('const host = "";', self.text)
+        self.assertIn('SSID này chỉ dùng proxy trong Pool', self.text)
 
     def test_the_skin_changes_no_behaviour(self):
         """It is presentation only: no id or handler is renamed by it."""

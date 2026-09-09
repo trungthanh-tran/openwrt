@@ -165,7 +165,6 @@
         <p><b>Chặn</b> sẽ giữ DHCP/gateway nhưng chặn DNS và Internet tới khi thiết bị được gán proxy.</p>
         <select id="poolUnassignedSelect" aria-label="Chính sách thiết bị chưa gán proxy">
           <option value="block">Chặn Internet</option>
-          <option value="default">Dùng proxy mặc định</option>
         </select>
         <div class="settings-actions"><button class="btn primary" id="poolUnassignedSave">Lưu &amp; Apply</button></div>
         <div class="settings-value" id="poolUnassignedStatus">Chưa kiểm tra</div>
@@ -222,6 +221,8 @@
         <label>Mật khẩu WiFi <span class="req">*</span> <span class="derived">(≥ 8 ký tự)</span></label>
         <input type="text" id="f_key" class="mono" placeholder="Alpha_pass_123">
       </div>
+      <div class="pool-only-note derived">SSID này chỉ dùng proxy trong Pool. Thiết bị chưa được gán slot sẽ bị chặn; không có proxy mặc định.</div>
+      <div id="ssid_default_proxy_fields" hidden>
       <div class="field two">
         <div>
           <label>Loại proxy</label>
@@ -251,6 +252,7 @@
           <label>Proxy pass</label>
           <input type="text" id="f_pass" class="mono">
         </div>
+      </div>
       </div>
       <div class="field">
         <label>WebRTC</label>

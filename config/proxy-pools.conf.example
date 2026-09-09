@@ -2,10 +2,9 @@
 # Copy to config/proxy-pools.conf. Do not add spaces around separators.
 # Empty rows and rows beginning with `#` are ignored.
 #
-# This file is OPTIONAL. Without it — or for an idx with no row here — the SSID
-# keeps using the single proxy from its wifi-socks.conf row, exactly as before.
-# With rows here, a device is pinned to one of them and keeps it; the proxy in
-# wifi-socks.conf stays as the default for devices not yet pinned.
+# An SSID is pool-only. Add at least one row for every SSID that should provide
+# Internet access. Devices without a pin are blocked; wifi-socks.conf never
+# supplies a default proxy.
 #
 # Columns:
 #   idx        : Wi-Fi index from wifi-socks.conf. Rows for the same idx form
