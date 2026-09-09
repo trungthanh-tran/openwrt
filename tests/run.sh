@@ -1287,6 +1287,13 @@ match "a pool slot can be edited in place"    "$web_console" 'function beginPool
 match "the edited slot keeps its position"    "$web_console" 'activePool\.map\(\(row, i\) => \(i === slot \? next : row\)\)'
 match "and keeps the label that names it"     "$web_console" 'label: current\.label'
 match "editing takes exactly one proxy line"  "$web_console" 'parsed\.length !== 1'
+# Pool mutations are already persisted and applied by save_pool/pool.sh. They
+# must not fall through to applyConfigText, which writes wifi-socks.conf and
+# would make a proxy-pool edit appear to be an SSID-default edit.
+pool_mutations="$(printf '%s' "$web_console" | sed -n '/function addPoolLines()/,/function deletePoolSlots()/p')"
+match "pool add/edit uses the pool writer" "$pool_mutations" 'savePoolRows'
+match "pool add/edit reports proxy-pools.conf" "$pool_mutations" 'proxy-pools\.conf'
+nomatch "pool add/edit never writes wifi-socks.conf" "$pool_mutations" 'applyConfigText\(genConf\(\)'
 # A delete renumbers the rest, so an edit left open would aim at another proxy.
 match "a delete cancels an open edit"         "$web_console" 'cancelPoolEdit\(\); poolSelected\.clear\(\)'
 match "the edit action is offered in the pool dialog" "$web_console" 'action === "edit"'

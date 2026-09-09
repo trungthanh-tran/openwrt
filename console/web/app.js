@@ -1415,11 +1415,8 @@
     if (poolEditSlot !== null) return savePoolEdit(added);
     setPoolAddState(true, pick("Adding proxies to the pool…", "Đang thêm proxy vào pool…"));
     savePoolRows(activePool.concat(added)).then(() => {
-      setPoolAddState(true, pick("Pool saved. Applying router configuration…", "Đã thêm pool. Đang apply cấu hình router…"));
-      return applyConfigText(genConf(), false);
-    }).then(() => {
       $("poolInput").value = "";
-      setPoolAddState(false, pick("Added and applied successfully.", "Đã thêm và apply thành công."));
+      setPoolAddState(false, pick("Added and saved to proxy-pools.conf.", "Đã thêm và lưu vào proxy-pools.conf."));
       toast(pick("Proxy pool added and applied ✓", "Đã thêm proxy và apply ✓"));
     }).catch(e => {
       setPoolAddState(false, pick("Could not finish adding: ", "Chưa hoàn tất thêm proxy: ") + (e.message || e));
@@ -1442,11 +1439,8 @@
     const rows = activePool.map((row, i) => (i === slot ? next : row));
     setPoolAddState(true, pick("Saving the proxy…", "Đang lưu proxy…"));
     return savePoolRows(rows).then(() => {
-      setPoolAddState(true, pick("Pool saved. Applying router configuration…", "Đã lưu pool. Đang apply cấu hình router…"));
-      return applyConfigText(genConf(), false);
-    }).then(() => {
       cancelPoolEdit();
-      setPoolAddState(false, pick("Slot updated and applied.", "Đã cập nhật slot và apply."));
+      setPoolAddState(false, pick("Slot updated and saved to proxy-pools.conf.", "Đã cập nhật slot và lưu vào proxy-pools.conf."));
       toast(pick(`Slot ${slot} updated and applied ✓`, `Đã cập nhật slot ${slot} và apply ✓`));
     }).catch(e => {
       setPoolAddState(false, pick("Could not save the slot: ", "Chưa lưu được slot: ") + (e.message || e));
