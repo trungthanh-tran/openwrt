@@ -132,6 +132,13 @@ eq "pool slot carries its endpoint" "$(jq -r '.pool_probes["1"]["1"].endpoint' "
 eq "healthy slots wait five minutes" "$(jq -r '.pool_probes["1"]["0"] | .next_check - .checked_at' "$HEALTH_FILE")" '300'
 eq "slow slots wait two minutes" "$(jq -r '.pool_probes["2"]["0"] | .next_check - .checked_at' "$HEALTH_FILE")" '120'
 eq "failed slots retry after fifteen seconds" "$(jq -r '.pool_probes["1"]["1"] | .next_check - .checked_at' "$HEALTH_FILE")" '15'
+# The schedule lengths are asserted above. Pin every cached result into the
+# future before testing reuse so a slow Windows shell does not spend the
+# failed slot's 15-second TTL launching the preceding jq assertions.
+fresh_until=$(( $(date +%s) + 600 ))
+jq --argjson next "$fresh_until" \
+  '(.probes[]?.next_check, .pool_probes[][]?.next_check) = $next' \
+  "$HEALTH_FILE" > "$TMP/fresh.json" && mv "$TMP/fresh.json" "$HEALTH_FILE"
 calls_before="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
 sh "$HEALTHD" --once
 calls_after="$(wc -l < "$CURL_CALLS" | tr -d ' ')"
