@@ -858,11 +858,82 @@
       poll();
     }).catch(err => toast(pick("Error: ", "Lỗi: ") + (err.message || err))).finally(busyDone);
   }
+  function bundleIndices(conf) {
+    const out = [];
+    String(conf || "").split(/\r?\n/).forEach(line => {
+      const p = line.split("|"); const idx = parseInt(p[2], 10);
+      if (p.length >= 4 && Number.isInteger(idx) && !out.includes(idx)) out.push(idx);
+    });
+    return out.sort((a, b) => a - b);
+  }
+  async function collectRouterBundle() {
+    const wifi_socks_conf = await api("get_conf", "GET", null, "resp");
+    if (!wifi_socks_conf) throw new Error(pick("The router has no Wi-Fi config yet.", "Router chưa có cấu hình WiFi."));
+    const proxy_pools = {}, device_mapping = {};
+    await Promise.all(bundleIndices(wifi_socks_conf).map(async idx => {
+      const url = apiUrl("get_pool") + "&idx=" + encodeURIComponent(idx);
+      const r = await fetch(url, { headers: { "Authorization": `Bearer ${agent.token}` } }).then(readJson);
+      if (!r || r.ok === false) throw new Error(routerReason(r, `get_pool idx=${idx} failed`));
+      proxy_pools[idx] = Array.isArray(r.proxies) ? r.proxies : [];
+      device_mapping[idx] = Array.isArray(r.assignments) ? r.assignments : [];
+    }));
+    return { format: "sbproxy-bundle-v1", exported_at: new Date().toISOString(), wifi_socks_conf, proxy_pools, device_mapping };
+  }
+  async function exportBundle() {
+    if (!agent.connected) return toast(pick("Connect to the router before exporting.", "Hãy kết nối router trước khi export."));
+    try {
+      busy(pick("Reading the complete router bundle…", "Đang đọc bundle đầy đủ từ router…"));
+      download("sbproxy-bundle.json", JSON.stringify(await collectRouterBundle(), null, 2));
+      toast(pick("Complete bundle exported ✓", "Đã export đầy đủ WiFi, pool và device mapping ✓"));
+    } catch (err) { toast(pick("Export failed: ", "Export thất bại: ") + (err.message || err)); }
+    finally { busyDone(); }
+  }
+  async function clearAssignmentsFor(idx, assignments) {
+    const rows = (assignments || []).map(a => ({ mac: a.mac, slot: "none" }));
+    if (!rows.length) return;
+    busy(pick("Clearing device mapping…", "Đang xoá device mapping…"));
+    let d;
+    try { d = await api("assign_proxy", "POST", { idx: Number(idx), assignments: rows }); }
+    finally { busyDone(); }
+    if (!d || d.ok === false) throw new Error(routerReason(d, `clearing device mapping idx=${idx} failed`));
+  }
+  async function importBundleObject(bundle) {
+    if (!bundle || bundle.format !== "sbproxy-bundle-v1" || typeof bundle.wifi_socks_conf !== "string" || !bundle.proxy_pools || !bundle.device_mapping) {
+      throw new Error(pick("Invalid sbproxy bundle.", "Bundle sbproxy không hợp lệ."));
+    }
+    const current = await collectRouterBundle();
+    await applyConfigText(bundle.wifi_socks_conf, true);
+    for (const idx of Object.keys(current.device_mapping)) await clearAssignmentsFor(idx, current.device_mapping[idx]);
+    const targetIdx = Object.keys(bundle.proxy_pools).map(Number).filter(Number.isInteger).sort((a, b) => a - b);
+    for (const idx of targetIdx) {
+      const d = await api("save_pool", "POST", { idx, proxies: Array.isArray(bundle.proxy_pools[idx]) ? bundle.proxy_pools[idx] : [] });
+      if (!d || d.ok === false) throw new Error(routerReason(d, `saving pool idx=${idx} failed`));
+      const assignments = Array.isArray(bundle.device_mapping[idx]) ? bundle.device_mapping[idx] : [];
+      if (assignments.length) {
+        busy(pick("Restoring device mapping…", "Đang khôi phục device mapping…"));
+        let a;
+        try { a = await api("assign_proxy", "POST", { idx, assignments: assignments.map(x => ({ mac: x.mac, slot: Number(x.slot) })) }); }
+        finally { busyDone(); }
+        if (!a || a.ok === false) throw new Error(routerReason(a, `restoring device mapping idx=${idx} failed`));
+      }
+    }
+    parseConfInto(bundle.wifi_socks_conf); render(); poll();
+  }
+  function importBundle() { if (agent.connected) { $("bundleFile").value = ""; $("bundleFile").click(); } }
+  function handleBundleFile() {
+    const file = $("bundleFile").files[0]; if (!file) return;
+    file.text().then(text => {
+      const bundle = JSON.parse(text);
+      if (!confirm(pick("Import the complete bundle? This replaces Wi-Fi config, proxy pools and device mappings on the router.", "Import bundle đầy đủ? Thao tác này thay WiFi, proxy pool và device mapping trên router."))) return;
+      busy(pick("Importing the complete bundle…", "Đang import bundle đầy đủ…"));
+      return importBundleObject(bundle).then(() => toast(pick("Complete bundle imported ✓", "Đã import đầy đủ bundle ✓")));
+    }).catch(err => toast(pick("Import failed: ", "Import thất bại: ") + (err.message || err))).finally(busyDone);
+  }
   function pullFromRouter() {
-    api("get_conf", "GET", null, "resp").then(txt => {
-      if (!txt) return toast(pick("The router has no config yet.", "Router chưa có conf."));
-      lastRouterConf = txt; parseConfInto(txt); render(); toast(pick("Config downloaded from the router", "Đã tải config từ router"));
-    }).catch(err => toast(pick("Error: ", "Lỗi: ") + err.message));
+    collectRouterBundle().then(bundle => {
+      lastRouterConf = bundle.wifi_socks_conf; parseConfInto(bundle.wifi_socks_conf); render();
+      toast(pick("Pulled Wi-Fi, proxy pools and device mappings from the router ✓", "Đã pull WiFi, proxy pool và device mapping từ router ✓"));
+    }).catch(err => toast(pick("Pull failed: ", "Pull thất bại: ") + err.message));
   }
   function zapSock(s) {
     if (!agent.connected) return;
@@ -1599,7 +1670,7 @@
   function setupConfigToolbar() {
     const toolbar = $("configToolbar");
     if (toolbar.dataset.ready) return;
-    ["addBtn", "importBtn", "exportConf", "exportJson", "pushApplyBtn", "pullBtn", "clearBtn"]
+    ["addBtn", "importBundleBtn", "exportBundleBtn", "pushApplyBtn", "pullBtn", "clearBtn"]
       .forEach(id => { const el = $(id); if (el) toolbar.appendChild(el); });
     toolbar.dataset.ready = "1";
   }
@@ -2591,9 +2662,9 @@
     output.hidden = !output.hidden;
     $("outputToggle").textContent = `${output.hidden ? "⌄" : "⌃"} Configuration preview`;
   };
-  $("importBtn").onclick = importConf;
-  $("exportConf").onclick = () => download("wifi-socks.conf", genConf());
-  $("exportJson").onclick = () => download("sbproxy-ssids.json", JSON.stringify(ssids, null, 2));
+  $("importBundleBtn").onclick = importBundle;
+  $("exportBundleBtn").onclick = exportBundle;
+  $("bundleFile").onchange = handleBundleFile;
   $("copyBtn").onclick = () => copy(TABS[curTab].gen());
   $("clearBtn").onclick = resetEverything;
 

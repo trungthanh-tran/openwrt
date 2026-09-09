@@ -25,9 +25,9 @@
       <div class="nav-block">
       <div class="side-group">Cấu hình</div>
       <button class="btn primary" id="addBtn">＋ Thêm WiFi</button>
-      <button class="btn ghost" id="importBtn">⤓ Nhập .conf</button>
-      <button class="btn ghost" id="exportConf">⭳ Tải wifi-socks.conf</button>
-      <button class="btn ghost" id="exportJson">⭳ Tải JSON</button>
+      <button class="btn ghost" id="importBundleBtn">⤓ Nhập bundle đầy đủ</button>
+      <button class="btn ghost" id="exportBundleBtn">⭳ Xuất bundle đầy đủ</button>
+      <input id="bundleFile" type="file" accept="application/json,.json" hidden>
       <button class="btn ghost danger" id="clearBtn">✕ Xoá hết</button>
       <button class="btn primary page-active" id="configBtn" title="Quản lý cấu hình WiFi và proxy">▦ WiFi</button>
       </div>
@@ -36,7 +36,7 @@
         <div class="side-group">Router</div>
         <button class="btn primary" id="pushApplyBtn" title="Ghi config lên router rồi chạy apply.sh">⇪ Đẩy &amp; Áp lên router</button>
         <button class="btn ghost" id="devicesBtn" title="Thiết bị đang kết nối từng WiFi (kick / cấm)">📱 Thiết bị</button>
-        <button class="btn ghost" id="pullBtn" title="Tải wifi-socks.conf từ router">⭳ Tải từ router</button>
+      <button class="btn ghost" id="pullBtn" title="Đồng bộ wifi-socks.conf, proxy pool và device mapping từ router">⭳ Pull from router</button>
         <button class="btn ghost" id="rbBtn" title="Backup & Rollback trên router">🗂 Backup / Rollback</button>
         <button class="btn ghost" id="gwBtn" title="Xem và đổi đường ra Internet của router">🌐 Đường ra</button>
         <button class="btn ghost" id="upBtn" title="Cập nhật code sbproxy trên router bằng package .tar.gz/.zip">⬆ Cập nhật</button>

@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 const EN_TEXT = {
+  "Nhập bundle đầy đủ": "Import complete bundle",
+  "Xuất bundle đầy đủ": "Export complete bundle",
+  "Đồng bộ wifi-socks.conf, proxy pool và device mapping từ router": "Sync wifi-socks.conf, proxy pools and device mapping from the router",
   "Dải IP local riêng (/24)": "Dedicated local IP range (/24)",
   "(tuỳ chọn, RFC1918: 10/8, 172.16/12, 192.168/16)": "(optional, RFC1918: 10/8, 172.16/12, 192.168/16)",
   "Để trống để dùng dải 192.168.(NET_BASE + idx).0/24.": "Leave empty to use 192.168.(NET_BASE + idx).0/24.",
@@ -110,7 +113,7 @@ const EN_ATTR = {
     "Kết nối agent trên router": "Connect to the router agent", "Đăng xuất": "Log out", "Đổi giao diện sáng/tối": "Toggle light/dark theme",
     "Ghi config lên router rồi chạy apply.sh": "Write the configuration to the router and run apply.sh",
     "Thiết bị đang kết nối từng WiFi (kick / cấm)": "Devices connected to each Wi-Fi (disconnect / block)",
-    "Tải wifi-socks.conf từ router": "Download wifi-socks.conf from the router",
+    "Đồng bộ wifi-socks.conf, proxy pool và device mapping từ router": "Sync wifi-socks.conf, proxy pools and device mapping from the router",
     "Backup & Rollback trên router": "Back up and roll back the router",
     "Xem và đổi đường ra Internet của router": "View and switch the router's Internet egress",
     "Đá mọi thiết bị, xoá mọi SSID và pool, rồi apply": "Kick every device, delete every SSID and pool, then apply",
