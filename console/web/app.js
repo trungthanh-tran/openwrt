@@ -1670,7 +1670,7 @@
   function setupConfigToolbar() {
     const toolbar = $("configToolbar");
     if (toolbar.dataset.ready) return;
-    ["addBtn", "importBundleBtn", "exportBundleBtn", "pullBtn", "clearBtn"]
+    ["addBtn", "importBundleBtn", "exportBundleBtn", "clearBtn"]
       .forEach(id => { const el = $(id); if (el) toolbar.appendChild(el); });
     toolbar.dataset.ready = "1";
   }
@@ -2797,7 +2797,6 @@
   };
   bindLongPress($("devRows"), "tr[data-key]", showDeviceContext);
   bindLongPress($("poolRows"), "[data-pool-row]", showPoolContext);
-  $("pullBtn").onclick = pullFromRouter;
   $("upBtn").onclick = openUpdate;
   $("topUpBtn").onclick = openUpdate;
   $("upGo").onclick = doUpdate;
