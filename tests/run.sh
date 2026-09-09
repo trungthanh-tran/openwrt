@@ -896,9 +896,11 @@ match "apply enables the sing-box service" "$apply_script" 'ensure_singbox_servi
 match "apply verifies sing-box came up"    "$apply_script" 'verify_singbox_running'
 # The verify must come AFTER the Wi-Fi is brought back: dying between the
 # sing-box restart and `wifi reload` left every SSID down (and the operator
-# without a management path) whenever sing-box could not start.
+# without a management path) whenever sing-box could not start. The second
+# restart is a guarded fallback for firmware that emits the interface trigger
+# before DHCP installs the route.
 apply_order="$(grep -n 'ensure_singbox_service\|/etc/init.d/sing-box restart\|verify_singbox_running\|recover_wifi_networks' "$ROOT/scripts/apply.sh" | cut -d: -f2- | tr -d ' ' | tr '\n' ' ')"
-eq "apply orders enable -> restart -> wifi recovery -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" recover_wifi_networks verify_singbox_running '
+eq "apply orders enable -> restart -> wifi recovery -> fallback restart -> verify" "$apply_order" 'ensure_singbox_service run"/etc/init.d/sing-boxrestart" recover_wifi_networks run"/etc/init.d/sing-boxrestart" verify_singbox_running '
 match "install-deps enables the sing-box service" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_service'
 match "apply persists the current sing-box uplink trigger" "$apply_script" 'ensure_singbox_uplink_trigger'
 match "apply bounds its wait for a default route" "$apply_script" 'wait_for_default_route'
