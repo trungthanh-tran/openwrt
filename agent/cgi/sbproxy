@@ -866,7 +866,11 @@ case "$ACTION" in
                   | map({mac:.[0], slot:(.[1]|tonumber), source:.[2]})')"
     pool_health_file="${HEALTH_FILE:-/tmp/sbproxy-health.json}"
     pool_health="$(jq -c --arg i "$idx" '.pool_probes[$i] // {}' "$pool_health_file" 2>/dev/null || printf '{}')"
-    json_ok "$(jq -n --argjson idx "$idx" --argjson p "${proxies:-[]}" --argjson a "${assignments:-[]}" --argjson h "${pool_health:-{}}" \
+    # Defaulted here, not inline: "${pool_health:-{}}" parses as ${pool_health:-{}
+    # followed by a literal }, so it fed jq {}} and the whole answer came back
+    # with an empty body.
+    [ -n "$pool_health" ] || pool_health='{}'
+    json_ok "$(jq -n --argjson idx "$idx" --argjson p "${proxies:-[]}" --argjson a "${assignments:-[]}" --argjson h "$pool_health" \
       '{ok:true, idx:$idx, proxies:$p, assignments:$a, pool_health:$h}')"
     ;;
 
