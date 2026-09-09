@@ -130,6 +130,10 @@ else
 fi
 run "wifi reload"
 recover_wifi_networks
+# A newly-created SSID can have a valid UCI DHCP section before dnsmasq has
+# re-read it.  Restart after Wi-Fi recovery so every new bridge gets its
+# address range immediately; otherwise clients can associate but never lease.
+run "/etc/init.d/dnsmasq restart"
 # Verify sing-box only after Wi-Fi is back up: when sing-box cannot start,
 # the apply must fail loudly, but with the SSIDs broadcasting (unproxied
 # clients are held by nftables anyway) — dying before `wifi reload` used to

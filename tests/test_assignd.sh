@@ -267,6 +267,14 @@ assign_sync_map 9 >/dev/null 2>&1
 eq "an SSID with no pool is not touched" "$(wc -l < "$NFT_LOG" | tr -d ' ')" "0"
 
 echo "== which SSID an address belongs to =="
+# The mode-2 fixture above temporarily narrows CONF to one SSID.  Use a small
+# all-default table here so this test checks subnet arithmetic, not example
+# file choices such as a dedicated subnet on idx=2.
+printf '%s\n' \
+  'One|2g|1|password12|||||1|0' \
+  'Two|2g|2|password12|||||1|0' \
+  'Last|5g|200|password12|||||1|0' > "$STUB/subnets.conf"
+CONF="$STUB/subnets.conf"
 NET_BASE=10
 eq "the first SSID's subnet"      "$(idx_of_ip 192.168.11.100)" "1"
 eq "the second SSID's subnet"     "$(idx_of_ip 192.168.12.7)"   "2"

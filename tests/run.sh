@@ -922,7 +922,7 @@ match "apply installs the sing-box default-route guard" "$apply_script" 'ensure_
 match "apply defers sing-box without a route" "$apply_script" 'start is deferred until the uplink trigger sees the route'
 match "sing-box init guard is idempotent" "$(cat "$ROOT/scripts/lib.sh")" 'SBPROXY_DEFAULT_ROUTE_GUARD'
 match "sing-box init guard checks the IPv4 default route" "$(cat "$ROOT/scripts/lib.sh")" 'ip -4 route show default'
-nomatch "apply does not restart dnsmasq in addition to interface reloads" "$apply_script" '/etc/init.d/dnsmasq restart'
+match "apply restarts dnsmasq after Wi-Fi recovery" "$apply_script" '/etc/init.d/dnsmasq restart'
 match "install-deps persists the sing-box uplink trigger" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_uplink_trigger'
 match "gateway switching updates the sing-box uplink trigger" "$(cat "$ROOT/scripts/switch-gateway.sh")" 'sing-box.main.ifaces'
 match "doctor reports a disabled sing-box service" "$(cat "$ROOT/scripts/doctor.sh")" 'enabled=0: the init script never starts sing-box'
