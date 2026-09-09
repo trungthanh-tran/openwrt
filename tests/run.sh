@@ -360,7 +360,7 @@ echo "== conf helpers =="
 mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
 B|5g|1|password12|5.6.7.8|1080|||1|0'
 eq "desired_idx sorted"  "$(CONF="$STUB/c.conf" desired_idx | tr '\n' ' ')" "1 3 "
-# validate_conf accepts 10, 11 or 12 columns. An SSID that names its proxy_type
+# validate_conf accepts 10, 11, 12 or 13 columns. An SSID that names its proxy_type
 # has 12, and desired_idx feeds emit_stale_uci -- so a row it cannot see is an
 # SSID that apply.sh tears down as if it had been removed.
 mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
@@ -368,6 +368,10 @@ B|5g|1|password12|5.6.7.8|1080|||1|0|aa:bb:cc
 C|2g|7|password12|9.9.9.9|8080|||1|0|aa:bb:cc|http'
 eq "desired_idx sees every column count validate_conf allows" \
    "$(CONF="$STUB/c.conf" desired_idx | tr '\n' ' ')" "1 3 7 "
+mkc 'Dedicated|2g|8|password12|||||1|0||socks5|10.50.7.0/24'
+vrun "accept dedicated RFC1918 /24" ok validate_conf
+eq "custom subnet gateway" "$(CONF="$STUB/c.conf" gateway_of_idx 8)" "10.50.7.1"
+eq "custom subnet maps client IP to idx" "$(CONF="$STUB/c.conf" idx_of_ip 10.50.7.44)" "8"
 mkc 'A|2g|3|password12|1.2.3.4|1080|||1|1
 B|5g|1|password12|5.6.7.8|1080|||1|0'
 eq "band_of_idx 3 -> 2g" "$(CONF="$STUB/c.conf" band_of_idx 3)" "2g"

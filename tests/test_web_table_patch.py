@@ -297,6 +297,8 @@ class PlainSkinTests(unittest.TestCase):
         self.assertIn('$("f_host").value = "";', self.text)
         self.assertIn('const host = "";', self.text)
         self.assertIn('SSID này chỉ dùng proxy trong Pool', self.text)
+        self.assertIn('id="f_subnet"', self.text)
+        self.assertIn('local_subnet', self.text)
 
     def test_the_skin_changes_no_behaviour(self):
         """It is presentation only: no id or handler is renamed by it."""

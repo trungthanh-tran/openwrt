@@ -214,6 +214,11 @@
         </div>
       </div>
       <div class="field">
+        <label>Dải IP local riêng (/24) <span class="derived">(tuỳ chọn, RFC1918: 10/8, 172.16/12, 192.168/16)</span></label>
+        <input type="text" id="f_subnet" class="mono" placeholder="10.50.7.0/24">
+        <div class="derived">Để trống để dùng dải 192.168.(NET_BASE + idx).0/24.</div>
+      </div>
+      <div class="field">
         <label>Hãng WiFi giả lập (MAC) <span class="derived">(3 byte đầu của MAC theo hãng; 3 byte sau random)</span></label>
         <select id="f_vendor"></select>
       </div>

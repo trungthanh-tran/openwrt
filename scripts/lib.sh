@@ -157,15 +157,18 @@ validate_conf() {
   awk -F'|' -v net_base="${NET_BASE:-10}" -v port_base="${TPROXY_PORT_BASE:-12000}" '
     function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
     /^#/ || /^[[:space:]]*$/ { next }
-    NF != 10 && NF != 11 && NF != 12 { printf "line %d: expected 10, 11 or 12 columns, found %d\n", NR, NF; bad=1; next }
+    NF != 10 && NF != 11 && NF != 12 && NF != 13 { printf "line %d: expected 10, 11, 12 or 13 columns, found %d\n", NR, NF; bad=1; next }
     {
       idx=trim($3); port=trim($6); band=trim($2); iso=trim($9); web=trim($10); host=trim($5)
       oui=(NF==11)?trim($11):""
       if (NF>=11) oui=trim($11)
-      proxy_type=(NF==12)?tolower(trim($12)):"socks5"
+      proxy_type=(NF>=12)?tolower(trim($12)):"socks5"
+      local_subnet=(NF==13)?trim($13):""
       if (proxy_type == "") proxy_type="socks5"
       if (proxy_type != "socks5" && proxy_type != "http") { printf "line %d: proxy_type must be socks5 or http\n", NR; bad=1 }
       if (oui != "" && oui !~ /^[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]$/) { printf "line %d: mac_oui must use the AA:BB:CC format or be empty\n", NR; bad=1 }
+      if (local_subnet != "" && local_subnet !~ /^(10\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]+|192\.168\.[0-9]+)\.0\/24$/) { printf "line %d: local_subnet must be an RFC1918 /24 network\n", NR; bad=1 }
+      if (local_subnet != "") { split(local_subnet, oct, /[.\/]/); if (oct[2] > 255 || oct[3] > 255) { printf "line %d: local_subnet octet is out of range\n", NR; bad=1 } if (local_subnet in seen_subnet) { printf "line %d: duplicate local_subnet %s\n", NR, local_subnet; bad=1 } seen_subnet[local_subnet]=1 }
       # BusyBox awk can retain trim() results as pure strings and perform a
       # lexical comparison (for example, "3" > "200").  Coerce validated
       # decimal fields before every bounds check so adding IDX 3+ and using
@@ -265,17 +268,32 @@ band_of_idx() {
 }
 
 # --- Values derived from the Wi-Fi index -----------------------------------
-net_octet()    { echo $(( NET_BASE + $1 )); }         # 192.168.<octet>.0/24
+net_octet()    { echo $(( NET_BASE + $1 )); }         # legacy default third octet
+
+# Return the per-SSID private /24, falling back to the legacy deterministic
+# range when the optional 13th column is empty.
+subnet_of_idx() {
+  _so_idx="$1"
+  _so_sub="$(awk -F'|' -v i="$_so_idx" '!/^#/ && $3 == i { print $13; exit }' "$CONF" 2>/dev/null)"
+  [ -n "$_so_sub" ] && { printf '%s\n' "$_so_sub"; return; }
+  printf '192.168.%s.0/24\n' "$(net_octet "$_so_idx")"
+}
+
+gateway_of_idx() { subnet_of_idx "$1" | sed 's#\.0/24$#.1#'; }
 
 # Which SSID an address belongs to, reading net_octet backwards. Prints nothing
 # for the router's own LAN or for anything outside the managed range, so a
 # caller can treat "no answer" as "not ours".
 idx_of_ip() { # ip
-  printf '%s' "${1:-}" | awk -F. -v base="${NET_BASE:-10}" '
-    NF == 4 && $1 == "192" && $2 == "168" && $3 ~ /^[0-9]+$/ && $4 ~ /^[0-9]+$/ {
-      idx = $3 - base
-      if (idx >= 1 && idx <= 200) print idx
-    }'
+  _io_ip="${1:-}"
+  awk -F'|' -v ip="$_io_ip" -v base="${NET_BASE:-10}" '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    !/^#/ && NF >= 3 {
+      idx=trim($3); cidr=trim($13)
+      if (cidr == "") cidr="192.168." (base + idx) ".0/24"
+      split(cidr, a, /[.\/]/); split(ip, b, /\./)
+      if (length(a) >= 3 && length(b) == 4 && b[1] == a[1] && b[2] == a[2] && b[3] == a[3] && b[4] ~ /^[0-9]+$/ && b[4] >= 1 && b[4] <= 254) print idx
+    }' "$CONF"
 }
 
 # Where dnsmasq must call us from, and whether its current setting is free to
@@ -449,11 +467,11 @@ uci_dquote() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 # Columns 11/12 are optional; legacy rows default to an empty OUI and SOCKS5.
 for_each_ssid() {
   _cb="$1"
-  while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui proxy_type extra; do
+  while IFS='|' read -r name band idx key host port user pass isolate webrtc mac_oui proxy_type local_subnet extra; do
     case "$name" in ''|\#*) continue;; esac
     [ -z "$extra" ] || { warn "Skipping row with too many columns: $name"; continue; }
     [ -n "$idx" ] || { warn "Skipping row with missing idx: $name"; continue; }
-    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui" "${proxy_type:-socks5}"
+    "$_cb" "$name" "$band" "$idx" "$key" "$host" "$port" "$user" "$pass" "${isolate:-1}" "${webrtc:-0}" "$mac_oui" "${proxy_type:-socks5}" "$local_subnet"
   done < "$CONF"
 }
 
@@ -1220,7 +1238,12 @@ emit_uci_one() {
   mac_oui="$(printf '%s' "${11}" | tr -d ' \r' | tr 'A-Z' 'a-z')"
   name_q="$(uci_dquote "$name")"; key_q="$(uci_dquote "$key")"
   radio="$(radio_of "$band")"
-  octet="$(net_octet "$idx")"
+  local_subnet="${13:-}"
+  if [ -n "$local_subnet" ]; then
+    gateway="${local_subnet%.0/24}.1"
+  else
+    gateway="192.168.$(net_octet "$idx").1"
+  fi
   mac="$(uci -q get "wireless.w$idx.macaddr" 2>/dev/null || true)"
   # Keep an existing MAC stable, but regenerate when absent or when a vendor
   # OUI is requested and the current MAC does not already start with it, so
@@ -1242,7 +1265,7 @@ set network.brw$idx.type=bridge
 set network.w$idx=interface
 set network.w$idx.proto=static
 set network.w$idx.device=br-w$idx
-set network.w$idx.ipaddr=192.168.$octet.1
+set network.w$idx.ipaddr=$gateway
 set network.w$idx.netmask=255.255.255.0
 set dhcp.w$idx=dhcp
 set dhcp.w$idx.interface=w$idx
@@ -1276,7 +1299,7 @@ EOF
 set firewall.z${idx}adm=rule
 set firewall.z${idx}adm.name=block-admin-w$idx
 set firewall.z${idx}adm.src=z$idx
-set firewall.z${idx}adm.dest_ip=192.168.$octet.1
+set firewall.z${idx}adm.dest_ip=$gateway
 set firewall.z${idx}adm.proto=tcp
 set firewall.z${idx}adm.target=REJECT
 set firewall.z${idx}adm.dest_port="$ADMIN_PORTS"
@@ -1294,11 +1317,11 @@ validate_admin_rule_scope() {
   [ "$ZONE_INPUT" = "ACCEPT" ] || return 0
 
   for idx in $(desired_idx); do
-    octet="$(net_octet "$idx")"
-    expected_ip="set firewall.z${idx}adm.dest_ip=192.168.$octet.1"
+    gateway="$(gateway_of_idx "$idx")"
+    expected_ip="set firewall.z${idx}adm.dest_ip=$gateway"
     expected_ports="set firewall.z${idx}adm.dest_port=\"$ADMIN_PORTS\""
     grep -qxF "$expected_ip" "$batch" \
-      || die "admin rule w$idx must restrict dest_ip=192.168.$octet.1"
+      || die "admin rule w$idx must restrict dest_ip=$gateway"
     grep -qxF "$expected_ports" "$batch" \
       || die "admin rule w$idx must overwrite dest_port=\"$ADMIN_PORTS\""
     if grep -q "^add_list firewall\.z${idx}adm\.dest_port=" "$batch"; then
@@ -1680,11 +1703,11 @@ EOF
 }
 
 desired_idx() {
-  # The column counts accepted here must stay the same set validate_conf
+# The column counts accepted here must stay the same set validate_conf
   # accepts. A row validate_conf calls valid but this cannot see is an SSID
   # emit_stale_uci then tears down as if it had been removed -- which is what
   # happened to every SSID that named its proxy_type in a 12th column.
-  awk -F'|' '!/^#/ && NF >= 10 && NF <= 12 { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
+  awk -F'|' '!/^#/ && NF >= 10 && NF <= 13 { gsub(/[[:space:]]/,"",$3); if ($3 != "") print $3 }' "$CONF" | sort -n -u
 }
 
 emit_stale_uci() {
