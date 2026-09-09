@@ -237,6 +237,18 @@ recover_wifi_networks() {
   done
 }
 
+# Restart dnsmasq only when its effective UCI configuration changed, or when
+# the daemon is not running.  Proxy-only applies must not interrupt DHCP/DNS.
+refresh_dnsmasq_if_needed() { # before_snapshot after_snapshot
+  _rd_before="$1"
+  _rd_after="$2"
+  if cmp -s "$_rd_before" "$_rd_after" && pidof dnsmasq >/dev/null 2>&1; then
+    log "DHCP configuration unchanged; keeping dnsmasq running."
+    return 0
+  fi
+  run "/etc/init.d/dnsmasq restart"
+}
+
 # Space-separated banned MACs for one idx from BANS_FILE (lines: idx|mac).
 bans_for_idx() {
   f="${BANS_FILE:-/etc/sbproxy.bans}"

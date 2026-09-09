@@ -922,7 +922,23 @@ match "apply installs the sing-box default-route guard" "$apply_script" 'ensure_
 match "apply defers sing-box without a route" "$apply_script" 'start is deferred until the uplink trigger sees the route'
 match "sing-box init guard is idempotent" "$(cat "$ROOT/scripts/lib.sh")" 'SBPROXY_DEFAULT_ROUTE_GUARD'
 match "sing-box init guard checks the IPv4 default route" "$(cat "$ROOT/scripts/lib.sh")" 'ip -4 route show default'
-match "apply restarts dnsmasq after Wi-Fi recovery" "$apply_script" '/etc/init.d/dnsmasq restart'
+match "apply conditionally refreshes dnsmasq after Wi-Fi recovery" "$apply_script" 'refresh_dnsmasq_if_needed'
+DNSMASQ_TEST="$STUB/dnsmasq-refresh"; mkdir -p "$DNSMASQ_TEST/bin"
+cat > "$DNSMASQ_TEST/bin/pidof" <<'SH'
+#!/bin/sh
+[ "${DNSMASQ_RUNNING:-0}" = 1 ] && [ "$1" = dnsmasq ]
+SH
+chmod +x "$DNSMASQ_TEST/bin/pidof"
+printf '%s\n' 'config dhcp w1' > "$DNSMASQ_TEST/before"
+cp "$DNSMASQ_TEST/before" "$DNSMASQ_TEST/same"
+printf '%s\n' 'config dhcp w1' 'config dhcp w2' > "$DNSMASQ_TEST/changed"
+dnsmasq_refresh() {
+  ( PATH="$DNSMASQ_TEST/bin:$PATH" DRYRUN=1 DNSMASQ_RUNNING="$1" \
+    refresh_dnsmasq_if_needed "$DNSMASQ_TEST/before" "$2" ) 2>&1
+}
+nomatch "unchanged DHCP keeps a running dnsmasq" "$(dnsmasq_refresh 1 "$DNSMASQ_TEST/same")" 'dnsmasq restart'
+match "changed DHCP restarts dnsmasq" "$(dnsmasq_refresh 1 "$DNSMASQ_TEST/changed")" 'dnsmasq restart'
+match "a stopped dnsmasq is restarted even without config changes" "$(dnsmasq_refresh 0 "$DNSMASQ_TEST/same")" 'dnsmasq restart'
 match "install-deps persists the sing-box uplink trigger" "$(cat "$ROOT/scripts/install-deps.sh")" 'ensure_singbox_uplink_trigger'
 match "gateway switching updates the sing-box uplink trigger" "$(cat "$ROOT/scripts/switch-gateway.sh")" 'sing-box.main.ifaces'
 match "doctor reports a disabled sing-box service" "$(cat "$ROOT/scripts/doctor.sh")" 'enabled=0: the init script never starts sing-box'

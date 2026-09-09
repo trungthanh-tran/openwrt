@@ -33,7 +33,11 @@ fi
 
 # 1) Generate UCI commands in a temporary file, then load them with `uci batch`.
 TMP="/tmp/sbproxy-uci.$$"
-: > "$TMP"; trap 'rm -rf "$TMP" "${STAGE:-}"' EXIT INT TERM
+DHCP_BEFORE="/tmp/sbproxy-dhcp-before.$$"
+DHCP_AFTER="/tmp/sbproxy-dhcp-after.$$"
+: > "$TMP"
+uci -q export dhcp > "$DHCP_BEFORE" 2>/dev/null || : > "$DHCP_BEFORE"
+trap 'rm -rf "$TMP" "$DHCP_BEFORE" "$DHCP_AFTER" "${STAGE:-}"' EXIT INT TERM
 {
   if radio_country_set; then
     echo "set wireless.$RADIO_2G.country=$WIFI_COUNTRY"
@@ -70,6 +74,7 @@ fi
 
 log "Loading UCI configuration..."
 uci batch < "$TMP"
+uci -q export dhcp > "$DHCP_AFTER" 2>/dev/null || : > "$DHCP_AFTER"
 rm -f "$TMP"
 uci commit network
 uci commit dhcp
@@ -131,9 +136,9 @@ fi
 run "wifi reload"
 recover_wifi_networks
 # A newly-created SSID can have a valid UCI DHCP section before dnsmasq has
-# re-read it.  Restart after Wi-Fi recovery so every new bridge gets its
-# address range immediately; otherwise clients can associate but never lease.
-run "/etc/init.d/dnsmasq restart"
+# re-read it. Restart only when that configuration changed (or the daemon is
+# down), so proxy-only applies do not interrupt existing DHCP leases and DNS.
+refresh_dnsmasq_if_needed "$DHCP_BEFORE" "$DHCP_AFTER"
 # Verify sing-box only after Wi-Fi is back up: when sing-box cannot start,
 # the apply must fail loudly, but with the SSIDs broadcasting (unproxied
 # clients are held by nftables anyway) — dying before `wifi reload` used to
