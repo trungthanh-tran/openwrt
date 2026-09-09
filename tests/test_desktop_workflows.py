@@ -884,6 +884,102 @@ class WifiMutationTests(unittest.TestCase):
         dialog.assert_not_called()
 
 
+class EditPoolSlotTests(unittest.TestCase):
+    """Replacing one proxy must not disturb the others or their pins.
+
+    Slot numbers are positions in proxy-pools.conf and devices are pinned by
+    position, so delete-then-add renumbered everything after the removed slot
+    and repointed whoever was on it. Editing rewrites the slot where it is.
+    """
+
+    EXISTING = [
+        {"slot": 0, "type": "socks5", "host": "1.1.1.1", "port": 1080,
+         "user": "u0", "pass": "p0", "label": "keep-me"},
+        {"slot": 1, "type": "http", "host": "2.2.2.2", "port": 8080,
+         "user": "", "pass": "", "label": "second"},
+    ]
+
+    def make_instance(self, existing=None):
+        instance = bare_app()
+        instance.client = mock.Mock()
+        instance.client.save_pool.return_value = {"ok": True, "log": "saved"}
+        instance.require_client = lambda: instance.client
+        instance.pool_for_idx = lambda idx, refresh=False: {
+            "proxies": [dict(r) for r in (self.EXISTING if existing is None else existing)]}
+        instance.pool_cache = {}
+        instance.pool_counts = {}
+        instance.confirm_important = mock.Mock(return_value=True)
+        instance.append_log = mock.Mock()
+        instance.refresh_clients = mock.Mock()
+        instance.update_loading = mock.Mock()
+        instance._probe_new_slots = mock.Mock(return_value=[])
+        instance._report_new_slot_probes = mock.Mock()
+        instance._task_error = mock.Mock()
+        synchronous_run_task(instance)
+        return instance
+
+    def saved_rows(self, instance):
+        instance.client.save_pool.assert_called_once()
+        return instance.client.save_pool.call_args[0][1]
+
+    def test_only_the_named_slot_moves(self):
+        instance = self.make_instance()
+        instance.edit_pool_slot(1, 0, "9.9.9.9:1080:nu:np", "host_port_user_pass")
+        rows = self.saved_rows(instance)
+        self.assertEqual(len(rows), 2, "the pool keeps its size, so no pin shifts")
+        self.assertEqual(rows[0][1], "9.9.9.9")
+        self.assertEqual(rows[0][3], "nu")
+        self.assertEqual(rows[1][1], "2.2.2.2", "the untouched slot is written back as it was")
+
+    def test_the_slot_keeps_its_label(self):
+        """The label names the slot, not the endpoint that was in it."""
+        instance = self.make_instance()
+        instance.edit_pool_slot(1, 0, "9.9.9.9:1080::", "host_port_user_pass")
+        self.assertEqual(self.saved_rows(instance)[0][5], "keep-me")
+
+    def test_editing_the_second_slot_leaves_the_first_alone(self):
+        instance = self.make_instance()
+        instance.edit_pool_slot(1, 1, "8.8.8.8:3128::", "host_port_user_pass")
+        rows = self.saved_rows(instance)
+        self.assertEqual(rows[0][1], "1.1.1.1")
+        self.assertEqual(rows[1][1], "8.8.8.8")
+        self.assertEqual(rows[1][2], 3128)
+
+    def test_two_lines_are_refused(self):
+        instance = self.make_instance()
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.edit_pool_slot(1, 0, "9.9.9.9:1080::\n8.8.8.8:1080::", "host_port_user_pass")
+        instance.client.save_pool.assert_not_called()
+        info.assert_called_once()
+
+    def test_an_unreadable_line_is_refused(self):
+        instance = self.make_instance()
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.edit_pool_slot(1, 0, "not a proxy", "host_port_user_pass")
+        instance.client.save_pool.assert_not_called()
+        info.assert_called_once()
+
+    def test_a_slot_that_no_longer_exists_is_refused(self):
+        instance = self.make_instance()
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.edit_pool_slot(1, 5, "9.9.9.9:1080::", "host_port_user_pass")
+        instance.client.save_pool.assert_not_called()
+        info.assert_called_once()
+
+    def test_an_unchanged_endpoint_is_not_written(self):
+        instance = self.make_instance()
+        with mock.patch.object(appmod.messagebox, "showinfo") as info:
+            instance.edit_pool_slot(1, 0, "1.1.1.1:1080:u0:p0", "host_port_user_pass")
+        instance.client.save_pool.assert_not_called()
+        info.assert_called_once()
+
+    def test_the_operator_confirms_before_the_slot_is_overwritten(self):
+        instance = self.make_instance()
+        instance.confirm_important.return_value = False
+        instance.edit_pool_slot(1, 0, "9.9.9.9:1080::", "host_port_user_pass")
+        instance.client.save_pool.assert_not_called()
+
+
 class EditWifiPoolSyncTests(unittest.TestCase):
     """Editing an SSID's proxy must change what its devices actually use.
 

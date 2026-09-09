@@ -472,6 +472,7 @@
         <select id="poolBulkAction" aria-label="Thao tác với proxy đã chọn">
           <option value="">Thao tác đã chọn…</option>
           <option value="test">Test proxy</option>
+          <option value="edit">Sửa proxy</option>
           <option value="delete">Xóa proxy</option>
         </select>
         <button class="btn ghost" id="poolBulkRun" disabled>Thực hiện</button>
@@ -495,7 +496,10 @@
       <div class="pool-input-stack">
         <textarea id="poolInput" rows="5" placeholder="176.116.132.71:43137:user:pass"></textarea>
         <div class="pool-input-help"><span>Mỗi dòng là một proxy.</span><span>Bạn có thể dán nhiều proxy cùng lúc vào ô này.</span></div>
-        <button class="btn primary" id="poolSave">Thêm vào pool</button>
+        <div class="pool-input-actions">
+          <button class="btn primary" id="poolSave">Thêm vào pool</button>
+          <button class="btn ghost" id="poolEditCancel" hidden>Huỷ sửa</button>
+        </div>
         <div class="sub" id="poolAddStatus" role="status" aria-live="polite"></div>
       </div>
     </div>

@@ -1150,6 +1150,11 @@
     return !!current && Number(current.webrtc) === 2;
   };
   let poolExpanded = false;
+  // Which slot the add form is editing, or null when it is adding. Editing
+  // rewrites the slot in place: slot numbers are positions in
+  // proxy-pools.conf and devices are pinned by position, so a pinned device
+  // keeps its slot and simply starts using the new endpoint.
+  let poolEditSlot = null;
   let poolLoadSeq = 0;
   let poolLoadController = null;
   function updatePoolSelection() {
@@ -1178,7 +1183,9 @@
     poolExpanded = false;
     poolSelected.clear();
     $("poolTitle").textContent = ssidNameByIdx(idx) + " · idx " + idx;
-    $("poolInput").value = "";
+    // Slot numbers belong to one pool, so an edit left open on the previous
+    // SSID would aim at a slot of this one.
+    cancelPoolEdit();
     showInline("poolBackdrop");
     loadPool();
   }
@@ -1347,10 +1354,46 @@
     const button = $("poolSave");
     const status = $("poolAddStatus");
     if (!button) return;
+    const editing = poolEditSlot !== null;
     button.disabled = loading;
     button.classList.toggle("loading", loading);
-    button.textContent = loading ? pick("Adding…", "Đang thêm…") : pick("Add to pool", "Thêm vào pool");
+    button.textContent = loading
+      ? (editing ? pick("Saving…", "Đang lưu…") : pick("Adding…", "Đang thêm…"))
+      : (editing ? pick(`Save slot ${poolEditSlot}`, `Lưu slot ${poolEditSlot}`)
+                 : pick("Add to pool", "Thêm vào pool"));
+    const cancel = $("poolEditCancel");
+    if (cancel) { cancel.hidden = !editing; cancel.disabled = loading; }
     if (status) status.textContent = message || "";
+  }
+
+  // Replace one proxy without deleting it first. Deleting a slot renumbers the
+  // ones after it and repoints every device pinned to them, so "change this
+  // proxy" had to be spelled delete-then-add, which was neither.
+  function beginPoolEdit(slots) {
+    const list = [...new Set(slots || [])].map(Number);
+    if (list.length !== 1) {
+      return toast(pick("Select exactly one proxy to edit.", "Chọn đúng một proxy để sửa."));
+    }
+    const slot = list[0];
+    if (!Number.isInteger(slot) || slot < 0 || slot >= activePool.length) {
+      return toast(pick("Invalid slot number.", "Số slot không hợp lệ."));
+    }
+    const row = activePool[slot];
+    poolEditSlot = slot;
+    // host:port:user:pass round-trips through parseProxyLine, so the operator
+    // can retype any part of it in the format they already paste.
+    $("poolFormat").value = "hpup";
+    $("poolType").value = (row.type === "http") ? "http" : "socks5";
+    $("poolInput").value = `${row.host}:${row.port}:${row.user || ""}:${row.pass || ""}`;
+    setPoolAddState(false, pick(
+      `Editing slot ${slot}. Devices pinned to it keep their pin and move to the new proxy.`,
+      `Đang sửa slot ${slot}. Thiết bị đang ghim vào slot này giữ nguyên ghim và chuyển sang proxy mới.`));
+    $("poolInput").focus();
+  }
+  function cancelPoolEdit() {
+    poolEditSlot = null;
+    $("poolInput").value = "";
+    setPoolAddState(false, "");
   }
   function addPoolLines() {
     const lines = $("poolInput").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
@@ -1369,6 +1412,7 @@
       if (!confirm(pick(`${dropped.length} line(s) could not be read and will be skipped:\n${detail}\n\nAdd the other ${added.length}?`,
                         `${dropped.length} dòng không đọc được và sẽ bị bỏ qua:\n${detail}\n\nVẫn thêm ${added.length} dòng còn lại?`))) return;
     }
+    if (poolEditSlot !== null) return savePoolEdit(added);
     setPoolAddState(true, pick("Adding proxies to the pool…", "Đang thêm proxy vào pool…"));
     savePoolRows(activePool.concat(added)).then(() => {
       setPoolAddState(true, pick("Pool saved. Applying router configuration…", "Đã thêm pool. Đang apply cấu hình router…"));
@@ -1382,6 +1426,34 @@
       toast(pick("Error: ", "Lỗi: ") + (e.message || e));
     });
   }
+  // The edited slot keeps its position and its label; only the endpoint moves.
+  // Every other row is written back exactly as it was, so no other pin shifts.
+  function savePoolEdit(parsed) {
+    const slot = poolEditSlot;
+    if (parsed.length !== 1) {
+      return toast(pick("Editing a slot takes exactly one proxy line.", "Sửa một slot chỉ nhận đúng một dòng proxy."));
+    }
+    if (!Number.isInteger(slot) || slot < 0 || slot >= activePool.length) {
+      cancelPoolEdit();
+      return toast(pick("That slot is gone; reload the pool.", "Slot đó không còn; hãy tải lại pool."));
+    }
+    const current = activePool[slot];
+    const next = { ...parsed[0], label: current.label || "" };
+    const rows = activePool.map((row, i) => (i === slot ? next : row));
+    setPoolAddState(true, pick("Saving the proxy…", "Đang lưu proxy…"));
+    return savePoolRows(rows).then(() => {
+      setPoolAddState(true, pick("Pool saved. Applying router configuration…", "Đã lưu pool. Đang apply cấu hình router…"));
+      return applyConfigText(genConf(), false);
+    }).then(() => {
+      cancelPoolEdit();
+      setPoolAddState(false, pick("Slot updated and applied.", "Đã cập nhật slot và apply."));
+      toast(pick(`Slot ${slot} updated and applied ✓`, `Đã cập nhật slot ${slot} và apply ✓`));
+    }).catch(e => {
+      setPoolAddState(false, pick("Could not save the slot: ", "Chưa lưu được slot: ") + (e.message || e));
+      toast(pick("Error: ", "Lỗi: ") + (e.message || e));
+    });
+  }
+
   // Remove named slots instead of the whole pool. Slot numbers are positions in
   // proxy-pools.conf, and devices are pinned by position, so the ones still in
   // use are refused rather than quietly repointing someone's device.
@@ -1398,13 +1470,18 @@
       if (!confirm(pick(`Remove ${slots.length} proxy slot(s) from this pool?`,
                         `Xoá ${slots.length} slot proxy khỏi pool này?`))) return null;
       return savePoolRows(activePool.filter((_p, i) => !slots.includes(i)));
-    }).then(r => { if (r !== null) { poolSelected.clear(); renderPoolRows(); } })
+    }).then(r => { if (r !== null) {
+      // Deleting renumbers every slot after the removed one, so an edit
+      // still open would now be aimed at a different proxy.
+      cancelPoolEdit(); poolSelected.clear(); renderPoolRows();
+    } })
       .catch(e => toast(pick("Error: ", "Lỗi: ") + (e.message || e)));
   }
   function runPoolBulk() {
     const action = $("poolBulkAction").value;
     if (!poolSelected.size) return toast(pick("Select at least one proxy.", "Chọn ít nhất một proxy."));
     if (action === "test") return testPoolSlots(poolSelected);
+    if (action === "edit") return beginPoolEdit([...poolSelected]);
     if (action === "delete") {
       deletePoolSlots([...poolSelected]);
     }
@@ -2303,6 +2380,7 @@
     selectContextPool(slot);
     openContextMenu(x, y, [
       { label: pick("Test selected", "Test mục đã chọn"), run: () => testPoolSlots(poolSelected) },
+      { label: pick("Edit this proxy", "Sửa proxy này"), run: () => beginPoolEdit([slot]) },
       { label: pick("Delete selected", "Xóa mục đã chọn"), danger: true, run: () => {
         deletePoolSlots([...poolSelected]);
       } }
@@ -2617,6 +2695,7 @@
   $("poolClose").onclick = closePool;
   $("poolBackdrop").onclick = e => { if (e.target.id === "poolBackdrop") closePool(); };
   $("poolSave").onclick = addPoolLines;
+  $("poolEditCancel").onclick = cancelPoolEdit;
   $("poolClear").onclick = clearPool;
   $("poolTest").onclick = testAllPool;
   $("poolRebalance").onclick = rebalancePoolClients;

@@ -5,6 +5,16 @@ Ngày theo định dạng YYYY-MM-DD.
 
 ## [Unreleased]
 
+### Added
+- **Sửa một proxy trong pool tại chỗ.** Dialog Pool trước đây chỉ có *Thêm* và
+  *Xoá*, nên muốn đổi một proxy phải xoá rồi thêm lại — mà xoá làm đánh số lại
+  mọi slot phía sau và kéo theo mọi thiết bị đang ghim vào chúng sang proxy
+  khác. Nay có **Sửa proxy**: chọn đúng một slot, ô nhập được điền sẵn dạng
+  `host:port:user:pass`, lưu xong slot đó bị ghi đè **đúng vị trí cũ** và
+  **giữ nguyên label**; thiết bị đang ghim giữ nguyên ghim và chuyển sang
+  endpoint mới. Có ở cả bản Web (menu thao tác hàng loạt và menu chuột phải)
+  lẫn Console Native. Xoá slot sẽ huỷ phiên sửa đang mở, vì đánh số đã đổi.
+
 ### Fixed
 - **Đổi proxy của một Wi-Fi trong console giờ có tác dụng thật.** Màn hình sửa
   Wi-Fi ẩn hết các ô proxy (`show_proxy_fields=False` ở bản Desktop, một rule CSS

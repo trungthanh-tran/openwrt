@@ -1280,6 +1280,18 @@ match "web console can upload update package" "$(cat "$ROOT/console/web/app.js")
 web_console="$(cat "$ROOT/console/web/control-panel.html" "$ROOT/console/web/app.css" "$ROOT/console/web/app.js" "$ROOT/console/web/i18n.en.js")"
 # The console is one page routed by the URL fragment; per-workspace .html files
 # are gone, so a nav link that still pointed at one would 404.
+# Slot numbers are positions in proxy-pools.conf and devices are pinned by
+# position, so delete-then-add renumbered the slots after the removed one and
+# repointed whoever was on them. Editing rewrites the slot where it is.
+match "a pool slot can be edited in place"    "$web_console" 'function beginPoolEdit\('
+match "the edited slot keeps its position"    "$web_console" 'activePool\.map\(\(row, i\) => \(i === slot \? next : row\)\)'
+match "and keeps the label that names it"     "$web_console" 'label: current\.label'
+match "editing takes exactly one proxy line"  "$web_console" 'parsed\.length !== 1'
+# A delete renumbers the rest, so an edit left open would aim at another proxy.
+match "a delete cancels an open edit"         "$web_console" 'cancelPoolEdit\(\); poolSelected\.clear\(\)'
+match "the edit action is offered in the pool dialog" "$web_console" 'action === "edit"'
+nomatch "the pool is no longer described as uneditable" "$web_console" 'proxy hiện có không sửa trực tiếp'
+
 # An SSID's proxy lives in wifi-socks.conf, which only unpinned devices read.
 # Hiding the fields left Save writing a proxy nobody could see or change.
 nomatch "the Wi-Fi dialog no longer hides its proxy fields" "$web_console" 'has\(#f_proxy_type\)'

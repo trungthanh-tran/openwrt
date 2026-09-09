@@ -475,6 +475,10 @@
      pool and adding it again. They are visible again; saveForm keeps the pool
      in step when the SSID has exactly one. */
   button[data-zap] { display: none; }
+  /* Add and its cancel sit on one row so the button does not jump when the
+     dialog switches between adding proxies and editing one slot. */
+  .pool-input-actions { display: flex; gap: 8px; align-items: center; }
+  .pool-input-actions .btn { flex: 1 1 auto; }
 
   /* Compact phone layout. Tables remain horizontally scrollable so proxy,
      device and health fields stay readable instead of being squeezed. */

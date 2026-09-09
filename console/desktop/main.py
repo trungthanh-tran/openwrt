@@ -3438,7 +3438,7 @@ class ManualBanDialog(tk.Toplevel):
 
 
 class PoolDialog(tk.Toplevel):
-    """Read-only proxy pool view; existing entries are added or removed only."""
+    """Proxy pool view: entries can be added, edited in place, or removed."""
 
     def __init__(self, parent, record, proxies, usage, language="en", palette=None,
                  online_devices=False, health=None, prober=None):
@@ -3504,7 +3504,7 @@ class PoolDialog(tk.Toplevel):
                             foreground=self.palette["text"], insertbackground=self.palette["text"],
                             relief="flat", borderwidth=0)
         self.text.pack(fill="both", expand=True, padx=1, pady=1)
-        ttk.Label(body, text="Double-click một channel để xem chi tiết; proxy hiện có không sửa trực tiếp.",
+        ttk.Label(body, text="Double-click một channel để xem chi tiết; chọn một proxy rồi bấm Sửa proxy để thay endpoint.",
                   style="Muted.TLabel", wraplength=460, justify="left").pack(anchor="w", pady=(0, 12))
 
         actions = ttk.Frame(body, style="Card.TFrame")
@@ -3516,12 +3516,19 @@ class PoolDialog(tk.Toplevel):
                       style="Muted.TLabel").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Xóa proxy chọn", command=self._delete_selected,
                    style="Danger.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Sửa proxy", command=self._edit_selected).pack(side="left", padx=(8, 0))
         if self.prober is not None:
             ttk.Button(actions, text="Test proxy", command=self._probe_selected,
                        style="Primary.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Huỷ", command=self.destroy).pack(side="right")
-        ttk.Button(actions, text="Thêm proxy", command=self._submit,
-                   style="Warning.TButton").pack(side="right", padx=(0, 8))
+        self.submit_button = ttk.Button(actions, text="Thêm proxy", command=self._submit,
+                                        style="Warning.TButton")
+        self.submit_button.pack(side="right", padx=(0, 8))
+        # Which slot _submit rewrites, or None while it is adding.
+        self.edit_slot = None
+        self.edit_hint = ttk.Label(body, text="", style="Muted.TLabel",
+                                   wraplength=460, justify="left")
+        self.edit_hint.pack(anchor="w", pady=(6, 0))
         self.bind("<Escape>", lambda _event: self.destroy())
         self.text.focus_set()
         localize_widget_tree(self, self.language)
@@ -3531,7 +3538,11 @@ class PoolDialog(tk.Toplevel):
         selected = self.format_var.get()
         input_format = next((key for key, label in PROXY_IMPORT_FORMATS.items()
                              if label == selected), "auto")
-        self.result = ("__ADD_POOL__", self.text.get("1.0", "end"), input_format)
+        if self.edit_slot is None:
+            self.result = ("__ADD_POOL__", self.text.get("1.0", "end"), input_format)
+        else:
+            self.result = ("__EDIT_POOL_SLOT__", self.edit_slot,
+                           self.text.get("1.0", "end"), input_format)
         self.destroy()
 
     def _show_detail(self, _event=None):
@@ -3606,6 +3617,31 @@ class PoolDialog(tk.Toplevel):
 
         threading.Thread(target=work, daemon=True, name="pool-probe").start()
         self.after(120, poll)
+
+    # Replacing a slot keeps its position, and devices are pinned by position,
+    # so a pinned device keeps its pin and simply starts using the new proxy.
+    # Deleting and re-adding renumbers the slots after it and repoints whoever
+    # was on them, which is why "change this proxy" needed its own action.
+    def _edit_selected(self):
+        selected = self.table.selection()
+        if len(selected) != 1:
+            messagebox.showinfo(APP_NAME, self.t("Hãy chọn đúng một proxy để sửa"), parent=self)
+            return
+        slot = int(self.table.item(selected[0], "values")[0])
+        row = self.proxies[slot] if slot < len(self.proxies) else None
+        if not isinstance(row, dict):
+            messagebox.showinfo(APP_NAME, self.t("Không đọc được proxy này"), parent=self)
+            return
+        self.format_var.set(PROXY_IMPORT_FORMATS["host_port_user_pass"])
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", "{}:{}:{}:{}".format(
+            row.get("host") or "", row.get("port") or "",
+            row.get("user") or "", row.get("pass") or ""))
+        self.edit_slot = slot
+        self.edit_hint.configure(text=self.t(
+            "Đang sửa slot {slot}. Bấm Lưu slot để ghi đè đúng slot này.", slot=slot))
+        self.submit_button.configure(text=self.t("Lưu slot"))
+        self.text.focus_set()
 
     def _delete_selected(self):
         selected = self.table.selection()
@@ -6952,6 +6988,8 @@ class NativeApp:
             action, payload, *extra = dialog.result
             if action == "__ADD_POOL__":
                 self.add_pool_text(record.idx, payload, extra[0] if extra else "auto")
+            elif action == "__EDIT_POOL_SLOT__":
+                self.edit_pool_slot(record.idx, payload, extra[0], extra[1] if len(extra) > 1 else "auto")
             elif action == "__DELETE_POOL_SLOTS__":
                 self.delete_pool_slots(record.idx, payload)
             return
@@ -7063,6 +7101,62 @@ class NativeApp:
             self.refresh_clients()
             self._report_new_slot_probes(idx, probes)
         self.run_task("Đang thêm proxy…", work, done, show_loading=True, timeout_hint=60)
+
+    def edit_pool_slot(self, idx, slot, text, input_format="auto"):
+        """Rewrite one slot in place, keeping its position, label and pins."""
+        rows, dropped = parse_proxy_list(text, limit=2, input_format=input_format)
+        if len(rows) != 1:
+            detail = chr(10).join(f"{number}: {line} — {reason}"
+                                  for number, line, reason in dropped[:5])
+            messagebox.showinfo(
+                APP_NAME,
+                self.t("Sửa một slot cần đúng một dòng proxy") + (chr(10) + detail if detail else ""),
+                parent=self.root)
+            return
+        try:
+            client = self.require_client()
+            existing = self.pool_for_idx(idx, refresh=True).get("proxies") or []
+        except AgentError as exc:
+            self._task_error(exc)
+            return
+        slot = int(slot)
+        if not 0 <= slot < len(existing):
+            messagebox.showinfo(APP_NAME, self.t("Slot đó không còn; hãy mở lại pool"), parent=self.root)
+            return
+        merged = []
+        for position, row in enumerate(existing):
+            current = proxy_object_tuple(row)
+            if position == slot:
+                # The label belongs to the slot, not to the endpoint being
+                # replaced, so it survives the edit.
+                label = current[5] if current else ""
+                merged.append(rows[0][:5] + (label,))
+            elif current is None:
+                messagebox.showinfo(APP_NAME, self.t("Pool chứa dòng không đọc được; hãy sửa bằng Xóa/Thêm"),
+                                    parent=self.root)
+                return
+            else:
+                merged.append(current)
+        if merged[slot][:5] == (proxy_object_tuple(existing[slot]) or (None,))[:5]:
+            messagebox.showinfo(APP_NAME, self.t("Proxy không thay đổi"), parent=self.root)
+            return
+        if not self.confirm_important(
+            "Sửa proxy", f"Ghi đè slot {slot} của pool Wi‑Fi {idx}.",
+            "Thiết bị đang ghim vào slot này giữ nguyên ghim và chuyển sang proxy mới.",
+        ):
+            return
+        def work():
+            response = client.save_pool(idx, merged)
+            self.update_loading("Đang kiểm tra proxy vừa sửa từ router…")
+            return response, self._probe_new_slots(client, merged, [slot])
+        def done(result):
+            response, probes = result
+            self.pool_cache.pop(idx, None)
+            self.pool_counts[idx] = len(merged)
+            self.append_log(response.get("log") or self.t("Hoàn tất"))
+            self.refresh_clients()
+            self._report_new_slot_probes(idx, probes)
+        self.run_task("Đang sửa proxy…", work, done, show_loading=True, timeout_hint=60)
 
     def delete_pool_slots(self, idx, slots):
         try:

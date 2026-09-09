@@ -32,6 +32,7 @@ const EN_TEXT = {
     "Trạng thái": "Status", "Trạng thái: tất cả": "Status: all", "WiFi: tất cả": "Wi-Fi: all",
     "Thao tác đã chọn…": "Selected actions…", "Ngắt kết nối": "Disconnect", "Thực hiện": "Run",
     "0 đã chọn": "0 selected", "Chọn tất cả": "Select all", "Xóa proxy": "Delete proxy",
+    "Sửa proxy": "Edit proxy", "Huỷ sửa": "Cancel edit",
     "Thêm proxy & phân phối": "Add proxies & distribute", "Thêm proxy": "Add proxies", "Thêm proxy ·": "Add proxies ·",
     "Proxy mới được thêm vào SSID. Chỉ thiết bị đã chọn được phân phối lại.": "New proxies are added to the SSID. Only selected devices are redistributed.",
     "Đang tải pool…": "Loading pool…", "Thêm & phân phối": "Add & distribute",
