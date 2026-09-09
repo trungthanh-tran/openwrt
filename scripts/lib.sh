@@ -1660,7 +1660,6 @@ build_singbox() {
   }
   _sb_row() {
     name="$1"; idx="$3"; host="$5"; port="$6"; user="$7"; pass="$8"; proxy_type="${12:-socks5}"
-    tp="$(tproxy_port "$idx")"
     if ! pool_enabled "$idx"; then
       warn "SSID idx=$idx has no proxy pool; no default proxy will be generated."
     fi

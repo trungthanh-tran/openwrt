@@ -530,7 +530,7 @@ printf '%s\n' \
   '1|socks5|1.2.3.4|1080|||A' \
   '2|socks5|dns.example.com|1080|||B' \
   '3|socks5|1.2.3.4|1080|||C' > "$STUB/nft-pools"
-POOLS="$STUB/nft-pools"
+export POOLS="$STUB/nft-pools"
 ( CONF="$STUB/c.conf" NFT_FILE="$STUB/x.nft" build_nft ) >/dev/null 2>&1
 nft="$(cat "$STUB/x.nft" 2>/dev/null)"
 # Each SSID now has its own chain, entered from a verdict map, so the

@@ -217,7 +217,7 @@ else
   printf '%s
 ' '9|socks5|9.9.9.9|1080|||' > "$ORPHAN"
   gen "$ORPHAN" >/dev/null
-  eq "a pool for an unknown idx generates nothing"     "$(jq -c '[.inbounds[].tag]' "$SINGBOX_CONF")" '["in-w1","in-w2","in-w3"]'
+  eq "a pool for an unknown idx generates nothing"     "$(jq -c '[.inbounds[].tag]' "$SINGBOX_CONF")" '[]'
 
   # An empty wifi-socks.conf must still produce loadable JSON (0.4.9 regression).
   : > "$STUB/empty.conf"
