@@ -13,6 +13,16 @@
   const EN_TEXT = window.SBPROXY_I18N_EN.EN_TEXT;
   const EN_HTML = window.SBPROXY_I18N_EN.EN_HTML;
   const EN_ATTR = window.SBPROXY_I18N_EN.EN_ATTR;
+  // Dynamic labels are translated here, where the live language state exists.
+  // Keeping this beside pick() avoids crossing the private IIFE boundary of
+  // i18n.en.js, which only exports the translation tables.
+  const ICON_PREFIX = /^([^\p{L}\p{N}(]*)(.*)$/su;
+  function translatePhrase(vi) {
+    const match = String(vi || "").match(ICON_PREFIX);
+    if (!match || language === "vi") return vi;
+    const body = EN_TEXT[match[2].trim()];
+    return body === undefined ? vi : match[1] + body;
+  }
   function localizeStatic(root = document.body) {
     root.querySelectorAll("[data-i18n-html]").forEach(el => {
       const key = el.dataset.i18nHtml;
