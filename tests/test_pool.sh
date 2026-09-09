@@ -238,6 +238,11 @@ nftgen() { # <pool file or -> [POOL_DIVERT value]
   POOL_DIVERT="${2:-off}"
   build_nft >/dev/null 2>&1
 }
+BASE_POOL="$STUB/base-nft-pool.conf"
+printf '%s\n' \
+  '1|socks5|1.2.3.4|1080|||' \
+  '2|socks5|5.6.7.8|1080|||' \
+  '3|socks5|9.9.9.9|1080|||' > "$BASE_POOL"
 # Body of one chain, without its type/policy line.
 chain_body() {
   awk -v c="  chain $1 {" '$0==c {inside=1; next} inside && /^  }/ {exit} inside && !/type [a-z]+ hook/' "$NFT_FILE"
@@ -256,7 +261,7 @@ chain_shape() {
   ' | tr '\n' ' '
 }
 
-nftgen -
+nftgen "$BASE_POOL"
 eq "one chain per SSID" \
   "$(grep -c '^  chain w[0-9]* {' "$NFT_FILE")" "3"
 eq "every SSID is dispatched from the verdict map" \
@@ -268,19 +273,19 @@ eq "prerouting no longer carries per-SSID rules" \
 # Rule order inside an SSID chain must match the old flat chain's order.
 # SOCKS_UDP is on by default, so a socks5 SSID no longer drops QUIC: UDP now
 # reaches the Internet through the proxy instead of being blackholed.
-eq "chain w1 keeps the original rule order" "$(chain_shape w1)" "dns localnet hosts tproxy "
-eq "chain w3 has the identical shape"       "$(chain_shape w3)" "dns localnet hosts tproxy "
+eq "chain w1 keeps the pool rule order" "$(chain_shape w1)" "dns pin localnet hosts pin "
+eq "chain w3 has the identical pool shape" "$(chain_shape w3)" "dns pin localnet hosts pin "
 eq "an SSID chain is a constant number of rules" \
   "$(chain_body w1 | grep -vc '^ *#')" "$(chain_body w3 | grep -vc '^ *#')"
 
-eq "DNS still goes to the SSID's own port" \
-  "$(chain_body w2 | grep 'dport 53' | grep -c ":$(tproxy_port 2)")" "1"
+eq "DNS follows the SSID pool map" \
+  "$(chain_body w2 | grep 'dport 53' | grep -c '@w2map')" "1"
 eq "tcp and udp share one DNS rule now" \
   "$(chain_body w2 | grep -c 'dport 53')" "1"
-eq "tcp and udp share one tproxy rule now" \
+eq "tcp and udp share the pool-map rules now" \
   "$(chain_body w2 | grep -c 'meta l4proto { tcp, udp } tproxy')" "1"
-eq "the default tproxy target is the SSID port" \
-  "$(chain_body w2 | grep -c "tproxy ip to :$(tproxy_port 2) meta mark set 1 accept")" "2"
+eq "there is no legacy default tproxy target" \
+  "$(chain_body w2 | grep -c "tproxy ip to :$(tproxy_port 2) meta mark set 1 accept")" "0"
 
 # Proxy hosts move from one rule each into a single set.
 eq "numeric proxy hosts become set elements" \
@@ -295,10 +300,10 @@ printf '%s\n' '1|socks5|203.0.113.7|1080|||' '1|socks5|1.2.3.4|1080|||' \
 nftgen "$POOLHOSTS"
 eq "pool hosts are bypassed too, deduplicated, hostnames excluded" \
   "$(grep -o 'elements = { [^}]*}' "$NFT_FILE")" \
-  'elements = { 1.2.3.4, 5.6.7.8, 9.9.9.9, 203.0.113.7 }'
+  'elements = { 203.0.113.7, 1.2.3.4 }'
 
 # WebRTC lives on the forward hook and must not move into the verdict map.
-nftgen -
+nftgen "$BASE_POOL"
 eq "the webrtc chain still hooks forward" \
   "$(grep -c 'chain webrtc' "$NFT_FILE")" "1"
 eq "webrtc rules stay interface-matched, only for SSIDs that asked" \
@@ -307,14 +312,14 @@ eq "webrtc is untouched for the SSID with the flag off" \
   "$(chain_body webrtc | grep -c 'br-w3')" "0"
 
 echo "== nftables divert rule =="
-nftgen - on
+nftgen "$BASE_POOL" on
 eq "divert is the first rule in prerouting" \
   "$(chain_body prerouting | grep -v '^ *#' | head -1)" \
   "    meta l4proto tcp socket transparent 1 meta mark set 1 accept"
 eq "divert is tcp only" "$(chain_body prerouting | grep -c 'socket transparent 1')" "1"
-nftgen - off
+nftgen "$BASE_POOL" off
 eq "divert can be turned off" "$(grep -c 'socket transparent' "$NFT_FILE")" "0"
-eq "the chains are otherwise unchanged without divert" "$(chain_shape w1)" "dns localnet hosts tproxy "
+eq "the chains are otherwise unchanged without divert" "$(chain_shape w1)" "dns pin localnet hosts pin "
 
 echo "== nftables edge cases =="
 : > "$STUB/empty.conf"; CONF="$STUB/empty.conf"; nftgen -
@@ -343,7 +348,7 @@ printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' > "$POOL1"
 nftgen -
 eq "no pool means no map"      "$(grep -c 'map w[0-9]*map' "$NFT_FILE")" "0"
 eq "no pool means no pin rule" "$(grep -c 'ip saddr map' "$NFT_FILE")" "0"
-eq "no pool drops traffic" "$(chain_shape w1)" "dns localnet hosts drop "
+eq "no pool drops traffic" "$(chain_shape w1)" "dns localnet hosts "
 
 nftgen "$POOL1"
 eq "a pooled SSID declares one map"  "$(grep -c 'map w1map' "$NFT_FILE")" "1"
@@ -355,12 +360,12 @@ eq "the map declares a size, for the fixed-size hash backend" \
   "$(grep -c 'map w1map {.*size 512' "$NFT_FILE")" "1"
 eq "the map declares no timeout, which would force the resizable backend" \
   "$(grep -c 'map w1map {.*timeout' "$NFT_FILE")" "0"
-eq "the pin rule sits before the default tproxy rule" "$(chain_shape w1)" \
-  "dns localnet hosts pin tproxy "
+eq "the pin rules sit in the pool chain" "$(chain_shape w1)" \
+  "dns pin localnet hosts pin "
 # w2 of the example config is an HTTP proxy, which has no UDP transport at all,
 # so it keeps dropping QUIC however SOCKS_UDP is set.
-eq "an SSID without a pool is also blocked" "$(chain_shape w2)" \
-  "dns localnet hosts quic drop "
+eq "an SSID without a pool is fail-closed" "$(chain_shape w2)" \
+  "dns localnet hosts "
 eq "the pin rule covers tcp and udp" \
   "$(chain_body w1 | grep -c 'meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w1map meta mark set 1 accept')" "1"
 
@@ -379,8 +384,8 @@ eq "the default tproxy fallback is gone" \
 # hand it a fake IP it can never connect to, so it follows the pin map too.
 eq "DNS is pinned as well, so an unpinned device cannot resolve" \
   "$(chain_body w1 | grep -c 'dport 53 tproxy ip to :ip saddr map @w1map')" "1"
-eq "an SSID with no pool is untouched by the policy" "$(chain_shape w2)" \
-  "dns localnet hosts quic tproxy "
+eq "an SSID with no pool stays fail-closed" "$(chain_shape w2)" \
+  "dns localnet hosts "
 # The local-net return still precedes the drop: without it the device could not
 # even DHCP or reach its own gateway.
 # The DNS rule now carries the pin map too, so it reports as "dns pin".
@@ -446,7 +451,7 @@ eq "a device with no DHCP lease is left unpinned" \
 : > "$ASSIGN_FILE"; nftgen "$POOL1"
 eq "an empty map is still declared" "$(grep -c 'map w1map' "$NFT_FILE")" "1"
 eq "an empty map emits no element list" "$(grep -c 'elements = { }' "$NFT_FILE")" "0"
-eq "the pin rule survives an empty map" "$(chain_body w1 | grep -c '@w1map')" "1"
+eq "the pin rules survive an empty map" "$(chain_body w1 | grep -c '@w1map')" "2"
 
 echo "== nftables assignment hygiene =="
 # Every identity below owns a lease, including the malformed ones. That is the

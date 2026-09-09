@@ -523,6 +523,14 @@ echo "== build_nft =="
 mkc 'A|2g|1|password12|1.2.3.4|1080|||1|1|
 B|5g|2|password12|dns.example.com|1080|||1|0|
 C|5g|3|password12|1.2.3.4|1080|||1|2|'
+# SSIDs are pool-only. Give this generator fixture one slot per SSID so the
+# assertions exercise the live map-to-slot path instead of the intentional
+# no-pool fail-closed path.
+printf '%s\n' \
+  '1|socks5|1.2.3.4|1080|||A' \
+  '2|socks5|dns.example.com|1080|||B' \
+  '3|socks5|1.2.3.4|1080|||C' > "$STUB/nft-pools"
+POOLS="$STUB/nft-pools"
 ( CONF="$STUB/c.conf" NFT_FILE="$STUB/x.nft" build_nft ) >/dev/null 2>&1
 nft="$(cat "$STUB/x.nft" 2>/dev/null)"
 # Each SSID now has its own chain, entered from a verdict map, so the
@@ -530,9 +538,9 @@ nft="$(cat "$STUB/x.nft" 2>/dev/null)"
 # assert the same facts against the new shape. tests/test_pool.sh checks the
 # structure itself, including that the rule order per SSID is unchanged.
 match   "every SSID is dispatched by verdict map" "$nft" 'iifname vmap [{] "br-w1" : jump w1, "br-w2" : jump w2, "br-w3" : jump w3 [}]'
-match   "DNS hijack covers tcp and udp"  "$nft" 'meta l4proto [{] tcp, udp [}] th dport 53 tproxy ip to :12001'
-match   "tproxy rule for the first SSID" "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12001'
-match   "second SSID tproxy port"        "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :12002'
+match   "DNS hijack covers tcp and udp"  "$nft" 'meta l4proto [{] tcp, udp [}] th dport 53 tproxy ip to :ip saddr map @w1map'
+match   "tproxy rule for the first SSID" "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :ip saddr map @w1map'
+match   "second SSID tproxy map"         "$nft" 'meta l4proto [{] tcp, udp [}] tproxy ip to :ip saddr map @w2map'
 # With SOCKS_UDP on, QUIC only stays blocked where UDP could not be delivered:
 # an HTTP-proxy SSID. A socks5 SSID lets it through to the proxy instead.
 nomatch "socks5 SSID no longer blocks QUIC" "$(echo "$nft" | awk '/^  chain w1 \{/,/^  \}/')" 'udp dport 443 drop'
@@ -554,8 +562,8 @@ nomatch "no webrtc drop for webrtc=2" "$nft" 'iifname "br-w3" udp dport \{ 3478'
 # webrtc=2 forces STUN/TURN into sing-box so the proxy, not the router, is the
 # address the STUN server reflects back. It has to sit above the local-net and
 # proxy-host return rules, or a STUN packet would escape before reaching it.
-match   "webrtc=2 tproxies STUN over udp"  "$nft" 'udp dport \{ 3478[^}]*\} tproxy ip to :12003'
-match   "webrtc=2 tproxies STUN over tcp"  "$nft" 'tcp dport \{ 3478[^}]*\} tproxy ip to :12003'
+match   "webrtc=2 tproxies STUN over udp"  "$nft" 'udp dport \{ 3478[^}]*\} tproxy ip to :ip saddr map @w3map'
+match   "webrtc=2 tproxies STUN over tcp"  "$nft" 'tcp dport \{ 3478[^}]*\} tproxy ip to :ip saddr map @w3map'
 webrtc_bypass_chain="$(echo "$nft" | awk '/^  chain w3 \{/,/^  \}/')"
 eq "webrtc=2 hijacks STUN before every return" \
   "$(echo "$webrtc_bypass_chain" | grep 'return\|3478' | head -n 1 | grep -c '3478')" "1"
