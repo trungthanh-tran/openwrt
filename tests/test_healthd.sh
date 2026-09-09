@@ -100,6 +100,11 @@ echo "== health daemon probe states =="
 export CONF POOLS HEALTH_FILE CURL_CALLS
 export SBPROXY_SKIP_ENV=1
 export PATH="$BIN:$PATH"
+# healthd defaults UDP_PROBE to $SB_ROOT/scripts/probe-socks5-udp.uc, and
+# SB_ROOT defaults to /root/sbproxy, which exists on a router and nowhere else.
+# Without this every mode-2 probe reports "UDP checker is unavailable" instead
+# of exercising the ucode stub above.
+export UDP_PROBE="$ROOT/scripts/probe-socks5-udp.uc"
 export PROBE_URL='https://probe.example/204' PROBE_TIMEOUT=3 SLOW_MS=800
 if sh "$HEALTHD" --once; then ok "--once succeeds"; else no "--once succeeds"; fi
 if jq -e . "$HEALTH_FILE" >/dev/null 2>&1; then ok "health output is valid JSON"; else no "health output is valid JSON"; fi
