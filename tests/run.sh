@@ -573,7 +573,11 @@ echo "== build_singbox =="
 if command -v jq >/dev/null 2>&1; then
   mkc 'A|2g|1|password12|1.2.3.4|1080|user1|pass1|1|1|
 B|5g|2|password12|5.6.7.8|8080|||1|0||http'
-  ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/config.json" FAKEIP_RANGE="198.18.0.0/15" build_singbox ) >/dev/null 2>&1
+  SBPOOL="$STUB/singbox-pool.conf"
+  printf '%s\n' \
+    '1|socks5|1.2.3.4|1080|user1|pass1|slot-1' \
+    '2|http|5.6.7.8|8080|||slot-2' > "$SBPOOL"
+  ( CONF="$STUB/c.conf" POOLS="$SBPOOL" SINGBOX_CONF="$STUB/config.json" FAKEIP_RANGE="198.18.0.0/15" build_singbox ) >/dev/null 2>&1
   cfg="$(cat "$STUB/config.json" 2>/dev/null)"
   if printf '%s' "$cfg" | jq -e . >/dev/null 2>&1; then ok "JSON parses"; else no "JSON parses"; fi
   eq      "fakeip inet4_range"   "$(printf '%s' "$cfg" | jq -r '.dns.servers[]|select(.type=="fakeip").inet4_range')" "198.18.0.0/15"
@@ -585,15 +589,15 @@ B|5g|2|password12|5.6.7.8|8080|||1|0||http'
   eq      "socks outbound count"  "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="socks")]|length')" "1"
   eq      "http outbound count"   "$(printf '%s' "$cfg" | jq '[.outbounds[]|select(.type=="http")]|length')" "1"
   # SOCKS_UDP on: no "network" pin, so sing-box also relays UDP ASSOCIATE.
-  eq      "socks outbound relays udp" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network // "any"')" "any"
-  eq      "auth on user row"      "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1")|.username')" "user1"
-  eq      "no auth on empty row"  "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w2")|.username // "none"')" "none"
+  eq      "socks outbound relays udp" "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1-s0")|.network // "any"')" "any"
+  eq      "auth on user row"      "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w1-s0")|.username')" "user1"
+  eq      "no auth on empty row"  "$(printf '%s' "$cfg" | jq -r '.outbounds[]|select(.tag=="out-w2-s0")|.username // "none"')" "none"
   # SOCKS_UDP off restores the TCP-only pin. An HTTP proxy has no UDP transport
   # either way, so it never carries a "network" key to begin with.
-  ( CONF="$STUB/c.conf" SINGBOX_CONF="$STUB/config-noudp.json" SOCKS_UDP=0 build_singbox ) >/dev/null 2>&1
+  ( CONF="$STUB/c.conf" POOLS="$SBPOOL" SINGBOX_CONF="$STUB/config-noudp.json" SOCKS_UDP=0 build_singbox ) >/dev/null 2>&1
   cfg_noudp="$(cat "$STUB/config-noudp.json" 2>/dev/null)"
-  eq "SOCKS_UDP=0 pins socks to tcp" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w1")|.network')" "tcp"
-  eq "http outbound never pins network" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w2")|.network // "any"')" "any"
+  eq "SOCKS_UDP=0 pins socks to tcp" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w1-s0")|.network')" "tcp"
+  eq "http outbound never pins network" "$(printf '%s' "$cfg_noudp" | jq -r '.outbounds[]|select(.tag=="out-w2-s0")|.network // "any"')" "any"
 else
   sk "build_singbox" "no jq"
 fi
@@ -601,10 +605,12 @@ fi
 echo "== routing-rules.conf =="
 if command -v jq >/dev/null 2>&1; then
   mkc 'A|2g|1|password12|1.2.3.4|1080|||1|0||socks5'
+  ROUTE_POOL="$STUB/route-pool.conf"
+  printf '%s\n' '1|socks5|1.2.3.4|1080|||route-slot' > "$ROUTE_POOL"
   ROUTES_OK="$STUB/routes.conf"
   printf '%s\n' '# a comment' 'proxy|domain|api.example.com' 'direct|domain_suffix|example.com' \
     'block|domain_keyword|doubleclick' 'direct|ip_cidr|103.0.0.0/8' > "$ROUTES_OK"
-  ( CONF="$STUB/c.conf" ROUTES="$ROUTES_OK" SINGBOX_CONF="$STUB/routes.json" build_singbox ) >/dev/null 2>&1
+  ( CONF="$STUB/c.conf" POOLS="$ROUTE_POOL" ROUTES="$ROUTES_OK" SINGBOX_CONF="$STUB/routes.json" build_singbox ) >/dev/null 2>&1
   rcfg="$STUB/routes.json"
   eq "a routed config is still valid JSON" "$(jq -e . "$rcfg" >/dev/null 2>&1 && echo yes)" "yes"
   # File order is the whole semantic: first match wins, so a narrow exception
@@ -618,13 +624,13 @@ if command -v jq >/dev/null 2>&1; then
   # `proxy` cannot name one outbound, so it becomes an inbound-scoped rule per
   # inbound; without it the broad `direct` line below would swallow the host.
   eq "proxy is scoped to an inbound and its own outbound" \
-    "$(jq -c '.route.rules[]|select(.domain)|[.inbound[0],.outbound]' "$rcfg")" '["in-w1","out-w1"]'
+    "$(jq -c '.route.rules[]|select(.domain)|[.inbound[0],.outbound]' "$rcfg")" '["in-w1-s0","out-w1-s0"]'
   # Routing rules must precede the inbound-to-outbound mapping, or nothing
   # could ever be taken away from the proxy.
   eq "routing rules come before the inbound mapping" \
     "$(jq '([.route.rules[]|has("domain_suffix")]|index(true)) < ([.route.rules[]|(has("inbound") and has("outbound") and (has("domain")|not))]|index(true))' "$rcfg")" "true"
 
-  ( CONF="$STUB/c.conf" ROUTES="$STUB/no-such-routes.conf" SINGBOX_CONF="$STUB/noroutes.json" build_singbox ) >/dev/null 2>&1
+  ( CONF="$STUB/c.conf" POOLS="$ROUTE_POOL" ROUTES="$STUB/no-such-routes.conf" SINGBOX_CONF="$STUB/noroutes.json" build_singbox ) >/dev/null 2>&1
   eq "no routing file adds no rules" \
     "$(jq '[.route.rules[]|select(has("domain") or has("domain_suffix") or has("domain_keyword") or has("ip_cidr"))]|length' "$STUB/noroutes.json")" "0"
 
