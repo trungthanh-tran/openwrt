@@ -302,7 +302,7 @@ class PlainSkinTests(unittest.TestCase):
 
     def test_the_skin_changes_no_behaviour(self):
         """It is presentation only: no id or handler is renamed by it."""
-        for probe in ('id="pushApplyBtn"', 'id="devicesBtn"', 'id="debugBtn"', 'id="busyChip"'):
+        for probe in ('id="devicesBtn"', 'id="debugBtn"', 'id="busyChip"'):
             self.assertIn(probe, self.text)
 
 

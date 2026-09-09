@@ -1670,7 +1670,7 @@
   function setupConfigToolbar() {
     const toolbar = $("configToolbar");
     if (toolbar.dataset.ready) return;
-    ["addBtn", "importBundleBtn", "exportBundleBtn", "pushApplyBtn", "pullBtn", "clearBtn"]
+    ["addBtn", "importBundleBtn", "exportBundleBtn", "pullBtn", "clearBtn"]
       .forEach(id => { const el = $(id); if (el) toolbar.appendChild(el); });
     toolbar.dataset.ready = "1";
   }
@@ -2707,7 +2707,6 @@
   $("cpBackdrop").onclick = e => { if (e.target.id === "cpBackdrop") hideInline("cpBackdrop"); };
   $("connCancel").onclick = () => hideInline("connBackdrop");
   $("connBackdrop").onclick = e => { if (e.target.id === "connBackdrop") hideInline("connBackdrop"); };
-  $("pushApplyBtn").onclick = pushApply;
   $("devicesBtn").onclick = openDevices;
   $("devClose").onclick = closeDevices;
   $("devRefresh").onclick = loadDevices;
