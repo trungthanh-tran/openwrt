@@ -1290,7 +1290,7 @@ match "editing takes exactly one proxy line"  "$web_console" 'parsed\.length !==
 # Pool mutations are already persisted and applied by save_pool/pool.sh. They
 # must not fall through to applyConfigText, which writes wifi-socks.conf and
 # would make a proxy-pool edit appear to be an SSID-default edit.
-pool_mutations="$(printf '%s' "$web_console" | sed -n '/function addPoolLines()/,/function deletePoolSlots()/p')"
+pool_mutations="$(sed -n '/^  function addPoolLines()/,/^  function deletePoolSlots(selectedSlots)/p' "$ROOT/console/web/app.js")"
 match "pool add/edit uses the pool writer" "$pool_mutations" 'savePoolRows'
 match "pool add/edit reports proxy-pools.conf" "$pool_mutations" 'proxy-pools\.conf'
 nomatch "pool add/edit never writes wifi-socks.conf" "$pool_mutations" 'applyConfigText\(genConf\(\)'
