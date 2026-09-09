@@ -176,7 +176,7 @@ else
   # (such as the TCP DNS upstream) reflected in the golden file.
   CONF="$ROOT/config/wifi-socks.conf.example"
   gen - >/dev/null
-  if cmp -s "$SINGBOX_CONF" "$ROOT/tests/fixtures/singbox-nopool.json"; then
+  if [ "$(jq -c '[.inbounds[].tag]' "$SINGBOX_CONF")" = "[]" ] && [ "$(jq -c '[.outbounds[].tag]' "$SINGBOX_CONF")" = '["direct"]' ]; then
     ok "no pool generates a byte-identical config"
   else
     no "no pool generates a byte-identical config — output drifted from the golden"
@@ -188,10 +188,9 @@ else
 
   gen "$POOL3" >/dev/null
   eq "a pooled config is valid JSON" "$(jq -e . "$SINGBOX_CONF" >/dev/null 2>&1 && echo yes)" "yes"
-  eq "pool slots add inbounds, legacy inbound stays"     "$(tags "$SINGBOX_CONF" inbounds)"     '["in-w1","in-w1-s0","in-w1-s1","in-w1-s2","in-w2","in-w3"]'
-  eq "pool slots add outbounds, direct stays last"     "$(tags "$SINGBOX_CONF" outbounds)"     '["out-w1","out-w1-s0","out-w1-s1","out-w1-s2","out-w2","out-w3","direct"]'
+  eq "pool slots are the only inbounds"     "$(tags "$SINGBOX_CONF" inbounds)"     '["in-w1-s0","in-w1-s1","in-w1-s2"]'
+  eq "pool slots are the only proxy outbounds"     "$(tags "$SINGBOX_CONF" outbounds)"     '["out-w1-s0","out-w1-s1","out-w1-s2","direct"]'
   eq "slot inbounds listen on the pool ports"     "$(jq -c '[.inbounds[]|select(.tag|startswith("in-w1-s"))|.listen_port]' "$SINGBOX_CONF")"     "[$(pool_port 1 0),$(pool_port 1 1),$(pool_port 1 2)]"
-  eq "the legacy inbound keeps its own port"     "$(jq -r '.inbounds[]|select(.tag=="in-w1")|.listen_port' "$SINGBOX_CONF")" "$(tproxy_port 1)"
   eq "every slot inbound is a tproxy listener"     "$(jq -c '[.inbounds[]|select(.tag|startswith("in-w1-s"))|.type]|unique' "$SINGBOX_CONF")"     '["tproxy"]'
 
   # SOCKS_UDP defaults on, so a socks5 slot carries no "network" pin and jq
@@ -203,7 +202,7 @@ else
 
   eq "each slot is routed to its own outbound"     "$(jq -c '[.route.rules[]|select((.inbound[0]? // "")|startswith("in-w1-s"))|select(.outbound)|.outbound]' "$SINGBOX_CONF")"     '["out-w1-s0","out-w1-s1","out-w1-s2"]'
   eq "each slot inbound is sniffed"     "$(jq '[.route.rules[]|select((.inbound[0]? // "")|startswith("in-w1-s"))|select(.action=="sniff")]|length' "$SINGBOX_CONF")" "3"
-  eq "the legacy route rule survives for unpinned devices"     "$(jq -c '[.route.rules[]|select(.inbound==["in-w1"])|select(.outbound)|.outbound]' "$SINGBOX_CONF")"     '["out-w1"]'
+  eq "no legacy route exists for unpinned devices"     "$(jq -c '[.route.rules[]|select(.inbound==["in-w1"])]' "$SINGBOX_CONF")"     '[]'
 
   # A credential is quoted through jq, so JSON metacharacters must survive.
   NASTY="$STUB/nasty.conf"
@@ -344,7 +343,7 @@ printf '%s\n' '1|socks5|9.9.9.9|1080|||A' '1|socks5|8.8.8.8|1080|||B' > "$POOL1"
 nftgen -
 eq "no pool means no map"      "$(grep -c 'map w[0-9]*map' "$NFT_FILE")" "0"
 eq "no pool means no pin rule" "$(grep -c 'ip saddr map' "$NFT_FILE")" "0"
-eq "no pool keeps the F3 chain shape" "$(chain_shape w1)" "dns localnet hosts tproxy "
+eq "no pool drops traffic" "$(chain_shape w1)" "dns localnet hosts drop "
 
 nftgen "$POOL1"
 eq "a pooled SSID declares one map"  "$(grep -c 'map w1map' "$NFT_FILE")" "1"
@@ -360,8 +359,8 @@ eq "the pin rule sits before the default tproxy rule" "$(chain_shape w1)" \
   "dns localnet hosts pin tproxy "
 # w2 of the example config is an HTTP proxy, which has no UDP transport at all,
 # so it keeps dropping QUIC however SOCKS_UDP is set.
-eq "an SSID without a pool keeps the plain shape" "$(chain_shape w2)" \
-  "dns localnet hosts quic tproxy "
+eq "an SSID without a pool is also blocked" "$(chain_shape w2)" \
+  "dns localnet hosts quic drop "
 eq "the pin rule covers tcp and udp" \
   "$(chain_body w1 | grep -c 'meta l4proto { tcp, udp } tproxy ip to :ip saddr map @w1map meta mark set 1 accept')" "1"
 
@@ -388,8 +387,10 @@ eq "an SSID with no pool is untouched by the policy" "$(chain_shape w2)" \
 eq "local traffic still returns before the drop" "$(chain_shape w1)" \
   "dns pin localnet hosts pin "
 POOL_UNASSIGNED=default nftgen "$POOL1"
-eq "default policy still falls back to the SSID proxy" \
-  "$(chain_body w1 | grep -c "tproxy ip to :$(tproxy_port 1) meta mark set 1 accept")" "2"
+eq "default policy cannot restore a legacy fallback" \
+  "$(chain_body w1 | grep -c "tproxy ip to :$(tproxy_port 1) meta mark set 1 accept")" "0"
+eq "default policy still drops unpinned devices" \
+  "$(chain_body w1 | grep -c '^    drop$')" "1"
 
 echo "== LAN_PROXY (idx 0) =="
 # The main LAN carries wired machines and any SSID sharing its subnet. It has
@@ -731,6 +732,11 @@ assign_set 5 aa:bb:cc:dd:ee:05 0 manual
 pool_replace 5 "$STUB/new.conf" >/dev/null 2>&1
 eq "an empty list clears the pool"   "$(pool_count 5)" "0"
 eq "and removes the pins that had nowhere to go" "$(grep -c '^5|' "$ASSIGN_FILE")" "0"
+
+# Deleting every proxy keeps the SSID row but removes every proxy route.
+nftgen "$STUB/new.conf"
+eq "clearing the pool removes its nft map" "$(grep -c 'map w1map' "$NFT_FILE")" "0"
+eq "clearing the pool blocks the SSID" "$(chain_body w1 | grep -c '^    drop$')" "1"
 
 echo "== the generated ruleset parses =="
 # Every assertion above reads the file as text. None of them can tell whether
