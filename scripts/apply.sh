@@ -113,26 +113,37 @@ ensure_singbox_compat_env
 # managed interface events emitted by network/wifi reload. An explicit restart
 # caused a second ujail teardown and an extra, harmless
 # "procd: Got unexpected signal 1" on current OpenWrt snapshots.
+ensure_singbox_privileges
+ensure_singbox_service
+ensure_singbox_route_guard
 log "Reloading services..."
 run "/etc/init.d/network reload"
 run "/etc/init.d/firewall reload"
 run "/etc/init.d/sbproxy restart"
-ensure_singbox_privileges
-ensure_singbox_service
 # A dynamic uplink may need a few seconds to reacquire DHCP after network
 # reload. Starting sing-box before that produced "missing default interface"
 # and left fake-IP DNS unavailable until another restart.
 if ! wait_for_default_route; then
-  warn "No IPv4 default route after ${SINGBOX_ROUTE_WAIT:-15}s; starting sing-box anyway. Its uplink trigger will retry when the route appears."
+  warn "No IPv4 default route after ${SINGBOX_ROUTE_WAIT:-15}s; sing-box start is deferred until the uplink trigger sees the route."
+else
+  run "/etc/init.d/sing-box restart"
 fi
-run "/etc/init.d/sing-box restart"
 run "wifi reload"
 recover_wifi_networks
 # Verify sing-box only after Wi-Fi is back up: when sing-box cannot start,
 # the apply must fail loudly, but with the SSIDs broadcasting (unproxied
 # clients are held by nftables anyway) — dying before `wifi reload` used to
 # leave every SSID down AND the operator without a management path.
-verify_singbox_running
+if default_route_ready; then
+  # DHCP may complete during Wi-Fi recovery. On firmware variants that emit
+  # the interface trigger too early, start the deferred service explicitly.
+  if ! singbox_pid >/dev/null 2>&1; then
+    run "/etc/init.d/sing-box restart"
+  fi
+  verify_singbox_running
+else
+  warn "No IPv4 default route after Wi-Fi recovery; sing-box remains deferred until the uplink is restored."
+fi
 
 log "APPLY COMPLETE. Run the test scripts described in docs/TESTING.md."
 log "If networking is lost or an error occurs: scripts/rollback.sh (see docs/ROLLBACK.md)"

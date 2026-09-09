@@ -1370,6 +1370,38 @@ ensure_singbox_compat_env() {
   log "Inserted the compatibility environment into $initf"
 }
 
+# Defer the packaged procd service until DHCP has installed an IPv4 default
+# route. Re-apply this after package upgrades because the package owns the init
+# script; the existing interface trigger starts it when the uplink is ready.
+ensure_singbox_route_guard() {
+  initf="/etc/init.d/sing-box"
+  [ -f "$initf" ] || { warn "$initf was not found; skipping the default-route guard."; return 0; }
+  grep -q 'SBPROXY_DEFAULT_ROUTE_GUARD' "$initf" && return 0
+  if [ "${DRYRUN:-0}" = "1" ]; then
+    printf 'DRYRUN> add the default-route guard to %s\n' "$initf" >&2
+    return 0
+  fi
+  grep -q 'start_service()' "$initf" || {
+    warn "$initf has no start_service hook; cannot add the default-route guard."
+    return 0
+  }
+  _srg_tmp="${initf}.new.$$"
+  awk '
+    $0 == "start_service() {" {
+      print
+      print "\t# SBPROXY_DEFAULT_ROUTE_GUARD: defer until DHCP installs a default route."
+      print "\tif ! ip -4 route show default 2>/dev/null | grep -q \"^default \"; then"
+      print "\t\tlogger -t sing-box \"delayed start: no IPv4 default route\""
+      print "\t\treturn 0"
+      print "\tfi"
+      next
+    }
+    { print }
+  ' "$initf" > "$_srg_tmp" && mv "$_srg_tmp" "$initf"
+  chmod 755 "$initf"
+  log "Added the sing-box default-route guard to $initf"
+}
+
 # The OpenWrt sing-box package ships /etc/config/sing-box with
 # `option enabled '0'`, and its init script returns from start_service without
 # starting anything while that flag is 0. `/etc/init.d/sing-box enable` only

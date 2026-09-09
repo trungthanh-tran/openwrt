@@ -16,6 +16,10 @@ Ngày theo định dạng YYYY-MM-DD.
   lẫn Console Native. Xoá slot sẽ huỷ phiên sửa đang mở, vì đánh số đã đổi.
 
 ### Fixed
+- **sing-box no longer crash-loops while a Wi-Fi uplink is acquiring DHCP.**
+  The package init script now defers its procd instance until an IPv4 default
+  route exists. Apply leaves the service deferred until the uplink trigger
+  starts it after the route returns.
 - **Đổi proxy của một Wi-Fi trong console giờ có tác dụng thật.** Màn hình sửa
   Wi-Fi ẩn hết các ô proxy (`show_proxy_fields=False` ở bản Desktop, một rule CSS
   ở bản Web), nên nút Save ghi một proxy không ai nhìn thấy hay sửa được — mà
